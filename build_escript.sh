@@ -21,7 +21,7 @@ rm -f "$TMPDIR"/gleamunison_test.beam "$TMPDIR"/gleeunit*.beam 2>/dev/null
 cat > "$TMPDIR"/main.erl << 'EOF'
 -module(main).
 -export([main/1]).
-main(_Args) -> gleamunison:main().
+main(Args) -> gleamunison:main(Args).
 EOF
 erlc -o "$TMPDIR" "$TMPDIR"/main.erl 2>&1
 
@@ -31,7 +31,7 @@ cd "$TMPDIR"
 zip -q gleamunison.zip *.beam
 cd "$OLDPWD"
 
-printf '#!/usr/bin/env escript\n%%! -noshell -sname gleamunison\n' > gleamunison
+printf '#!/usr/bin/env escript\n%%! -noshell -sname gleamunison -main main\n' > gleamunison
 cat "$TMPDIR/gleamunison.zip" >> gleamunison
 chmod +x gleamunison
 

@@ -28,14 +28,14 @@ fn demo_term(compiler, loader, codebase, label, term, typ) {
           io.println("Load: OK")
           #(cb, ld)
         }
-        Error(_) -> #(cb, loader)
+        Error(#(ld, _)) -> #(cb, ld)
       }
     }
     Error(_) -> #(codebase, loader)
   }
 }
 
-pub fn main() -> Nil {
+pub fn main(_args: List(String)) -> Nil {
   io.println("=== Gleamunison ===")
   let compiler = new_compiler()
   let loader = new_loader()

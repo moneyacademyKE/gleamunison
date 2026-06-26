@@ -3,7 +3,8 @@ import gleam/list
 import gleam/result
 import gleamunison/identity.{Local}
 import gleamunison/ast as ast
-import gleamunison/types.{type TypeCache, type InferenceError, CTTerm, TypeMismatch}
+import gleamunison/types.{type TypeCache, type InferenceError, CTTerm, TypeMismatch, CTAbility}
+import gleamunison/infer_helper.{substitute, list_all_match}
 
 pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, InferenceError) {
   case term {
@@ -15,7 +16,7 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
         [] -> Ok(ast.Builtin(ast.ListType))
         [first, ..rest] -> {
           use t <- result.try(infer_term(first, cache))
-          case list_all_match(rest, t, cache) {
+          case list_all_match(rest, t, cache, infer_term) {
             True -> Ok(ast.Builtin(ast.ListType))
             False -> Error(TypeMismatch(t, ast.TypeVar(0), "element mismatch"))
           }
@@ -62,36 +63,25 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
     ast.RefTo(ref) -> {
       case dict.get(cache.entries, ref) {
         Ok(CTTerm(t)) -> Ok(t)
-        _ -> Ok(ast.TypeVar(0))
+        _ -> Ok(ast.TypeVar(-1))
       }
     }
-    _ -> Ok(ast.TypeVar(0))
-  }
-}
-
-fn substitute(typ: ast.Type, target_index: Int, replacement: ast.Type) -> ast.Type {
-  case typ {
-    ast.TypeVar(i) -> {
-      case i == target_index {
-        True -> replacement
-        False -> typ
+    ast.Do(ability, Local(op_idx), _) -> {
+      case dict.get(cache.entries, ability) {
+        Ok(CTAbility(ops)) -> {
+          case list.drop(ops, op_idx) |> list.first {
+            Ok(op_typ) -> Ok(op_typ.output)
+            Error(_) -> Error(TypeMismatch(ast.TypeVar(-1), ast.TypeVar(-1), "op index out of bounds"))
+          }
+        }
+        _ -> Ok(ast.TypeVar(-1))
       }
     }
-    ast.Fn(params, result, requires) ->
-      ast.Fn(list.map(params, substitute(_, target_index, replacement)), substitute(result, target_index, replacement), requires)
-    ast.App(name, args) ->
-      ast.App(name, list.map(args, substitute(_, target_index, replacement)))
-    _ -> typ
-  }
-}
-
-fn list_all_match(ts: List(ast.Term), t: ast.Type, cache: TypeCache) -> Bool {
-  case ts {
-    [] -> True
-    [first, ..rest] -> {
-      case infer_term(first, cache) {
-        Ok(t2) -> t == t2 && list_all_match(rest, t, cache)
-        Error(_) -> False
+    ast.Handle(computation, _, _) -> infer_term(computation, cache)
+    ast.Match(_, cases) -> {
+      case cases {
+        [] -> Ok(ast.TypeVar(-1))
+        [first, ..] -> infer_term(first.body, cache)
       }
     }
   }

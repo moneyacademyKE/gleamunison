@@ -58,8 +58,10 @@ matches_handler(Map, AbilityKey, OpIdx) when is_map(Map) ->
     Keys = maps:keys(Map),
     case find_matching_key(Keys, AbilityKey) of
         {ok, MatchKey} ->
-            {ok, SubHandler} = maps:find(MatchKey, Map),
-            matches_handler(SubHandler, AbilityKey, OpIdx);
+            case maps:find(MatchKey, Map) of
+                {ok, SubHandler} -> matches_handler(SubHandler, AbilityKey, OpIdx);
+                error -> error
+            end;
         error ->
             error
     end;

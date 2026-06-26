@@ -1,3 +1,4 @@
+import gleam/dict
 import gleam/list
 import gleam/option
 import gleam/result
@@ -24,7 +25,7 @@ pub fn elab_term_def(
     Ok(#(_, term)) -> {
       case infer_term(term, cache) {
         Ok(typ) -> {
-          let next_cache = TypeCache(dict_insert(cache.entries, ref, CTTerm(typ)))
+          let next_cache = TypeCache(dict.insert(cache.entries, ref, CTTerm(typ)))
           Ok(#(ast.TermDef(term:, typ:), next_cache))
         }
         Error(e) -> Error(InferFailed(string.inspect(e)))
@@ -39,10 +40,10 @@ pub fn elab_type_def(
   ref: DefinitionRef,
   cache: TypeCache,
 ) -> Result(#(ast.Definition, TypeCache), ElaborateError) {
-  case lower_type_ref(t) {
-    Ok(tr) -> {
+  case lower_type_ref(t, dict.new()) {
+    Ok(#(tr, _)) -> {
       let type_decl = ast.Structural(Local(0), [], [ast.Constructor(Local(1), [tr])])
-      let next_cache = TypeCache(dict_insert(cache.entries, ref, CTType))
+      let next_cache = TypeCache(dict.insert(cache.entries, ref, CTType))
       Ok(#(ast.TypeDef(type_decl), next_cache))
     }
     Error(e) -> Error(e)
@@ -55,9 +56,19 @@ pub fn elab_ability_def(
   cache: TypeCache,
 ) -> Result(#(ast.Definition, TypeCache), ElaborateError) {
   case list.try_map(ops, fn(op) {
-    use ins <- result.try(list.try_map(op.inputs, lower_type_ref))
-    use out <- result.try(lower_type_ref(op.output))
-    Ok(#(op.name, ins, out))
+    let init_vars = dict.new()
+    case list.try_fold(op.inputs, #(init_vars, []), fn(acc, inp) {
+      let #(current_vars, acc_inps) = acc
+      use #(tr, next_vars) <- result.try(lower_type_ref(inp, current_vars))
+      Ok(#(next_vars, [tr, ..acc_inps]))
+    }) {
+      Ok(#(final_vars, lowered_inps)) -> {
+        let lowered_inps = list.reverse(lowered_inps)
+        use #(lowered_out, _) <- result.try(lower_type_ref(op.output, final_vars))
+        Ok(#(op.name, lowered_inps, lowered_out))
+      }
+      Error(e) -> Error(e)
+    }
   }) {
     Ok(lowered_ops) -> {
       let aops = list.map(lowered_ops, fn(lo) {
@@ -68,16 +79,10 @@ pub fn elab_ability_def(
         let output = type_ref_to_type(lo.2)
         types.OperationType(name: option.Some(lo.0), inputs:, output:)
       })
-      let next_cache = TypeCache(dict_insert(cache.entries, ref, CTAbility(op_typs)))
+      let next_cache = TypeCache(dict.insert(cache.entries, ref, CTAbility(op_typs)))
       let ability_decl = ast.AbilityDecl(ast.AbilityDeclaration(Local(0), aops))
       Ok(#(ability_decl, next_cache))
     }
     Error(e) -> Error(e)
   }
-}
-
-// Helper to avoid importing gleam/dict directly if not needed, or we can just import it.
-import gleam/dict
-fn dict_insert(d: dict.Dict(k, v), k: k, v: v) -> dict.Dict(k, v) {
-  dict.insert(d, k, v)
 }

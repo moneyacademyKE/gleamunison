@@ -16,8 +16,14 @@ pub fn elaborate_term(term: SurfaceTerm, ctx: ElabCtx) -> Result(#(ElabCtx, ast.
     SFloat(f) -> Ok(#(ctx, ast.Float(f)))
     SText(b) -> Ok(#(ctx, ast.Text(b)))
     SList(ts) -> {
-      list.try_map(ts, fn(t) { elaborate_term(t, ctx) |> result.map(fn(p) { p.1 }) })
-      |> result.map(fn(terms) { #(ctx, ast.List(terms)) })
+      case list.try_fold(ts, #(ctx, []), fn(acc, t) {
+        let #(c_ctx, acc_ts) = acc
+        use #(n_ctx, term) <- result.try(elaborate_term(t, c_ctx))
+        Ok(#(n_ctx, [term, ..acc_ts]))
+      }) {
+        Ok(#(final_ctx, terms)) -> Ok(#(final_ctx, ast.List(list.reverse(terms))))
+        Error(e) -> Error(e)
+      }
     }
     SVar(name) -> {
       case lookup_binding(ctx, name) {
@@ -58,10 +64,10 @@ pub fn elaborate_term(term: SurfaceTerm, ctx: ElabCtx) -> Result(#(ElabCtx, ast.
       Ok(#(ctx, ast.Do(ab_ref, Local(op_idx), terms)))
     }
     SHandle(c, h, ab) -> {
-      use _ab_ref <- result.try(dict.get(ctx.abilities, ab) |> result.replace_error(MissingAbilityDecl(ab)))
+      use ab_ref <- result.try(dict.get(ctx.abilities, ab) |> result.replace_error(MissingAbilityDecl(ab)))
       use #(ctx2, comp) <- result.try(elaborate_term(c, ctx))
       use #(ctx3, hand) <- result.try(elaborate_term(h, ctx2))
-      Ok(#(ctx3, ast.Handle(comp, hand)))
+      Ok(#(ctx3, ast.Handle(comp, hand, ab_ref)))
     }
   }
 }

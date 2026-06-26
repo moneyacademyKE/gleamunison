@@ -42,7 +42,7 @@ pub type Term {
   Let(binder: LocalVar, value: Term, body: Term)
   Match(scrutinee: Term, cases: List(Case))
   Do(ability: DefinitionRef, operation: LocalVar, args: List(Term))
-  Handle(computation: Term, handler: Term)
+  Handle(computation: Term, handler: Term, ability: DefinitionRef)
 }
 
 pub type Case {

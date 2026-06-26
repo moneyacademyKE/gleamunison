@@ -24,29 +24,41 @@ pub fn new_loader() -> Loader {
   Loader(compiler: new_compiler(), loaded: set.new(), failed: dict.new())
 }
 
-fn compile_and_load(ref: DefinitionRef, def: Definition, compiler: Compiler) -> Result(BitArray, LoaderError) {
+fn compile_and_load(ref: DefinitionRef, def: Definition, compiler: Compiler) -> Result(BitArray, String) {
   case compile_definition(compiler, def, ref) {
     Ok(beam) -> Ok(beam)
-    Error(_) -> Error(CompileFailed(ref, "compile error"))
+    Error(e) -> Error(e.reason)
   }
 }
 
-pub fn ensure_loaded(ld: Loader, ref: DefinitionRef, def: Definition) -> Result(Loader, LoaderError) {
+pub fn ensure_loaded(
+  ld: Loader,
+  ref: DefinitionRef,
+  def: Definition,
+) -> Result(Loader, #(Loader, LoaderError)) {
   case set.contains(ld.loaded, ref) {
     True -> Ok(ld)
     False -> {
       case dict.get(ld.failed, ref) {
-        Ok(e) -> Error(e)
+        Ok(e) -> Error(#(ld, e))
         Error(_) -> {
           case compile_and_load(ref, def, ld.compiler) {
             Ok(beam) -> {
               let mod_name = module_name_for(ref)
               case load_binary(mod_name, beam) {
                 Ok(_) -> Ok(Loader(..ld, loaded: set.insert(ld.loaded, ref)))
-                Error(msg) -> Error(LoadFailed(ref, msg))
+                Error(msg) -> {
+                  let err = LoadFailed(ref, msg)
+                  let next_ld = Loader(..ld, failed: dict.insert(ld.failed, ref, err))
+                  Error(#(next_ld, err))
+                }
               }
             }
-            Error(e) -> Error(e)
+            Error(msg) -> {
+              let err = CompileFailed(ref, msg)
+              let next_ld = Loader(..ld, failed: dict.insert(ld.failed, ref, err))
+              Error(#(next_ld, err))
+            }
           }
         }
       }

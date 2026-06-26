@@ -1,7 +1,7 @@
 import gleam/bit_array
 import gleam/dict.{type Dict}
-import gleam/float
 import gleam/int
+import gleam/float
 import gleam/list
 import gleam/string
 import gleamunison/identity.{type DefinitionRef, type Hash, Local, Ref, hash_bytes, hash_equal, hash_to_debug_string}
@@ -38,7 +38,7 @@ fn hash_term(term: ast.Term) -> Hash {
       hash_bytes(bit_array.concat([str_to_bits("app:"), hash_to_binary(hash_term(f)), hash_to_binary(hash_term(a))]))
     ast.Let(binder: Local(i), value: v, body: b) ->
       hash_bytes(bit_array.concat([str_to_bits("let:" <> int.to_string(i) <> ":"), hash_to_binary(hash_term(v)), hash_to_binary(hash_term(b))]))
-    _ -> hash_bytes(str_to_bits("term:other"))
+    other -> hash_bytes(str_to_bits("term:struct:" <> string.inspect(other)))
   }
 }
 
@@ -48,7 +48,7 @@ fn hash_type(typ: ast.Type) -> Hash {
     ast.Builtin(ast.FloatType) -> hash_bytes(str_to_bits("float"))
     ast.Builtin(ast.TextType) -> hash_bytes(str_to_bits("text"))
     ast.TypeVar(i) -> hash_bytes(str_to_bits("var:" <> int.to_string(i)))
-    _ -> hash_bytes(str_to_bits("type"))
+    other -> hash_bytes(str_to_bits("type:struct:" <> string.inspect(other)))
   }
 }
 
