@@ -107,8 +107,8 @@ Loader.failed: Dict(DefinitionRef, LoaderError)  — known bad
 ensure_loaded(loader, ref, def)
   1. Check loaded set → skip if done
   2. Check failed set → return cached error
-  3. compile_definition → BEAM binary
-  4. load_binary (FFI) → code:load_binary/3
+  3. compile_definition → BEAM binary. Thread CompileFailed details on failure and store in failed dictionary.
+  4. load_binary (FFI) → code:load_binary/3. Thread LoadFailed details on failure and store in failed dictionary.
   5. Update loaded set on success
 ```
 
@@ -133,7 +133,7 @@ Stack = [{AbilityModule, OpDict} | ...]
 - `pop_frame()` — removes top frame
 - `find_frame(AbilityMod)` — walks stack, returns matching frame
 - `do_op(AbilityMod, OpIndex, Args, Cont)` — looks up frame, calls handler
-- `handle_comp(HandlerMod, Thunk)` — push, run, pop
+- `handle_comp({AbilityKey, Handler}, Thunk)` — push, run, pop
 
 ## Sync model
 

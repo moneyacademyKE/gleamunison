@@ -219,3 +219,19 @@ Orchestrate complex logic (like elaboration) by splitting it into specialized he
 
 **Applied in:** `elaborate.gleam`, `elab_pat.gleam`, `elab_term.gleam`
 
+---
+
+## 15. Alpha-Equivalence Type Normalization
+
+Re-index all free type variables sequentially starting at 0 based on depth-first discovery order before executing a structural equality check.
+
+**Applied in:** `typecheck.gleam`
+
+---
+
+## 16. Stateful Type Variable Lowering
+
+Thread a stateful mapping of string names to sequential integers during type lowering, ensuring multi-variable parameters resolve to unique de Bruijn indices.
+
+**Applied in:** `lower.gleam`, `elab_def.gleam`
+
