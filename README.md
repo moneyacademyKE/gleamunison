@@ -53,6 +53,7 @@ gleam test       # Run tests
 - [Roadmap](docs/ROADMAP.md) — 6-phase plan from spec to production
 - [Learnings](docs/LEARNINGS.md) — architectural insights discovered
 - [Patterns](docs/PATTERNS.md) — design patterns used
+- [Reference Manual](docs/MANUAL.md) — complete reference user guide
 - [ADRs](docs/adr/) — Architecture Decision Records
 
 ## Runtime output
@@ -71,6 +72,14 @@ Elaboration       ✓ Surface → typed
 Effects           ✓ RuntimeConfig
 Sync              ✓ PeerId/SyncState
 ```
+
+## Unique Usecases (Impossible on Gleam or Unison Alone)
+
+Gleamunison combines the scheduling, distribution, and runtime efficiency of the BEAM with the content-addressing and algebraic effects constraints of Unison:
+
+1. **Zero-Downtime Stateful Actor Upgrades**: Hot-swapping active actor code on-the-fly without state loss. Standard Gleam module updates clash on name/version collisions, and Unison lacks native actor scheduling. Gleamunison addresses both.
+2. **Decoupled Multi-tenant Sandboxing**: Running untrusted third-party plugins concurrently where namespaces are isolated by hash, and capabilities (like IO/network) are dynamically sandboxed by wrapping compilation thunks in algebraic effects `Handle` terms.
+3. **Resilient P2P Job Stealing**: Edge computing nodes dynamically pulling (`pull_sync`), structurally verifying, local-compiling, and running job definitions securely.
 
 ## License
 
