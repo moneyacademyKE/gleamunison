@@ -77,7 +77,7 @@ fn elaborate_cases(cs: List(SCase), ctx: ElabCtx, acc: List(ast.Case)) -> Result
     [] -> Ok(#(ctx, list.reverse(acc)))
     [first, ..rest] -> {
       use #(ctx2, el) <- result.try(elaborate_case(first, ctx))
-      let case_ctx = ElabCtx(..ctx2, bindings: ctx.bindings)
+      let case_ctx = ElabCtx(..ctx2, bindings: ctx.bindings, next_local: ctx.next_local)
       elaborate_cases(rest, case_ctx, [el, ..acc])
     }
   }

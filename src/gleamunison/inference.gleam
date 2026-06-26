@@ -12,11 +12,11 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
     ast.Text(_) -> Ok(ast.Builtin(ast.TextType))
     ast.List(ts) -> {
       case ts {
-        [] -> Ok(ast.TypeVar(0))
+        [] -> Ok(ast.Builtin(ast.ListType))
         [first, ..rest] -> {
           use t <- result.try(infer_term(first, cache))
           case list_all_match(rest, t, cache) {
-            True -> Ok(ast.TypeVar(0))
+            True -> Ok(ast.Builtin(ast.ListType))
             False -> Error(TypeMismatch(t, ast.TypeVar(0), "element mismatch"))
           }
         }
@@ -29,8 +29,28 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
     ast.Apply(function: f, arg: a) -> {
       use ft <- result.try(infer_term(f, cache))
       case ft {
-        ast.Fn([ast.TypeVar(i)], ret, _) ->
-          infer_term(a, cache) |> result.map(fn(arg_typ) { substitute(ret, i, arg_typ) })
+        ast.Fn([param_typ, ..rest], ret, req) -> {
+          use arg_typ <- result.try(infer_term(a, cache))
+          case param_typ {
+            ast.TypeVar(i) -> {
+              let ret2 = substitute(ret, i, arg_typ)
+              let rest2 = list.map(rest, substitute(_, i, arg_typ))
+              case rest2 {
+                [] -> Ok(ret2)
+                _ -> Ok(ast.Fn(rest2, ret2, req))
+              }
+            }
+            _ ->
+              case arg_typ == param_typ {
+                True ->
+                  case rest {
+                    [] -> Ok(ret)
+                    _ -> Ok(ast.Fn(rest, ret, req))
+                  }
+                False -> Error(TypeMismatch(param_typ, arg_typ, "argument type mismatch"))
+              }
+          }
+        }
         ast.TypeVar(_) -> Ok(ast.TypeVar(0))
         other -> Error(TypeMismatch(ast.Fn([], ast.TypeVar(0), ast.Required([])), other, "not a function"))
       }

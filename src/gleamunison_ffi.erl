@@ -2,7 +2,9 @@
 -export([
     hash_bytes/1, hash_equal/2, hash_to_hex/1,
     compile_source/1, load_binary/2,
-    string_to_binary/1
+    string_to_binary/1,
+    sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
+    sync_request_defs/2, sync_push_defs/2
 ]).
 
 %% --- Hash ---
@@ -84,3 +86,10 @@ load_binary(Mod, Binary) ->
         {'EXIT', Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))};
         {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
     end.
+
+%% --- Sync FFI Stubs ---
+sync_connect(_Node) -> {ok, nil}.
+sync_send_refs(_Node, _Refs) -> {ok, nil}.
+sync_receive_diff(_Node) -> {ok, []}.
+sync_request_defs(_Node, _Refs) -> {ok, []}.
+sync_push_defs(_Node, _Defs) -> {ok, nil}.

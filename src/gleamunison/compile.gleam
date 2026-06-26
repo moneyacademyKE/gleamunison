@@ -16,7 +16,7 @@ fn ffi_compile_source(source: String) -> Result(BitArray, String)
 pub fn module_name_for(ref: DefinitionRef) -> String {
   let Ref(hash) = ref
   let full = hash_to_debug_string(hash)
-  "m_" <> string.slice(full, string.length(full) - 8, 8)
+  "m_" <> string.slice(full, 0, 8)
 }
 
 fn emit_term(t: ast.Term) -> String {

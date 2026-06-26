@@ -70,6 +70,7 @@ pub type Constructor {
 pub type TypeRef {
   TypeRefVar(LocalVar)
   TypeCon(DefinitionRef)
+  TypeRefBuiltin(BuiltinType)
 }
 
 pub type AbilityDeclaration {

@@ -60,4 +60,6 @@ pub type ElaborateError {
   NameNotFound(String)
   UnknownOperation(ability: String, op: String)
   MissingAbilityDecl(String)
+  InferFailed(message: String)
+  UnsupportedTypeRef(description: String)
 }
