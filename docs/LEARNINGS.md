@@ -1,0 +1,112 @@
+# Architectural Learnings
+
+Key insights discovered during the design and implementation of gleamunison.
+
+---
+
+## 1. Content-addressing forces de-complection at every level
+
+If the hash IS the identity, then anything that shouldn't change the hash
+can't be in the definition. The core AST is pure structure — no names, no
+metadata, no annotations.
+
+## 1b. The type IS part of the identity (correcting a mistake)
+
+ADR-0002 said types are NOT in the hash. This was wrong. The inferred type
+determines runtime behavior (overloaded operators, type-directed dispatch).
+Two terms with identical structure but different types are different definitions.
+ADR-0009 corrected this: pipeline is Elaborate → **Type Check** → Hash.
+
+## 2. Algebraic effects on BEAM are simpler than they first appear
+
+Initial instinct: CPS transform or interpreter loop. Reality: the BEAM
+already handles closures, try/catch, and process-local state. Effects
+reduce to:
+- `Do` = dynamic scope lookup + function call with a continuation closure
+- `Handle` = push/pop on a stack, with try/catch cleanup
+
+No CPS. No interpreter. The BEAM does all the heavy lifting.
+
+## 3. The Loader is a protocol, not a service
+
+Split into `Compiler` (pure, CPU), `Loader` state (loaded/failed sets).
+Each independently testable and replaceable.
+
+## 4. Genesis builtins eliminate the "second system" problem
+
+Primitives are definitions in the genesis block with pre-computed hashes.
+They go through the same pipeline as user code. A `DefinitionRef` always
+means the same thing.
+
+## 5. The `m_` prefix for module names provides collision safety
+
+Changed from `@` prefix (ADR-0006) to `m_` prefix. `m_` followed by hex
+characters cannot collide with any Gleam module (Gleam modules use lowercase
+letters and single `_` separators). Valid Erlang atoms without quoting.
+
+## 6. Pull-based sync is simpler than push
+
+"Here's what I have, tell me what you need" — stateless exchange of root
+hashes. Same pattern as Git and IPFS.
+
+## 7. Dynamic scope is not evil for algebraic effects
+
+The process dictionary on BEAM is the right tool: per-process, scoped,
+recoverable. Handle always cleans up via try/catch.
+
+## 8. de Bruijn indices simplify hashing
+
+Positional variable references make α-equivalence trivial: same structure =
+same hash. The elaborator assigns indices during name resolution, before hashing.
+
+## 9. OTP 29 compatibility requires care
+
+Several OTP 29 changes affected the implementation:
+- `compile:file/2` with `return` option returns `{ok, Mod, []}` — the empty
+  list in the third position means "binary on disk, not returned in memory"
+- `erlang:type/1` was removed — use `is_binary/1`, `is_list/1` guards instead
+- `code:load_binary/3` continues to work but module name must be a valid atom
+- Gleam v1.0+ represents strings as UTF-8 binaries, not char lists — all FFI
+  code must use `is_binary` guards, not `is_list`
+
+## 10. Erlang source generation is simpler than abstract format
+
+Two approaches for BEAM compilation:
+- **Abstract format**: Generate Erlang abstract syntax trees, pass to
+  `compile:forms/2`. Type-safe but verbose — each node is a 3+ tuple.
+- **Source generation**: Generate Erlang source text, write to temp file,
+  pass to `compile:file/2`. Simple string concatenation, easy to debug.
+
+The source generation approach won for the prototype: `emit_term/1` is a
+single recursive function that pattern-matches on each `Term` variant and
+returns a string. The generated source is human-readable, making debugging
+trivial.
+
+## 11. escript self-contained binary approach
+
+Two approaches for creating standalone escripts:
+- **`escript:create/2` with `{beam, Module, Binary}` entries**: Clean API
+  but fails on module names containing `@` and requires Erlang module for
+  the build script.
+- **Shell header + zip**: `printf header | cat - zipfile > escript` is
+  simple but the zip's central directory offsets are wrong after prepending
+  text.
+- **Working approach**: `gleam build` → collect `.beam` files → OS `zip`
+  command into archive → prepend escript shebang line. The escript runtime
+  correctly finds the zip by scanning for `PK` magic bytes.
+
+## 12. Gleam v1.0+ string representation
+
+Gleam v1.0+ represents `String` as UTF-8 binaries (`binary()` in Erlang).
+Key consequences:
+- FFI functions must use `is_binary` guards, not `is_list`
+- `erlang:list_to_binary/1` doesn't work on Gleam strings (they're already
+  binaries)
+- `erlang:binary_to_atom/2` with `utf8` decodes correctly
+- The Gleam `bit_array` module provides `concat`, `byte_size`, etc.
+
+## 13. Lightweight type substitution solves polymorphic propagation
+Instead of implementing full Hindley-Milner unification with stateful substitutions, simple structural type propagation combined with a stateless `substitute` function resolves polymorphic function applications (e.g. identity function applications) robustly.
+
+## 14. File constraints (<100 LOC) drive modular purity
+Enforcing a strict <100 LOC limit per file forces decomposition of large modules (like splitting `elaborate.gleam` and `types.gleam`). It breaks circular dependency imports when combined with clean `use` block statements.

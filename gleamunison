@@ -1,0 +1,23 @@
+#!/bin/bash
+# gleamunison — standalone runner (requires Erlang/OTP 26+)
+# Usage: ./gleamunison
+#
+# Automatically finds build artifacts. If not found, run:
+#   gleam build
+# first, or use ./build_escript.sh for a zip-based binary.
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Find all ebin directories in the build tree
+EBINS=$(find "$SCRIPT_DIR/build/dev/erlang" -name ebin -type d 2>/dev/null | tr '\n' ' ')
+
+if [ -z "$EBINS" ]; then
+  echo "Error: Build artifacts not found. Run: gleam build"
+  exit 1
+fi
+
+exec erl -noshell \
+  -pa $EBINS \
+  -eval 'gleamunison:main().' \
+  -s init stop
