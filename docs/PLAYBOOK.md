@@ -50,10 +50,10 @@
 ### Pipeline
 
 ```
-AST (Gleam types) → Hash (phash2) → Codebase (in-memory)
-                                      → Compile (Erlang source → BEAM binary)
-                                      → Load (code:load_binary into VM)
-                                      → Call $eval()
+Text (S-Expr) → AST (Gleam types) → Hash (SHA256) → Codebase (DETS / in-memory)
+                                                    → Compile (Erlang source → BEAM binary)
+                                                    → Load (code:load_binary into VM)
+                                                    → Call $eval()
 ```
 
 ### Building standalone binary

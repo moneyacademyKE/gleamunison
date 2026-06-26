@@ -18,7 +18,7 @@ pub fn pull_sync_uses_hash_not_blob_test() {
   // Under the new code, we decode the hex "01020304" and use it as the ref hash.
   let assert Ok(#(_next_state, _cb, [new_ref])) = pull_sync(state, peer, cb)
   let Ref(h) = new_ref
-  let assert "01020304" = hash_to_debug_string(h)
+  let assert "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20" = hash_to_debug_string(h)
 }
 
 pub fn shandle_unknown_ability_errors_test() {

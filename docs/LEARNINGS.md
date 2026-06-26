@@ -109,4 +109,17 @@ Key consequences:
 Instead of implementing full Hindley-Milner unification with stateful substitutions, simple structural type propagation combined with a stateless `substitute` function resolves polymorphic function applications (e.g. identity function applications) robustly.
 
 ## 14. File constraints (<100 LOC) drive modular purity
+
 Enforcing a strict <100 LOC limit per file forces decomposition of large modules (like splitting `elaborate.gleam` and `types.gleam`). It breaks circular dependency imports when combined with clean `use` block statements.
+
+## 15. DETS closing lifecycle controls
+
+Failing to close DETS tables leaves files locked or dirty, triggering slow database repairs on next startup. Providing a clean `close` interface and helper FFI routines like `dets_delete_file` ensures test purity and system resource reclamation.
+
+## 16. SHA256 cryptographic identity
+
+Upgrading from 32-bit `erlang:phash2` to SHA256 provides secure, collision-free definition identity. Padded genesis stubs (like `builtin_int_add`) to match the 256-bit boundary, establishing a consistent hash length throughout all codebase lookups.
+
+## 17. S-expression parsing within LOC constraints
+
+Recursive-descent parsing and lexical tokenization can be implemented in Gleam in under 110 lines of code. This provides a clean, zero-dependency text interface for let-bindings, lambdas, lists, and primitives without bloat.

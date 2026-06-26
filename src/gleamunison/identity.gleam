@@ -72,9 +72,9 @@ pub fn hash_to_short_string(h: Hash) -> String {
 // Placeholder hashes — actual values depend on genesis block content.
 
 pub fn builtin_int_add() -> DefinitionRef {
-  Ref(Hash(<<1:32>>))
+  Ref(Hash(<<1:256>>))
 }
 
 pub fn builtin_io_read_line() -> DefinitionRef {
-  Ref(Hash(<<2:32>>))
+  Ref(Hash(<<2:256>>))
 }

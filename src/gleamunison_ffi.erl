@@ -7,7 +7,7 @@
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
-    <<(erlang:phash2(Bytes)):32/big-unsigned-integer>>.
+    crypto:hash(sha256, Bytes).
 
 hash_equal(A, B) when is_binary(A), is_binary(B) -> A =:= B.
 
@@ -82,11 +82,11 @@ sync_connect(_Node) -> {ok, nil}.
 sync_send_refs(<<"test_node">>, _Refs) -> {ok, nil};
 sync_send_refs(_Node, _Refs) -> {ok, nil}.
 
-sync_receive_diff(<<"test_node">>) -> {ok, [<<"01020304">>]};
+sync_receive_diff(<<"test_node">>) -> {ok, [<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>]};
 sync_receive_diff(_Node) -> {ok, []}.
 
-sync_request_defs(<<"test_node">>, [<<"01020304">>]) ->
-    {ok, [{<<"01020304">>, <<"dummy_blob">>}]};
+sync_request_defs(<<"test_node">>, [<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>]) ->
+    {ok, [{<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>, <<"dummy_blob">>}]};
 sync_request_defs(_Node, _Refs) -> {ok, []}.
 
 sync_push_defs(<<"test_node">>, _Defs) -> {ok, nil};

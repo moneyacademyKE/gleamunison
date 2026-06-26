@@ -1,44 +1,42 @@
 # Gleamunison Reference Manual
 
-Gleamunison is a content-addressed language runtime with algebraic effects running on the Erlang BEAM, implemented in Gleam.
+Gleamunison is a content-addressed runtime with algebraic effects running on the Erlang BEAM, implemented in Gleam.
 
 ---
 
 ## 1. Core Philosophy & Concepts
 
 ### 1.1 Content-Addressability
-Unlike traditional programming languages where code is identified by names, directories, or package versions, Gleamunison identifies all definitions (terms, type declarations, abilities) by the **cryptographic-like hash** of their serialized Abstract Syntax Tree (AST) structure.
-- **Identity = Hash**: If the implementation of a function does not change, its hash remains identical.
-- **Decoupled Names**: Names are merely metadata mappings (pointers) pointing to hashes. Renaming a function has zero runtime compile/dependency cost.
-- **No Builds**: Once type-checked and compiled to BEAM bytecode, a definition is immutable and cached forever.
+Definitions (terms, type declarations, abilities) are identified by the **SHA256 hash** of their serialized AST structure.
+- **Identity = Hash**: Unchanged implementations retain identical hashes.
+- **Decoupled Names**: Names are merely metadata mappings pointing to hashes.
+- **No Builds**: Once compiled to BEAM bytecode, a definition is immutable and cached.
 
 ### 1.2 Algebraic Effects (Abilities)
-Side effects and environment operations are declared as **Abilities**. Functions requiring abilities are typed with effect requirements.
-- **Resumable Continuations**: When an ability operation is triggered via `Do`, computation yields to the nearest handler in the call stack.
-- **Process Dictionary Stack**: Effect handlers are dynamically scoped and maintained on a thread-local stack in the Erlang process dictionary.
+Side effects and environment operations are declared as **Abilities**.
+- **Resumable Continuations**: triggers via `Do` yield to the nearest stack handler.
+- **Process Dictionary**: Handlers are thread-locally scoped in process dictionaries.
 
 ---
 
-## 2. Command Line Interface (CLI)
-
-The compiled standalone binary `gleamunison` runs with zero dependencies on any machine with Erlang/OTP installed.
-
+## 2. Command Line Interface (CLI) & S-Expression Parser
+The standalone binary runs with zero dependencies on any Erlang/OTP environment.
 ```sh
-./gleamunison [args]
+./build_escript.sh && ./gleamunison
 ```
 
-### Build & Package Standalone Binary
-To compile all Gleam code, Erlang FFI files, and stdlib dependencies into a single executable escript:
-```sh
-./build_escript.sh
-```
+### 2.1 S-Expression Syntax
+Gleamunison supports text input via a recursive-descent S-expression parser:
+- Literals: `42`, `"hello"`
+- Symbols: `x`, `y`
+- Lists: `(1 2 3)`
+- Scoped variables: `(let x 42 (add x 1))`
+- Lambdas: `(lam x (add x 1))`
 
 ---
 
 ## 3. Language AST & Definition Model
-
 Definitions exist in three forms, represented in `ast.gleam`:
-
 ```gleam
 pub type Definition {
   TermDef(term: Term, typ: Type)
@@ -46,94 +44,39 @@ pub type Definition {
   AbilityDecl(AbilityDeclaration)
 }
 ```
-
-### 3.1 Term Types
-The AST defines 12 core term constructors:
-- `Int(Int)` / `Float(Float)` / `Text(BitArray)`: Basic literal expressions.
-- `List(List(Term))`: Homogeneous lists.
-- `LocalVarRef(LocalVar)`: Local variable references bound by de Bruijn indices.
-- `RefTo(DefinitionRef)`: Content-addressed pointer to another definition.
-- `Apply(function: Term, arg: Term)`: Curried function application.
-- `Lambda(binder: LocalVar, body: Term)`: Anonymous function binders.
-- `Let(binder: LocalVar, value: Term, body: Term)`: Scoped variable declarations.
-- `Match(scrutinee: Term, cases: List(Case))`: Scoped pattern matches.
-- `Do(ability: DefinitionRef, operation: LocalVar, args: List(Term))`: Triggers an algebraic operation.
-- `Handle(computation: Term, handler: Term, ability: DefinitionRef)`: Binds an effect handler around a computation.
+AST defines 12 term constructors: literals, homogenous lists, variables, function applications, lambdas, let bindings, case matching, and handlers.
 
 ---
 
-## 4. Algebraic Effects Tutorial
+## 4. Hashing & Codebase Persistence
 
-### 4.1 Declaring an Ability
-To define a new capability, declare it as an `AbilityDeclaration` with operations:
+### 4.1 Verification on Insert
+Insertions verify that `hash_of_definition(def)` matches the target `DefinitionRef`.
 
-```gleam
-let read_op = ast.Operation(
-  name: Local(0),
-  inputs: [ast.TypeRefBuiltin(ast.IntType)],
-  output: ast.TypeRefBuiltin(ast.TextType)
-)
-let ability = ast.AbilityDecl(
-  ast.AbilityDeclaration(name: Local(0), operations: [read_op])
-)
-```
-
-### 4.2 Handling Abilities
-Handlers are functions (or maps of functions) executed when operations yield.
-```erlang
-% erlang handler function format
-Handler = fun(Args, Cont) -> 
-    [Arg1] = Args,
-    % resume computation with result
-    Cont(<<"read result">>)
-end.
-```
-Compiled `Handle` terms push this handler onto the execution stack:
-```
-gleamunison_effets:handle_comp({AbilityKey, Handler}, Thunk)
-```
-
----
-
-## 5. Hashing & Codebase Persistence
-
-### 5.1 Verification on Insert
-Every insertion into the codebase verifies that `hash_of_definition(def)` matches the target `DefinitionRef`. If the computed hash does not match, the insertion fails with `HashMismatch`.
-
-### 5.2 Storage Backends
-By default, Gleamunison uses the `inmemory` adapter. Custom storage backends must implement the `StorageAdapter` record:
+### 4.2 Storage Backends (DETS)
+Persistence is managed via the `StorageAdapter` record, which supports disk-based DETS:
 ```gleam
 pub type StorageAdapter {
   StorageAdapter(
     insert: fn(DefinitionRef, BitArray) -> Result(Nil, StorageError),
     lookup: fn(DefinitionRef) -> Result(Option(BitArray), StorageError),
     list_refs: fn() -> Result(List(DefinitionRef), StorageError),
+    close: fn() -> Result(Nil, StorageError),
   )
 }
 ```
 
 ---
 
-## 6. Pull-based Node Syncing
-
-Gleamunison uses a pull-based distributed protocol to sync definitions between nodes:
-
-1. **Advertise**: Connect to peer and exchange lists of local hashes (`sync_send_refs`).
-2. **Calculate Diff**: Peer computes the diff of hashes missing locally (`sync_receive_diff`).
+## 5. Pull-based Node Syncing
+1. **Advertise**: Exchange lists of local hashes (`sync_send_refs`).
+2. **Calculate Diff**: Peer computes missing hashes (`sync_receive_diff`).
 3. **Request & Persist**: Request missing definition binaries (`sync_request_defs`) and insert them into local storage (`codebase.insert_raw`).
 
 ---
 
-## 7. Library Integration Guide
-
-Gleamunison can be used as a standard Gleam library to add content-addressing and algebraic effects to host Gleam applications.
-
-### 7.1 Requirements
-- **Erlang Target**: The host application must target Erlang (`--target erlang`). Compilation/execution on JavaScript is unsupported due to low-level BEAM VM requirements.
-- **OTP Version**: Erlang/OTP 29+ is required.
-- **File System Permissions**: The host process must have write access to `/tmp` (or `TMPDIR`) for dynamic FFI compilation.
-
-### 7.2 Core Integration Example
+## 6. Library Integration Guide
+Host applications must target Erlang (`--target erlang`) and use OTP 29+.
 ```gleam
 import gleamunison/ast
 import gleamunison/codebase
@@ -143,13 +86,8 @@ pub fn run_plugin(def: ast.Definition) {
   let cb = codebase.empty()
   let ld = loader.new_loader()
   let ref = codebase.hash_of_definition(def)
-  
-  // Dynamically compile and hot-load the bytecode safely into the host's BEAM VM
   case loader.ensure_loaded(ld, ref, def) {
-    Ok(ld_updated) -> {
-      // Execute the loaded module via $eval()
-      Ok(ld_updated)
-    }
+    Ok(ld_updated) -> Ok(ld_updated)
     Error(err) -> Error(err)
   }
 }
