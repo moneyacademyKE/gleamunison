@@ -121,3 +121,36 @@ Gleamunison uses a pull-based distributed protocol to sync definitions between n
 1. **Advertise**: Connect to peer and exchange lists of local hashes (`sync_send_refs`).
 2. **Calculate Diff**: Peer computes the diff of hashes missing locally (`sync_receive_diff`).
 3. **Request & Persist**: Request missing definition binaries (`sync_request_defs`) and insert them into local storage (`codebase.insert_raw`).
+
+---
+
+## 7. Library Integration Guide
+
+Gleamunison can be used as a standard Gleam library to add content-addressing and algebraic effects to host Gleam applications.
+
+### 7.1 Requirements
+- **Erlang Target**: The host application must target Erlang (`--target erlang`). Compilation/execution on JavaScript is unsupported due to low-level BEAM VM requirements.
+- **OTP Version**: Erlang/OTP 29+ is required.
+- **File System Permissions**: The host process must have write access to `/tmp` (or `TMPDIR`) for dynamic FFI compilation.
+
+### 7.2 Core Integration Example
+```gleam
+import gleamunison/ast
+import gleamunison/codebase
+import gleamunison/loader
+
+pub fn run_plugin(def: ast.Definition) {
+  let cb = codebase.empty()
+  let ld = loader.new_loader()
+  let ref = codebase.hash_of_definition(def)
+  
+  // Dynamically compile and hot-load the bytecode safely into the host's BEAM VM
+  case loader.ensure_loaded(ld, ref, def) {
+    Ok(ld_updated) -> {
+      // Execute the loaded module via $eval()
+      Ok(ld_updated)
+    }
+    Error(err) -> Error(err)
+  }
+}
+```
