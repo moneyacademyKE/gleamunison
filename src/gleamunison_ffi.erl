@@ -3,7 +3,8 @@
     hash_bytes/1, hash_equal/2, hash_to_hex/1,
     compile_source/1, load_binary/2, string_to_binary/1,
     sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
-    sync_request_defs/2, sync_push_defs/2, hex_to_bytes/1
+    sync_request_defs/2, sync_push_defs/2, hex_to_bytes/1,
+    unload_binary/1, corrupt_handler_stack/1, assert_throws_corrupted_stack/1
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -94,3 +95,26 @@ sync_push_defs(_Node, _Defs) -> {ok, nil}.
 
 hex_to_bytes(Hex) when is_binary(Hex) ->
     binary:decode_hex(Hex).
+
+unload_binary(Mod) ->
+    ModuleAtom = case is_binary(Mod) of
+        true -> erlang:binary_to_atom(Mod, utf8);
+        false -> Mod
+    end,
+    code:delete(ModuleAtom),
+    code:purge(ModuleAtom),
+    {ok, nil}.
+
+corrupt_handler_stack(Val) ->
+    erlang:put({gleamunison_handlers}, Val),
+    ok.
+
+assert_throws_corrupted_stack(Fun) ->
+    try
+        Fun(),
+        error(did_not_throw)
+    catch
+        error:{corrupted_handler_stack, _} -> ok;
+        error:{invalid_handler_stack, _} -> ok;
+        error:{invalid_handler, _} -> ok
+    end.

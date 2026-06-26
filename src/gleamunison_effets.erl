@@ -2,18 +2,25 @@
 -export([handle_comp/2, do_op/4]).
 
 handle_comp(Handler, Thunk) ->
+    case validate_handler(Handler) of
+        true -> ok;
+        false -> error({invalid_handler, Handler})
+    end,
     Stack = erlang:get({gleamunison_handlers}),
+    validate_stack(Stack),
     NewStack = [Handler | coerce_stack(Stack)],
     erlang:put({gleamunison_handlers}, NewStack),
     try
         Thunk()
     after
+        validate_stack(Stack),
         erlang:put({gleamunison_handlers}, Stack)
     end.
 
 do_op(AbilityKey, OpIdx, Args, Cont) ->
-    Stack = coerce_stack(erlang:get({gleamunison_handlers})),
-    case find_handler(Stack, AbilityKey, OpIdx) of
+    Stack = erlang:get({gleamunison_handlers}),
+    validate_stack(Stack),
+    case find_handler(coerce_stack(Stack), AbilityKey, OpIdx) of
         {ok, HandlerFn} ->
             HandlerFn(Args, Cont);
         error ->
@@ -21,8 +28,25 @@ do_op(AbilityKey, OpIdx, Args, Cont) ->
     end.
 
 coerce_stack(undefined) -> [];
-coerce_stack(List) when is_list(List) -> List;
-coerce_stack(_) -> [].
+coerce_stack(List) when is_list(List) -> List.
+
+validate_stack(undefined) -> ok;
+validate_stack(List) when is_list(List) ->
+    lists:foreach(fun(H) ->
+        case validate_handler(H) of
+            true -> ok;
+            false -> error({corrupted_handler_stack, H})
+        end
+    end, List),
+    ok;
+validate_stack(Other) ->
+    error({invalid_handler_stack, Other}).
+
+validate_handler(H) when is_function(H, 3) -> true;
+validate_handler(Map) when is_map(Map) -> true;
+validate_handler({_, F}) when is_function(F) -> true;
+validate_handler({_, Map}) when is_map(Map) -> true;
+validate_handler(_) -> false.
 
 find_handler([Handler | Stack], AbilityKey, OpIdx) ->
     case matches_handler(Handler, AbilityKey, OpIdx) of

@@ -11,58 +11,72 @@ pub type Token {
   RParen
 }
 
-pub fn tokenize(input: String) -> List(Token) {
-  let chars = string.to_graphemes(input)
-  do_tokenize(chars, "")
+pub type TokenInfo {
+  TokenInfo(token: Token, line: Int, col: Int)
 }
 
-fn do_tokenize(chars: List(String), acc: String) -> List(Token) {
+pub type ParseError {
+  ParseError(message: String, line: Int, col: Int)
+}
+
+pub fn tokenize(input: String) -> List(TokenInfo) {
+  do_tokenize(string.to_graphemes(input), "", 1, 1, 1, 1)
+}
+
+fn do_tokenize(chars: List(String), acc: String, sl: Int, sc: Int, l: Int, c: Int) -> List(TokenInfo) {
   case chars {
-    [] -> flush_token(acc, [])
-    [" ", ..rest] | ["\n", ..rest] | ["\t", ..rest] ->
-      flush_token(acc, do_tokenize(rest, ""))
+    [] -> flush_token(acc, sl, sc, [])
+    ["\n", ..rest] ->
+      flush_token(acc, sl, sc, do_tokenize(rest, "", 1, 1, l + 1, 1))
+    [" ", ..rest] | ["\t", ..rest] ->
+      flush_token(acc, sl, sc, do_tokenize(rest, "", 1, 1, l, c + 1))
     ["(", ..rest] ->
-      flush_token(acc, [LParen, ..do_tokenize(rest, "")])
+      flush_token(acc, sl, sc, [TokenInfo(LParen, l, c), ..do_tokenize(rest, "", 1, 1, l, c + 1)])
     [")", ..rest] ->
-      flush_token(acc, [RParen, ..do_tokenize(rest, "")])
-    [c, ..rest] ->
-      do_tokenize(rest, acc <> c)
+      flush_token(acc, sl, sc, [TokenInfo(RParen, l, c), ..do_tokenize(rest, "", 1, 1, l, c + 1)])
+    [ch, ..rest] -> {
+      let #(nsl, nsc) = case acc {
+        "" -> #(l, c)
+        _ -> #(sl, sc)
+      }
+      do_tokenize(rest, acc <> ch, nsl, nsc, l, c + 1)
+    }
   }
 }
 
-fn flush_token(acc: String, tail: List(Token)) -> List(Token) {
+fn flush_token(acc: String, l: Int, c: Int, tail: List(TokenInfo)) -> List(TokenInfo) {
   case acc {
     "" -> tail
     _ -> {
       case int.parse(acc) {
-        Ok(n) -> [IntVal(n), ..tail]
-        Error(_) -> [Symbol(acc), ..tail]
+        Ok(n) -> [TokenInfo(IntVal(n), l, c), ..tail]
+        Error(_) -> [TokenInfo(Symbol(acc), l, c), ..tail]
       }
     }
   }
 }
 
 pub type SExpr {
-  SAtom(Token)
-  SListExpr(List(SExpr))
+  SAtom(Token, line: Int, col: Int)
+  SListExpr(List(SExpr), line: Int, col: Int)
 }
 
-pub fn parse_sexpr(tokens: List(Token)) -> Result(#(SExpr, List(Token)), String) {
+pub fn parse_sexpr(tokens: List(TokenInfo)) -> Result(#(SExpr, List(TokenInfo)), ParseError) {
   case tokens {
-    [] -> Error("Unexpected EOF")
-    [LParen, ..rest] -> {
+    [] -> Error(ParseError("Unexpected EOF", 1, 1))
+    [TokenInfo(LParen, l, c), ..rest] -> {
       use #(exprs, rest2) <- result.try(parse_list(rest, []))
-      Ok(#(SListExpr(exprs), rest2))
+      Ok(#(SListExpr(exprs, l, c), rest2))
     }
-    [RParen, ..] -> Error("Unexpected )")
-    [other, ..rest] -> Ok(#(SAtom(other), rest))
+    [TokenInfo(RParen, l, c), ..] -> Error(ParseError("Unexpected )", l, c))
+    [TokenInfo(other, l, c), ..rest] -> Ok(#(SAtom(other, l, c), rest))
   }
 }
 
-fn parse_list(tokens: List(Token), acc: List(SExpr)) -> Result(#(List(SExpr), List(Token)), String) {
+fn parse_list(tokens: List(TokenInfo), acc: List(SExpr)) -> Result(#(List(SExpr), List(TokenInfo)), ParseError) {
   case tokens {
-    [] -> Error("Unclosed (")
-    [RParen, ..rest] -> Ok(#(list.reverse(acc), rest))
+    [] -> Error(ParseError("Unclosed (", 1, 1))
+    [TokenInfo(RParen, _, _), ..rest] -> Ok(#(list.reverse(acc), rest))
     _ -> {
       use #(expr, rest) <- result.try(parse_sexpr(tokens))
       parse_list(rest, [expr, ..acc])
@@ -70,35 +84,37 @@ fn parse_list(tokens: List(Token), acc: List(SExpr)) -> Result(#(List(SExpr), Li
   }
 }
 
-pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, String) {
+pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
   case sexpr {
-    SAtom(IntVal(n)) -> Ok(SInt(n))
-    SAtom(Symbol(name)) -> Ok(SVar(name))
-    SAtom(_) -> Error("Invalid atom")
-    SListExpr(exprs) -> {
+    SAtom(IntVal(n), _, _) -> Ok(SInt(n))
+    SAtom(Symbol(name), _, _) -> Ok(SVar(name))
+    SAtom(_, l, c) -> Error(ParseError("Invalid atom", l, c))
+    SListExpr(exprs, _l, _c) -> {
       case exprs {
-        [SAtom(Symbol("let")), SAtom(Symbol(name)), val, body] -> {
+        [SAtom(Symbol("let"), _, _), SAtom(Symbol(name), _, _), val, body] -> {
           use val_t <- result.try(sexpr_to_term(val))
           use body_t <- result.try(sexpr_to_term(body))
           Ok(SLet(name, val_t, body_t))
         }
-        [SAtom(Symbol("lam")), SAtom(Symbol(name)), body] -> {
+        [SAtom(Symbol("lam"), _, _), SAtom(Symbol(name), _, _), body] -> {
           use body_t <- result.try(sexpr_to_term(body))
           Ok(SLambda(name, body_t))
         }
         _ -> {
-          use terms <- result.try(list.try_map(exprs, sexpr_to_term))
-          Ok(SList(terms))
+          case list.try_map(exprs, sexpr_to_term) {
+            Ok(terms) -> Ok(SList(terms))
+            Error(e) -> Error(e)
+          }
         }
       }
     }
   }
 }
 
-pub fn parse_string(input: String) -> Result(SurfaceTerm, String) {
+pub fn parse_string(input: String) -> Result(SurfaceTerm, ParseError) {
   case parse_sexpr(tokenize(input)) {
     Ok(#(sexpr, [])) -> sexpr_to_term(sexpr)
-    Ok(#(_, _)) -> Error("Extra tokens after expression")
+    Ok(#(_, [TokenInfo(_, l, c), ..])) -> Error(ParseError("Extra tokens after expression", l, c))
     Error(e) -> Error(e)
   }
 }

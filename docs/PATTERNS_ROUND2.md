@@ -20,3 +20,41 @@ let ret2 = substitute(ret, target, replacement)
 let rest2 = list.map(rest, substitute(_, target, replacement))
 ```
 This reduces the function arity from N to N-1.
+
+## 3. Hash-Partitioned Routing (Storage Pattern)
+Dynamically compute the partition index from the first 4 bits of the cryptographic hash ref and route the operations to the corresponding table registered under that prefix:
+```erlang
+<<N:4, _/bitstring>> = Ref,
+Tab = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, (hex(N))>>, utf8)
+```
+
+## 4. LRU Cache Loader Eviction (Loader Pattern)
+Evict the least recently used modules in a loader sequence when exceeding constraints, purging them from the BEAM VM memory space:
+```gleam
+let #(keep, evict) = list.split(next_order, ld.max_size)
+list.each(evict, fn(evicted_ref) {
+  let evicted_mod = module_name_for(evicted_ref)
+  let _ = unload_binary(evicted_mod)
+})
+```
+
+## 5. Dynamic Stack Guards (Safety Pattern)
+Enforce handler stack validation checks on pushing and popping operations to safeguard stack integrity and yield debuggable errors on stack corruption:
+```erlang
+validate_stack(List) when is_list(List) ->
+    lists:foreach(fun(H) ->
+        case validate_handler(H) of
+            true -> ok;
+            false -> error({corrupted_handler_stack, H})
+        end
+    end, List),
+    ok.
+```
+
+## 6. Position-Tracked Tokenizer (Parsing Pattern)
+Track coordinates (line & col offsets) dynamically during lexical passes and bind them to token instances:
+```gleam
+pub type TokenInfo {
+  TokenInfo(token: Token, line: Int, col: Int)
+}
+```
