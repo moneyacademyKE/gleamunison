@@ -16,7 +16,7 @@ fn ffi_compile_source(source: String) -> Result(BitArray, String)
 pub fn module_name_for(ref: DefinitionRef) -> String {
   let Ref(hash) = ref
   let full = hash_to_debug_string(hash)
-  "m_" <> string.slice(full, 0, 8)
+  "m_" <> string.slice(full, string.length(full) - 8, 8)
 }
 
 fn emit_term(t: ast.Term) -> String {
@@ -24,9 +24,9 @@ fn emit_term(t: ast.Term) -> String {
     ast.Int(n) -> int.to_string(n)
     ast.Float(f) -> float.to_string(f)
     ast.Text(b) -> string.inspect(b)
-    ast.RefTo(ref) -> "'" <> module_name_for(ref) <> "':$eval()"
+    ast.RefTo(ref) -> "'" <> module_name_for(ref) <> "':'$eval'()"
     ast.LocalVarRef(Local(i)) -> "V" <> int.to_string(i)
-    ast.Apply(function: f, arg: a) -> "(" <> emit_term(f) <> ")(" <> emit_term(a) <> ")"
+    ast.Apply(function: f, arg: a) -> "erlang:apply(" <> emit_term(f) <> ", [" <> emit_term(a) <> "])"
     ast.Lambda(binder: Local(i), body:) -> "fun(V" <> int.to_string(i) <> ") -> " <> emit_term(body) <> " end"
     ast.Let(binder: Local(i), value:, body:) ->
       "begin V" <> int.to_string(i) <> " = " <> emit_term(value) <> ", " <> emit_term(body) <> " end"

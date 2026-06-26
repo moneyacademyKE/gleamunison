@@ -91,7 +91,8 @@ pub fn stack_corruption_protection_test() {
 pub fn parser_s_expression_test() {
   let assert Ok(SInt(42)) = parser.parse_string("42")
   let assert Ok(SVar("x")) = parser.parse_string("x")
-  let assert Ok(SList([SInt(1), SInt(2)])) = parser.parse_string("(1 2)")
+  let assert Ok(SList([SInt(1), SInt(2)])) = parser.parse_string("(list 1 2)")
+  let assert Ok(elab_types.SApply(SVar("add"), SInt(1))) = parser.parse_string("(add 1)")
   let assert Ok(SLet("x", SInt(42), SVar("x"))) = parser.parse_string("(let x 42 x)")
   let assert Ok(SLambda("x", SVar("x"))) = parser.parse_string("(lam x x)")
 }

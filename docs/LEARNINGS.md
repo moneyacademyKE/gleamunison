@@ -128,3 +128,12 @@ Recursive-descent parsing and lexical tokenization can be implemented in Gleam i
 
 System environments or active workflows can export default credentials like `GITHUB_TOKEN` which override the local keyring helper. Sanitizing the environment via `env -u GITHUB_TOKEN` allows Git to successfully fallback to keychain authentication.
 
+## 19. Curried Call compilation via erlang:apply/2
+
+Nested function application of the form `(F(X))(Y)` results in Erlang syntax parse errors. Compiling applications to recursive `erlang:apply/2` calls resolves all dynamic invocations cleanly.
+
+## 20. Split structural storage and name-based VM loading
+
+To pass content-addressed verification, definitions must be inserted into the codebase under their structural hash. However, VM executions rely on name-based modules to resolve AST references. The compiler bridges this by splitting insertion (structural) and VM loading (name-based).
+
+

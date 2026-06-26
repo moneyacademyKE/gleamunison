@@ -12,6 +12,8 @@ import gleamunison/elaborate as elab
 import gleamunison/elab_types as elab_types
 import gleamunison/effects.{RuntimeConfig}
 import gleamunison/sync.{new_sync_state}
+import gleamunison/repl
+
 
 fn demo_term(compiler, loader, codebase, label, term, typ) {
   io.println("--- " <> label <> " ---")
@@ -35,7 +37,14 @@ fn demo_term(compiler, loader, codebase, label, term, typ) {
   }
 }
 
-pub fn main(_args: List(String)) -> Nil {
+pub fn main(args: List(String)) -> Nil {
+  case args {
+    ["demo"] -> run_demo()
+    _ -> repl.start_repl()
+  }
+}
+
+fn run_demo() -> Nil {
   io.println("=== Gleamunison ===")
   let compiler = new_compiler()
   let loader = new_loader()

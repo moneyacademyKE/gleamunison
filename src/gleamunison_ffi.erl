@@ -54,7 +54,9 @@ compile_source(Source) when is_binary(Source) ->
                     {ok, Bin} -> {ok, Bin};
                     {error, R} -> {error, list_to_binary(io_lib:format("read3 failed: ~p", [R]))}
                 end;
-            {error, Errors, _Ws} -> {error, flatten_errors(Errors)}
+            {error, Errors, _Ws} ->
+                io:format("Failed Source:~n~s~n", [Source]),
+                {error, flatten_errors(Errors)}
         end
     after
         catch file:delete(TmpFile),

@@ -76,6 +76,18 @@ Always pre-verify all remote transfers:
 2. Run standard pushes (`env -u GITHUB_TOKEN git push`).
 3. Never use standard `--force`. If history rewriting is required, use `--force-with-lease --force-if-includes`.
 
+### Interactive REPL
+
+Start the interactive loop to dogfood the codebase:
+```sh
+./gleamunison
+```
+The REPL bootstraps `"Console"`, `"add"`, and `"read_line"`, and supports:
+- `(define name expr)` to define names
+- expressions (like `(add 1 2)`) to evaluate them
+- `(do Console print "hello")` to trigger algebraic effects.
+
+
 
 ### LOC Constraints
 All Gleam/Erlang source files MUST be strictly under 150 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.

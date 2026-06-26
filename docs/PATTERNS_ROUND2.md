@@ -65,4 +65,16 @@ env -u GITHUB_TOKEN git push --dry-run
 ```
 This isolates local keychain overrides and validates host network and authentication states safely.
 
+## 8. Recursive Dynamic Dispatch (Compilation Pattern)
+Use recursive `erlang:apply/2` calls for functional application to resolve currying safely:
+```gleam
+"erlang:apply(" <> emit_term(f) <> ", [" <> emit_term(a) <> "])"
+```
+
+## 9. Split Loading and Storage (Linker Pattern)
+Resolve name references vs content-addressed storage verification by separating codebase insertion from VM loading:
+- Insert under structural `computed_ref`
+- Load under name-based `name_ref`
+
+
 ```
