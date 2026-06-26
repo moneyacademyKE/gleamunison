@@ -12,7 +12,7 @@ pub fn sync_send_refs(node: String, refs: List(String)) -> Result(Nil, String)
 pub fn sync_receive_diff(node: String) -> Result(List(String), String)
 
 @external(erlang, "gleamunison_ffi", "sync_request_defs")
-pub fn sync_request_defs(node: String, refs: List(String)) -> Result(List(BitArray), String)
+pub fn sync_request_defs(node: String, refs: List(String)) -> Result(List(#(String, BitArray)), String)
 
 @external(erlang, "gleamunison_ffi", "sync_push_defs")
 pub fn sync_push_defs(node: String, defs: List(BitArray)) -> Result(Nil, String)

@@ -3,6 +3,7 @@ import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
 import gleam/list
+import gleam/string
 import gleamunison/identity.{type DefinitionRef, type Hash, Local, Ref, hash_bytes, hash_equal, hash_to_debug_string}
 import gleamunison/ast as ast
 import gleamunison/storage.{type StorageAdapter, inmemory}
@@ -55,8 +56,8 @@ pub fn hash_of_definition(def: ast.Definition) -> Hash {
   case def {
     ast.TermDef(term:, typ:) ->
       hash_bytes(bit_array.concat([hash_to_binary(hash_term(term)), hash_to_binary(hash_type(typ))]))
-    ast.TypeDef(_) -> hash_bytes(str_to_bits("typedef"))
-    ast.AbilityDecl(_) -> hash_bytes(str_to_bits("abilitydecl"))
+    ast.TypeDef(td) -> hash_bytes(str_to_bits(string.inspect(td)))
+    ast.AbilityDecl(ad) -> hash_bytes(str_to_bits(string.inspect(ad)))
   }
 }
 
@@ -64,7 +65,7 @@ fn verify_and_store(codebase: Codebase, ref: DefinitionRef, def: ast.Definition)
   let computed = hash_of_definition(def)
   let Ref(hash) = ref
   case hash_equal(computed, hash) {
-    False -> Error(HashMismatch(hash, computed))
+    False -> Error(HashMismatch(hash_expected: computed, hash_got: hash))
     True -> {
       case dict.get(codebase.seen, computed) {
         Ok(existing) -> Error(DuplicateDef(existing, ref))

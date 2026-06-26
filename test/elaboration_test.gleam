@@ -45,3 +45,15 @@ pub fn typecheck_mismatch_test() {
   )
   let assert Error(_) = elab.typecheck_unit(bad_unit, cache)
 }
+
+pub fn typedef_constructor_distinct_local_test() {
+  let cache = empty_cache()
+  let surface = SurfaceUnit(
+    root: Ref(hash_bytes(<<"root">>)),
+    defs: [#("MyType", elab_types.SurfaceTypeDef(elab_types.TBuiltin(elab_types.TInt)))]
+  )
+  let assert Ok(#(unit, _)) = elab.elaborate_unit(surface, cache)
+  let assert ast.Unit(root: _, defs: [#(_ref, ast.TypeDef(ast.Structural(name, _, [ast.Constructor(c_name, _)])))]) = unit
+  let assert False = name == c_name
+}
+

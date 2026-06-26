@@ -51,7 +51,7 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
               }
           }
         }
-        ast.TypeVar(_) -> Ok(ast.TypeVar(0))
+        ast.TypeVar(_) -> Ok(ast.TypeVar(-1))
         other -> Error(TypeMismatch(ast.Fn([], ast.TypeVar(0), ast.Required([])), other, "not a function"))
       }
     }

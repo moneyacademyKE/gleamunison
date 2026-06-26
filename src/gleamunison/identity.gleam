@@ -20,6 +20,9 @@ pub type LocalVar {
 @external(erlang, "gleamunison_ffi", "hash_bytes")
 fn ffi_hash_bytes(_bytes: BitArray) -> BitArray
 
+@external(erlang, "gleamunison_ffi", "hex_to_bytes")
+pub fn hex_to_bytes(hex: String) -> BitArray
+
 @external(erlang, "gleamunison_ffi", "hash_equal")
 fn ffi_hash_equal(_a: BitArray, _b: BitArray) -> Bool
 

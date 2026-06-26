@@ -29,8 +29,9 @@ pub fn pull_sync(state: SyncState, peer: PeerId, _codebase: Codebase) -> Result(
             Ok(diff_refs) -> {
               case sync_request_defs(name, diff_refs) {
                 Ok(def_blobs) -> {
-                  let new_refs = list.filter_map(def_blobs, fn(blob) {
-                    Ok(identity.Ref(identity.hash_bytes(blob)))
+                  let new_refs = list.filter_map(def_blobs, fn(pair) {
+                    let #(hash_hex, _) = pair
+                    Ok(identity.Ref(identity.hash_from_bytes(identity.hex_to_bytes(hash_hex))))
                   })
                   let ps = PeerState(last_seen: 1, refs: set.from_list(our_refs), status: Connected)
                   let new_peers = dict.insert(state.peers, peer, ps)

@@ -57,7 +57,8 @@ pub fn elaborate_term(term: SurfaceTerm, ctx: ElabCtx) -> Result(#(ElabCtx, ast.
       use op_idx <- result.try(dict.get(ctx.ops, #(ab, op)) |> result.replace_error(UnknownOperation(ab, op)))
       Ok(#(ctx, ast.Do(ab_ref, Local(op_idx), terms)))
     }
-    SHandle(c, h, _) -> {
+    SHandle(c, h, ab) -> {
+      use _ab_ref <- result.try(dict.get(ctx.abilities, ab) |> result.replace_error(MissingAbilityDecl(ab)))
       use #(ctx2, comp) <- result.try(elaborate_term(c, ctx))
       use #(ctx3, hand) <- result.try(elaborate_term(h, ctx2))
       Ok(#(ctx3, ast.Handle(comp, hand)))

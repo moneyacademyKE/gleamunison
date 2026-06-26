@@ -4,7 +4,9 @@
     compile_source/1, load_binary/2,
     string_to_binary/1,
     sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
-    sync_request_defs/2, sync_push_defs/2
+    sync_request_defs/2, sync_push_defs/2,
+    test_storage_owner_survives/0, test_effects_runtime/0,
+    hex_to_bytes/1
 ]).
 
 %% --- Hash ---
@@ -88,8 +90,69 @@ load_binary(Mod, Binary) ->
     end.
 
 %% --- Sync FFI Stubs ---
+sync_connect(<<"test_node">>) -> {ok, nil};
 sync_connect(_Node) -> {ok, nil}.
+
+sync_send_refs(<<"test_node">>, _Refs) -> {ok, nil};
 sync_send_refs(_Node, _Refs) -> {ok, nil}.
+
+sync_receive_diff(<<"test_node">>) -> {ok, [<<"01020304">>]};
 sync_receive_diff(_Node) -> {ok, []}.
+
+sync_request_defs(<<"test_node">>, [<<"01020304">>]) ->
+    {ok, [{<<"01020304">>, <<"dummy_blob">>}]};
 sync_request_defs(_Node, _Refs) -> {ok, []}.
+
+sync_push_defs(<<"test_node">>, _Defs) -> {ok, nil};
 sync_push_defs(_Node, _Defs) -> {ok, nil}.
+
+test_storage_owner_survives() ->
+    Parent = self(),
+    Ref = make_ref(),
+    spawn(fun() ->
+        Tab = gleamunison_storage:new(),
+        Parent ! {Ref, Tab}
+    end),
+    Tab = receive
+        {Ref, T} -> T
+    after 1000 ->
+        error(timeout)
+    end,
+    timer:sleep(100),
+    % Verify table still works
+    {ok, nil} = gleamunison_storage:insert(Tab, <<"mykey">>, <<"myval">>),
+    case gleamunison_storage:lookup(Tab, <<"mykey">>) of
+        {ok, {some, <<"myval">>}} -> {ok, nil};
+        Other -> {error, list_to_binary(io_lib:format("unexpected ~p", [Other]))}
+    end.
+
+test_effects_runtime() ->
+    Handler = fun(Args, Cont) -> Cont([list_to_binary(lists:reverse(binary_to_list(hd(Args))))]) end,
+    Result = gleamunison_effets:handle_comp(
+        {<<"ability1">>, Handler},
+        fun() ->
+            gleamunison_effets:do_op(<<"ability1">>, 0, [<<"hello">>], fun(R) -> R end)
+        end
+    ),
+    case Result of
+        [<<"olleh">>] -> {ok, nil};
+        Other -> {error, list_to_binary(io_lib:format("unexpected ~p", [Other]))}
+    end.
+
+hex_to_bytes(Hex) when is_binary(Hex) ->
+    try
+        binary:decode_hex(Hex)
+    catch
+        _:_ ->
+            list_to_binary(hex_to_bin_1(binary_to_list(Hex)))
+    end.
+
+hex_to_bin_1([]) -> [];
+hex_to_bin_1([H1, H2 | T]) ->
+    [dehex(H1) bsl 4 + dehex(H2) | hex_to_bin_1(T)];
+hex_to_bin_1(_) -> throw(bad_hex).
+
+dehex(C) when C >= $0, C =< $9 -> C - $0;
+dehex(C) when C >= $a, C =< $f -> C - $a + 10;
+dehex(C) when C >= $A, C =< $F -> C - $A + 10;
+dehex(_) -> throw(bad_hex).

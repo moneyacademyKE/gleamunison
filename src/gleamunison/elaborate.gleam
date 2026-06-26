@@ -1,19 +1,14 @@
 import gleam/dict
 import gleam/list
-import gleam/option
-import gleam/result
-import gleam/string
-import gleamunison/identity.{type DefinitionRef, Local, Ref}
+import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/ast as ast
-import gleamunison/types.{type TypeCache, CTTerm, CTType, CTAbility}
-import gleamunison/inference.{infer_term}
+import gleamunison/types.{type TypeCache}
 import gleamunison/elab_types.{
   type SurfaceUnit, type ElaborateError, type SurfaceDef, SurfaceUnit, SurfaceTermDef, SurfaceTypeDef, SurfaceAbilityDef,
   InferFailed
 }
 import gleamunison/elab_ctx.{type ElabCtx, ElabCtx, empty_elab_ctx}
-import gleamunison/elab_term.{elaborate_term}
-import gleamunison/lower.{lower_type_ref, type_ref_to_type}
+import gleamunison/elab_def
 import gleamunison/typecheck
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
@@ -57,54 +52,17 @@ pub fn elaborate_unit(su: SurfaceUnit, cache: TypeCache) -> Result(#(ast.Unit, T
       Error(e) -> list.Stop(Error(e))
       Ok(#(acc_defs, current_cache)) -> {
         let #(name, sd) = kv
-        let ref = case dict.get(ctx.names, name) {
-          Ok(ref_found) -> ref_found
-          _ -> r
-        }
-        case sd {
-          SurfaceTermDef(st) -> {
-            case elaborate_term(st, ctx) {
-              Ok(#(_, term)) -> {
-                case infer_term(term, current_cache) {
-                  Ok(typ) -> {
-                    let next_cache = types.TypeCache(dict.insert(current_cache.entries, ref, CTTerm(typ)))
-                    list.Continue(Ok(#([#(ref, ast.TermDef(term:, typ:)), ..acc_defs], next_cache)))
-                  }
-                  Error(e) -> list.Stop(Error(InferFailed(string.inspect(e))))
-                }
-              }
-              Error(e) -> list.Stop(Error(e))
+        case dict.get(ctx.names, name) {
+          Error(_) -> list.Stop(Error(InferFailed("internal: ref not found for " <> name)))
+          Ok(ref) -> {
+            let res = case sd {
+              SurfaceTermDef(st) -> elab_def.elab_term_def(st, ctx, ref, current_cache)
+              SurfaceTypeDef(t) -> elab_def.elab_type_def(t, ref, current_cache)
+              SurfaceAbilityDef(_, ops) -> elab_def.elab_ability_def(ops, ref, current_cache)
             }
-          }
-          SurfaceTypeDef(t) -> {
-            case lower_type_ref(t) {
-              Ok(tr) -> {
-                let type_decl = ast.Structural(Local(0), [], [ast.Constructor(Local(0), [tr])])
-                let next_cache = types.TypeCache(dict.insert(current_cache.entries, ref, CTType))
-                list.Continue(Ok(#([#(ref, ast.TypeDef(type_decl)), ..acc_defs], next_cache)))
-              }
-              Error(e) -> list.Stop(Error(e))
-            }
-          }
-          SurfaceAbilityDef(_, ops) -> {
-            case list.try_map(ops, fn(op) {
-              use ins <- result.try(list.try_map(op.inputs, lower_type_ref))
-              use out <- result.try(lower_type_ref(op.output))
-              Ok(#(op.name, ins, out))
-            }) {
-              Ok(lowered_ops) -> {
-                let aops = list.map(lowered_ops, fn(lo) {
-                  ast.Operation(Local(0), lo.1, lo.2)
-                })
-                let op_typs = list.map(lowered_ops, fn(lo) {
-                  let inputs = list.map(lo.1, type_ref_to_type)
-                  let output = type_ref_to_type(lo.2)
-                  types.OperationType(name: option.Some(lo.0), inputs:, output:)
-                })
-                let next_cache = types.TypeCache(dict.insert(current_cache.entries, ref, CTAbility(op_typs)))
-                let ability_decl = ast.AbilityDecl(ast.AbilityDeclaration(Local(0), aops))
-                list.Continue(Ok(#([#(ref, ability_decl), ..acc_defs], next_cache)))
-              }
+            case res {
+              Ok(#(def, next_cache)) ->
+                list.Continue(Ok(#([#(ref, def), ..acc_defs], next_cache)))
               Error(e) -> list.Stop(Error(e))
             }
           }
