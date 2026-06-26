@@ -69,18 +69,30 @@ fn verify_and_store(codebase: Codebase, ref: DefinitionRef, def: ast.Definition)
     True -> {
       case dict.get(codebase.seen, computed) {
         Ok(existing) -> Error(DuplicateDef(existing, ref))
-        Error(_) -> Ok(Codebase(..codebase, seen: dict.insert(codebase.seen, computed, ref)))
+        Error(_) -> {
+          let _ = codebase.adapter.insert(ref, bit_array.from_string(string.inspect(def)))
+          Ok(Codebase(..codebase, seen: dict.insert(codebase.seen, computed, ref)))
+        }
       }
     }
   }
 }
 
 pub fn insert(codebase: Codebase, unit: ast.Unit) -> Result(Codebase, InsertError) {
-  let ast.Unit(root: _, defs:) = unit
-  list.fold(defs, Ok(codebase), fn(acc, kv) {
+  list.fold(unit.defs, Ok(codebase), fn(acc, kv) {
     case acc {
       Ok(cb) -> verify_and_store(cb, kv.0, kv.1)
       Error(_) -> acc
     }
   })
+}
+
+pub fn insert_raw(codebase: Codebase, ref: DefinitionRef, bytes: BitArray) -> Codebase {
+  let _ = codebase.adapter.insert(ref, bytes)
+  let Ref(h) = ref
+  Codebase(..codebase, seen: dict.insert(codebase.seen, h, ref))
+}
+
+pub fn get_adapter(codebase: Codebase) -> StorageAdapter {
+  codebase.adapter
 }

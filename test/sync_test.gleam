@@ -16,7 +16,7 @@ pub fn pull_sync_uses_hash_not_blob_test() {
   // Under the old code, this would fail because ffi returns [{ "01020304", "dummy_blob" }]
   // and we'd hash "dummy_blob" (result is NOT 01020304).
   // Under the new code, we decode the hex "01020304" and use it as the ref hash.
-  let assert Ok(#(_next_state, [new_ref])) = pull_sync(state, peer, cb)
+  let assert Ok(#(_next_state, _cb, [new_ref])) = pull_sync(state, peer, cb)
   let Ref(h) = new_ref
   let assert "01020304" = hash_to_debug_string(h)
 }

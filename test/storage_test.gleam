@@ -20,6 +20,6 @@ pub fn pull_empty_diff_test() {
   let cb = codebase.empty()
   let state = new_sync_state()
   let peer = PeerId("localnode")
-  let assert Ok(#(_next_state, new_refs)) = pull_sync(state, peer, cb)
+  let assert Ok(#(_next_state, _cb, new_refs)) = pull_sync(state, peer, cb)
   let assert [] = new_refs
 }

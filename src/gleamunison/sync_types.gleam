@@ -15,7 +15,7 @@ pub fn sync_receive_diff(node: String) -> Result(List(String), String)
 pub fn sync_request_defs(node: String, refs: List(String)) -> Result(List(#(String, BitArray)), String)
 
 @external(erlang, "gleamunison_ffi", "sync_push_defs")
-pub fn sync_push_defs(node: String, defs: List(BitArray)) -> Result(Nil, String)
+pub fn sync_push_defs(node: String, defs: List(#(String, BitArray))) -> Result(Nil, String)
 
 pub type PeerId {
   PeerId(name: String)

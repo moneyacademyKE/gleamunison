@@ -14,7 +14,11 @@ pub fn new_sync_state() -> SyncState {
   SyncState(peers: dict.new(), known_refs: set.new())
 }
 
-pub fn pull_sync(state: SyncState, peer: PeerId, _codebase: Codebase) -> Result(#(SyncState, List(DefinitionRef)), SyncError) {
+pub fn pull_sync(
+  state: SyncState,
+  peer: PeerId,
+  codebase: Codebase,
+) -> Result(#(SyncState, Codebase, List(DefinitionRef)), SyncError) {
   let PeerId(name) = peer
   case sync_connect(name) {
     Ok(_) -> {
@@ -29,14 +33,17 @@ pub fn pull_sync(state: SyncState, peer: PeerId, _codebase: Codebase) -> Result(
             Ok(diff_refs) -> {
               case sync_request_defs(name, diff_refs) {
                 Ok(def_blobs) -> {
-                  let new_refs = list.filter_map(def_blobs, fn(pair) {
-                    let #(hash_hex, _) = pair
-                    Ok(identity.Ref(identity.hash_from_bytes(identity.hex_to_bytes(hash_hex))))
+                  let #(new_cb, new_refs) = list.fold(def_blobs, #(codebase, []), fn(acc, pair) {
+                    let #(cb, refs) = acc
+                    let #(hash_hex, bytes) = pair
+                    let ref = identity.Ref(identity.hash_from_bytes(identity.hex_to_bytes(hash_hex)))
+                    let next_cb = codebase.insert_raw(cb, ref, bytes)
+                    #(next_cb, [ref, ..refs])
                   })
                   let ps = PeerState(last_seen: 1, refs: set.from_list(our_refs), status: Connected)
                   let new_peers = dict.insert(state.peers, peer, ps)
                   let new_known = set.union(state.known_refs, set.from_list(new_refs))
-                  Ok(#(SyncState(peers: new_peers, known_refs: new_known), new_refs))
+                  Ok(#(SyncState(peers: new_peers, known_refs: new_known), new_cb, new_refs))
                 }
                 Error(msg) -> Error(TransferFailed(peer, msg))
               }
@@ -57,7 +64,10 @@ pub fn push_sync(state: SyncState, peer: PeerId, refs: List(DefinitionRef), adap
     Ok(_) -> {
       let blobs = list.filter_map(refs, fn(r) {
         case adapter.lookup(r) {
-          Ok(Some(bytes)) -> Ok(bytes)
+          Ok(Some(bytes)) -> {
+            let Ref(h) = r
+            Ok(#(hash_to_debug_string(h), bytes))
+          }
           _ -> Error(Nil)
         }
       })
