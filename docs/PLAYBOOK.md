@@ -68,3 +68,7 @@ AST (Gleam types) → Hash (phash2) → Codebase (in-memory)
 Every significant design decision is recorded as an ADR in `docs/adr/`.
 Before making a change, read the relevant ADRs. After making a change,
 write a new ADR or update an existing one.
+
+### LOC Constraints
+All Gleam/Erlang source files MUST be strictly under 100 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
+
