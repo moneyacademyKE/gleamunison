@@ -4,7 +4,8 @@
     compile_source/1, load_binary/2, string_to_binary/1,
     sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
     sync_request_defs/2, sync_push_defs/2, hex_to_bytes/1,
-    unload_binary/1, corrupt_handler_stack/1, assert_throws_corrupted_stack/1
+    unload_binary/1, corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
+    soft_purge_binary/1, test_soft_purge_scenario/0
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -118,3 +119,27 @@ assert_throws_corrupted_stack(Fun) ->
         error:{invalid_handler_stack, _} -> ok;
         error:{invalid_handler, _} -> ok
     end.
+
+soft_purge_binary(Mod) ->
+    ModuleAtom = case is_binary(Mod) of
+        true -> erlang:binary_to_atom(Mod, utf8);
+        false -> Mod
+    end,
+    code:delete(ModuleAtom),
+    Res = code:soft_purge(ModuleAtom),
+    {ok, Res}.
+
+test_soft_purge_scenario() ->
+    Source = <<"-module('m_purge_test').\n-export([loop/0]).\nloop() -> timer:sleep(1000), loop().\n">>,
+    {ok, Bin} = compile_source(Source),
+    {module, m_purge_test} = code:load_binary(m_purge_test, "nofile", Bin),
+    Pid = spawn(fun() -> m_purge_test:loop() end),
+    timer:sleep(50),
+    code:delete(m_purge_test),
+    PurgeRes1 = code:soft_purge(m_purge_test),
+    exit(Pid, kill),
+    timer:sleep(50),
+    PurgeRes2 = code:soft_purge(m_purge_test),
+    code:delete(m_purge_test),
+    code:purge(m_purge_test),
+    {ok, {PurgeRes1, PurgeRes2}}.

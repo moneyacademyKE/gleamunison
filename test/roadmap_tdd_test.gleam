@@ -11,8 +11,7 @@ import gleamunison/loader
 
 pub fn sha256_hash_length_test() {
   let def = ast.TermDef(term: ast.Int(42), typ: ast.Builtin(ast.IntType))
-  let computed = hash_of_definition(def)
-  let hex_str = identity.hash_to_debug_string(computed)
+  let hex_str = identity.hash_to_debug_string(hash_of_definition(def))
   let assert 64 = string.length(hex_str)
 }
 
@@ -44,14 +43,12 @@ pub fn partitioned_dets_storage_test() {
   let assert Ok(Nil) = adapter.insert(ref1, data1)
   let assert Ok(Nil) = adapter.insert(ref2, data2)
 
-  let assert Ok(Some(retrieved1)) = adapter.lookup(ref1)
-  let assert Ok(Some(retrieved2)) = adapter.lookup(ref2)
-  let assert True = retrieved1 == data1
-  let assert True = retrieved2 == data2
+  let assert Ok(Some(r1)) = adapter.lookup(ref1)
+  let assert Ok(Some(r2)) = adapter.lookup(ref2)
+  let assert True = r1 == data1 && r2 == data2
 
   let assert Ok(refs) = adapter.list_refs()
-  let assert True = list.contains(refs, ref1)
-  let assert True = list.contains(refs, ref2)
+  let assert True = list.contains(refs, ref1) && list.contains(refs, ref2)
 
   let assert Ok(Nil) = adapter.close()
   let assert Ok(Nil) = storage.partitioned_dets_delete(path)
@@ -68,13 +65,11 @@ pub fn lru_purging_test() {
 
   let assert Ok(ld) = loader.ensure_loaded(ld, ref1, def1)
   let assert Ok(ld) = loader.ensure_loaded(ld, ref2, def2)
-  let assert True = loader.is_loaded(ld, ref1)
-  let assert True = loader.is_loaded(ld, ref2)
+  let assert True = loader.is_loaded(ld, ref1) && loader.is_loaded(ld, ref2)
 
   let assert Ok(ld) = loader.ensure_loaded(ld, ref3, def3)
   let assert False = loader.is_loaded(ld, ref1)
-  let assert True = loader.is_loaded(ld, ref2)
-  let assert True = loader.is_loaded(ld, ref3)
+  let assert True = loader.is_loaded(ld, ref2) && loader.is_loaded(ld, ref3)
 }
 
 @external(erlang, "gleamunison_ffi", "corrupt_handler_stack")
@@ -106,4 +101,47 @@ pub fn parser_coordinate_error_test() {
     parser.parse_string("\n )")
   let assert 2 = line
   let assert 2 = col
+}
+
+@external(erlang, "gleamunison_storage", "test_make_ref")
+fn test_make_ref(bytes: BitArray) -> identity.DefinitionRef
+
+@external(erlang, "gleamunison_storage", "get_open_dets_count")
+fn get_open_dets_count(prefix: String) -> Int
+
+pub fn dets_fd_pool_test() {
+  let path = "/tmp/test_fd_pool"
+  let _ = storage.partitioned_dets_delete(path)
+  let assert Ok(adapter) = storage.partitioned_dets(path)
+
+  let refs = list.map(range(0, 15), fn(i) {
+    test_make_ref(<<i:4, 0:252>>)
+  })
+
+  list.each(refs, fn(r) {
+    let assert Ok(Nil) = adapter.insert(r, <<"data">>)
+    Nil
+  })
+
+  let assert True = get_open_dets_count(path) <= 4
+
+  let assert Ok(Some(<<"data">>)) = adapter.lookup(test_make_ref(<<0:4, 0:252>>))
+  let assert Ok(Some(<<"data">>)) = adapter.lookup(test_make_ref(<<15:4, 0:252>>))
+
+  let assert Ok(Nil) = adapter.close()
+  let assert Ok(Nil) = storage.partitioned_dets_delete(path)
+}
+
+fn range(start: Int, end: Int) -> List(Int) {
+  case start > end {
+    True -> []
+    False -> [start, ..range(start + 1, end)]
+  }
+}
+
+@external(erlang, "gleamunison_ffi", "test_soft_purge_scenario")
+fn test_soft_purge_scenario() -> Result(#(Bool, Bool), String)
+
+pub fn soft_purge_test() {
+  let assert Ok(#(False, True)) = test_soft_purge_scenario()
 }

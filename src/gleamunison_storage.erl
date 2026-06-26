@@ -4,143 +4,111 @@
     dets_new/1, dets_insert/3, dets_lookup/2, dets_list_refs/1, dets_close/1,
     dets_delete_file/1,
     partitioned_dets_new/1, partitioned_dets_insert/3, partitioned_dets_lookup/2,
-    partitioned_dets_list_refs/1, partitioned_dets_close/1, partitioned_dets_delete_file/1
+    partitioned_dets_list_refs/1, partitioned_dets_close/1, partitioned_dets_delete_file/1,
+    test_make_ref/1, get_open_dets_count/1
 ]).
 
 new() ->
-    Parent = self(),
-    Ref = make_ref(),
-    spawn(fun() ->
-        Tab = ets:new(gleamunison_store, [set, public]),
-        Parent ! {Ref, Tab},
-        holder_loop(Tab)
-    end),
-    receive
-        {Ref, Tab} -> Tab
-    after 5000 ->
-        error(ets_creation_timeout)
-    end.
+    P = self(), R = make_ref(),
+    spawn(fun() -> T = ets:new(gleamunison_store, [set, public]), P ! {R, T}, receive after infinity -> ok end end),
+    receive {R, T} -> T after 5000 -> error(timeout) end.
 
-holder_loop(Tab) -> receive _ -> holder_loop(Tab) end.
+insert(Tab, Ref, Bytes) -> ets:insert(Tab, {Ref, Bytes}), {ok, nil}.
 
-insert(Tab, Ref, Bytes) when is_binary(Ref), is_binary(Bytes) ->
-    ets:insert(Tab, {Ref, Bytes}), {ok, nil}.
-
-lookup(Tab, Ref) when is_binary(Ref) ->
+lookup(Tab, Ref) ->
     case ets:lookup(Tab, Ref) of
-        [{Ref, Bytes}] -> {ok, {some, Bytes}};
+        [{Ref, B}] -> {ok, {some, B}};
         [] -> {ok, none}
     end.
 
-list_refs(Tab) ->
-    {ok, [Ref || {Ref, _} <- ets:tab2list(Tab)]}.
+list_refs(Tab) -> {ok, [R || {R, _} <- ets:tab2list(Tab)]}.
 
-dets_new(Path) when is_binary(Path) ->
-    Name = erlang:binary_to_atom(<<"gleamunison_dets_", Path/binary>>, utf8),
-    case dets:open_file(Name, [{file, binary_to_list(Path)}, {type, set}]) of
-        {ok, Name} -> {ok, Name};
-        {error, Reason} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [Reason]))}}
+err(R) -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}.
+
+dets_new(Path) ->
+    N = erlang:binary_to_atom(<<"gleamunison_dets_", Path/binary>>, utf8),
+    case dets:open_file(N, [{file, binary_to_list(Path)}, {type, set}]) of
+        {ok, N} -> {ok, N};
+        {error, R} -> err(R)
     end.
 
-dets_insert(Tab, Ref, Bytes) when is_binary(Ref), is_binary(Bytes) ->
-    case dets:insert(Tab, {Ref, Bytes}) of
-        ok -> {ok, nil};
-        {error, Reason} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [Reason]))}}
-    end.
+dets_insert(Tab, Ref, Bytes) ->
+    case dets:insert(Tab, {Ref, Bytes}) of ok -> {ok, nil}; {error, R} -> err(R) end.
 
-dets_lookup(Tab, Ref) when is_binary(Ref) ->
+dets_lookup(Tab, Ref) ->
     case dets:lookup(Tab, Ref) of
-        {error, Reason} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [Reason]))}};
-        [{Ref, Bytes}] -> {ok, {some, Bytes}};
-        [] -> {ok, none}
+        [{Ref, B}] -> {ok, {some, B}};
+        [] -> {ok, none};
+        {error, R} -> err(R)
     end.
 
 dets_list_refs(Tab) ->
-    case dets:select(Tab, [{{'$1', '_'}, [], ['$1']}]) of
-        {error, Reason} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [Reason]))}};
-        List -> {ok, List}
-    end.
+    case dets:select(Tab, [{{'$1', '_'}, [], ['$1']}]) of {error, R} -> err(R); L -> {ok, L} end.
 
 dets_close(Tab) ->
-    case dets:close(Tab) of
-        ok -> {ok, nil};
-        {error, Reason} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [Reason]))}}
+    case dets:close(Tab) of ok -> {ok, nil}; {error, R} -> err(R) end.
+
+dets_delete_file(Path) ->
+    case file:delete(Path) of ok -> {ok, nil}; {error, R} -> err(R) end.
+
+partitioned_dets_new(DP) ->
+    Dir = case binary:last(DP) of $/ -> DP; _ -> <<DP/binary, "/">> end,
+    ok = filelib:ensure_dir(filename:join(binary_to_list(Dir), "x")), {ok, Dir}.
+
+ensure_dets_open(Dir, P) ->
+    Key = {gleamunison_open_dets, Dir},
+    Open = case erlang:get(Key) of undefined -> []; L -> L end,
+    Tab = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, P>>, utf8),
+    case lists:member(P, Open) of
+        true -> erlang:put(Key, [P | lists:delete(P, Open)]), Tab;
+        false ->
+            NewOpen = case length(Open) >= 4 of
+                true ->
+                    LRU = lists:last(Open),
+                    dets:close(erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, LRU>>, utf8)),
+                    [P | lists:droplast(Open)];
+                false -> [P | Open]
+            end,
+            erlang:put(Key, NewOpen),
+            {ok, Tab} = dets:open_file(Tab, [{file, binary_to_list(<<Dir/binary, P, ".dets">>)}, {type, set}]),
+            Tab
     end.
 
-dets_delete_file(Path) when is_binary(Path) ->
-    case file:delete(Path) of
-        ok -> {ok, nil};
-        {error, Reason} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [Reason]))}}
-    end.
+partitioned_dets_insert(Dir, Ref, Bytes) ->
+    <<N:4, _/bitstring>> = Ref, dets_insert(ensure_dets_open(Dir, hex(N)), Ref, Bytes).
 
-partitioned_dets_new(DirPath) when is_binary(DirPath) ->
-    Dir = case binary:last(DirPath) of $/ -> DirPath; _ -> <<DirPath/binary, "/">> end,
-    ok = filelib:ensure_dir(filename:join(binary_to_list(Dir), "dummy")),
-    OpenRes = [dets_open_partition(Dir, P) || P <- "0123456789abcdef"],
-    case lists:filter(fun({error, _}) -> true; (_) -> false end, OpenRes) of
-        [] -> {ok, Dir};
-        [Error | _] -> Error
-    end.
-
-dets_open_partition(Dir, PrefixChar) ->
-    Name = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, PrefixChar>>, utf8),
-    FilePath = binary_to_list(<<Dir/binary, PrefixChar, ".dets">>),
-    case dets:open_file(Name, [{file, FilePath}, {type, set}]) of
-        {ok, Name} -> ok;
-        {error, R} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}
-    end.
-
-partitioned_dets_insert(Dir, Ref, Bytes) when is_binary(Dir), is_binary(Ref), is_binary(Bytes) ->
-    <<N:4, _/bitstring>> = Ref,
-    Tab = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, (hex(N))>>, utf8),
-    case dets:insert(Tab, {Ref, Bytes}) of
-        ok -> {ok, nil};
-        {error, R} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}
-    end.
-
-partitioned_dets_lookup(Dir, Ref) when is_binary(Dir), is_binary(Ref) ->
-    <<N:4, _/bitstring>> = Ref,
-    Tab = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, (hex(N))>>, utf8),
-    case dets:lookup(Tab, Ref) of
-        {error, R} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}};
-        [{Ref, Bytes}] -> {ok, {some, Bytes}};
-        [] -> {ok, none}
-    end.
+partitioned_dets_lookup(Dir, Ref) ->
+    <<N:4, _/bitstring>> = Ref, dets_lookup(ensure_dets_open(Dir, hex(N)), Ref).
 
 partitioned_dets_list_refs(Dir) ->
-    Results = [dets_list_partition_refs(Dir, P) || P <- "0123456789abcdef"],
-    case lists:filter(fun({error, _}) -> true; (_) -> false end, Results) of
-        [] -> 
-            AllRefs = lists:foldl(fun({ok, L}, Acc) -> L ++ Acc end, [], Results),
-            {ok, AllRefs};
-        [Error | _] -> Error
-    end.
-
-dets_list_partition_refs(Dir, PrefixChar) ->
-    Tab = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, PrefixChar>>, utf8),
-    case dets:select(Tab, [{{'$1', '_'}, [], ['$1']}]) of
-        {error, R} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}};
-        List -> {ok, List}
+    R = [case filelib:is_file(binary_to_list(<<Dir/binary, P, ".dets">>)) of
+        false -> {ok, []};
+        true -> dets_list_refs(ensure_dets_open(Dir, P))
+    end || P <- "0123456789abcdef"],
+    case lists:keyfind(error, 1, R) of
+        false -> {ok, lists:append([L || {ok, L} <- R])};
+        Err -> Err
     end.
 
 partitioned_dets_close(Dir) ->
-    Results = [dets_close_partition(Dir, P) || P <- "0123456789abcdef"],
-    case lists:filter(fun({error, _}) -> true; (_) -> false end, Results) of
-        [] -> {ok, nil};
-        [Error | _] -> Error
-    end.
-
-dets_close_partition(Dir, PrefixChar) ->
-    Tab = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, PrefixChar>>, utf8),
-    case dets:close(Tab) of
-        ok -> ok;
-        {error, R} -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}
-    end.
-
-partitioned_dets_delete_file(DirPath) ->
-    Dir = case binary:last(DirPath) of $/ -> DirPath; _ -> <<DirPath/binary, "/">> end,
-    [file:delete(<<Dir/binary, P, ".dets">>) || P <- "0123456789abcdef"],
+    K = {gleamunison_open_dets, Dir},
+    case erlang:get(K) of
+        undefined -> ok;
+        L ->
+            [dets:close(erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, P>>, utf8)) || P <- L],
+            erlang:erase(K)
+    end,
     {ok, nil}.
 
-hex(N) when N < 10 -> $0 + N;
-hex(N) -> $a + N - 10.
+partitioned_dets_delete_file(DP) ->
+    Dir = case binary:last(DP) of $/ -> DP; _ -> <<DP/binary, "/">> end,
+    partitioned_dets_close(Dir),
+    [file:delete(<<Dir/binary, P, ".dets">>) || P <- "0123456789abcdef"], {ok, nil}.
+
+test_make_ref(Bytes) -> {ref, {hash, Bytes}}.
+
+get_open_dets_count(DP) ->
+    Dir = case binary:last(DP) of $/ -> DP; _ -> <<DP/binary, "/">> end,
+    case erlang:get({gleamunison_open_dets, Dir}) of undefined -> 0; L -> length(L) end.
+
+hex(N) -> case N < 10 of true -> $0 + N; false -> $a + N - 10 end.

@@ -8,8 +8,8 @@ import gleamunison/compile.{type Compiler, new as new_compiler, compile_definiti
 @external(erlang, "gleamunison_ffi", "load_binary")
 fn load_binary(mod_name: String, beam: BitArray) -> Result(Nil, String)
 
-@external(erlang, "gleamunison_ffi", "unload_binary")
-fn unload_binary(mod_name: String) -> Result(Nil, String)
+@external(erlang, "gleamunison_ffi", "soft_purge_binary")
+fn soft_purge_binary(mod_name: String) -> Result(Bool, String)
 
 pub type LoaderError {
   CompileFailed(DefinitionRef, message: String)
@@ -23,6 +23,7 @@ pub opaque type Loader {
     failed: Dict(DefinitionRef, LoaderError),
     order: List(DefinitionRef),
     max_size: Int,
+    pending_purge: Set(DefinitionRef),
   )
 }
 
@@ -33,6 +34,7 @@ pub fn new_loader() -> Loader {
     failed: dict.new(),
     order: [],
     max_size: 1000,
+    pending_purge: set.new(),
   )
 }
 
@@ -43,11 +45,29 @@ pub fn new_loader_with_limit(limit: Int) -> Loader {
     failed: dict.new(),
     order: [],
     max_size: limit,
+    pending_purge: set.new(),
   )
 }
 
 pub fn is_loaded(ld: Loader, ref: DefinitionRef) -> Bool {
   set.contains(ld.loaded, ref)
+}
+
+fn retry_pending_purges(ld: Loader) -> Loader {
+  let #(still_pending, successful_purges) = set.fold(
+    ld.pending_purge,
+    #(set.new(), set.new()),
+    fn(acc, ref) {
+      let #(pending, success) = acc
+      let mod_name = module_name_for(ref)
+      case soft_purge_binary(mod_name) {
+        Ok(True) -> #(pending, set.insert(success, ref))
+        _ -> #(set.insert(pending, ref), success)
+      }
+    },
+  )
+  let next_loaded = set.fold(successful_purges, ld.loaded, set.delete)
+  Loader(..ld, loaded: next_loaded, pending_purge: still_pending)
 }
 
 fn compile_and_load(ref: DefinitionRef, def: Definition, compiler: Compiler) -> Result(BitArray, String) {
@@ -62,6 +82,7 @@ pub fn ensure_loaded(
   ref: DefinitionRef,
   def: Definition,
 ) -> Result(Loader, #(Loader, LoaderError)) {
+  let ld = retry_pending_purges(ld)
   case set.contains(ld.loaded, ref) {
     True -> {
       let next_order = [ref, ..list.filter(ld.order, fn(r) { r != ref })]
@@ -80,13 +101,19 @@ pub fn ensure_loaded(
                   case list.length(next_order) > ld.max_size {
                     True -> {
                       let #(keep, evict) = list.split(next_order, ld.max_size)
-                      list.each(evict, fn(evicted_ref) {
-                        let evicted_mod = module_name_for(evicted_ref)
-                        let _ = unload_binary(evicted_mod)
-                        Nil
-                      })
-                      let next_loaded = list.fold(evict, set.insert(ld.loaded, ref), set.delete)
-                      Ok(Loader(..ld, loaded: next_loaded, order: keep))
+                      let #(next_loaded, next_pending) = list.fold(
+                        evict,
+                        #(set.insert(ld.loaded, ref), ld.pending_purge),
+                        fn(acc, evicted_ref) {
+                          let #(loaded_set, pending_set) = acc
+                          let evicted_mod = module_name_for(evicted_ref)
+                          case soft_purge_binary(evicted_mod) {
+                            Ok(True) -> #(set.delete(loaded_set, evicted_ref), pending_set)
+                            _ -> #(loaded_set, set.insert(pending_set, evicted_ref))
+                          }
+                        },
+                      )
+                      Ok(Loader(..ld, loaded: next_loaded, order: keep, pending_purge: next_pending))
                     }
                     False -> {
                       Ok(Loader(..ld, loaded: set.insert(ld.loaded, ref), order: next_order))
