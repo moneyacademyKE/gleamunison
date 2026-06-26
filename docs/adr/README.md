@@ -25,3 +25,5 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0019](0019-alpha-equivalence-normalizer.md) | Alpha-Equivalence Normalization for Polymorphic Types | Accepted |
 | [ADR-0020](0020-dets-persistent-storage-and-sha256-hashing.md) | DETS Persistent Storage, SHA256 Hashing, and S-Expression Parser | Accepted |
 | [ADR-0021](0021-runtime-tradeoffs-and-robustness-safeguards.md) | Runtime Tradeoffs & Robustness Safeguards | Accepted |
+| [ADR-0022](0022-safe-deployment-and-remote-synchronization.md) | Safe Remote Synchronization and Environment-Isolated Pushes | Accepted |
+

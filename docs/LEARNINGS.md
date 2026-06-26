@@ -123,3 +123,8 @@ Upgrading from 32-bit `erlang:phash2` to SHA256 provides secure, collision-free 
 ## 17. S-expression parsing within LOC constraints
 
 Recursive-descent parsing and lexical tokenization can be implemented in Gleam in under 110 lines of code. This provides a clean, zero-dependency text interface for let-bindings, lambdas, lists, and primitives without bloat.
+
+## 18. Environment-isolated git push credential resolution
+
+System environments or active workflows can export default credentials like `GITHUB_TOKEN` which override the local keyring helper. Sanitizing the environment via `env -u GITHUB_TOKEN` allows Git to successfully fallback to keychain authentication.
+

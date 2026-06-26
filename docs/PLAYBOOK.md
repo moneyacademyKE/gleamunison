@@ -69,6 +69,14 @@ Every significant design decision is recorded as an ADR in `docs/adr/`.
 Before making a change, read the relevant ADRs. After making a change,
 write a new ADR or update an existing one.
 
+### Deployment and Synchronization
+
+Always pre-verify all remote transfers:
+1. Execute a dry run (`env -u GITHUB_TOKEN git push --dry-run`).
+2. Run standard pushes (`env -u GITHUB_TOKEN git push`).
+3. Never use standard `--force`. If history rewriting is required, use `--force-with-lease --force-if-includes`.
+
+
 ### LOC Constraints
 All Gleam/Erlang source files MUST be strictly under 150 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
 

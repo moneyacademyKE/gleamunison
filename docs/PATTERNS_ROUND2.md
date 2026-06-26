@@ -57,4 +57,12 @@ Track coordinates (line & col offsets) dynamically during lexical passes and bin
 pub type TokenInfo {
   TokenInfo(token: Token, line: Int, col: Int)
 }
+
+## 7. Dry-Run Preflight Verification (Deployment Pattern)
+Perform dry-run remote executions first to validate authentication, remote status, and credentials without side-effects or partial changes:
+```sh
+env -u GITHUB_TOKEN git push --dry-run
+```
+This isolates local keychain overrides and validates host network and authentication states safely.
+
 ```
