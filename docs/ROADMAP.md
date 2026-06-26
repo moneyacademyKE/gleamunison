@@ -82,11 +82,9 @@ Hash → Codebase → Compile → Load → Execute.
 
 ### Status: Types implemented. DETS/Mnesia backends and sync runtime are future work.
 
-- **3.1 DETS storage adapter** — `StorageAdapter` type defined. DETS implementation
-  is future work.
+- **3.1 Persistent storage adapters** — Implement DETS and SQLite adapters to store serialized definition bytes on disk, replacing the purely in-memory ETS table.
 - **3.2 Mnesia storage adapter** — Future work.
-- **3.3 Pull-based sync** — `SyncState`, `PeerState`, `pull_sync`, `push_sync`
-  with Erlang distribution FFI stubs.
+- **3.3 Pull-based sync** — `SyncState`, `PeerState`, `pull_sync`, `push_sync` with Erlang distribution FFI stubs.
 - **3.4 Namespace management** — Future work.
 
 ---
@@ -97,9 +95,11 @@ Hash → Codebase → Compile → Load → Execute.
 
 ### Status: Design documented. Implementation is future work.
 
-- Architecture supports: lazy loading, pre-compilation, module unloading,
-  supervision trees, telemetry.
-- `phash2` is prototype-only — swap to Blake2b for production.
+- **4.1 In-memory Abstract Format compilation** — Generate Erlang Abstract Format in memory and compile using `compile:forms/2` to eliminate temporary file system I/O latency.
+- **4.2 Cryptographic Hash migration** — Migrate from 32-bit `phash2` to 512-bit Blake2b or SHA3 to eliminate hash collision risks.
+- **4.3 Full Hindley-Milner solver** — Upgrade the type substitution engine to a stateful constraint-solving algorithm (Algorithm W) to support complex type variables inference.
+- **4.4 Process Dictionary stack protection** — Wrap process dictionary operations in safe wrapper APIs or migrate to process-local state holders to prevent manual dictionary corruption.
+- **4.5 Telemetry and Supervision** — Supervision trees, dynamic module unloading, and observability telemetry.
 
 ---
 
