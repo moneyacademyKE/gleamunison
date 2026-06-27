@@ -1,0 +1,7 @@
+---
+version: 2.0.1
+title: parser_ast_snapshot
+file: ./test/parser_snapshot_test.gleam
+test_name: parser_ast_snapshot_test
+---
+SLet("x", SInt(1), SLet("y", SInt(2), SLambda("z", SList([SVar("x"), SVar("y"), SVar("z")]))))

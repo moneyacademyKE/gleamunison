@@ -10,8 +10,9 @@
     get_plain_args/0,
     eval_expression/1,
     state_get/1, state_set/2,
-    file_read/1, file_write/2, file_delete/1, to_dynamic/1,
+    to_dynamic/1,
     spawn_concurrent_evals/0
+
 
 
 ]).
@@ -171,23 +172,7 @@ state_set(Key, Val) when is_binary(Key) ->
     erlang:put(Key, Val),
     {ok, ok}.
 
-file_read(Path) when is_binary(Path) ->
-    case file:read_file(Path) of
-        {ok, Data} -> {ok, Data};
-        {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
-    end.
 
-file_write(Path, Data) when is_binary(Path) ->
-    case file:write_file(Path, Data) of
-        ok -> {ok, ok};
-        {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
-    end.
-
-file_delete(Path) when is_binary(Path) ->
-    case file:delete(Path) of
-        ok -> {ok, ok};
-        {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
-    end.
 
 eval_expression(Expr) when is_binary(Expr) ->
     try

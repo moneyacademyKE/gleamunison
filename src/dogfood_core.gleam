@@ -1,6 +1,8 @@
 import gleam/io
 import gleam/string
 import gleam/bit_array
+import simplifile
+
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{Some, None}
 import gleam/int
@@ -176,14 +178,36 @@ pub fn level41() -> Nil {
   io.println("Level 41: OK")
 }
 
-@external(erlang, "gleamunison_ffi", "file_read")
-fn ffi_file_read(path: BitArray) -> Result(BitArray, BitArray)
+fn ffi_file_read(path: BitArray) -> Result(BitArray, BitArray) {
+  case bit_array.to_string(path) {
+    Ok(path_str) -> case simplifile.read_bits(path_str) {
+      Ok(bits) -> Ok(bits)
+      Error(e) -> Error(bit_array.from_string(string.inspect(e)))
+    }
+    Error(_) -> Error(bit_array.from_string("invalid_utf8_path"))
+  }
+}
 
-@external(erlang, "gleamunison_ffi", "file_write")
-fn ffi_file_write(path: BitArray, data: BitArray) -> Result(BitArray, BitArray)
+fn ffi_file_write(path: BitArray, data: BitArray) -> Result(BitArray, BitArray) {
+  case bit_array.to_string(path) {
+    Ok(path_str) -> case simplifile.write_bits(path_str, data) {
+      Ok(Nil) -> Ok(data)
+      Error(e) -> Error(bit_array.from_string(string.inspect(e)))
+    }
+    Error(_) -> Error(bit_array.from_string("invalid_utf8_path"))
+  }
+}
 
-@external(erlang, "gleamunison_ffi", "file_delete")
-fn ffi_file_delete(path: BitArray) -> Result(BitArray, BitArray)
+fn ffi_file_delete(path: BitArray) -> Result(BitArray, BitArray) {
+  case bit_array.to_string(path) {
+    Ok(path_str) -> case simplifile.delete(path_str) {
+      Ok(Nil) -> Ok(bit_array.from_string("ok"))
+      Error(e) -> Error(bit_array.from_string(string.inspect(e)))
+    }
+    Error(_) -> Error(bit_array.from_string("invalid_utf8_path"))
+  }
+}
+
 
 pub fn level47() -> Nil {
   io.println("--- Level 47: File I/O ---")

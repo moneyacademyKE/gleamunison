@@ -1,0 +1,7 @@
+---
+version: 2.0.1
+title: type_pretty_snapshot
+file: ./test/parser_snapshot_test.gleam
+test_name: type_pretty_snapshot_test
+---
+a -> b -> #67329053544b[a]

@@ -23,6 +23,8 @@ import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/types.{empty_cache, type TypeCache}
 import gleamunison/repl_io
 import gleamunison/repl_eval
+import gleamunison/type_pretty
+
 
 @external(erlang, "erlang", "unique_integer")
 fn ffi_unique_integer() -> Int
@@ -34,7 +36,7 @@ pub fn eval_string(expr: String) -> Result(String, String) {
       Error("Define not supported in eval endpoint: " <> name)
     Ok(term) -> {
       case repl_eval.do_eval(term, "repl_expr", empty_cache(), []) {
-        Ok(#(val_str, typ, _)) -> Ok(val_str <> " : " <> string.inspect(typ))
+        Ok(#(val_str, typ, _)) -> Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
         Error(err) -> Error(err)
       }
     }
@@ -50,12 +52,13 @@ pub fn eval_string_unique(expr: String) -> Result(String, String) {
       let unique_id = ffi_unique_integer()
       let ref_name = "repl_expr_" <> int.to_string(unique_id)
       case repl_eval.do_eval(term, ref_name, empty_cache(), []) {
-        Ok(#(val_str, typ, _)) -> Ok(val_str <> " : " <> string.inspect(typ))
+        Ok(#(val_str, typ, _)) -> Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
         Error(err) -> Error(err)
       }
     }
   }
 }
+
 
 pub fn start_repl() -> Nil {
   io.println("=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit.")
@@ -164,9 +167,10 @@ fn handle_line(
     Ok(term) -> {
       case repl_eval.do_eval(term, "repl_expr", cache, prev_defs) {
         Ok(#(val_str, typ, next_cache)) -> {
-          io.println(val_str <> " : " <> string.inspect(typ))
+          io.println(val_str <> " : " <> type_pretty.pretty_print(typ))
           Ok(#(next_cache, prev_defs))
         }
+
         Error(err) -> {
           io.println(err)
           Error(Nil)
