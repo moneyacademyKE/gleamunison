@@ -43,8 +43,8 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 | Step | Status |
 |---|---|
-| AST → Hash (phash2) | ✓ Content-addressed identity |
-| Codebase insert with hash verification | ✓ In-memory, dedup |
+| AST → Hash (SHA256) | ✓ Content-addressed identity |
+| Codebase insert with hash verification | ✓ DETS/ETS persistence, dedup |
 | Compile to BEAM binary (all Term variants) | ✓ Int/Float/Text/List/Lambda/Apply/Let/Match |
 | Load into VM (`code:load_binary/3`) | ✓ OTP 29 compatible |
 | Type inference (Int/Float/Text/List) | ✓ Hindley-Milner style |
@@ -105,10 +105,10 @@ If you already have Erlang installed, this is as close to a zero-install languag
 ## Quick start
 
 ```sh
-cd ~/Desktop/gleamunison
-gleam run        # Run the full pipeline demonstration
-gleam test       # Run tests
-./gleamunison    # Standalone escript (after ./build_escript.sh)
+cd ~/Desktop/gleamunison_dogfood/gleamunison_repo
+gleam run -- all             # Run all 1000 dogfooding levels
+gleam test                  # Run unit tests
+./gleamunison_escript repl   # Start interactive REPL via standalone escript (after ./build_escript.sh)
 ```
 
 ## Documentation
