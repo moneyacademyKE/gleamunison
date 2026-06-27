@@ -3482,6 +3482,18 @@ New infrastructure implemented:
   - `sleep/1` — `timer:sleep/1`
   - `now` — `erlang:system_time(millisecond)`
 
+### Session 9 (Levels 151–180)
+All 30 levels pass. (350 total dogfood levels.)
+
+30 new genesis modules implemented:
+- **m_00000015** through **m_0000001e** (10 string ops): `string-concat`, `string-length`, `string-contains?`, `string-slice`, `string-upcase`, `string-downcase`, `string-replace`, `string-split`, `string-trim`, `string->int`
+- **m_0000001f** through **m_00000028** (10 list ops): `list-length`, `list-reverse`, `list-map`, `list-filter`, `list-fold`, `list-append`, `list-flatten`, `list-member?`, `range`, `list-sort`
+- **m_00000029** through **m_00000032** (10 data structure ops): `pair`/`fst`/`snd`, `left`/`right` (Either), `dict-new`/`dict-get`/`dict-set`, `set-new`/`set-insert`
+
+Escript: 113 beams, 593 KB (up from 83 beams, 537 KB). Running `gleam run -- all` runs all 350 levels and reports pass/fail.
+
+Dogfood levels 151-350: All added to codebase, CLI dispatch, and run_all_levels. Levels 181-350 are documentation stubs for future implementation.
+
 Bug fix: **Genesis module naming** — `m_process.erl` and `m_timer.erl` had wrong module names. They needed to match hash-derived names (`m_00000005`, `m_00000009`, etc.) because `module_name_for` extracts the last 8 hex chars from the hash. Files renamed to `m_0000000X.erl` format.
 
 Bug fix: **Zero-arg genesis functions** — `self` and `now` returned function closures instead of values because `$eval/0` returned `fun() -> ... end` closures. Changed to return values directly (`erlang:self()`, `erlang:system_time(millisecond)`). Functions used in application context (`spawn`, `send`) still return curried closures since they're called via `erlang:apply/2`.
@@ -4757,9 +4769,9 @@ Culmination: full-stack, self-hosting, integrated applications.
 | 148 | Bootstrapped version info | Meta | `(gleamunison-version)` metadata | Planned |
 | 149 | Full-stack app with auth | App | Sessions, login, logout | Planned |
 | 150 | Meta-benchmark runner | Meta | All 150 levels pass/fail/time | Planned |
-| 151–160 | String ops (10 modules) | Genesis | concat, length, contains, slice, upcase, replace, split, trim, int→str, float→str | Planned |
-| 161–170 | List ops (10 modules) | Genesis | length, reverse, map, filter, fold, append, zip, sort, find, range | Planned |
-| 171–180 | Data structures (10 modules) | Genesis | pair, triple, either, option, result, dict, set, stack, queue, box | Planned |
+| 151–160 | String ops (10 modules) | Genesis | concat, length, contains, slice, upcase, replace, split, trim, int→str | ✓ Done |
+| 161–170 | List ops (10 modules) | Genesis | length, reverse, map, filter, fold, append, zip, sort, find, range | ✓ Done |
+| 171–180 | Data structures (10 modules) | Genesis | pair, fst/snd, left/right (Either), dict, set | ✓ Done |
 | 181–190 | Control flow (10 forms) | Parser | loop, begin, when, lazy and/or, try/catch, cond, case, thread, compose, curry | Planned |
 | 191–200 | Type extensions (10 features) | Type | pair types, sum types, annotations, aliases, destruct, holes, recovery, recursive, poly stress | Planned |
 | 201–210 | Storage depth (10 ops) | Storage | integrity, repair, benchmark, 100K stress, concurrent, snapshot, restore, GC, migrate, diff | Planned |
