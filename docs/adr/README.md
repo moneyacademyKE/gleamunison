@@ -28,5 +28,6 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0022](0022-safe-deployment-and-remote-synchronization.md) | Safe Remote Synchronization and Environment-Isolated Pushes | Accepted |
 | [ADR-0023](0023-interactive-repl-and-curried-beam-emission.md) | Interactive REPL and Curried BEAM Emission | Accepted |
 | [ADR-0024](0024-repl-purging-stateful-ffi-and-web-dashboard.md) | REPL Module Purging, Stateful/File FFI, and Dynamic Web Dashboard | Accepted |
-
-
+| [ADR-0025](0025-lower-typecheck-module.md) | Code Deconstruction and Lowering-Typecheck Division | Accepted |
+| [ADR-0026](0026-canonical-hash-serialization.md) | Canonical Binary Serialization for Hash Invariants | Accepted |
+| [ADR-0027](0027-community-library-package-integration.md) | Integration of Community Library Packages | Accepted |
