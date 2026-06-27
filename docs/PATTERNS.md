@@ -303,5 +303,26 @@ Inheriting standard streams (`{:err :inherit}`) for long-running subprocess pipe
 
 **Applied in:** `run_playbook_tests.clj`
 
+---
 
+## 25. Clustered execution via Location transparency
 
+Representing remote computation nodes as lightweight type variables (e.g. `Location` and `Task`) and mapping them to Erlang node spawning primitives. This ensures location transparency for distributed execution without compiler overhead.
+
+**Applied in:** `repl.gleam`, `gleamunison_repl_ffi.erl`
+
+---
+
+## 26. Supervisor process tree link wrapping
+
+Spawning supervisor trees in dedicated worker threads to isolate active Erlang node links. This prevents termination signals from cascading and crashing the parent test/runner environments.
+
+**Applied in:** `gleamunison_sup.erl`, `roadmap_tdd_test.gleam`
+
+---
+
+## 27. Mnesia transactional database adapter
+
+Implementing storage replication and transactional security across distributed nodes using Erlang's Mnesia database transactions (`mnesia:transaction/1`).
+
+**Applied in:** `storage.gleam`, `gleamunison_storage.erl`

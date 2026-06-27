@@ -184,3 +184,15 @@ Unresolved name binding errors (NameNotFound) are common developer mistakes. Imp
 ## 33. Subprocess pipe buffering and state pollution loops
 
 Background subprocess runners using pipes hang if their stderr stream is not inherited/drained, as the OS pipe buffer fills up and blocks writes. Furthermore, continuous REPL session execution can cause state pollution between test levels (such as mutual recursive redefinitions of standard primitives like `add` and `sub`), which must be cleared by selective session restarts at logical boundaries.
+
+## 34. Content-addressed module naming enables Erlang fun serialization across nodes
+
+Erlang's binary serialization (`term_to_binary/1` and `binary_to_term/1`) can serialize dynamic closures and continuations across nodes only if the module names and versions loaded on both nodes are exactly identical (matching MD5 hashes). Because Gleamunison compiles definitions into content-addressed modules named `m_<hash>.beam`, any identical module name guarantees 100% identical compiled representation, making continuation serialization work natively and flawlessly.
+
+## 35. Mnesia for ACID replicated distributed code storage
+
+ETS and DETS storage adapters are limited to a single node. Erlang's Mnesia database provides a distributed table storage mechanism. Implementing a Mnesia storage adapter via transactional `mnesia:write/1` and `mnesia:read/2` transactions lets us achieve ACID guarantees and automatic database replication across clustered nodes.
+
+## 36. Supervisor process link isolation for test runners
+
+Using `supervisor:start_link` starts the supervisor and links it to the calling process. During unit testing, calling `exit(SupPid, kill)` triggers a cascaded exit signal that kills the test runner process. Spawning the supervisor inside an isolated process wraps the link topology, preventing test runner crash propagation.

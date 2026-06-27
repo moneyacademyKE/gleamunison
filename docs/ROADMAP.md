@@ -23,15 +23,8 @@ From architectural specification to production-grade content-addressed runtime.
 
 ---
 
-## Phase 5: Distributed Topology & Concurrency (Next Phase)
-
-**Goal:** Turn Gleamunison into a multi-node, location-aware distributed cluster.
-
-- **5.1 Distributed `Remote` Ability**: Add native support for location-based computation redirects:
-  `remoteCompute : Location -> (() ->{Remote} a) ->{IO, Remote} a`
-- **5.2 Serializable Continuations**: Capture stack-level execution checkpoints to resume suspended handler computations on remote BEAM nodes.
-- **5.3 Mnesia storage cluster**: Add multi-node replicated database codebases using Erlang Mnesia instead of local DETS/ETS.
-- **5.4 Supervision Trees**: Implement dynamic BEAM supervisors to hot-restart crashed actors while preserving stack-based handlers.
+## Phase 5: Distributed Topology & Concurrency ✓
+- **Status:** COMPLETE. Added `Remote` ability with `forkAt`, `await`, and `here` operations, Mnesia replicated storage adapter, dynamic OTP supervision trees (`gleamunison_sup`), and serializable continuations using Erlang's binary serialization engine.
 
 ---
 
