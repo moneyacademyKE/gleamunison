@@ -1,12 +1,17 @@
 import gleam/dict
 import gleam/list
 import gleam/result
+import gleamunison/ast
 import gleamunison/identity.{Local}
-import gleamunison/ast as ast
-import gleamunison/types.{type TypeCache, type InferenceError, CTTerm, TypeMismatch, CTAbility}
-import gleamunison/infer_helper.{substitute, list_all_match}
+import gleamunison/infer_helper.{list_all_match, substitute}
+import gleamunison/types.{
+  type InferenceError, type TypeCache, CTAbility, CTTerm, TypeMismatch,
+}
 
-pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, InferenceError) {
+pub fn infer_term(
+  term: ast.Term,
+  cache: TypeCache,
+) -> Result(ast.Type, InferenceError) {
   case term {
     ast.Int(_) -> Ok(ast.Builtin(ast.IntType))
     ast.Float(_) -> Ok(ast.Builtin(ast.FloatType))
@@ -48,12 +53,22 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
                     [] -> Ok(ret)
                     _ -> Ok(ast.Fn(rest, ret, req))
                   }
-                False -> Error(TypeMismatch(param_typ, arg_typ, "argument type mismatch"))
+                False ->
+                  Error(TypeMismatch(
+                    param_typ,
+                    arg_typ,
+                    "argument type mismatch",
+                  ))
               }
           }
         }
         ast.TypeVar(_) -> Ok(ast.TypeVar(-1))
-        other -> Error(TypeMismatch(ast.Fn([], ast.TypeVar(0), ast.Required([])), other, "not a function"))
+        other ->
+          Error(TypeMismatch(
+            ast.Fn([], ast.TypeVar(0), ast.Required([])),
+            other,
+            "not a function",
+          ))
       }
     }
     ast.Let(binder: Local(_), value: v, body: b) -> {
@@ -71,7 +86,12 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
         Ok(CTAbility(ops)) -> {
           case list.drop(ops, op_idx) |> list.first {
             Ok(op_typ) -> Ok(op_typ.output)
-            Error(_) -> Error(TypeMismatch(ast.TypeVar(-1), ast.TypeVar(-1), "op index out of bounds"))
+            Error(_) ->
+              Error(TypeMismatch(
+                ast.TypeVar(-1),
+                ast.TypeVar(-1),
+                "op index out of bounds",
+              ))
           }
         }
         _ -> Ok(ast.TypeVar(-1))

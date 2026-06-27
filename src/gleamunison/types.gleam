@@ -1,8 +1,8 @@
 import gleam/dict.{type Dict}
 import gleam/list
 import gleam/option.{type Option}
+import gleamunison/ast
 import gleamunison/identity.{type DefinitionRef}
-import gleamunison/ast as ast
 
 pub type ComputedType {
   CTTerm(typ: ast.Type)
@@ -33,7 +33,13 @@ pub type InferenceError {
 pub type HandlerError {
   MissingOperation(ability: DefinitionRef, op_name: String, op_index: Int)
   ExtraOperation(ability: DefinitionRef, op_index: Int)
-  ArityMismatch(ability: DefinitionRef, op_name: String, op_index: Int, expected: Int, got: Int)
+  ArityMismatch(
+    ability: DefinitionRef,
+    op_name: String,
+    op_index: Int,
+    expected: Int,
+    got: Int,
+  )
 }
 
 pub fn validate_handler(
@@ -55,7 +61,14 @@ pub fn validate_handler(
                   let expected = list.length(op.inputs)
                   case arity == expected {
                     True -> Ok(Nil)
-                    False -> Error(ArityMismatch(ability_ref, op_name, idx, expected, arity))
+                    False ->
+                      Error(ArityMismatch(
+                        ability_ref,
+                        op_name,
+                        idx,
+                        expected,
+                        arity,
+                      ))
                   }
                 }
               }

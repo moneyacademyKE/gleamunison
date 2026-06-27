@@ -4,9 +4,16 @@ import gleam/list
 import gleam/string
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 
-pub type HandlerFrame { HandlerFrame(ability: DefinitionRef, ops: Dict(Int, OpHandler)) }
-pub type OpHandler = fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic
-pub type RuntimeConfig { RuntimeConfig(ambient_handlers: List(HandlerFrame)) }
+pub type HandlerFrame {
+  HandlerFrame(ability: DefinitionRef, ops: Dict(Int, OpHandler))
+}
+
+pub type OpHandler =
+  fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic
+
+pub type RuntimeConfig {
+  RuntimeConfig(ambient_handlers: List(HandlerFrame))
+}
 
 @external(erlang, "gleamunison_effets", "handle_comp")
 fn ffi_handle_comp(handler: Dynamic, thunk: fn() -> Dynamic) -> Dynamic

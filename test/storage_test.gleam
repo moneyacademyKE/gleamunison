@@ -1,15 +1,15 @@
-import gleam/option.{Some, None}
+import gleam/option.{None, Some}
+import gleamunison/codebase
 import gleamunison/identity.{Ref, hash_bytes}
 import gleamunison/storage.{inmemory}
-import gleamunison/sync.{pull_sync, new_sync_state}
+import gleamunison/sync.{new_sync_state, pull_sync}
 import gleamunison/sync_types.{PeerId}
-import gleamunison/codebase
 
 pub fn storage_roundtrip_test() {
   let adapter = inmemory()
   let ref = Ref(hash_bytes(<<"myref">>))
   let data = <<"hello world">>
-  
+
   let assert Ok(None) = adapter.lookup(ref)
   let assert Ok(Nil) = adapter.insert(ref, data)
   let assert Ok(Some(retrieved)) = adapter.lookup(ref)

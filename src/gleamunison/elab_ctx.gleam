@@ -1,6 +1,6 @@
 import gleam/dict.{type Dict}
-import gleamunison/identity.{type DefinitionRef, type LocalVar, Local}
 import gleamunison/elab_types.{type ElaborateError, NameNotFound}
+import gleamunison/identity.{type DefinitionRef, type LocalVar, Local}
 
 pub type ElabCtx {
   ElabCtx(
@@ -19,10 +19,16 @@ pub fn empty_elab_ctx() -> ElabCtx {
 pub fn add_binding(ctx: ElabCtx, name: String) -> #(ElabCtx, LocalVar) {
   let v = Local(ctx.next_local)
   let new_bindings = dict.insert(ctx.bindings, name, v)
-  #(ElabCtx(ctx.names, new_bindings, ctx.next_local + 1, ctx.abilities, ctx.ops), v)
+  #(
+    ElabCtx(ctx.names, new_bindings, ctx.next_local + 1, ctx.abilities, ctx.ops),
+    v,
+  )
 }
 
-pub fn lookup_binding(ctx: ElabCtx, name: String) -> Result(LocalVar, ElaborateError) {
+pub fn lookup_binding(
+  ctx: ElabCtx,
+  name: String,
+) -> Result(LocalVar, ElaborateError) {
   case dict.get(ctx.bindings, name) {
     Ok(v) -> Ok(v)
     Error(_) -> Error(NameNotFound(name))

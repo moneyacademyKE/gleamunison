@@ -13,7 +13,34 @@ fn get_char(alphabet: List(String), index: Int) -> String {
 }
 
 fn var_name(index: Int) -> String {
-  let alphabet = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
+  let alphabet = [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m",
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z",
+  ]
   case index < 26 {
     True -> get_char(alphabet, index)
     False -> {
@@ -48,13 +75,16 @@ pub fn type_to_doc(t: Type) -> Document {
               doc.nest(
                 doc.concat([
                   doc.soft_break,
-                  doc.join(arg_docs, with: doc.concat([doc.from_string(","), doc.space])),
+                  doc.join(
+                    arg_docs,
+                    with: doc.concat([doc.from_string(","), doc.space]),
+                  ),
                 ]),
                 2,
               ),
               doc.soft_break,
               doc.from_string("]"),
-            ])
+            ]),
           )
         }
       }
@@ -62,31 +92,37 @@ pub fn type_to_doc(t: Type) -> Document {
     ast.Fn(params, result, requires) -> {
       let param_docs = list.map(params, type_to_doc)
       let result_doc = type_to_doc(result)
-      
+
       let ast.Required(abilities) = requires
       let req_doc = case abilities {
         [] -> doc.from_string("")
         _ -> {
-          let ability_docs = list.map(abilities, fn(el) {
-            case el {
-              ast.ReqVar(idx) -> doc.from_string("e" <> int.to_string(idx))
-              ast.Concrete(ast.AbilityRef(Ref(hash))) -> doc.from_string("#" <> hash_to_short_string(hash))
-            }
-          })
+          let ability_docs =
+            list.map(abilities, fn(el) {
+              case el {
+                ast.ReqVar(idx) -> doc.from_string("e" <> int.to_string(idx))
+                ast.Concrete(ast.AbilityRef(Ref(hash))) ->
+                  doc.from_string("#" <> hash_to_short_string(hash))
+              }
+            })
           doc.concat([
             doc.from_string("{"),
-            doc.join(ability_docs, with: doc.concat([doc.from_string(","), doc.space])),
+            doc.join(
+              ability_docs,
+              with: doc.concat([doc.from_string(","), doc.space]),
+            ),
             doc.from_string("}"),
           ])
         }
       }
-      
+
       let arrow = doc.concat([doc.from_string("->"), req_doc])
-      
+
       let all_parts = list.append(param_docs, [result_doc])
-      doc.group(
-        doc.join(all_parts, with: doc.concat([doc.space, arrow, doc.space]))
-      )
+      doc.group(doc.join(
+        all_parts,
+        with: doc.concat([doc.space, arrow, doc.space]),
+      ))
     }
   }
 }

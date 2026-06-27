@@ -1,14 +1,14 @@
 import gleam/list
-import gleam/option.{Some, None}
+import gleam/option.{None, Some}
 import gleam/string
-import gleamunison/identity.{Ref, hash_bytes}
 import gleamunison/ast
-import gleamunison/elab_types.{SInt, SVar, SList, SLet, SLambda}
 import gleamunison/codebase.{hash_of_definition}
-import gleamunison/parser
+import gleamunison/elab_types.{SInt, SLambda, SLet, SList, SVar}
+import gleamunison/identity.{Ref, hash_bytes}
 import gleamunison/lexer
-import gleamunison/storage
 import gleamunison/loader
+import gleamunison/parser
+import gleamunison/storage
 
 pub fn sha256_hash_length_test() {
   let def = ast.TermDef(term: ast.Int(42), typ: ast.Builtin(ast.IntType))
@@ -80,7 +80,12 @@ fn corrupt_handler_stack(val: String) -> Nil
 fn assert_throws_corrupted_stack(fun: fn() -> Nil) -> Nil
 
 @external(erlang, "gleamunison_effets", "do_op")
-fn ffi_do_op(ability: String, op: Int, args: List(String), cont: fn(String) -> Nil) -> Nil
+fn ffi_do_op(
+  ability: String,
+  op: Int,
+  args: List(String),
+  cont: fn(String) -> Nil,
+) -> Nil
 
 pub fn stack_corruption_protection_test() {
   corrupt_handler_stack("bad stack value")
@@ -93,8 +98,10 @@ pub fn parser_s_expression_test() {
   let assert Ok(SInt(42)) = parser.parse_string("42")
   let assert Ok(SVar("x")) = parser.parse_string("x")
   let assert Ok(SList([SInt(1), SInt(2)])) = parser.parse_string("(list 1 2)")
-  let assert Ok(elab_types.SApply(SVar("add"), SInt(1))) = parser.parse_string("(add 1)")
-  let assert Ok(SLet("x", SInt(42), SVar("x"))) = parser.parse_string("(let x 42 x)")
+  let assert Ok(elab_types.SApply(SVar("add"), SInt(1))) =
+    parser.parse_string("(add 1)")
+  let assert Ok(SLet("x", SInt(42), SVar("x"))) =
+    parser.parse_string("(let x 42 x)")
   let assert Ok(SLambda("x", SVar("x"))) = parser.parse_string("(lam x x)")
 }
 
@@ -116,9 +123,7 @@ pub fn dets_fd_pool_test() {
   let _ = storage.partitioned_dets_delete(path)
   let assert Ok(adapter) = storage.partitioned_dets(path)
 
-  let refs = list.map(range(0, 15), fn(i) {
-    test_make_ref(<<i:4, 0:252>>)
-  })
+  let refs = list.map(range(0, 15), fn(i) { test_make_ref(<<i:4, 0:252>>) })
 
   list.each(refs, fn(r) {
     let assert Ok(Nil) = adapter.insert(r, <<"data">>)
@@ -127,8 +132,10 @@ pub fn dets_fd_pool_test() {
 
   let assert True = get_open_dets_count(path) <= 4
 
-  let assert Ok(Some(<<"data">>)) = adapter.lookup(test_make_ref(<<0:4, 0:252>>))
-  let assert Ok(Some(<<"data">>)) = adapter.lookup(test_make_ref(<<15:4, 0:252>>))
+  let assert Ok(Some(<<"data">>)) =
+    adapter.lookup(test_make_ref(<<0:4, 0:252>>))
+  let assert Ok(Some(<<"data">>)) =
+    adapter.lookup(test_make_ref(<<15:4, 0:252>>))
 
   let assert Ok(Nil) = adapter.close()
   let assert Ok(Nil) = storage.partitioned_dets_delete(path)
@@ -149,18 +156,25 @@ pub fn soft_purge_test() {
 }
 
 import gleamunison/repl_eval
-import gleamunison/types.{empty_cache}
 import gleamunison/repl_io
+import gleamunison/types.{empty_cache}
 
 pub fn spelling_suggestions_test() {
   let prev_defs = [
     #("secret", elab_types.SurfaceTermDef(SInt(42))),
     #("guess", elab_types.SurfaceTermDef(SInt(0))),
   ]
-  let assert Error(err) = repl_eval.do_eval(SVar("secre"), "test_expr", empty_cache(), prev_defs)
+  let assert Error(err) =
+    repl_eval.do_eval(SVar("secre"), "test_expr", empty_cache(), prev_defs)
   let assert True = string.contains(err, "Did you mean: secret?")
 
-  let assert Error(err2) = repl_eval.do_eval(SVar("nonexistent"), "test_expr", empty_cache(), prev_defs)
+  let assert Error(err2) =
+    repl_eval.do_eval(
+      SVar("nonexistent"),
+      "test_expr",
+      empty_cache(),
+      prev_defs,
+    )
   let assert False = string.contains(err2, "Did you mean:")
 }
 
@@ -196,7 +210,8 @@ pub fn serialization_continuation_test() {
   let closure = fn(x) { x + 1 }
   let closure_bytes = repl_eval.serialize_term(closure)
   let assert True = closure_bytes != <<>>
-  let deserialized_closure: fn(Int) -> Int = repl_eval.deserialize_term(closure_bytes)
+  let deserialized_closure: fn(Int) -> Int =
+    repl_eval.deserialize_term(closure_bytes)
   let assert 11 = deserialized_closure(10)
 }
 

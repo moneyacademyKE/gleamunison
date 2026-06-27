@@ -1,19 +1,19 @@
-import gleeunit
 import gleam/dict
 import gleam/option
-import gleamunison/identity.{Local, Ref, builtin_int_add, builtin_io_read_line, hash_equal, hash_bytes}
-import gleamunison/ast.{Apply, Int, Lambda, TermDef, TypeVar, LocalVarRef}
+import gleamunison/ast.{Apply, Int, Lambda, LocalVarRef, TermDef, TypeVar}
 import gleamunison/codebase.{hash_of_definition}
-import gleamunison/types.{empty_cache}
-import gleamunison/inference.{infer_term}
 import gleamunison/compile.{module_name_for}
+import gleamunison/identity.{
+  Local, Ref, builtin_int_add, builtin_io_read_line, hash_bytes, hash_equal,
+}
+import gleamunison/inference.{infer_term}
 import gleamunison/repl_eval
+import gleamunison/types.{empty_cache}
+import gleeunit
 
 pub fn main() -> Nil {
   gleeunit.main()
 }
-
-
 
 pub fn hello_world_test() {
   let name = "Joe"
@@ -54,9 +54,21 @@ pub fn type_inference_match_test() {
 
 pub fn type_inference_do_test() {
   let ability_ref = Ref(hash_bytes(<<"console">>))
-  let cache = types.TypeCache(entries: dict.from_list([
-    #(ability_ref, types.CTAbility([types.OperationType(name: option.Some("print"), inputs: [ast.Builtin(ast.TextType)], output: ast.Builtin(ast.IntType))]))
-  ]))
+  let cache =
+    types.TypeCache(
+      entries: dict.from_list([
+        #(
+          ability_ref,
+          types.CTAbility([
+            types.OperationType(
+              name: option.Some("print"),
+              inputs: [ast.Builtin(ast.TextType)],
+              output: ast.Builtin(ast.IntType),
+            ),
+          ]),
+        ),
+      ]),
+    )
   let do_term = ast.Do(ability_ref, Local(0), [ast.Text(<<"hello">>)])
   let assert Ok(ast.Builtin(ast.IntType)) = infer_term(do_term, cache)
 }

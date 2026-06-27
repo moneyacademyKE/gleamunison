@@ -1,7 +1,9 @@
 import gleam/dict
-import gleamunison/identity.{Local}
 import gleamunison/ast
-import gleamunison/elab_types.{type Typ, type ElaborateError, TVar, TCon, TBuiltin, TFun, UnsupportedTypeRef}
+import gleamunison/elab_types.{
+  type ElaborateError, type Typ, TBuiltin, TCon, TFun, TVar, UnsupportedTypeRef,
+}
+import gleamunison/identity.{Local}
 
 pub fn lower_type_ref(
   t: Typ,

@@ -2,8 +2,8 @@ import gleam/io
 import gleam/list
 import gleam/string
 
-import dogfood_core as core
 import dogfood_bench as bench
+import dogfood_core as core
 
 // Meta-test runner — executes all real levels in sequence.
 // Stub levels are tracked separately via all_levels() Dict.

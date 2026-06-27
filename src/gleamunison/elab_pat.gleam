@@ -2,10 +2,16 @@ import gleam/dict
 import gleam/list
 import gleam/result
 import gleamunison/ast
-import gleamunison/elab_types.{type SPattern, type ElaborateError, SPVar, SPInt, SPText, SPCons, SPEmptyList, SPAs, SPConstructor, NameNotFound}
 import gleamunison/elab_ctx.{type ElabCtx, add_binding}
+import gleamunison/elab_types.{
+  type ElaborateError, type SPattern, NameNotFound, SPAs, SPCons, SPConstructor,
+  SPEmptyList, SPInt, SPText, SPVar,
+}
 
-pub fn elaborate_pattern(pat: SPattern, ctx: ElabCtx) -> Result(#(ElabCtx, ast.Pattern), ElaborateError) {
+pub fn elaborate_pattern(
+  pat: SPattern,
+  ctx: ElabCtx,
+) -> Result(#(ElabCtx, ast.Pattern), ElaborateError) {
   case pat {
     SPVar(name) -> {
       let #(ctx2, lv) = add_binding(ctx, name)
@@ -27,13 +33,18 @@ pub fn elaborate_pattern(pat: SPattern, ctx: ElabCtx) -> Result(#(ElabCtx, ast.P
       }
     }
     SPConstructor(name, args) -> {
-      use ctor_ref <- result.try(dict.get(ctx.names, name) |> result.replace_error(NameNotFound(name)))
-      case list.try_fold(args, #(ctx, []), fn(acc, arg) {
-        let #(c_ctx, acc_args) = acc
-        use #(n_ctx, pat) <- result.try(elaborate_pattern(arg, c_ctx))
-        Ok(#(n_ctx, [pat, ..acc_args]))
-      }) {
-        Ok(#(final_ctx, pats)) -> Ok(#(final_ctx, ast.PatConstructor(ctor_ref, list.reverse(pats))))
+      use ctor_ref <- result.try(
+        dict.get(ctx.names, name) |> result.replace_error(NameNotFound(name)),
+      )
+      case
+        list.try_fold(args, #(ctx, []), fn(acc, arg) {
+          let #(c_ctx, acc_args) = acc
+          use #(n_ctx, pat) <- result.try(elaborate_pattern(arg, c_ctx))
+          Ok(#(n_ctx, [pat, ..acc_args]))
+        })
+      {
+        Ok(#(final_ctx, pats)) ->
+          Ok(#(final_ctx, ast.PatConstructor(ctor_ref, list.reverse(pats))))
         Error(e) -> Error(e)
       }
     }

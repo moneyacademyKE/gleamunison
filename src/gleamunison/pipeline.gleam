@@ -1,13 +1,17 @@
 import gleam/string
-import gleamunison/parser
-import gleamunison/lexer.{type ParseError}
-import gleamunison/elab_types.{type SurfaceTerm, type SurfaceDef, SurfaceUnit, SurfaceTermDef}
-import gleamunison/elaborate as elab
-import gleamunison/elab_ctx.{type ElabCtx}
-import gleamunison/compile.{module_name_for, compile_definition, new as new_compiler}
-import gleamunison/types.{type TypeCache}
-import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes}
 import gleamunison/ast
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
+import gleamunison/elab_ctx.{type ElabCtx}
+import gleamunison/elab_types.{
+  type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
+}
+import gleamunison/elaborate as elab
+import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes}
+import gleamunison/lexer.{type ParseError}
+import gleamunison/parser
+import gleamunison/types.{type TypeCache}
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
 fn string_to_binary(s: String) -> BitArray

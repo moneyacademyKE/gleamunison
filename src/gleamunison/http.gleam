@@ -8,7 +8,9 @@ fn ffi_start_server(port: Int) -> Nil
 fn ffi_stop_server() -> Nil
 
 pub fn start_server(port: Int) -> Nil {
-  io.println("Starting Gleamunison web server on port " <> int.to_string(port) <> "...")
+  io.println(
+    "Starting Gleamunison web server on port " <> int.to_string(port) <> "...",
+  )
   ffi_start_server(port)
 }
 

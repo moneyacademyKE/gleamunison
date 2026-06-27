@@ -1,32 +1,29 @@
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/string
-import gleam/int
-import gleamunison/identity.{
-  builtin_int_add, builtin_io_read_line,
-  builtin_process_spawn, builtin_process_self, builtin_process_send, builtin_process_recv,
-  builtin_timer_sleep, builtin_timer_now,
-  builtin_sub, builtin_mul, builtin_div, builtin_mod,
-  builtin_eq, builtin_lt, builtin_gt,
-  builtin_and, builtin_or, builtin_not,
-  builtin_string_concat, builtin_string_length, builtin_string_contains,
-  builtin_string_slice, builtin_string_upcase, builtin_string_downcase,
-  builtin_string_replace, builtin_string_split, builtin_string_trim, builtin_string_to_int,
-  builtin_list_length, builtin_list_reverse, builtin_list_map, builtin_list_filter,
-  builtin_list_fold, builtin_list_append, builtin_list_flatten, builtin_list_member,
-  builtin_list_range, builtin_list_sort,
-  builtin_pair, builtin_fst, builtin_snd,
-  builtin_left, builtin_right,
-  builtin_dict_new, builtin_dict_get, builtin_dict_set,
-  builtin_set_new, builtin_set_insert,
-  builtin_json_parse, builtin_http_get, builtin_file_read}
-import gleamunison/parser
 import gleamunison/elab_types.{SurfaceTermDef}
-import gleamunison/types.{empty_cache, type TypeCache}
-import gleamunison/repl_io
+import gleamunison/identity.{
+  builtin_and, builtin_dict_get, builtin_dict_new, builtin_dict_set, builtin_div,
+  builtin_eq, builtin_file_read, builtin_fst, builtin_gt, builtin_http_get,
+  builtin_int_add, builtin_io_read_line, builtin_json_parse, builtin_left,
+  builtin_list_append, builtin_list_filter, builtin_list_flatten,
+  builtin_list_fold, builtin_list_length, builtin_list_map, builtin_list_member,
+  builtin_list_range, builtin_list_reverse, builtin_list_sort, builtin_lt,
+  builtin_mod, builtin_mul, builtin_not, builtin_or, builtin_pair,
+  builtin_process_recv, builtin_process_self, builtin_process_send,
+  builtin_process_spawn, builtin_right, builtin_set_insert, builtin_set_new,
+  builtin_snd, builtin_string_concat, builtin_string_contains,
+  builtin_string_downcase, builtin_string_length, builtin_string_replace,
+  builtin_string_slice, builtin_string_split, builtin_string_to_int,
+  builtin_string_trim, builtin_string_upcase, builtin_sub, builtin_timer_now,
+  builtin_timer_sleep,
+}
+import gleamunison/parser
 import gleamunison/repl_eval
+import gleamunison/repl_io
 import gleamunison/type_pretty
-
+import gleamunison/types.{type TypeCache, empty_cache}
 
 @external(erlang, "erlang", "unique_integer")
 fn ffi_unique_integer() -> Int
@@ -38,7 +35,8 @@ pub fn eval_string(expr: String) -> Result(String, String) {
       Error("Define not supported in eval endpoint: " <> name)
     Ok(term) -> {
       case repl_eval.do_eval(term, "repl_expr", empty_cache(), []) {
-        Ok(#(val_str, typ, _)) -> Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
+        Ok(#(val_str, typ, _)) ->
+          Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
         Error(err) -> Error(err)
       }
     }
@@ -54,37 +52,102 @@ pub fn eval_string_unique(expr: String) -> Result(String, String) {
       let unique_id = ffi_unique_integer()
       let ref_name = "repl_expr_" <> int.to_string(unique_id)
       case repl_eval.do_eval(term, ref_name, empty_cache(), []) {
-        Ok(#(val_str, typ, _)) -> Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
+        Ok(#(val_str, typ, _)) ->
+          Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
         Error(err) -> Error(err)
       }
     }
   }
 }
 
-
 pub fn start_repl() -> Nil {
-  io.println("=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit. Type 'help' for builtins.")
+  io.println(
+    "=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit. Type 'help' for builtins.",
+  )
   let init_defs = [
-    #("Console", elab_types.SurfaceAbilityDef("Console", [
-      elab_types.SurfaceOp("print", [elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TInt))
-    ])),
-    #("State", elab_types.SurfaceAbilityDef("State", [
-      elab_types.SurfaceOp("get", [elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TText)),
-      elab_types.SurfaceOp("set", [elab_types.TBuiltin(elab_types.TText), elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TText))
-    ])),
-    #("Math", elab_types.SurfaceAbilityDef("Math", [
-      elab_types.SurfaceOp("add", [elab_types.TBuiltin(elab_types.TInt), elab_types.TBuiltin(elab_types.TInt)], elab_types.TBuiltin(elab_types.TInt)),
-      elab_types.SurfaceOp("sub", [elab_types.TBuiltin(elab_types.TInt), elab_types.TBuiltin(elab_types.TInt)], elab_types.TBuiltin(elab_types.TInt)),
-      elab_types.SurfaceOp("mul", [elab_types.TBuiltin(elab_types.TInt), elab_types.TBuiltin(elab_types.TInt)], elab_types.TBuiltin(elab_types.TInt))
-    ])),
-    #("Show", elab_types.SurfaceAbilityDef("Show", [
-      elab_types.SurfaceOp("show", [elab_types.TVar("a")], elab_types.TBuiltin(elab_types.TText))
-    ])),
-    #("Remote", elab_types.SurfaceAbilityDef("Remote", [
-      elab_types.SurfaceOp("forkAt", [elab_types.TVar("location"), elab_types.TVar("a")], elab_types.TVar("task")),
-      elab_types.SurfaceOp("await", [elab_types.TVar("task")], elab_types.TVar("a")),
-      elab_types.SurfaceOp("here", [], elab_types.TVar("location"))
-    ])),
+    #(
+      "Console",
+      elab_types.SurfaceAbilityDef("Console", [
+        elab_types.SurfaceOp(
+          "print",
+          [elab_types.TBuiltin(elab_types.TText)],
+          elab_types.TBuiltin(elab_types.TInt),
+        ),
+      ]),
+    ),
+    #(
+      "State",
+      elab_types.SurfaceAbilityDef("State", [
+        elab_types.SurfaceOp(
+          "get",
+          [elab_types.TBuiltin(elab_types.TText)],
+          elab_types.TBuiltin(elab_types.TText),
+        ),
+        elab_types.SurfaceOp(
+          "set",
+          [
+            elab_types.TBuiltin(elab_types.TText),
+            elab_types.TBuiltin(elab_types.TText),
+          ],
+          elab_types.TBuiltin(elab_types.TText),
+        ),
+      ]),
+    ),
+    #(
+      "Math",
+      elab_types.SurfaceAbilityDef("Math", [
+        elab_types.SurfaceOp(
+          "add",
+          [
+            elab_types.TBuiltin(elab_types.TInt),
+            elab_types.TBuiltin(elab_types.TInt),
+          ],
+          elab_types.TBuiltin(elab_types.TInt),
+        ),
+        elab_types.SurfaceOp(
+          "sub",
+          [
+            elab_types.TBuiltin(elab_types.TInt),
+            elab_types.TBuiltin(elab_types.TInt),
+          ],
+          elab_types.TBuiltin(elab_types.TInt),
+        ),
+        elab_types.SurfaceOp(
+          "mul",
+          [
+            elab_types.TBuiltin(elab_types.TInt),
+            elab_types.TBuiltin(elab_types.TInt),
+          ],
+          elab_types.TBuiltin(elab_types.TInt),
+        ),
+      ]),
+    ),
+    #(
+      "Show",
+      elab_types.SurfaceAbilityDef("Show", [
+        elab_types.SurfaceOp(
+          "show",
+          [elab_types.TVar("a")],
+          elab_types.TBuiltin(elab_types.TText),
+        ),
+      ]),
+    ),
+    #(
+      "Remote",
+      elab_types.SurfaceAbilityDef("Remote", [
+        elab_types.SurfaceOp(
+          "forkAt",
+          [elab_types.TVar("location"), elab_types.TVar("a")],
+          elab_types.TVar("task"),
+        ),
+        elab_types.SurfaceOp(
+          "await",
+          [elab_types.TVar("task")],
+          elab_types.TVar("a"),
+        ),
+        elab_types.SurfaceOp("here", [], elab_types.TVar("location")),
+      ]),
+    ),
     #("add", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("+", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("read_line", SurfaceTermDef(elab_types.SRef(builtin_io_read_line()))),
@@ -106,11 +169,20 @@ pub fn start_repl() -> Nil {
     #("not", SurfaceTermDef(elab_types.SRef(builtin_not()))),
     #("string-concat", SurfaceTermDef(elab_types.SRef(builtin_string_concat()))),
     #("string-length", SurfaceTermDef(elab_types.SRef(builtin_string_length()))),
-    #("string-contains?", SurfaceTermDef(elab_types.SRef(builtin_string_contains()))),
+    #(
+      "string-contains?",
+      SurfaceTermDef(elab_types.SRef(builtin_string_contains())),
+    ),
     #("string-slice", SurfaceTermDef(elab_types.SRef(builtin_string_slice()))),
     #("string-upcase", SurfaceTermDef(elab_types.SRef(builtin_string_upcase()))),
-    #("string-downcase", SurfaceTermDef(elab_types.SRef(builtin_string_downcase()))),
-    #("string-replace", SurfaceTermDef(elab_types.SRef(builtin_string_replace()))),
+    #(
+      "string-downcase",
+      SurfaceTermDef(elab_types.SRef(builtin_string_downcase())),
+    ),
+    #(
+      "string-replace",
+      SurfaceTermDef(elab_types.SRef(builtin_string_replace())),
+    ),
     #("string-split", SurfaceTermDef(elab_types.SRef(builtin_string_split()))),
     #("string-trim", SurfaceTermDef(elab_types.SRef(builtin_string_trim()))),
     #("string->int", SurfaceTermDef(elab_types.SRef(builtin_string_to_int()))),
@@ -140,28 +212,33 @@ pub fn start_repl() -> Nil {
   ]
   let assert Ok(compare_term) =
     parser.parse_string("(lam a (lam b (if (eq? a b) 0 (if (lt? a b) -1 1))))")
-  let init_defs = list.append(init_defs, [#("compare", SurfaceTermDef(compare_term))])
-  let #(cache, bootstrap_list) = repl_eval.bootstrap_defs(init_defs, empty_cache())
+  let init_defs =
+    list.append(init_defs, [#("compare", SurfaceTermDef(compare_term))])
+  let #(cache, bootstrap_list) =
+    repl_eval.bootstrap_defs(init_defs, empty_cache())
   repl_loop(cache, bootstrap_list)
 }
 
 fn help_text() -> String {
-  "Builtins: add + sub mul div mod eq? lt? gt? and or not compare\n" <>
-  "Strings:  string-concat string-length string-contains? string-slice\n" <>
-  "          string-upcase string-downcase string-replace string-split\n" <>
-  "          string-trim string->int\n" <>
-  "Lists:    list-length list-reverse list-map list-filter list-fold\n" <>
-  "          list-append list-flatten list-member? range list-sort\n" <>
-  "Pairs:    pair fst snd left right\n" <>
-  "Dicts:    dict-new dict-get dict-set set-new set-insert\n" <>
-  "IO:       read_line spawn self send recv sleep now\n" <>
-  "FFI:      json-parse http-get file-read\n" <>
-  "Abilities: Console(print) State(get set) Math(add sub mul) Show(show)\n" <>
-  "Forms:    (define name val) (lam x body) (do Ability op args...)\n" <>
-  "          (handle comp handler Ability) (match val cases...)"
+  "Builtins: add + sub mul div mod eq? lt? gt? and or not compare\n"
+  <> "Strings:  string-concat string-length string-contains? string-slice\n"
+  <> "          string-upcase string-downcase string-replace string-split\n"
+  <> "          string-trim string->int\n"
+  <> "Lists:    list-length list-reverse list-map list-filter list-fold\n"
+  <> "          list-append list-flatten list-member? range list-sort\n"
+  <> "Pairs:    pair fst snd left right\n"
+  <> "Dicts:    dict-new dict-get dict-set set-new set-insert\n"
+  <> "IO:       read_line spawn self send recv sleep now\n"
+  <> "FFI:      json-parse http-get file-read\n"
+  <> "Abilities: Console(print) State(get set) Math(add sub mul) Show(show)\n"
+  <> "Forms:    (define name val) (lam x body) (do Ability op args...)\n"
+  <> "          (handle comp handler Ability) (match val cases...)"
 }
 
-fn repl_loop(cache: TypeCache, prev_defs: List(#(String, elab_types.SurfaceDef))) -> Nil {
+fn repl_loop(
+  cache: TypeCache,
+  prev_defs: List(#(String, elab_types.SurfaceDef)),
+) -> Nil {
   case repl_io.read_expression() {
     Error(_) -> io.println("\nBye!")
     Ok(line) -> {
@@ -173,10 +250,11 @@ fn repl_loop(cache: TypeCache, prev_defs: List(#(String, elab_types.SurfaceDef))
           repl_loop(cache, prev_defs)
         }
         "" -> repl_loop(cache, prev_defs)
-        _ -> case handle_line(trimmed, cache, prev_defs) {
-          Ok(#(next_cache, next_defs)) -> repl_loop(next_cache, next_defs)
-          Error(_) -> repl_loop(cache, prev_defs)
-        }
+        _ ->
+          case handle_line(trimmed, cache, prev_defs) {
+            Ok(#(next_cache, next_defs)) -> repl_loop(next_cache, next_defs)
+            Error(_) -> repl_loop(cache, prev_defs)
+          }
       }
     }
   }
@@ -192,7 +270,12 @@ fn handle_line(
       case err.message {
         "Empty input" -> Error(Nil)
         _ -> {
-          io.println("Parse Error: " <> err.message <> " at line " <> string.inspect(err.line))
+          io.println(
+            "Parse Error: "
+            <> err.message
+            <> " at line "
+            <> string.inspect(err.line),
+          )
           Error(Nil)
         }
       }

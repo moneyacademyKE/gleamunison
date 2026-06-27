@@ -1,10 +1,10 @@
+import dogfood
 import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
 import gleamunison/http
 import gleamunison/repl
-import dogfood
 
 pub fn main() -> Nil {
   run(get_plain_args())
@@ -23,19 +23,32 @@ pub fn run(args: List(String)) -> Nil {
   }
 }
 
-fn dispatch(cmd: String, param: String, levels: dict.Dict(String, fn() -> Nil)) -> Nil {
+fn dispatch(
+  cmd: String,
+  param: String,
+  levels: dict.Dict(String, fn() -> Nil),
+) -> Nil {
   case cmd {
     "server" -> {
-      let port = case int.parse(param) { Ok(n) -> n Error(_) -> 8080 }
+      let port = case int.parse(param) {
+        Ok(n) -> n
+        Error(_) -> 8080
+      }
       http.start_server(port)
     }
     "demo" -> print_help()
     "repl" -> repl.start_repl()
     "all" -> run_all_levels(levels)
-    _ -> case dict.get(levels, cmd) {
-      Ok(f) -> f()
-      Error(_) -> io.println("Unknown command: '" <> cmd <> "'. Try: server, repl, all, level1..level1000")
-    }
+    _ ->
+      case dict.get(levels, cmd) {
+        Ok(f) -> f()
+        Error(_) ->
+          io.println(
+            "Unknown command: '"
+            <> cmd
+            <> "'. Try: server, repl, all, level1..level1000",
+          )
+      }
   }
 }
 

@@ -1,11 +1,15 @@
 import gleam/int
 import gleam/list
 import gleam/string
-import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/ast
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
+import gleamunison/elab_types.{
+  type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
+}
 import gleamunison/elaborate as elab
-import gleamunison/elab_types.{type SurfaceTerm, type SurfaceDef, SurfaceUnit, SurfaceTermDef}
-import gleamunison/compile.{module_name_for, compile_definition, new as new_compiler}
+import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/types.{type TypeCache}
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
@@ -61,7 +65,10 @@ fn lev_dist_limit(s: List(String), t: List(String), limit: Int) -> Int {
   }
 }
 
-fn find_suggestions(name: String, prev_defs: List(#(String, SurfaceDef))) -> List(String) {
+fn find_suggestions(
+  name: String,
+  prev_defs: List(#(String, SurfaceDef)),
+) -> List(String) {
   let name_chars = string.to_graphemes(name)
   list.filter_map(prev_defs, fn(pair) {
     let #(def_name, _) = pair
@@ -74,13 +81,21 @@ fn find_suggestions(name: String, prev_defs: List(#(String, SurfaceDef))) -> Lis
   })
 }
 
-fn format_elab_error(err: elab_types.ElaborateError, prev_defs: List(#(String, SurfaceDef))) -> String {
+fn format_elab_error(
+  err: elab_types.ElaborateError,
+  prev_defs: List(#(String, SurfaceDef)),
+) -> String {
   case err {
     elab_types.NameNotFound(name) -> {
       let suggestions = find_suggestions(name, prev_defs)
       case suggestions {
         [] -> "NameNotFound(\"" <> name <> "\")"
-        _ -> "NameNotFound(\"" <> name <> "\"). Did you mean: " <> string.join(suggestions, ", ") <> "?"
+        _ ->
+          "NameNotFound(\""
+          <> name
+          <> "\"). Did you mean: "
+          <> string.join(suggestions, ", ")
+          <> "?"
       }
     }
     _ -> string.inspect(err)
@@ -100,7 +115,8 @@ pub fn do_eval(
   let expr_ref = ref_for_name(name)
   let defs = [#(name, SurfaceTermDef(term)), ..prev_defs]
   case elab.elaborate_unit(SurfaceUnit(expr_ref, defs), cache) {
-    Error(err) -> Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
+    Error(err) ->
+      Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
     Ok(#(unit, next_cache, _elab_ctx)) -> {
       case list.key_find(unit.defs, expr_ref) {
         Error(_) -> Error("No def found")
@@ -109,18 +125,24 @@ pub fn do_eval(
           let _ = unload_binary(mod_name)
           case compile_definition(new_compiler(), def, expr_ref) {
             Error(e) -> Error("Compile Error: " <> string.inspect(e))
-            Ok(beam) -> case load_binary(mod_name, beam) {
-              Error(err) -> Error("Load Error: " <> err)
-              Ok(_) -> case eval_module(mod_name) {
-                Error(err) -> Error("Runtime Error: " <> err)
-                Ok(val_str) -> {
-                  case def {
-                    ast.TermDef(term: _, typ:) -> Ok(#(val_str, typ, next_cache))
-                    _ -> Error("Expected term definition, but got type or ability declaration")
+            Ok(beam) ->
+              case load_binary(mod_name, beam) {
+                Error(err) -> Error("Load Error: " <> err)
+                Ok(_) ->
+                  case eval_module(mod_name) {
+                    Error(err) -> Error("Runtime Error: " <> err)
+                    Ok(val_str) -> {
+                      case def {
+                        ast.TermDef(term: _, typ:) ->
+                          Ok(#(val_str, typ, next_cache))
+                        _ ->
+                          Error(
+                            "Expected term definition, but got type or ability declaration",
+                          )
+                      }
+                    }
                   }
-                }
               }
-            }
           }
         }
       }
@@ -137,8 +159,11 @@ pub fn handle_define(
   let name_ref = ref_for_name(name)
   let prev_defs = list.filter(prev_defs, fn(pair) { pair.0 != name })
   let defs = [#(name, SurfaceTermDef(val)), ..prev_defs]
-  case elab.elaborate_unit(SurfaceUnit(ref_for_name("repl_expr"), defs), cache) {
-    Error(err) -> Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
+  case
+    elab.elaborate_unit(SurfaceUnit(ref_for_name("repl_expr"), defs), cache)
+  {
+    Error(err) ->
+      Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
     Ok(#(unit, next_cache, _elab_ctx)) -> {
       case list.key_find(unit.defs, name_ref) {
         Error(_) -> Error("No def found")
@@ -147,10 +172,11 @@ pub fn handle_define(
           let _ = unload_binary(mod_name)
           case compile_definition(new_compiler(), def, name_ref) {
             Error(e) -> Error("Compile Error: " <> string.inspect(e))
-            Ok(beam) -> case load_binary(mod_name, beam) {
-              Error(err) -> Error("Load Error: " <> err)
-              Ok(_) -> Ok(#(next_cache, defs))
-            }
+            Ok(beam) ->
+              case load_binary(mod_name, beam) {
+                Error(err) -> Error("Load Error: " <> err)
+                Ok(_) -> Ok(#(next_cache, defs))
+              }
           }
         }
       }
@@ -174,7 +200,12 @@ pub fn bootstrap_defs(
       }
       elab_types.SurfaceAbilityDef(_, _) -> {
         let name_ref = ref_for_name(name)
-        case elab.elaborate_unit(SurfaceUnit(ref_for_name("repl_expr"), [#(name, val_def)]), curr_cache) {
+        case
+          elab.elaborate_unit(
+            SurfaceUnit(ref_for_name("repl_expr"), [#(name, val_def)]),
+            curr_cache,
+          )
+        {
           Error(_) -> acc
           Ok(#(unit, next_cache, _elab_ctx)) -> {
             case list.key_find(unit.defs, name_ref) {
@@ -184,10 +215,11 @@ pub fn bootstrap_defs(
                 let _ = unload_binary(mod_name)
                 case compile_definition(new_compiler(), def, name_ref) {
                   Error(_) -> acc
-                  Ok(beam) -> case load_binary(mod_name, beam) {
-                    Error(_) -> acc
-                    Ok(_) -> #(next_cache, [pair, ..curr_defs])
-                  }
+                  Ok(beam) ->
+                    case load_binary(mod_name, beam) {
+                      Error(_) -> acc
+                      Ok(_) -> #(next_cache, [pair, ..curr_defs])
+                    }
                 }
               }
             }

@@ -1,21 +1,22 @@
+import gleam/bit_array
 import gleam/io
 import gleam/string
-import gleam/bit_array
 import simplifile
 
 import gleam/dynamic.{type Dynamic}
-import gleam/option.{Some, None}
 import gleam/int
-import gleamunison/identity.{Local, Ref, hash_to_debug_string}
-import gleamunison/ast as ast
-import gleamunison/codebase.{empty as new_codebase, insert, hash_of_definition, get_adapter}
-import gleamunison/compile.{new as new_compiler, compile_definition}
-import gleamunison/loader.{new_loader, ensure_loaded}
-import gleamunison/parser
+import gleam/option.{None, Some}
+import gleamunison/ast
+import gleamunison/codebase.{
+  empty as new_codebase, get_adapter, hash_of_definition, insert,
+}
+import gleamunison/compile.{compile_definition, new as new_compiler}
 import gleamunison/elab_types
-import gleamunison/types
+import gleamunison/identity.{Local, Ref, hash_to_debug_string}
+import gleamunison/loader.{ensure_loaded, new_loader}
+import gleamunison/parser
 import gleamunison/repl_eval
-
+import gleamunison/types
 
 pub fn level21() -> Nil {
   io.println("--- Level 21: Term API ---")
@@ -40,7 +41,10 @@ pub fn level22() -> Nil {
   let def = ast.TermDef(term: lam, typ: ast.TypeVar(0))
   let ref = Ref(hash_of_definition(def))
   case compile_definition(compiler, def, ref) {
-    Ok(beam) -> io.println("Compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes")
+    Ok(beam) ->
+      io.println(
+        "Compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes",
+      )
     Error(e) -> io.println("Compile failed: " <> string.inspect(e))
   }
   case ensure_loaded(loader, ref, def) {
@@ -59,7 +63,10 @@ pub fn level23() -> Nil {
     Ok(cb) -> {
       io.println("First insert: OK")
       case get_adapter(cb).lookup(ref) {
-        Ok(Some(bytes)) -> io.println("Lookup: " <> string.inspect(bit_array.byte_size(bytes)) <> " bytes")
+        Ok(Some(bytes)) ->
+          io.println(
+            "Lookup: " <> string.inspect(bit_array.byte_size(bytes)) <> " bytes",
+          )
         Ok(None) -> io.println("Lookup: not found (BUG)")
         Error(e) -> io.println("Lookup error: " <> string.inspect(e))
       }
@@ -70,7 +77,12 @@ pub fn level23() -> Nil {
 }
 
 @external(erlang, "gleamunison_effets", "do_op")
-fn ffi_do_op(ab: BitArray, op: Int, args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic
+fn ffi_do_op(
+  ab: BitArray,
+  op: Int,
+  args: List(Dynamic),
+  cont: fn(Dynamic) -> Dynamic,
+) -> Dynamic
 
 pub fn level24() -> Nil {
   io.println("--- Level 24: Effects runtime ---")
@@ -113,7 +125,8 @@ fn ffi_spawn_concurrent_evals() -> Nil
 pub fn level32() -> Nil {
   io.println("--- Level 32: Float literal ---")
   case parser.parse_string("3.14") {
-    Ok(elab_types.SFloat(f)) -> io.println("Float literal parsed: " <> string.inspect(f))
+    Ok(elab_types.SFloat(f)) ->
+      io.println("Float literal parsed: " <> string.inspect(f))
     _ -> io.println("Float parsing FAILED")
   }
   io.println("Level 32: OK")
@@ -180,34 +193,39 @@ pub fn level41() -> Nil {
 
 fn ffi_file_read(path: BitArray) -> Result(BitArray, BitArray) {
   case bit_array.to_string(path) {
-    Ok(path_str) -> case simplifile.read_bits(path_str) {
-      Ok(bits) -> Ok(bits)
-      Error(e) -> Error(bit_array.from_string(string.inspect(e)))
-    }
+    Ok(path_str) ->
+      case simplifile.read_bits(path_str) {
+        Ok(bits) -> Ok(bits)
+        Error(e) -> Error(bit_array.from_string(string.inspect(e)))
+      }
     Error(_) -> Error(bit_array.from_string("invalid_utf8_path"))
   }
 }
 
-fn ffi_file_write(path: BitArray, data: BitArray) -> Result(BitArray, BitArray) {
+fn ffi_file_write(
+  path: BitArray,
+  data: BitArray,
+) -> Result(BitArray, BitArray) {
   case bit_array.to_string(path) {
-    Ok(path_str) -> case simplifile.write_bits(path_str, data) {
-      Ok(Nil) -> Ok(data)
-      Error(e) -> Error(bit_array.from_string(string.inspect(e)))
-    }
+    Ok(path_str) ->
+      case simplifile.write_bits(path_str, data) {
+        Ok(Nil) -> Ok(data)
+        Error(e) -> Error(bit_array.from_string(string.inspect(e)))
+      }
     Error(_) -> Error(bit_array.from_string("invalid_utf8_path"))
   }
 }
 
 fn ffi_file_delete(path: BitArray) -> Result(BitArray, BitArray) {
   case bit_array.to_string(path) {
-    Ok(path_str) -> case simplifile.delete(path_str) {
-      Ok(Nil) -> Ok(bit_array.from_string("ok"))
-      Error(e) -> Error(bit_array.from_string(string.inspect(e)))
-    }
+    Ok(path_str) ->
+      case simplifile.delete(path_str) {
+        Ok(Nil) -> Ok(bit_array.from_string("ok"))
+        Error(e) -> Error(bit_array.from_string(string.inspect(e)))
+      }
     Error(_) -> Error(bit_array.from_string("invalid_utf8_path"))
   }
 }
-
 
 pub fn level47() -> Nil {
   io.println("--- Level 47: File I/O ---")
@@ -222,4 +240,3 @@ pub fn level47() -> Nil {
   let _ = ffi_file_delete(<<"test_file.txt">>)
   io.println("Level 47: OK")
 }
-

@@ -1,11 +1,13 @@
 import gleam/list
-import gleam/string
 import gleam/result
-import gleamunison/lexer.{
-  type Token, type TokenInfo, type ParseError, Symbol, IntVal, FloatVal, LParen, RParen, Quote, ParseError
-}
+import gleam/string
 import gleamunison/elab_types.{
-  type SurfaceTerm, SInt, SFloat, SVar, SLet, SLambda, SList, SMatch, SCase, SPVar, SPInt, SPText, SPConstructor
+  type SurfaceTerm, SCase, SFloat, SInt, SLambda, SLet, SList, SMatch,
+  SPConstructor, SPInt, SPText, SPVar, SVar,
+}
+import gleamunison/lexer.{
+  type ParseError, type Token, type TokenInfo, FloatVal, IntVal, LParen,
+  ParseError, Quote, RParen, Symbol,
 }
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
@@ -16,14 +18,17 @@ pub type SExpr {
   SListExpr(List(SExpr), line: Int, col: Int)
 }
 
-pub fn parse_sexpr(tokens: List(TokenInfo)) -> Result(#(SExpr, List(TokenInfo)), ParseError) {
+pub fn parse_sexpr(
+  tokens: List(TokenInfo),
+) -> Result(#(SExpr, List(TokenInfo)), ParseError) {
   case tokens {
     [] -> Error(ParseError("Unexpected EOF", 1, 1))
     [lexer.TokenInfo(LParen, l, c), ..rest] -> {
       use #(exprs, rest2) <- result.try(parse_list(rest, []))
       Ok(#(SListExpr(exprs, l, c), rest2))
     }
-    [lexer.TokenInfo(RParen, l, c), ..] -> Error(ParseError("Unexpected )", l, c))
+    [lexer.TokenInfo(RParen, l, c), ..] ->
+      Error(ParseError("Unexpected )", l, c))
     [lexer.TokenInfo(Quote, l, c), ..rest] -> {
       case parse_sexpr(rest) {
         Ok(#(expr, rest2)) ->
@@ -79,12 +84,19 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
           use cond_t <- result.try(sexpr_to_term(cond))
           use then_t <- result.try(sexpr_to_term(then_expr))
           use else_t <- result.try(sexpr_to_term(else_expr))
-          Ok(elab_types.SMatch(cond_t, [
-            elab_types.SCase(elab_types.SPInt(1), then_t),
-            elab_types.SCase(elab_types.SPVar("_"), else_t),
-          ]))
+          Ok(
+            elab_types.SMatch(cond_t, [
+              elab_types.SCase(elab_types.SPInt(1), then_t),
+              elab_types.SCase(elab_types.SPVar("_"), else_t),
+            ]),
+          )
         }
-        [SAtom(Symbol("do"), _, _), SAtom(Symbol(ab), _, _), SAtom(Symbol(op), _, _), ..args] -> {
+        [
+          SAtom(Symbol("do"), _, _),
+          SAtom(Symbol(ab), _, _),
+          SAtom(Symbol(op), _, _),
+          ..args
+        ] -> {
           use parsed_args <- result.try(list.try_map(args, sexpr_to_term))
           Ok(elab_types.SDo(ab, op, parsed_args))
         }
@@ -105,16 +117,18 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
         }
         [SAtom(Symbol("match"), _, _), scrutinee, ..cases] -> {
           use scrutinee_t <- result.try(sexpr_to_term(scrutinee))
-          use parsed_cases <- result.try(list.try_map(cases, fn(case_expr) {
-            case case_expr {
-              SListExpr([pat_expr, body_expr], _, _) -> {
-                use pat <- result.try(sexpr_to_pattern(pat_expr))
-                use body <- result.try(sexpr_to_term(body_expr))
-                Ok(SCase(pattern: pat, body: body))
+          use parsed_cases <- result.try(
+            list.try_map(cases, fn(case_expr) {
+              case case_expr {
+                SListExpr([pat_expr, body_expr], _, _) -> {
+                  use pat <- result.try(sexpr_to_pattern(pat_expr))
+                  use body <- result.try(sexpr_to_term(body_expr))
+                  Ok(SCase(pattern: pat, body: body))
+                }
+                _ -> Error(ParseError("Invalid match case", 0, 0))
               }
-              _ -> Error(ParseError("Invalid match case", 0, 0))
-            }
-          }))
+            }),
+          )
           Ok(SMatch(scrutinee_t, parsed_cases))
         }
         [first, ..rest] -> {
@@ -154,10 +168,12 @@ pub fn parse_string(input: String) -> Result(SurfaceTerm, ParseError) {
   let tokens = lexer.tokenize(input)
   case tokens {
     [] -> Error(ParseError("Empty input", 0, 0))
-    _ -> case parse_sexpr(tokens) {
-      Ok(#(sexpr, [])) -> sexpr_to_term(sexpr)
-      Ok(#(_, [lexer.TokenInfo(_, l, c), ..])) -> Error(ParseError("Extra tokens after expression", l, c))
-      Error(e) -> Error(e)
-    }
+    _ ->
+      case parse_sexpr(tokens) {
+        Ok(#(sexpr, [])) -> sexpr_to_term(sexpr)
+        Ok(#(_, [lexer.TokenInfo(_, l, c), ..])) ->
+          Error(ParseError("Extra tokens after expression", l, c))
+        Error(e) -> Error(e)
+      }
   }
 }

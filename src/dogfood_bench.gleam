@@ -1,10 +1,10 @@
-import gleam/io
-import gleam/string
-import gleam/list
-import gleamunison/identity.{Ref, hash_to_debug_string}
-import gleamunison/ast as ast
-import gleamunison/codebase.{empty as new_codebase, insert, hash_of_definition}
 import dogfood_core.{library_eval}
+import gleam/io
+import gleam/list
+import gleam/string
+import gleamunison/ast
+import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
+import gleamunison/identity.{Ref, hash_to_debug_string}
 
 @external(erlang, "erlang", "monotonic_time")
 fn ffi_monotonic_time() -> Int
@@ -17,7 +17,9 @@ pub fn level48() -> Nil {
   let _ = library_eval("(let x 1 x)")
   let _ = library_eval("((lam x x) 99)")
   let elapsed = ffi_monotonic_time() - start
-  io.println("5 REPL evals: " <> string.inspect(elapsed) <> " native time units")
+  io.println(
+    "5 REPL evals: " <> string.inspect(elapsed) <> " native time units",
+  )
   io.println("Level 48: OK")
 }
 
@@ -34,7 +36,11 @@ pub fn level50() -> Nil {
   io.println("Level 50: OK")
 }
 
-fn insert_many(cb: codebase.Codebase, n: Int, int_type: ast.Type) -> Result(codebase.Codebase, codebase.InsertError) {
+fn insert_many(
+  cb: codebase.Codebase,
+  n: Int,
+  int_type: ast.Type,
+) -> Result(codebase.Codebase, codebase.InsertError) {
   case n {
     0 -> Ok(cb)
     n -> {
@@ -54,7 +60,12 @@ pub fn level51() -> Nil {
   let int_type = ast.Builtin(ast.IntType)
   let start = ffi_monotonic_time()
   case insert_many(new_codebase(), 10_000, int_type) {
-    Ok(_) -> io.println("10,000 inserts: " <> string.inspect(ffi_monotonic_time() - start) <> " ns")
+    Ok(_) ->
+      io.println(
+        "10,000 inserts: "
+        <> string.inspect(ffi_monotonic_time() - start)
+        <> " ns",
+      )
     Error(e) -> io.println("Insert failed: " <> string.inspect(e))
   }
   io.println("Level 51: OK")
@@ -73,8 +84,15 @@ pub fn level53() -> Nil {
 pub fn level54() -> Nil {
   io.println("--- Level 54: Serialization stability ---")
   let int_type = ast.Builtin(ast.IntType)
-  let terms = [ast.Int(1), ast.Float(3.14), ast.Text(<<"hi">>),
-               ast.Lambda(binder: identity.Local(0), body: ast.LocalVarRef(identity.Local(0)))]
+  let terms = [
+    ast.Int(1),
+    ast.Float(3.14),
+    ast.Text(<<"hi">>),
+    ast.Lambda(
+      binder: identity.Local(0),
+      body: ast.LocalVarRef(identity.Local(0)),
+    ),
+  ]
   list.each(terms, fn(term) {
     let def = ast.TermDef(term:, typ: int_type)
     let h1 = hash_of_definition(def)
@@ -87,7 +105,11 @@ pub fn level54() -> Nil {
   io.println("Level 54: OK")
 }
 
-fn build_defs(acc: List(#(identity.DefinitionRef, ast.Definition)), n: Int, int_type: ast.Type) -> List(#(identity.DefinitionRef, ast.Definition)) {
+fn build_defs(
+  acc: List(#(identity.DefinitionRef, ast.Definition)),
+  n: Int,
+  int_type: ast.Type,
+) -> List(#(identity.DefinitionRef, ast.Definition)) {
   case n {
     0 -> acc
     n -> {
@@ -106,7 +128,12 @@ pub fn level55() -> Nil {
   let unit = ast.Unit(root:, defs:)
   let start = ffi_monotonic_time()
   case insert(new_codebase(), unit) {
-    Ok(_) -> io.println("1000-def unit: " <> string.inspect(ffi_monotonic_time() - start) <> " ns")
+    Ok(_) ->
+      io.println(
+        "1000-def unit: "
+        <> string.inspect(ffi_monotonic_time() - start)
+        <> " ns",
+      )
     Error(e) -> io.println("Insert error: " <> string.inspect(e))
   }
   io.println("Level 55: OK")

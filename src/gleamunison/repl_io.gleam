@@ -5,14 +5,16 @@ pub fn read_line(prompt: String) -> Result(String, Nil)
 
 pub fn count_brackets(str: String, in_string: Bool, depth: Int) -> Int {
   case string.pop_grapheme(str) {
-    Ok(#("(", rest)) -> case in_string {
-      True -> count_brackets(rest, True, depth)
-      False -> count_brackets(rest, False, depth + 1)
-    }
-    Ok(#(")", rest)) -> case in_string {
-      True -> count_brackets(rest, True, depth)
-      False -> count_brackets(rest, False, depth - 1)
-    }
+    Ok(#("(", rest)) ->
+      case in_string {
+        True -> count_brackets(rest, True, depth)
+        False -> count_brackets(rest, False, depth + 1)
+      }
+    Ok(#(")", rest)) ->
+      case in_string {
+        True -> count_brackets(rest, True, depth)
+        False -> count_brackets(rest, False, depth - 1)
+      }
     Ok(#("\"", rest)) -> count_brackets(rest, !in_string, depth)
     Ok(#("'", rest)) -> {
       case in_string {

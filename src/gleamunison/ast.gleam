@@ -61,8 +61,17 @@ pub type Pattern {
 }
 
 pub type TypeDeclaration {
-  Structural(name: LocalVar, parameters: List(LocalVar), constructors: List(Constructor))
-  Unique(name: LocalVar, guid: String, parameters: List(LocalVar), constructors: List(Constructor))
+  Structural(
+    name: LocalVar,
+    parameters: List(LocalVar),
+    constructors: List(Constructor),
+  )
+  Unique(
+    name: LocalVar,
+    guid: String,
+    parameters: List(LocalVar),
+    constructors: List(Constructor),
+  )
 }
 
 pub type Constructor {

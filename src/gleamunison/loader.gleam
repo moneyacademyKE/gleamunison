@@ -1,10 +1,12 @@
 import gleam/dict.{type Dict}
-import gleam/set.{type Set}
 import gleam/list
-import gleamy/bimap
-import gleamunison/identity.{type DefinitionRef}
+import gleam/set.{type Set}
 import gleamunison/ast.{type Definition}
-import gleamunison/compile.{type Compiler, new as new_compiler, compile_definition, module_name_for}
+import gleamunison/compile.{
+  type Compiler, compile_definition, module_name_for, new as new_compiler,
+}
+import gleamunison/identity.{type DefinitionRef}
+import gleamy/bimap
 
 @external(erlang, "gleamunison_ffi", "load_binary")
 fn load_binary(mod_name: String, beam: BitArray) -> Result(Nil, String)
@@ -55,25 +57,27 @@ pub fn is_loaded(ld: Loader, ref: DefinitionRef) -> Bool {
 }
 
 fn retry_pending_purges(ld: Loader) -> Loader {
-  let #(still_pending, successful_purges) = set.fold(
-    ld.pending_purge,
-    #(set.new(), set.new()),
-    fn(acc, ref) {
+  let #(still_pending, successful_purges) =
+    set.fold(ld.pending_purge, #(set.new(), set.new()), fn(acc, ref) {
       let #(pending, success) = acc
       let mod_name = module_name_for(ref)
       case soft_purge_binary(mod_name) {
         Ok(True) -> #(pending, set.insert(success, ref))
         _ -> #(set.insert(pending, ref), success)
       }
-    },
-  )
-  let next_module_names = set.fold(successful_purges, ld.module_names, fn(bm, ref) {
-    bimap.delete_by_key(bm, ref)
-  })
+    })
+  let next_module_names =
+    set.fold(successful_purges, ld.module_names, fn(bm, ref) {
+      bimap.delete_by_key(bm, ref)
+    })
   Loader(..ld, module_names: next_module_names, pending_purge: still_pending)
 }
 
-fn compile_and_load(ref: DefinitionRef, def: Definition, compiler: Compiler) -> Result(BitArray, String) {
+fn compile_and_load(
+  ref: DefinitionRef,
+  def: Definition,
+  compiler: Compiler,
+) -> Result(BitArray, String) {
   case compile_definition(compiler, def, ref) {
     Ok(beam) -> Ok(beam)
     Error(e) -> Error(e.reason)
@@ -104,35 +108,61 @@ pub fn ensure_loaded(
                   case list.length(next_order) > ld.max_size {
                     True -> {
                       let #(keep, evict) = list.split(next_order, ld.max_size)
-                      let #(next_module_names, next_pending) = list.fold(
-                        evict,
-                        #(bimap.insert(ld.module_names, ref, mod_name), ld.pending_purge),
-                        fn(acc, evicted_ref) {
-                          let #(bm, pending_set) = acc
-                          let evicted_mod = module_name_for(evicted_ref)
-                          case soft_purge_binary(evicted_mod) {
-                            Ok(True) -> #(bimap.delete_by_key(bm, evicted_ref), pending_set)
-                            _ -> #(bm, set.insert(pending_set, evicted_ref))
-                          }
-                        },
+                      let #(next_module_names, next_pending) =
+                        list.fold(
+                          evict,
+                          #(
+                            bimap.insert(ld.module_names, ref, mod_name),
+                            ld.pending_purge,
+                          ),
+                          fn(acc, evicted_ref) {
+                            let #(bm, pending_set) = acc
+                            let evicted_mod = module_name_for(evicted_ref)
+                            case soft_purge_binary(evicted_mod) {
+                              Ok(True) -> #(
+                                bimap.delete_by_key(bm, evicted_ref),
+                                pending_set,
+                              )
+                              _ -> #(bm, set.insert(pending_set, evicted_ref))
+                            }
+                          },
+                        )
+                      Ok(
+                        Loader(
+                          ..ld,
+                          module_names: next_module_names,
+                          order: keep,
+                          pending_purge: next_pending,
+                        ),
                       )
-                      Ok(Loader(..ld, module_names: next_module_names, order: keep, pending_purge: next_pending))
                     }
                     False -> {
-                      Ok(Loader(..ld, module_names: bimap.insert(ld.module_names, ref, mod_name), order: next_order))
+                      Ok(
+                        Loader(
+                          ..ld,
+                          module_names: bimap.insert(
+                            ld.module_names,
+                            ref,
+                            mod_name,
+                          ),
+                          order: next_order,
+                        ),
+                      )
                     }
                   }
                 }
                 Error(msg) -> {
                   let err = LoadFailed(ref, msg)
-                  let next_ld = Loader(..ld, failed: dict.insert(ld.failed, ref, err))
+                  let next_ld =
+                    Loader(..ld, failed: dict.insert(ld.failed, ref, err))
                   Error(#(next_ld, err))
                 }
               }
             }
             Error(msg) -> {
               let err = CompileFailed(ref, msg)
-              let next_ld = Loader(..ld, failed: dict.insert(ld.failed, ref, err))
+              let next_ld =
+                Loader(..ld, failed: dict.insert(ld.failed, ref, err))
               Error(#(next_ld, err))
             }
           }
