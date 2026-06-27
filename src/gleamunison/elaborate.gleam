@@ -30,7 +30,7 @@ fn register_ability_ops(ctx: ElabCtx, _name: String, sd: SurfaceDef, ref: Defini
   }
 }
 
-pub fn elaborate_unit(su: SurfaceUnit, cache: TypeCache) -> Result(#(ast.Unit, TypeCache), ElaborateError) {
+pub fn elaborate_unit(su: SurfaceUnit, cache: TypeCache) -> Result(#(ast.Unit, TypeCache, ElabCtx), ElaborateError) {
   let SurfaceUnit(root: r, defs: ds) = su
   let ctx = case ds {
     [] -> empty_elab_ctx()
@@ -72,7 +72,7 @@ pub fn elaborate_unit(su: SurfaceUnit, cache: TypeCache) -> Result(#(ast.Unit, T
   })
 
   case folded {
-    Ok(#(defs, next_cache)) -> Ok(#(ast.Unit(r, list.reverse(defs)), next_cache))
+    Ok(#(defs, next_cache)) -> Ok(#(ast.Unit(r, list.reverse(defs)), next_cache, ctx))
     Error(e) -> Error(e)
   }
 }

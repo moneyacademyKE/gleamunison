@@ -2,6 +2,132 @@
 
 ---
 
+## What's New in v0.9.0 (2026-06-27)
+
+Phase 6.1 Dynamic Web Dashboard + Phase 7.1 Tagged Unions. **28 Gleam modules**, **96 source files** (4,639 lines), **1.2 MB escript**, 24 files changed (+688 / -177).
+
+### 1. Dynamic Web Dashboard (Phase 6.1)
+- **Tabbed admin UI**: 6 tabs — Overview, Modules, Processes, Definitions, Sync, Logs — with glassmorphic dark theme
+- **SSE real-time push**: `GET /api/events` replaces 2s polling, broadcasts on eval/define/module-load events
+- **Static file serving**: `GET /static/*` from `priv/static/` with MIME detection and path traversal protection
+- **Enhanced module listing**: `/api/modules` with hashes, beam sizes, and compilation timestamps
+- **Process inspector**: `/api/processes` with per-process memory, reductions, queue length, supervisor tree
+- **Sync status**: `/api/sync-status` with genesis count, notebook defs, loaded modules, beam file count
+- **Notebook manager**: Definition browser + editor in Definitions tab with `/define` and `/browse` endpoints
+- **Activity timeline**: Logs tab + redefinition tracking via `/api/logs` and `/api/redefinitions`
+
+### 2. Pipeline Refactoring
+- **Factored pipeline**: `src/gleamunison/pipeline.gleam` — `parse_only`, `elaborate_only`, `compile_only`, `load_and_eval` exposed as discrete phases
+- **ElabCtx exposed**: `elaborate_unit` now returns `#(Unit, TypeCache, ElabCtx)` — third element provides symbol/type/ability metadata for LSP
+- **Backward compatible**: `repl_eval.do_eval` and `handle_define` unchanged, all 1000 dogfood levels pass
+
+### 3. Tagged Unions (Phase 7.1)
+- **`Construct` term**: `(MyType arg1 arg2)` — builds values of custom types, emits Erlang tuples
+- **`PatConstructor` pattern**: `(MyType pat1 pat2)` in match cases — destructures custom types
+- **Type definition syntax**: `(type TypeName ctor1 ctor2 ...)` parsed as surface form
+- **Full pipeline support**: parser → elaboration → inference → compilation → codebase hashing — all layers handle new variants
+
+### 4. Documentation
+- **38 ADRs** (+4 new: 0035 lexer-parser separation, 0036 benchmarking, 0037 REPL decomposition, 0038 type pretty-printing)
+- **LICENSE** (MIT), **CONTRIBUTING.md**, **scripts/README.md**, **docs/BUILD_ESCRIPT.md**, **docs/genesis-modules.md**, **docs/GLOSSARY.md**
+- **Updated**: README (28 modules, 96 files, 4,639 lines), ARCHITECTURE (Phase 5 sections), MANUAL (concurrency, distributed, dashboard), ROADMAP (Phases 6-10)
+
+### Running
+```
+./gleamunison_escript server   # Web dashboard at http://localhost:8080
+./gleamunison_escript repl     # Interactive REPL
+gleam run -- all               # 1000 dogfood levels
+```
+
+---
+
+## What's New in v0.8.0 (2026-06-27)
+
+Phase 5 production release: distributed topology, concurrency primitives, community library integrations, and dogfood toolchain. **189 BEAM modules**, **1.1 MB escript**, **32 gleam source files** (436 KB), 80 files changed (+7822 / -5896).
+
+### 1. Distributed Topology & Concurrency (Phase 5)
+- **Concurrency primitives**: `spawn`, `send`, `recv`, `self`, `sleep`, `now` operations
+- **Remote ability**: `forkAt`, `await`, `here` — location-transparent distributed compute
+- **Mnesia storage adapter**: ACID replicated codebase storage across clustered nodes
+- **Supervision trees**: `gleamunison_sup` — OTP supervisor with isolated link topology for test runners
+
+### 2. Parser & REPL Upgrades
+- **Multi-line REPL**: bracket-counting accumulator with spelling suggestions via depth-limited Levenshtein
+- **Parser split**: lexer separated from parser for independent testing and extension
+- **Escaped quotes**: tokenizer-level escape sequence awareness for nested JSON-like strings
+- **Syntax additions**: `;` comments, `+` operator alias, `'` quote reader macro
+- **Pipe deadlock fixes**: stderr stream inheritance in subprocess runners
+
+### 3. Builtins & Abilities
+- **Math/Show abilities**: typed arithmetic and display operations
+- **FFI builtins**: `json-parse`, `http-get`, `file-read` — all via genesis hash-addressing
+- **State ability bootstrapping**: handler stack composition for mutable state
+
+### 4. Community Library Integrations
+- **simplifile**: typed file I/O operations
+- **glam**: pretty-printer layout engine
+- **birdie**: snapshot testing framework
+- **gleamy_structures**: Bimap and PriorityQueue persistent data structures
+
+### 5. Infrastructure
+- **Test runner**: timeout support, FFI split, help command, test suite recovery
+- **Stub generation**: starting at level 1, `all` command to run every level
+- **SHA256 identity**: upgraded from 32-bit phash2 to 256-bit cryptographic hashes
+- **34 ADRs**: complete Architecture Decision Record catalog with index
+
+---
+
+## What's New in v0.7.0 (2026-06-27)
+
+1000-level dogfood playbook completion. **113 BEAM modules**, **671 KB escript**, 114 beam files.
+
+### 1. Genesis Modules & Dogfood Completion
+- **30 new genesis modules**: string ops (10), list ops (10), data structures (pair/fst/snd, either, dict, set)
+- **1000 dogfood levels**: full playbook certification suite in `src/dogfood.gleam`
+- **10-file playbook split**: `docs/playbook/` with Results + Location metadata on every level
+- **Full CLI dispatch**: `gleam run -- levelN` and `gleam run -- all`
+
+### 2. REPL & Interactive Features
+- **Interactive REPL**: read-eval-print loop with dynamic module purging
+- **Curried dynamic dispatch**: `erlang:apply/2` for nested function applications
+- **Console algebraic effects**: print/read operations via effect handlers
+- **Module purging**: explicit `code:delete/1` and `code:purge/1` on redefinition
+
+### 3. Parser Features
+- **Handle syntax fix**: arity mismatch resolved with lambda wrapping
+- **Multi-line REPL support**: bracket-aware line accumulation
+- **Float literal parsing**: through tokenizer, parser, and compilation pipeline
+- **Unique module names**: fix concurrent `/eval` race conditions
+
+### 4. Infrastructure
+- **Self-contained escript**: `build_escript.sh` compiles raw `.erl` genesis modules
+- **HTTP server dashboard**: embedded web server for live node state inspection
+- **Stateful/file FFI**: process-dictionary-backed mutable state and file operations
+
+---
+
+## What's New in v0.6.0
+
+Runtime robustness safeguards across storage, module lifecycle, and dynamic scope stacks. All files strictly under 150 LOC.
+
+### 1. Hash-Partitioned DETS Storage
+- **Durable Prefix-Splitting**: Dynamically splits key-value storage across 16 DETS partition files (`db_0.dets` to `db_f.dets`) based on hash key prefix. Bypasses the DETS 2GB limit, supporting up to 32GB of native KV storage.
+- **Directory Lifecycle Control**: Exposes `partitioned_dets_delete` routines for segmented file purges during testing.
+
+### 2. LRU Module Purging
+- **Atom Table & Memory Guards**: LRU cache tracking module accesses. Evicts least-recently-used modules when exceeding capacity (default 1000).
+- **VM Unloader**: Explicit `code:delete/1` and `code:purge/1` FFI unloads on evicted BEAM binaries to prevent memory leaks.
+
+### 3. Dynamic Stack Safety Validation
+- **Format Integrity Checks**: `validate_stack` and `validate_handler` on every push/pop operation on the process dictionary `$gleamunison_handlers` stack.
+- **Clear Exceptions**: Throws debuggable Erlang exceptions instead of silent badmatches on stack corruption.
+
+### 4. Coordinate Tokenizer & Diagnostics
+- **Offset Tracking**: Tracks line and column positions dynamically during lexing passes.
+- **Diagnostics Propagation**: Precise coordinate references in `ParseError` objects.
+
+---
+
 ## What's New in v0.5.0
 
 This release implements the core production roadmap components: persistent storage, cryptographic hashing, and a surface syntax parser, while maintaining all files strictly under the 150 LOC limit.

@@ -38,3 +38,7 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0032](0032-parser-string-escape-sequences-and-timeout-resilient-test-runner.md) | Parser String Escape Sequences and Timeout-Resilient Test Runner | Accepted |
 | [ADR-0033](0033-spelling-suggestions-and-bracket-counting.md) | Spelling Suggestions and Bracket Counting | Accepted |
 | [ADR-0034](0034-distributed-topology-and-concurrency.md) | Distributed Topology & Concurrency | Accepted |
+| [ADR-0035](0035-lexer-parser-separation.md) | Lexer-Parser Separation | Accepted |
+| [ADR-0036](0036-dogfood-benchmarking.md) | Dogfood Benchmarking Methodology | Accepted |
+| [ADR-0037](0037-repl-eval-io-decomposition.md) | REPL Eval/IO Decomposition | Accepted |
+| [ADR-0038](0038-type-pretty-module.md) | Type Pretty-Printing Module | Accepted |

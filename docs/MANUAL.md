@@ -33,8 +33,6 @@ Gleamunison supports text input via a recursive-descent S-expression parser:
 - Scoped variables: `(let x 42 (add x 1))`
 - Lambdas: `(lam x (add x 1))`
 
----
-
 ## 3. Language AST & Definition Model
 Definitions exist in three forms, represented in `ast.gleam`:
 ```gleam
@@ -75,7 +73,66 @@ pub type StorageAdapter {
 
 ---
 
-## 6. Library Integration Guide
+## 6. Concurrency & Distributed Features
+
+### 6.1 Concurrency Primitives
+Gleamunison exposes Erlang's native process model through typed abilities:
+- **spawn**: `(do Remote spawn (lam () body))` — creates a new process executing `body`. Returns a `Task`.
+- **send**: `(do Remote send task value)` — sends `value` to the process identified by `task`.
+- **recv**: `(do Remote recv)` — blocks until a message arrives, returns the received value.
+- **self**: Returns the current process identifier.
+- **sleep**: `(do Remote sleep ms)` — suspends the current process for `ms` milliseconds.
+- **now**: Returns the current system time.
+
+### 6.2 Distributed Compute
+- **Remote ability**: `forkAt` ships a computation to a remote node by content-hash, `await` blocks on its result, `here` returns the current node location.
+- **Location transparency**: `Location` wraps Erlang node names (e.g., `node@host`). Computations are location-agnostic until executed.
+- **Code shipping**: Uses the pull-based sync protocol to verify and transfer content-addressed BEAM modules to remote nodes.
+- **Serializable continuations**: Erlang's `term_to_binary/1` serializes closures; identical module hashes across nodes guarantee correct deserialization.
+
+### 6.3 Mnesia Storage
+- **Replicated codebase**: The Mnesia storage adapter provides ACID transactions and automatic replication across clustered nodes.
+- **No external database**: Pure Erlang/OTP, no PostgreSQL or SQLite dependency.
+
+### 6.4 Supervision Trees
+- **OTP integration**: `gleamunison_sup` manages worker process lifecycles with standard Erlang supervisor behavior.
+- **Link isolation**: Supervisor processes are spawned in dedicated workers to prevent cascading termination during testing.
+
+---
+
+## 7. Web Dashboard
+
+```sh
+./gleamunison_escript server   # Starts on http://localhost:8080
+```
+
+The embedded HTTP dashboard provides:
+- **Node status**: Running processes, loaded module count, synced hashes.
+- **Mnesia table keys**: Browse all stored content-addressed definitions.
+- **Real-time updates**: ETS-backed counters with zero garbage collection overhead.
+
+---
+
+## 8. REPL Features
+
+### 8.1 Multi-line Input
+The REPL supports multi-line expressions. It tracks bracket depth and accumulates lines until parentheses balance:
+```
+> (define factorial
+|   (lam n
+|     (if (eq n 0) 1
+|       (multiply n (factorial (subtract n 1))))))
+```
+
+### 8.2 Spelling Suggestions
+On name resolution errors, the REPL provides spelling suggestions using depth-limited Levenshtein distance against all active environment definitions.
+
+### 8.3 Module Purging
+Redefining a name in the REPL automatically purges the old BEAM module (`code:delete/1` + `code:purge/1`) before loading the new compilation, preventing code server conflicts.
+
+---
+
+## 9. Library Integration Guide
 Host applications must target Erlang (`--target erlang`) and use OTP 29+.
 ```gleam
 import gleamunison/ast

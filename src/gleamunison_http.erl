@@ -65,5 +65,19 @@ handle_route(Socket, <<"/define", Rest/binary>>) ->
     gleamunison_http_routes:handle_define_route(Socket, Rest);
 handle_route(Socket, <<"/browse">>) ->
     gleamunison_http_routes:handle_browse_route(Socket);
+handle_route(Socket, <<"/api/status">>) ->
+    gleamunison_http_routes:handle_status_route(Socket);
+handle_route(Socket, <<"/api/events">>) ->
+    gleamunison_http_routes:handle_sse_route(Socket);
+handle_route(Socket, <<"/api/processes">>) ->
+    gleamunison_http_routes:handle_processes_route(Socket);
+handle_route(Socket, <<"/api/sync-status">>) ->
+    gleamunison_http_routes:handle_sync_status_route(Socket);
+handle_route(Socket, <<"/api/redefinitions", _Rest/binary>>) ->
+    gleamunison_http_routes:handle_redefinitions_route(Socket);
+handle_route(Socket, <<"/api/logs">>) ->
+    gleamunison_http_routes:handle_logs_route(Socket);
+handle_route(Socket, <<"/api/modules">>) ->
+    gleamunison_http_routes:handle_enhanced_modules_route(Socket);
 handle_route(Socket, Path) ->
     gleamunison_http_routes:serve_static(Socket, Path).

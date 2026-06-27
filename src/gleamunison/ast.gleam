@@ -43,6 +43,7 @@ pub type Term {
   Match(scrutinee: Term, cases: List(Case))
   Do(ability: DefinitionRef, operation: LocalVar, args: List(Term))
   Handle(computation: Term, handler: Term, ability: DefinitionRef)
+  Construct(ctor_ref: DefinitionRef, args: List(Term))
 }
 
 pub type Case {
@@ -56,6 +57,7 @@ pub type Pattern {
   PatCons(head: LocalVar, tail: LocalVar)
   PatEmptyList
   PatAs(bound: LocalVar, inner: Pattern)
+  PatConstructor(ctor_ref: DefinitionRef, args: List(Pattern))
 }
 
 pub type TypeDeclaration {

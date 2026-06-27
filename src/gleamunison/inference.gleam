@@ -84,5 +84,11 @@ pub fn infer_term(term: ast.Term, cache: TypeCache) -> Result(ast.Type, Inferenc
         [first, ..] -> infer_term(first.body, cache)
       }
     }
+    ast.Construct(ctor_ref, _) -> {
+      case dict.get(cache.entries, ctor_ref) {
+        Ok(CTTerm(t)) -> Ok(t)
+        _ -> Ok(ast.TypeVar(-1))
+      }
+    }
   }
 }

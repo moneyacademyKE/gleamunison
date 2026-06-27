@@ -1,5 +1,7 @@
 # Gap Analysis: High-Utility Low-Complexity Builtins
 
+> **Status: IMPLEMENTED (v0.8.0).** All recommended builtins were implemented: Math ability (numeric operations), Show ability (display/formatting), JSON parse (`json-parse` via gleam_json), HTTP get (`http-get` via gleamunison http client), and File read (`file-read` via simplifile). See ADR-0030 (Curried BEAM List Fold FFI) and ADR-0031 (Modular FFI Decomposition) for implementation details. This document is retained as historical record of the analysis that informed the implementation.
+
 A Rich Hickey-style Gap Analysis comparing the prototype stubs for experimental builtins and capabilities (Levels 89, 90, 96, 97, 98) with actual production-grade FFI implementations on the BEAM.
 
 ---

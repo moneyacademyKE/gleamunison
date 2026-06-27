@@ -13,6 +13,7 @@ pub type SurfaceTerm {
   SMatch(scrutinee: SurfaceTerm, cases: List(SCase))
   SDo(ability: String, operation: String, args: List(SurfaceTerm))
   SHandle(computation: SurfaceTerm, handler: SurfaceTerm, ability: String)
+  SConstruct(name: String, args: List(SurfaceTerm))
 }
 
 pub type SCase {
@@ -26,6 +27,7 @@ pub type SPattern {
   SPCons(head: String, tail: String)
   SPEmptyList
   SPAs(name: String, inner: SPattern)
+  SPConstructor(name: String, args: List(SPattern))
 }
 
 pub type SurfaceUnit {

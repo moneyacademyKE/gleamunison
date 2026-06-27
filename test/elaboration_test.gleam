@@ -10,7 +10,7 @@ pub fn elaborate_first_def_test() {
     root: Ref(hash_bytes(<<"root">>)),
     defs: [#("my_first_def", SurfaceTermDef(SInt(42)))]
   )
-  let assert Ok(#(unit, _)) = elab.elaborate_unit(surface, cache)
+  let assert Ok(#(unit, _, _)) = elab.elaborate_unit(surface, cache)
   let assert ast.Unit(root: _, defs: [#(_ref, def)]) = unit
   let assert ast.TermDef(term:, typ:) = def
   let assert ast.Int(42) = term
@@ -27,7 +27,7 @@ pub fn elaborate_case_index_test() {
     root: Ref(hash_bytes(<<"root">>)),
     defs: [#("test_match", SurfaceTermDef(m))]
   )
-  let assert Ok(#(unit, _)) = elab.elaborate_unit(surface, cache)
+  let assert Ok(#(unit, _, _)) = elab.elaborate_unit(surface, cache)
   let assert ast.Unit(root: _, defs: [#(_ref, ast.TermDef(term: ast.Match(_, [c1, c2]), typ: _))]) = unit
   let assert ast.Case(pattern: ast.PatVar(Local(i1)), body: ast.LocalVarRef(Local(v1))) = c1
   let assert ast.Case(pattern: ast.PatVar(Local(i2)), body: ast.LocalVarRef(Local(v2))) = c2
@@ -52,7 +52,7 @@ pub fn typedef_constructor_distinct_local_test() {
     root: Ref(hash_bytes(<<"root">>)),
     defs: [#("MyType", elab_types.SurfaceTypeDef(elab_types.TBuiltin(elab_types.TInt)))]
   )
-  let assert Ok(#(unit, _)) = elab.elaborate_unit(surface, cache)
+  let assert Ok(#(unit, _, _)) = elab.elaborate_unit(surface, cache)
   let assert ast.Unit(root: _, defs: [#(_ref, ast.TypeDef(ast.Structural(name, _, [ast.Constructor(c_name, _)])))]) = unit
   let assert False = name == c_name
 }

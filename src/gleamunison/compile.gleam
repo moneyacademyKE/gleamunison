@@ -49,6 +49,8 @@ fn emit_term(t: ast.Term) -> String {
     ast.Handle(computation:, handler:, ability:) ->
       "gleamunison_effets:handle_comp({'" <> module_name_for(ability) <> "', "
       <> "fun(Val, Cont) -> (" <> emit_term(handler) <> "(Val))(Cont) end}, fun() -> " <> emit_term(computation) <> " end)"
+    ast.Construct(ctor_ref:, args:) ->
+      "{" <> module_name_for(ctor_ref) <> ", " <> string.join(list.map(args, emit_term), ", ") <> "}"
   }
 }
 
@@ -60,6 +62,8 @@ fn emit_pattern(p: ast.Pattern) -> String {
     ast.PatCons(head: Local(h), tail: Local(t)) -> "[V" <> int.to_string(h) <> "|V" <> int.to_string(t) <> "]"
     ast.PatEmptyList -> "[]"
     ast.PatAs(bound: Local(b), inner:) -> "V" <> int.to_string(b) <> " = " <> emit_pattern(inner)
+    ast.PatConstructor(ctor_ref:, args:) ->
+      "{" <> module_name_for(ctor_ref) <> ", " <> string.join(list.map(args, emit_pattern), ", ") <> "}"
   }
 }
 

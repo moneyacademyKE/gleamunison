@@ -1,5 +1,7 @@
 # Rich Hickey Gap Analysis: Phase 5 Distributed Topology & Concurrency
 
+> **Status: IMPLEMENTED (v0.8.0).** All four recommendations in Section 4 were implemented: Remote ability with `forkAt`/`await`/`here` in `repl.gleam`/`gleamunison_repl_ffi.erl`, Mnesia storage adapter in `storage.gleam`/`gleamunison_storage.erl`, serializable continuations via `term_to_binary`/`binary_to_term` (see Learning #34), and supervision trees in `gleamunison_sup.erl` with isolated link topology (see Learning #36). This document is retained as historical record of the analysis that informed the implementation.
+
 This document performs a gap analysis on the distributed features (Remote ability, Location-aware compute, Mnesia storage, Supervision trees, and Serializable Continuations) required to transition `gleamunison` into a location-aware, distributed-first programming language.
 
 ---

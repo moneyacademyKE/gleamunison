@@ -5,7 +5,7 @@ import gleamunison/lexer.{
   type Token, type TokenInfo, type ParseError, Symbol, IntVal, FloatVal, LParen, RParen, Quote, ParseError
 }
 import gleamunison/elab_types.{
-  type SurfaceTerm, SInt, SFloat, SVar, SLet, SLambda, SList, SMatch, SCase, SPVar, SPInt, SPText
+  type SurfaceTerm, SInt, SFloat, SVar, SLet, SLambda, SList, SMatch, SCase, SPVar, SPInt, SPText, SPConstructor
 }
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
@@ -93,6 +93,10 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
           use handler_t <- result.try(sexpr_to_term(handler))
           Ok(elab_types.SHandle(comp_t, handler_t, ab))
         }
+        [SAtom(Symbol("type"), _, _), SAtom(Symbol(type_name), _, _), ..ctors] -> {
+          use ctor_terms <- result.try(list.try_map(ctors, sexpr_to_term))
+          Ok(SList([SVar("type"), SVar(type_name), ..ctor_terms]))
+        }
         [SAtom(Symbol("list"), _, _), ..rest] -> {
           case list.try_map(rest, sexpr_to_term) {
             Ok(terms) -> Ok(SList(terms))
@@ -137,6 +141,10 @@ fn sexpr_to_pattern(sexpr: SExpr) -> Result(elab_types.SPattern, ParseError) {
         }
         False -> Ok(SPVar(name))
       }
+    }
+    SListExpr([SAtom(Symbol(ctor_name), _, _), ..args], _, _) -> {
+      use parsed_args <- result.try(list.try_map(args, sexpr_to_pattern))
+      Ok(SPConstructor(ctor_name, parsed_args))
     }
     _ -> Error(ParseError("Invalid pattern", 0, 0))
   }

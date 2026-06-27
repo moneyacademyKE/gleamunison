@@ -1,5 +1,7 @@
 # Gap Analysis: awesome-gleam Integration
 
+> **Status: IMPLEMENTED (v0.8.0).** The recommendations were adopted: birdie for snapshot testing (see `test/parser_snapshot_test.gleam`), glam for pretty printing (see `gleamunison/type_pretty.gleam`), simplifile for file I/O (see FFI integration in `gleamunison_ffi_io.erl`), and gleamy_structures for Bimap/PriorityQueue (see `gleam.toml` deps). snag was rejected (loses domain error types). See ADR-0027 (Community Library Package Integration) for the decision record. This document is retained as historical record.
+
 This analysis evaluates the `gleamunison` codebase against community packages from `awesome-gleam`.
 
 ## Category Analysis

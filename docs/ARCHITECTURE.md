@@ -43,8 +43,17 @@ Thread-local scope stack managed via process dictionary (`$ability_stack`):
 ### 5. Pull-based Node Syncing
 Advertises local refs, retrieves remote difference, requests missing definition binaries, and persists them via codebase insertions.
 
+### 6. Distributed Topology & Concurrency (Phase 5)
+- **Concurrency Primitives**: `spawn`, `send`, `recv`, `self`, `sleep`, `now` — native Erlang process model with content-addressed module dispatch.
+- **Remote Ability**: `forkAt`, `await`, `here` — location-transparent distributed compute. `Location` wraps Erlang node names; code shipping via pull-based sync protocol.
+- **Mnesia Storage Adapter**: Replicated ACID storage across clustered nodes. Replaces single-node ETS/DETS for multi-node deployments.
+- **Supervision Trees**: `gleamunison_sup.erl` — OTP supervisor with isolated link topology. Workers spawned in dedicated processes to prevent cascading termination signals.
+- **Serializable Continuations**: Erlang `term_to_binary/1` and `binary_to_term/1` enable cross-node closure serialization. Content-addressed module naming (`m_<hash>`) guarantees identical module versions across nodes.
+
 ## Invariants
 - **Type-Inclusive Hash**: The AST term and its inferred type compile to the hash.
 - **Append-only Codebase**: Once inserted, definitions never change.
 - **Process Isolation**: Ability stack bound to processes.
-- **Standalone escript**: zero-dependency 384KB binary.
+- **Standalone escript**: zero-dependency ~1.1 MB binary.
+- **Content-Addressed Continuations**: Identical hashes guarantee identical module versions across nodes, enabling native Erlang closure serialization.
+- **Supervisor Link Isolation**: Supervisor trees spawned in dedicated workers to prevent cascading termination signals.

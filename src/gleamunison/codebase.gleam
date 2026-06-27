@@ -71,6 +71,8 @@ fn hash_pattern(p: ast.Pattern) -> Hash {
     ast.PatEmptyList -> hash_bytes(str_to_bits("patempty"))
     ast.PatAs(bound: Local(i), inner:) ->
       hash_bytes(bit_array.concat([str_to_bits("patas:" <> int.to_string(i) <> ":"), hash_to_binary(hash_pattern(inner))]))
+    ast.PatConstructor(ctor_ref: Ref(h), args:) ->
+      hash_bytes(bit_array.concat([str_to_bits("patctor:"), hash_to_binary(h), ..list.map(args, fn(a) { hash_to_binary(hash_pattern(a)) })]))
   }
 }
 
@@ -99,6 +101,8 @@ fn hash_term(term: ast.Term) -> Hash {
       hash_bytes(bit_array.concat([str_to_bits("do:" <> int.to_string(op_i) <> ":"), hash_to_binary(h), ..list.map(args, fn(a) { hash_to_binary(hash_term(a)) })]))
     ast.Handle(computation:, handler:, ability: Ref(h)) ->
       hash_bytes(bit_array.concat([str_to_bits("handle:"), hash_to_binary(h), hash_to_binary(hash_term(computation)), hash_to_binary(hash_term(handler))]))
+    ast.Construct(ctor_ref: Ref(h), args:) ->
+      hash_bytes(bit_array.concat([str_to_bits("construct:"), hash_to_binary(h), ..list.map(args, fn(a) { hash_to_binary(hash_term(a)) })]))
   }
 }
 

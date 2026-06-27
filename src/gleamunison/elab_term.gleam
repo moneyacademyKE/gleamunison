@@ -5,7 +5,7 @@ import gleamunison/ast
 import gleamunison/identity.{Local}
 import gleamunison/elab_types.{
   type SCase, type SurfaceTerm, type ElaborateError, SInt, SFloat, SText, SList, SVar, SRef, SApply, SLambda, SLet, SMatch, SDo, SHandle,
-  UnknownOperation, MissingAbilityDecl, NameNotFound, SCase
+  UnknownOperation, MissingAbilityDecl, NameNotFound, SCase, SConstruct
 }
 import gleamunison/elab_ctx.{type ElabCtx, ElabCtx, add_binding, lookup_binding}
 import gleamunison/elab_pat.{elaborate_pattern}
@@ -68,6 +68,17 @@ pub fn elaborate_term(term: SurfaceTerm, ctx: ElabCtx) -> Result(#(ElabCtx, ast.
       use #(ctx2, comp) <- result.try(elaborate_term(c, ctx))
       use #(ctx3, hand) <- result.try(elaborate_term(h, ctx2))
       Ok(#(ctx3, ast.Handle(comp, hand, ab_ref)))
+    }
+    SConstruct(name, args) -> {
+      use ctor_ref <- result.try(dict.get(ctx.names, name) |> result.replace_error(NameNotFound(name)))
+      use #(ctx2, elaborated_args) <- result.try(
+        list.try_fold(args, #(ctx, []), fn(acc, arg) {
+          let #(c_ctx, acc_args) = acc
+          use #(n_ctx, term) <- result.try(elaborate_term(arg, c_ctx))
+          Ok(#(n_ctx, [term, ..acc_args]))
+        })
+      )
+      Ok(#(ctx2, ast.Construct(ctor_ref, list.reverse(elaborated_args))))
     }
   }
 }

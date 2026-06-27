@@ -101,7 +101,7 @@ pub fn do_eval(
   let defs = [#(name, SurfaceTermDef(term)), ..prev_defs]
   case elab.elaborate_unit(SurfaceUnit(expr_ref, defs), cache) {
     Error(err) -> Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
-    Ok(#(unit, next_cache)) -> {
+    Ok(#(unit, next_cache, _elab_ctx)) -> {
       case list.key_find(unit.defs, expr_ref) {
         Error(_) -> Error("No def found")
         Ok(def) -> {
@@ -139,7 +139,7 @@ pub fn handle_define(
   let defs = [#(name, SurfaceTermDef(val)), ..prev_defs]
   case elab.elaborate_unit(SurfaceUnit(ref_for_name("repl_expr"), defs), cache) {
     Error(err) -> Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
-    Ok(#(unit, next_cache)) -> {
+    Ok(#(unit, next_cache, _elab_ctx)) -> {
       case list.key_find(unit.defs, name_ref) {
         Error(_) -> Error("No def found")
         Ok(def) -> {
@@ -176,7 +176,7 @@ pub fn bootstrap_defs(
         let name_ref = ref_for_name(name)
         case elab.elaborate_unit(SurfaceUnit(ref_for_name("repl_expr"), [#(name, val_def)]), curr_cache) {
           Error(_) -> acc
-          Ok(#(unit, next_cache)) -> {
+          Ok(#(unit, next_cache, _elab_ctx)) -> {
             case list.key_find(unit.defs, name_ref) {
               Error(_) -> acc
               Ok(def) -> {
