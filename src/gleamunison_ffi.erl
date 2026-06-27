@@ -10,7 +10,8 @@
     get_plain_args/0,
     eval_expression/1,
     state_get/1, state_set/2,
-    file_read/1, file_write/2, file_delete/1
+    file_read/1, file_write/2, file_delete/1, to_dynamic/1
+
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -201,3 +202,6 @@ eval_expression(Expr) when is_binary(Expr) ->
         Class:_Reason:Stack ->
             {error, iolist_to_binary(io_lib:format("~p:~p at ~p", [Class, _Reason, Stack]))}
     end.
+
+to_dynamic(X) -> X.
+

@@ -38,21 +38,30 @@ The standalone binary (`gleamunison_escript`) contains the full content-addresse
 
 If you already have Erlang installed, this is as close to a zero-install language runtime as it gets.
 
-## Modules (12 source modules, 1,450+ lines)
+## Modules (17 source modules, 1,650+ lines)
 
 | Module | Concern | Status |
 |---|---|---|
 | `gleamunison/identity` | Opaque Hash, DefinitionRef, LocalVar | Real |
-| `gleamunison/ast` | Core AST: Term (7 variants), Type, Definition, Unit | Real |
+| `gleamunison/ast` | Core AST: Term (12 variants), Type, Definition, Unit | Real |
 | `gleamunison/types` | Type inference + cache | Real |
 | `gleamunison/codebase` | Content-addressed Merkle store | Real |
 | `gleamunison/elaborate` | Surface → Core with name/ability resolution | Real |
+| `gleamunison/elab_def` | Elaboration helper for definitions (term, type, ability) | Real |
+| `gleamunison/lower` | Lowering surface types to core type references | Real |
+| `gleamunison/parser` | S-expression parser & tokenizer | Real |
 | `gleamunison/compile` | AST → Erlang source → BEAM binary | Real |
 | `gleamunison/loader` | Dynamic module loading into VM | Real |
 | `gleamunison/effects` | Algebraic effect types + Erlang runtime | Real |
+| `gleamunison/storage` | ETS, DETS, and Partitioned DETS storage adapters | Real |
+| `gleamunison/repl` | REPL entry point and loop orchestrator | Real |
+| `gleamunison/repl_eval` | REPL evaluation and definition compiler pipeline | Real |
+| `gleamunison/repl_io` | REPL bracket counter and line accumulator | Real |
 | `gleamunison/sync` | Pull-based sync protocol | Real |
+| `gleamunison/http` | Web server entry point | Real |
 | `gleamunison_ffi.erl` | FFI: hashing, compilation, loading, process dict | Real |
 | `gleamunison_effets.erl` | Effects runtime: push/pop/find_frame, do_op/handle_comp | Real |
+
 
 ## Quick start
 

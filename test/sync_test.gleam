@@ -1,4 +1,6 @@
+// NOTE: Sync tests run against mock FFI stubs that return mock static peer data.
 import gleamunison/identity.{Ref, hash_to_debug_string}
+
 import gleamunison/elab_types.{
   SurfaceUnit, SurfaceTermDef, SHandle, SInt, MissingAbilityDecl
 }

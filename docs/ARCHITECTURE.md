@@ -31,7 +31,8 @@ Pluggable storage adapter supporting:
 - **Compiler**: `emit_term` concatenates Erlang source code from AST, invoking `compile:file/2`.
 - **OTP 29**: Handles `{ok, Mod, []}` return, reading BEAM files directly from disk.
 - **Loader**: Threaded compilation and load results, caching loaded and failed refs.
-- **Module Names**: Maps `DefinitionRef` to `m_<first_8_hex_chars>` (e.g. `'m_e8e52932'`), preventing collisions.
+- **Module Names**: Maps `DefinitionRef` to `m_<last_8_hex_chars>` (e.g. `'m_e8e52932'`), preventing collisions.
+
 
 ### 4. Effects Runtime (`gleamunison_effets.erl`)
 Thread-local scope stack managed via process dictionary (`$ability_stack`):

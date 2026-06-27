@@ -148,5 +148,22 @@ By exposing `state_get/1` and `state_set/2` functions through Erlang FFI, functi
 
 To make the escript truly self-contained and run on any machine with only Erlang installed, the genesis modules (`src/m_*.erl`) must be compiled and bundled inside the escript's zip archive. The build script automates this by calling `erlc` on all `src/m_*.erl` files and adding the resulting `.beam` binaries to the ZIP.
 
+## 24. Canonical hashing resolves target-platform dependency
+
+Fallback to `string.inspect` creates target-platform and compiler-defined addressing. Implementing pure recursive binary serialization for type reference and constructors ensures cryptographic identity stability.
+
+## 25. Named ETS table resolves persistent_term GC sweeps
+
+Using `persistent_term` for mutable count tracking in a concurrent HTTP server is a performance bottleneck because `put` triggers VM-wide global garbage collections of all processes. Named public ETS tables with atomic updates are the correct way to handle concurrent mutations.
+
+## 26. Modular decomposition preserves LOC constraints
+
+Splitting large REPL and HTTP server FFI files into small sub-modules under 150 LOC keeps modules highly cohesive, prevents circular imports, and respects strict coding playbooks.
+
+## 27. Idempotent insertion for CAS stores
+
+Content-addressed insertions must be idempotent (returning Ok on duplicates) rather than returning error values.
+
+
 
 

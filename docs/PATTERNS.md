@@ -263,4 +263,29 @@ Build process compiles all genesis modules (`src/m_*.erl`) and includes their BE
 
 **Applied in:** `build_escript.sh`
 
+---
+
+## 20. Index Map Threading for lowering
+
+Threading type variable translation dictionaries when transforming AST nodes guarantees unique variable matching.
+
+**Applied in:** `lower.gleam`
+
+---
+
+## 21. Structured Recursive Hash Serialization
+
+Determining cryptographic definition hashes by canonical recursive traversal over AST structures, rather than fallback string inspections.
+
+**Applied in:** `codebase.gleam`
+
+---
+
+## 22. Named public ETS tables for global mutations
+
+Using public named ETS tables for global mutable count tracking, preserving process isolation while avoiding persistent_term GC halts.
+
+**Applied in:** `gleamunison_http.erl`
+
+
 
