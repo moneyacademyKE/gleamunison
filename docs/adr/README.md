@@ -27,4 +27,6 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0021](0021-runtime-tradeoffs-and-robustness-safeguards.md) | Runtime Tradeoffs & Robustness Safeguards | Accepted |
 | [ADR-0022](0022-safe-deployment-and-remote-synchronization.md) | Safe Remote Synchronization and Environment-Isolated Pushes | Accepted |
 | [ADR-0023](0023-interactive-repl-and-curried-beam-emission.md) | Interactive REPL and Curried BEAM Emission | Accepted |
+| [ADR-0024](0024-repl-purging-stateful-ffi-and-web-dashboard.md) | REPL Module Purging, Stateful/File FFI, and Dynamic Web Dashboard | Accepted |
+
 

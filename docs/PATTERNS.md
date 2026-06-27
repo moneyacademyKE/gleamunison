@@ -235,3 +235,32 @@ Thread a stateful mapping of string names to sequential integers during type low
 
 **Applied in:** `lower.gleam`, `elab_def.gleam`
 
+---
+
+## 17. Dynamic Purging / Redefinition Lifecycle
+
+To support interactive redefinitions in the REPL, the code server must unload existing compiled modules to prevent collision errors. This is handled by force-unloading the existing BEAM module before compiling and loading the new binary:
+```gleam
+let _ = unload_binary(mod_name)
+// Compile and load the new binary...
+```
+
+**Applied in:** `repl.gleam`
+
+---
+
+## 18. Process-Isolated State FFI
+
+Leverage process-scoped storage (Erlang process dictionary) inside external FFI functions to provide mutable state to functional code. This isolates state strictly within the active Erlang process, ensuring concurrency safety.
+
+**Applied in:** `gleamunison_ffi.erl`, `http.gleam`
+
+---
+
+## 19. Genesis Module Escript Packaging
+
+Build process compiles all genesis modules (`src/m_*.erl`) and includes their BEAM files inside the escript archive zip. This ensures that the standalone escript can evaluate all levels without needing external source compilation or path resolution at runtime.
+
+**Applied in:** `build_escript.sh`
+
+

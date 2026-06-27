@@ -5,7 +5,12 @@
     sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
     sync_request_defs/2, sync_push_defs/2, hex_to_bytes/1,
     unload_binary/1, corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
-    soft_purge_binary/1, test_soft_purge_scenario/0
+    soft_purge_binary/1, test_soft_purge_scenario/0,
+    binary_to_erl_literal/1,
+    get_plain_args/0,
+    eval_expression/1,
+    state_get/1, state_set/2,
+    file_read/1, file_write/2, file_delete/1
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -145,3 +150,54 @@ test_soft_purge_scenario() ->
     code:delete(m_purge_test),
     code:purge(m_purge_test),
     {ok, {PurgeRes1, PurgeRes2}}.
+
+binary_to_erl_literal(Bin) when is_binary(Bin) ->
+    Segments = [integer_to_list(X) || <<X>> <= Bin],
+    erlang:iolist_to_binary(["<<", string:join(Segments, ", "), ">>"]).
+
+get_plain_args() ->
+    [list_to_binary(A) || A <- init:get_plain_arguments()].
+
+state_get(Key) when is_binary(Key) ->
+    case erlang:get(Key) of
+        undefined -> {ok, null};
+        Val -> {ok, Val}
+    end.
+
+state_set(Key, Val) when is_binary(Key) ->
+    erlang:put(Key, Val),
+    {ok, ok}.
+
+file_read(Path) when is_binary(Path) ->
+    case file:read_file(Path) of
+        {ok, Data} -> {ok, Data};
+        {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
+    end.
+
+file_write(Path, Data) when is_binary(Path) ->
+    case file:write_file(Path, Data) of
+        ok -> {ok, ok};
+        {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
+    end.
+
+file_delete(Path) when is_binary(Path) ->
+    case file:delete(Path) of
+        ok -> {ok, ok};
+        {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
+    end.
+
+eval_expression(Expr) when is_binary(Expr) ->
+    try
+        case gleamunison@parser:parse_string(Expr) of
+            {ok, _STerm} ->
+                case gleamunison@repl:eval_string_unique(Expr) of
+                    {ok, Result} -> {ok, Result};
+                    {error, E} -> {error, E}
+                end;
+            {error, Reason} ->
+                {error, iolist_to_binary(io_lib:format("~tp", [Reason]))}
+        end
+    catch
+        Class:_Reason:Stack ->
+            {error, iolist_to_binary(io_lib:format("~p:~p at ~p", [Class, _Reason, Stack]))}
+    end.

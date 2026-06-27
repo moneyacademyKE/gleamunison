@@ -7,23 +7,26 @@ eval_module(Mod) ->
         false -> Mod
     end,
     ConsoleHandler = {<<"m_74eafa15">>, #{
-        0 => fun([Text], Cont) ->
-            io:format("~s~n", [Text]),
+        0 => fun([Arg], Cont) ->
+            case is_binary(Arg) of
+                true -> io:format("~s~n", [Arg]);
+                false -> io:format("~p~n", [Arg])
+            end,
             Cont(0)
         end
     }},
     try
         Val = gleamunison_effets:handle_comp(ConsoleHandler, fun() -> ModuleAtom:'$eval'() end),
-        {ok, list_to_binary(io_lib:format("~p", [Val]))}
+        {ok, list_to_binary(io_lib:format("~tp", [Val]))}
     catch
         Class:Reason:Stacktrace ->
             {error, list_to_binary(io_lib:format("~p:~p at ~p", [Class, Reason, Stacktrace]))}
     end.
 
-read_line(Prompt) ->
-    case io:get_line(Prompt) of
+read_line(_Prompt) ->
+    case io:get_line('') of
         eof -> {error, nil};
         {error, _} -> {error, nil};
-        Line when is_list(Line) -> {ok, list_to_binary(Line)};
+        Line when is_list(Line) -> {ok, unicode:characters_to_binary(Line)};
         Line when is_binary(Line) -> {ok, Line}
     end.

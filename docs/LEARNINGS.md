@@ -136,4 +136,17 @@ Nested function application of the form `(F(X))(Y)` results in Erlang syntax par
 
 To pass content-addressed verification, definitions must be inserted into the codebase under their structural hash. However, VM executions rely on name-based modules to resolve AST references. The compiler bridges this by splitting insertion (structural) and VM loading (name-based).
 
+## 21. Purging old modules on redefinition
+
+In Erlang, the code server can keep up to two versions of a module in memory. When executing rapid REPL redefinitions, we must explicitly call `code:delete/1` and `code:purge/1` to unload the old version. Otherwise, loading the new compiled module binary will fail or behave incorrectly due to code server limits.
+
+## 22. Process dictionary for stateful FFI
+
+By exposing `state_get/1` and `state_set/2` functions through Erlang FFI, functional code in the gleamunison runtime can perform stateful calculations. This maps directly to the current process dictionary (`erlang:get/1` and `erlang:put/2`), preserving process isolation and avoiding the need for global state synchronization.
+
+## 23. Self-contained Escript Genesis inclusion
+
+To make the escript truly self-contained and run on any machine with only Erlang installed, the genesis modules (`src/m_*.erl`) must be compiled and bundled inside the escript's zip archive. The build script automates this by calling `erlc` on all `src/m_*.erl` files and adding the resulting `.beam` binaries to the ZIP.
+
+
 

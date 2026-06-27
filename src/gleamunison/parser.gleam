@@ -1,8 +1,9 @@
 import gleam/list
 import gleam/string
 import gleam/int
+import gleam/float
 import gleam/result
-import gleamunison/elab_types.{type SurfaceTerm, SInt, SVar, SLet, SLambda, SList}
+import gleamunison/elab_types.{type SurfaceTerm, SInt, SFloat, SVar, SLet, SLambda, SList, SMatch, SCase, SPVar, SPInt, SPText}
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
 fn string_to_binary(s: String) -> BitArray
@@ -10,8 +11,10 @@ fn string_to_binary(s: String) -> BitArray
 pub type Token {
   Symbol(String)
   IntVal(Int)
+  FloatVal(Float)
   LParen
   RParen
+  Quote
 }
 pub type TokenInfo { TokenInfo(token: Token, line: Int, col: Int) }
 pub type ParseError { ParseError(message: String, line: Int, col: Int) }
@@ -26,6 +29,14 @@ fn do_tokenize(chars, acc, sl, sc, l, c) {
     [" ", ..rest] | ["\t", ..rest] -> flush_token(acc, sl, sc, do_tokenize(rest, "", 1, 1, l, c + 1))
     ["(", ..rest] -> flush_token(acc, sl, sc, [TokenInfo(LParen, l, c), ..do_tokenize(rest, "", 1, 1, l, c + 1)])
     [")", ..rest] -> flush_token(acc, sl, sc, [TokenInfo(RParen, l, c), ..do_tokenize(rest, "", 1, 1, l, c + 1)])
+    [";", ..rest] -> flush_token(acc, sl, sc, skip_line(rest, l, c + 1))
+    ["'", ..rest] -> flush_token(acc, sl, sc, [TokenInfo(Quote, l, c), ..do_tokenize(rest, "", sl, sc, l, c + 1)])
+    ["\"", ..rest] -> {
+      case acc {
+        "" -> read_string(rest, "\"", l, c, l, c + 1)
+        _ -> do_tokenize(rest, acc <> "\"", sl, sc, l, c + 1)
+      }
+    }
     [ch, ..rest] -> {
       let #(nsl, nsc) = case acc {
         "" -> #(l, c)
@@ -35,12 +46,30 @@ fn do_tokenize(chars, acc, sl, sc, l, c) {
     }
   }
 }
+fn read_string(chars, acc, sl, sc, l, c) {
+  case chars {
+    [] -> [TokenInfo(Symbol(acc <> "\""), sl, sc)]
+    ["\n", ..rest] -> read_string(rest, acc <> "\n", sl, sc, l + 1, 1)
+    ["\"", ..rest] -> flush_token(acc <> "\"", sl, sc, do_tokenize(rest, "", 1, 1, l, c + 1))
+    [ch, ..rest] -> read_string(rest, acc <> ch, sl, sc, l, c + 1)
+  }
+}
+fn skip_line(chars, l, c) {
+  case chars {
+    [] -> []
+    ["\n", ..rest] -> do_tokenize(rest, "", 1, 1, l + 1, 1)
+    [_, ..rest] -> skip_line(rest, l, c + 1)
+  }
+}
 fn flush_token(acc, l, c, tail) {
   case acc {
     "" -> tail
     _ -> case int.parse(acc) {
       Ok(n) -> [TokenInfo(IntVal(n), l, c), ..tail]
-      Error(_) -> [TokenInfo(Symbol(acc), l, c), ..tail]
+      Error(_) -> case float.parse(acc) {
+        Ok(f) -> [TokenInfo(FloatVal(f), l, c), ..tail]
+        Error(_) -> [TokenInfo(Symbol(acc), l, c), ..tail]
+      }
     }
   }
 }
@@ -57,6 +86,13 @@ pub fn parse_sexpr(tokens: List(TokenInfo)) -> Result(#(SExpr, List(TokenInfo)),
       Ok(#(SListExpr(exprs, l, c), rest2))
     }
     [TokenInfo(RParen, l, c), ..] -> Error(ParseError("Unexpected )", l, c))
+    [TokenInfo(Quote, l, c), ..rest] -> {
+      case parse_sexpr(rest) {
+        Ok(#(expr, rest2)) ->
+          Ok(#(SListExpr([SAtom(Symbol("quote"), l, c), expr], l, c), rest2))
+        Error(e) -> Error(e)
+      }
+    }
     [TokenInfo(other, l, c), ..rest] -> Ok(#(SAtom(other, l, c), rest))
   }
 }
@@ -74,6 +110,7 @@ fn parse_list(tokens, acc) {
 pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
   case sexpr {
     SAtom(IntVal(n), _, _) -> Ok(SInt(n))
+    SAtom(FloatVal(f), _, _) -> Ok(SFloat(f))
     SAtom(Symbol(name), _, _) -> {
       case string.starts_with(name, "\"") && string.ends_with(name, "\"") {
         True -> {
@@ -99,6 +136,16 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
           use val_t <- result.try(sexpr_to_term(val))
           Ok(SList([SVar("define"), SVar(name), val_t]))
         }
+        [SAtom(Symbol("if"), _, _), cond, then_expr, else_expr] -> {
+          // Expand (if cond then else) -> (match cond (1 then) (_ else))
+          use cond_t <- result.try(sexpr_to_term(cond))
+          use then_t <- result.try(sexpr_to_term(then_expr))
+          use else_t <- result.try(sexpr_to_term(else_expr))
+          Ok(elab_types.SMatch(cond_t, [
+            elab_types.SCase(elab_types.SPInt(1), then_t),
+            elab_types.SCase(elab_types.SPVar("_"), else_t),
+          ]))
+        }
         [SAtom(Symbol("do"), _, _), SAtom(Symbol(ab), _, _), SAtom(Symbol(op), _, _), ..args] -> {
           use parsed_args <- result.try(list.try_map(args, sexpr_to_term))
           Ok(elab_types.SDo(ab, op, parsed_args))
@@ -114,6 +161,20 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
             Error(e) -> Error(e)
           }
         }
+        [SAtom(Symbol("match"), _, _), scrutinee, ..cases] -> {
+          use scrutinee_t <- result.try(sexpr_to_term(scrutinee))
+          use parsed_cases <- result.try(list.try_map(cases, fn(case_expr) {
+            case case_expr {
+              SListExpr([pat_expr, body_expr], _, _) -> {
+                use pat <- result.try(sexpr_to_pattern(pat_expr))
+                use body <- result.try(sexpr_to_term(body_expr))
+                Ok(SCase(pattern: pat, body: body))
+              }
+              _ -> Error(ParseError("Invalid match case", 0, 0))
+            }
+          }))
+          Ok(SMatch(scrutinee_t, parsed_cases))
+        }
         [first, ..rest] -> {
           use f_term <- result.try(sexpr_to_term(first))
           list.try_fold(rest, f_term, fn(acc, arg) {
@@ -127,10 +188,30 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
   }
 }
 
+fn sexpr_to_pattern(sexpr: SExpr) -> Result(elab_types.SPattern, ParseError) {
+  case sexpr {
+    SAtom(IntVal(n), _, _) -> Ok(SPInt(n))
+    SAtom(Symbol(name), _, _) -> {
+      case string.starts_with(name, "\"") && string.ends_with(name, "\"") {
+        True -> {
+          let inner = string.slice(name, 1, string.length(name) - 2)
+          Ok(SPText(string_to_binary(inner)))
+        }
+        False -> Ok(SPVar(name))
+      }
+    }
+    _ -> Error(ParseError("Invalid pattern", 0, 0))
+  }
+}
+
 pub fn parse_string(input: String) -> Result(SurfaceTerm, ParseError) {
-  case parse_sexpr(tokenize(input)) {
-    Ok(#(sexpr, [])) -> sexpr_to_term(sexpr)
-    Ok(#(_, [TokenInfo(_, l, c), ..])) -> Error(ParseError("Extra tokens after expression", l, c))
-    Error(e) -> Error(e)
+  let tokens = tokenize(input)
+  case tokens {
+    [] -> Error(ParseError("Empty input", 0, 0))
+    _ -> case parse_sexpr(tokens) {
+      Ok(#(sexpr, [])) -> sexpr_to_term(sexpr)
+      Ok(#(_, [TokenInfo(_, l, c), ..])) -> Error(ParseError("Extra tokens after expression", l, c))
+      Error(e) -> Error(e)
+    }
   }
 }
