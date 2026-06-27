@@ -165,5 +165,15 @@ Splitting large REPL and HTTP server FFI files into small sub-modules under 150 
 Content-addressed insertions must be idempotent (returning Ok on duplicates) rather than returning error values.
 
 ## 28. Community library integration gaps
-
+ 
 A gap analysis against `awesome-gleam` packages shows that for compiler and REPL runtimes, adopting dev-dependencies like `birdie` (snapshot testing) and domain libraries like `glam` (pretty printing layout engine) dramatically increases developer efficiency and output aesthetics, while error stack utilities like `snag` are less suitable because domain-level programmatic error recovery (e.g. `NotFound` vs `IoError` in databases) is lost when error types are unified.
+
+## 29. Parser String Escaping for Nested S-Expressions
+Parsing string literals containing nested quotes (such as JSON payloads `\"`) requires tokenizer-level awareness of escape backslashes. If escape backslashes are not unescaped, the string is tokenized as separate split symbols divided by double quotes, breaking parentheses balance and AST structure. Recognizing escapes like `\"` and mapping them directly to internal character structures resolves this seamlessly.
+
+## 30. Test Suite Timeout and Process Recovery
+A long-running conformance suite parsing and executing user S-expressions can hang due to infinite recursion or blocked standard input reads. Wrapping execution in a timeout-aware thread mechanism (e.g. Clojure futures with a timeout) prevents single-test failures from blocking the entire pipeline, while automated process teardown and restart logic ensures the VM recovery process is robust.
+
+## 31. Proactive FFI Splitting for LOC Boundaries
+Maintaining strict file constraints requires proactive splitting of Erlang FFI wrappers before code lines cross boundaries. Dividing modules into core compile/loading operations and volatile transient state/IO concerns separates side effects and makes verification of deterministic behavior easier.
+
