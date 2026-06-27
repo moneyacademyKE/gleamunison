@@ -13,9 +13,10 @@ TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
 
 # Collect all beam files
-for dir in build/dev/erlang/gleamunison/ebin build/dev/erlang/gleam_stdlib/ebin; do
+for dir in build/dev/erlang/*/ebin; do
   [ -d "$dir" ] && find "$dir" -name '*.beam' -exec cp {} "$TMPDIR" \; 2>/dev/null || true
 done
+
 rm -f "$TMPDIR"/gleamunison_test.beam "$TMPDIR"/gleeunit*.beam 2>/dev/null
 
 # Compile and include raw Erlang genesis modules (m_*.erl)

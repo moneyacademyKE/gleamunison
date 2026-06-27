@@ -1,6 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/set.{type Set}
 import gleam/list
+import gleamy/bimap
 import gleamunison/identity.{type DefinitionRef}
 import gleamunison/ast.{type Definition}
 import gleamunison/compile.{type Compiler, new as new_compiler, compile_definition, module_name_for}
@@ -19,7 +20,7 @@ pub type LoaderError {
 pub opaque type Loader {
   Loader(
     compiler: Compiler,
-    loaded: Set(DefinitionRef),
+    module_names: bimap.Bimap(DefinitionRef, String),
     failed: Dict(DefinitionRef, LoaderError),
     order: List(DefinitionRef),
     max_size: Int,
@@ -30,7 +31,7 @@ pub opaque type Loader {
 pub fn new_loader() -> Loader {
   Loader(
     compiler: new_compiler(),
-    loaded: set.new(),
+    module_names: bimap.new(),
     failed: dict.new(),
     order: [],
     max_size: 1000,
@@ -41,7 +42,7 @@ pub fn new_loader() -> Loader {
 pub fn new_loader_with_limit(limit: Int) -> Loader {
   Loader(
     compiler: new_compiler(),
-    loaded: set.new(),
+    module_names: bimap.new(),
     failed: dict.new(),
     order: [],
     max_size: limit,
@@ -50,7 +51,7 @@ pub fn new_loader_with_limit(limit: Int) -> Loader {
 }
 
 pub fn is_loaded(ld: Loader, ref: DefinitionRef) -> Bool {
-  set.contains(ld.loaded, ref)
+  bimap.has_key(ld.module_names, ref)
 }
 
 fn retry_pending_purges(ld: Loader) -> Loader {
@@ -66,8 +67,10 @@ fn retry_pending_purges(ld: Loader) -> Loader {
       }
     },
   )
-  let next_loaded = set.fold(successful_purges, ld.loaded, set.delete)
-  Loader(..ld, loaded: next_loaded, pending_purge: still_pending)
+  let next_module_names = set.fold(successful_purges, ld.module_names, fn(bm, ref) {
+    bimap.delete_by_key(bm, ref)
+  })
+  Loader(..ld, module_names: next_module_names, pending_purge: still_pending)
 }
 
 fn compile_and_load(ref: DefinitionRef, def: Definition, compiler: Compiler) -> Result(BitArray, String) {
@@ -83,7 +86,7 @@ pub fn ensure_loaded(
   def: Definition,
 ) -> Result(Loader, #(Loader, LoaderError)) {
   let ld = retry_pending_purges(ld)
-  case set.contains(ld.loaded, ref) {
+  case bimap.has_key(ld.module_names, ref) {
     True -> {
       let next_order = [ref, ..list.filter(ld.order, fn(r) { r != ref })]
       Ok(Loader(..ld, order: next_order))
@@ -101,22 +104,22 @@ pub fn ensure_loaded(
                   case list.length(next_order) > ld.max_size {
                     True -> {
                       let #(keep, evict) = list.split(next_order, ld.max_size)
-                      let #(next_loaded, next_pending) = list.fold(
+                      let #(next_module_names, next_pending) = list.fold(
                         evict,
-                        #(set.insert(ld.loaded, ref), ld.pending_purge),
+                        #(bimap.insert(ld.module_names, ref, mod_name), ld.pending_purge),
                         fn(acc, evicted_ref) {
-                          let #(loaded_set, pending_set) = acc
+                          let #(bm, pending_set) = acc
                           let evicted_mod = module_name_for(evicted_ref)
                           case soft_purge_binary(evicted_mod) {
-                            Ok(True) -> #(set.delete(loaded_set, evicted_ref), pending_set)
-                            _ -> #(loaded_set, set.insert(pending_set, evicted_ref))
+                            Ok(True) -> #(bimap.delete_by_key(bm, evicted_ref), pending_set)
+                            _ -> #(bm, set.insert(pending_set, evicted_ref))
                           }
                         },
                       )
-                      Ok(Loader(..ld, loaded: next_loaded, order: keep, pending_purge: next_pending))
+                      Ok(Loader(..ld, module_names: next_module_names, order: keep, pending_purge: next_pending))
                     }
                     False -> {
-                      Ok(Loader(..ld, loaded: set.insert(ld.loaded, ref), order: next_order))
+                      Ok(Loader(..ld, module_names: bimap.insert(ld.module_names, ref, mod_name), order: next_order))
                     }
                   }
                 }

@@ -2,6 +2,8 @@ import gleam/dict
 import gleam/list
 import gleam/option.{Some}
 import gleam/set
+import gleam/string
+import gleamy/priority_queue
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/codebase.{type Codebase}
 import gleamunison/storage.{type StorageAdapter}
@@ -33,13 +35,20 @@ pub fn pull_sync(
             Ok(diff_refs) -> {
               case sync_request_defs(name, diff_refs) {
                 Ok(def_blobs) -> {
-                  let #(new_cb, new_refs) = list.fold(def_blobs, #(codebase, []), fn(acc, pair) {
-                    let #(cb, refs) = acc
+                  let compare_refs = fn(r1: DefinitionRef, r2: DefinitionRef) {
+                    let Ref(h1) = r1
+                    let Ref(h2) = r2
+                    string.compare(hash_to_debug_string(h1), hash_to_debug_string(h2))
+                  }
+                  let pq = priority_queue.new(compare_refs)
+                  let #(new_cb, next_pq) = list.fold(def_blobs, #(codebase, pq), fn(acc, pair) {
+                    let #(cb, q) = acc
                     let #(hash_hex, bytes) = pair
                     let ref = identity.Ref(identity.hash_from_bytes(identity.hex_to_bytes(hash_hex)))
                     let next_cb = codebase.insert_raw(cb, ref, bytes)
-                    #(next_cb, [ref, ..refs])
+                    #(next_cb, priority_queue.push(q, ref))
                   })
+                  let new_refs = priority_queue.to_list(next_pq)
                   let ps = PeerState(last_seen: 1, refs: set.from_list(our_refs), status: Connected)
                   let new_peers = dict.insert(state.peers, peer, ps)
                   let new_known = set.union(state.known_refs, set.from_list(new_refs))
