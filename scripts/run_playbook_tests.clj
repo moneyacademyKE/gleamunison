@@ -173,12 +173,9 @@
       (let [{:keys [expr expected]} (first cases)]
         (cond
           (or (str/includes? expr "read_line") (str/includes? expr "spawn") (str/includes? expr "recv")
-              (str/includes? expr "(do Console") (str/includes? expr "(do State"))
-          ;; Skip blocking I/O, concurrency, and unhandled effect ops
-          (recur (next cases))
-
-          (str/includes? expr (str \" ))
-          ;; Skip strings with escaped quotes - session writer mangling
+              (str/includes? expr "(do Console") (str/includes? expr "(do State")
+              (= (str/trim expr) "exit") (= (str/trim expr) "quit"))
+          ;; Skip blocking I/O, concurrency, unhandled effect ops, and exits
           (recur (next cases))
 
           (not (balanced? expr))

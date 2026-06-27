@@ -50,6 +50,9 @@ fn read_string(chars, acc, sl, sc, l, c) {
   case chars {
     [] -> [TokenInfo(Symbol(acc <> "\""), sl, sc)]
     ["\n", ..rest] -> read_string(rest, acc <> "\n", sl, sc, l + 1, 1)
+    ["\\", "\"", ..rest] -> read_string(rest, acc <> "\"", sl, sc, l, c + 2)
+    ["\\", "n", ..rest] -> read_string(rest, acc <> "\n", sl, sc, l, c + 2)
+    ["\\", "\\", ..rest] -> read_string(rest, acc <> "\\", sl, sc, l, c + 2)
     ["\"", ..rest] -> flush_token(acc <> "\"", sl, sc, do_tokenize(rest, "", 1, 1, l, c + 1))
     [ch, ..rest] -> read_string(rest, acc <> ch, sl, sc, l, c + 1)
   }
