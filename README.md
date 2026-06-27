@@ -106,6 +106,30 @@ Effects           ✓ RuntimeConfig
 Sync              ✓ PeerId/SyncState
 ```
 
+## Rationale & Gap Analysis
+
+### Why Gleamunison?
+Gleamunison combines the type-safe concurrency of the BEAM (via Gleam) with Unison's content-addressed codebase and algebraic effects, enabling zero-downtime hot upgrades and dynamic sandboxing.
+
+### Feature Set Differences (Gleamunison vs Unison)
+
+| Feature | Unison | Gleamunison | Trade-off / Benefit |
+|---|---|---|---|
+| **Identity** | SHA3-512 (Term+Type) | SHA256 (Term+Type) | SHA256 is native on BEAM; less hash size overhead. |
+| **Primitives** | `##` Prefix Namespace | Genesis Block (Hash space) | Genesis eliminates dual-identity complexity. |
+| **Effect Model** | Explicit continuation `k` | Implicit stack-based frame | Stack-based is simpler; lacks explicit `k` resume. |
+| **Codebase Store** | SQLite / Event Log | DETS / ETS Storage | DETS is native and lightweight on BEAM. |
+| **Namespaces** | Hierarchical Projects | Flat namespace mapping | Flat is simpler; hierarchy can be layered. |
+
+### Complexity vs. Utility
+
+| Element | Complexity | Utility | Recommendation |
+|---|---|---|---|
+| Genesis Primitives | Low | High | **Adopted**: Kept hash-space uniform. |
+| Stack-based Effects | Medium | High | **Adopted**: Simpler runtime implementation. |
+| Unique Type GUIDs | Low | Medium | **Adopted**: Prevents structural hash collisions. |
+| Remote Ability | High | Low | **Out-of-Scope**: Rely on BEAM distribution instead. |
+
 ## Unique Usecases (Impossible on Gleam or Unison Alone)
 
 Gleamunison combines the scheduling, distribution, and runtime efficiency of the BEAM with the content-addressing and algebraic effects constraints of Unison:
