@@ -1,6 +1,7 @@
 import gleam/dict
 import gleam/int
 import gleam/io
+import gleam/list
 import gleamunison/http
 import gleamunison/repl
 import dogfood
@@ -30,11 +31,31 @@ fn dispatch(cmd: String, param: String, levels: dict.Dict(String, fn() -> Nil)) 
     }
     "demo" -> print_help()
     "repl" -> repl.start_repl()
+    "all" -> run_all_levels(levels)
     _ -> case dict.get(levels, cmd) {
       Ok(f) -> f()
-      Error(_) -> io.println("Unknown command: '" <> cmd <> "'. Try: server, repl, level21..level1000")
+      Error(_) -> io.println("Unknown command: '" <> cmd <> "'. Try: server, repl, all, level1..level1000")
     }
   }
+}
+
+fn range(start: Int, end: Int) -> List(Int) {
+  case start > end {
+    True -> []
+    False -> [start, ..range(start + 1, end)]
+  }
+}
+
+fn run_all_levels(levels: dict.Dict(String, fn() -> Nil)) -> Nil {
+  let r = range(1, 1000)
+  list.each(r, fn(n) {
+    let key = "level" <> int.to_string(n)
+    case dict.get(levels, key) {
+      Ok(f) -> f()
+      Error(_) -> Nil
+    }
+  })
+  io.println("=== All 1000 levels complete ===")
 }
 
 fn print_help() -> Nil {
@@ -42,5 +63,6 @@ fn print_help() -> Nil {
   io.println("Usage: gleam run -- <command>")
   io.println("  server [port]   — start web server (default port 8080)")
   io.println("  repl            — interactive REPL")
-  io.println("  levelN          — run level N (21-1000)")
+  io.println("  all             — run all levels (1-1000)")
+  io.println("  levelN          — run level N (1-1000)")
 }
