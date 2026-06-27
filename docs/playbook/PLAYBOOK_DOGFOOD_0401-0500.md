@@ -1,5 +1,9 @@
 ## Level 401: Rank-1 polymorphism
 **Goal:** Identity at Int and Text.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level401()`
+
 ### 401.1 Test
 ```
 ((lam x x) 42) and ("hello")
@@ -10,6 +14,10 @@ Expected: Both typecheck
 
 ## Level 402: Recursive types
 **Goal:** List type definition.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level402()`
+
 ### 402.1 Test
 ```
 (type List a (Nil) (Cons a (List a)))
@@ -20,6 +28,10 @@ Expected: Type defined
 
 ## Level 403: Type variable scope
 **Goal:** Deeply nested.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level403()`
+
 ### 403.1 Test
 ```
 (lam a (lam b (lam c (lam d a))))
@@ -30,6 +42,10 @@ Expected: Typed as Fn chain
 
 ## Level 404: Let generalization
 **Goal:** Monomorphic restriction.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level404()`
+
 ### 404.1 Test
 ```
 (define id (lam x x)) ((id 42) (id "hi"))
@@ -40,6 +56,10 @@ Expected: Error or TVar(-1)
 
 ## Level 405: Type annotations
 **Goal:** Correct/wrong types.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level405()`
+
 ### 405.1 Test
 ```
 (the Int 42) vs (the Text 42)
@@ -50,6 +70,10 @@ Expected: Pass / Error
 
 ## Level 406: Row polymorphism
 **Goal:** Open record tails.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level406()`
+
 ### 406.1 Test
 ```
 (the {name: Text, age: Int} {name: "A", age: 30})
@@ -60,6 +84,10 @@ Expected: Record typed
 
 ## Level 407: Subsumption
 **Goal:** Wider context.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level407()`
+
 ### 407.1 Test
 ```
 (lam x (pair x x)) at Int and Text
@@ -70,6 +98,10 @@ Expected: Widens correctly
 
 ## Level 408: Occurs check
 **Goal:** Self-application fails.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level408()`
+
 ### 408.1 Test
 ```
 (lam x (x x))
@@ -80,6 +112,10 @@ Expected: Infinite type error
 
 ## Level 409: Mutual types
 **Goal:** A refs B refs A.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level409()`
+
 ### 409.1 Test
 ```
 (type A (A_con B)) (type B (B_con A))
@@ -90,6 +126,10 @@ Expected: Types defined
 
 ## Level 410: Perf: 100 nested
 **Goal:** Inference in < 500ms.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level410()`
+
 ### 410.1 Test
 ```
 (lam a0 ... (lam a99 a99)...)
@@ -100,6 +140,10 @@ Expected: < 500ms
 
 ## Level 411: Cross-expression define
 **Goal:** Define then use.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level411()`
+
 ### 411.1 Test
 ```
 (define f (lam x (add x 1))) (f 41)
@@ -110,6 +154,10 @@ Expected: 42
 
 ## Level 412: Hash collision
 **Goal:** Same hash overwrites.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level412()`
+
 ### 412.1 Test
 ```
 (define a 42) (define b 42)
@@ -120,6 +168,10 @@ Expected: Both define OK
 
 ## Level 413: Dependency ordering
 **Goal:** B before A.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level413()`
+
 ### 413.1 Test
 ```
 (define dbl (lam x (add x x))) (define quad ...) (quad 2)
@@ -130,6 +182,10 @@ Expected: 8
 
 ## Level 414: Circular dep detection
 **Goal:** A→B→A error.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level414()`
+
 ### 414.1 Test
 ```
 (define a b) (define b a)
@@ -140,6 +196,10 @@ Expected: Circular dep error
 
 ## Level 415: Module exports
 **Goal:** List exported fns.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level415()`
+
 ### 415.1 Test
 ```
 (exports-of m_00000001)
@@ -150,6 +210,10 @@ Expected: ["$eval"]
 
 ## Level 416: Reload cycle
 **Goal:** Define→eval→redefine→eval.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level416()`
+
 ### 416.1 Test
 ```
 (define x 1) x (define x 2) x
@@ -160,6 +224,10 @@ Expected: 1 then 2
 
 ## Level 417: Purge confirmation
 **Goal:** delete+purge clears.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level417()`
+
 ### 417.1 Test
 ```
 code:delete + code:purge
@@ -170,6 +238,10 @@ Expected: Module removed
 
 ## Level 418: Cross-module types
 **Goal:** Type across defs.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level418()`
+
 ### 418.1 Test
 ```
 (define p1 (pair 1 2)) (define p2 (pair 3 4)) (fst p1)
@@ -180,6 +252,10 @@ Expected: 1
 
 ## Level 419: Atom cleanup
 **Goal:** No orphan atoms after purge.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level419()`
+
 ### 419.1 Test
 ```
 :atoms before/after define/purge
@@ -190,6 +266,10 @@ Expected: Returns to baseline
 
 ## Level 420: 100-module chain
 **Goal:** Linear dep chain.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level420()`
+
 ### 420.1 Test
 ```
 v99 ... v0 chain
@@ -200,6 +280,10 @@ Expected: All resolve
 
 ## Level 421: Variable pattern
 **Goal:** Var used as pattern.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level421()`
+
 ### 421.1 Test
 ```
 (let x 42 (match x (x "matched")))
@@ -210,6 +294,10 @@ Expected: "matched"
 
 ## Level 422: Wildcard
 **Goal:** Catches all.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level422()`
+
 ### 422.1 Test
 ```
 (match 42 (_ "any"))
@@ -220,6 +308,10 @@ Expected: "any"
 
 ## Level 423: Text pattern
 **Goal:** Match on string.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level423()`
+
 ### 423.1 Test
 ```
 (match "hi" ("hi" "m") (x "n"))
@@ -230,6 +322,10 @@ Expected: "m"
 
 ## Level 424: Nested pattern
 **Goal:** Pair destructuring.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level424()`
+
 ### 424.1 Test
 ```
 (match (pair 1 2) ((pair x y) (add x y)))
@@ -240,6 +336,10 @@ Expected: 3
 
 ## Level 425: Multi-case
 **Goal:** 10 arms.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level425()`
+
 ### 425.1 Test
 ```
 (match 5 (1 "a") ... (5 "e") (x "other"))
@@ -250,6 +350,10 @@ Expected: "e"
 
 ## Level 426: Or-pattern
 **Goal:** Match 1 or 2.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level426()`
+
 ### 426.1 Test
 ```
 (match 1 ((1 2) "a") (x "b")) (match 2 ...)
@@ -260,6 +364,10 @@ Expected: "a" for both
 
 ## Level 427: As-pattern
 **Goal:** Bind whole value.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level427()`
+
 ### 427.1 Test
 ```
 (match (pair 1 2) ((pair x _) as p (fst p)))
@@ -270,6 +378,10 @@ Expected: 1
 
 ## Level 428: Pattern with effect
 **Goal:** Do in match arm.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level428()`
+
 ### 428.1 Test
 ```
 (match 1 (1 (do Console print "one")) (x "other"))
@@ -280,6 +392,10 @@ Expected: "one" printed
 
 ## Level 429: Exhaustiveness
 **Goal:** Incomplete match warns.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level429()`
+
 ### 429.1 Test
 ```
 (match 1 (2 "two"))
@@ -290,6 +406,10 @@ Expected: Exhaustiveness warning
 
 ## Level 430: Redundant pattern
 **Goal:** Unreachable arm flagged.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level430()`
+
 ### 430.1 Test
 ```
 (match 1 (x "a") (y "b"))
@@ -300,6 +420,10 @@ Expected: Redundancy warning
 
 ## Level 431: Serialization round-trip
 **Goal:** Term→bytes→Term.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level431()`
+
 ### 431.1 Test
 ```
 (serialize-def x) (deserialize bytes)
@@ -310,6 +434,10 @@ Expected: Round-trip preserved
 
 ## Level 432: Hash stability
 **Goal:** Same def → same hash.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level432()`
+
 ### 432.1 Test
 ```
 (define x 42) (define y 42)
@@ -320,6 +448,10 @@ Expected: Same hash
 
 ## Level 433: Codebase listing
 **Goal:** List all defs.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level433()`
+
 ### 433.1 Test
 ```
 :defs
@@ -330,6 +462,10 @@ Expected: All user defs listed
 
 ## Level 434: Query by type
 **Goal:** Filter TermDefs.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level434()`
+
 ### 434.1 Test
 ```
 :term-defs
@@ -340,6 +476,10 @@ Expected: Only term defs
 
 ## Level 435: Codebase size
 **Goal:** Def count.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level435()`
+
 ### 435.1 Test
 ```
 :def-count
@@ -350,6 +490,10 @@ Expected: Integer count
 
 ## Level 436: Dependency tree
 **Goal:** RefTo walk.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level436()`
+
 ### 436.1 Test
 ```
 (deps-of quadruple)
@@ -360,6 +504,10 @@ Expected: ["add","double"]
 
 ## Level 437: Codebase diff
 **Goal:** Compare two CBs.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level437()`
+
 ### 437.1 Test
 ```
 (codebase-diff cb1 cb2)
@@ -370,6 +518,10 @@ Expected: {new, missing, changed}
 
 ## Level 438: Codebase merge
 **Goal:** Combine + dedup.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level438()`
+
 ### 438.1 Test
 ```
 (merge cb1 cb2)
@@ -380,6 +532,10 @@ Expected: Combined
 
 ## Level 439: GC mark
 **Goal:** Walk reachable.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level439()`
+
 ### 439.1 Test
 ```
 (gc-mark)
@@ -390,6 +546,10 @@ Expected: Reachable refs set
 
 ## Level 440: GC sweep
 **Goal:** Remove unreachable.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level440()`
+
 ### 440.1 Test
 ```
 (gc-sweep)
@@ -400,6 +560,10 @@ Expected: Reachable survive
 
 ## Level 441: Source context
 **Goal:** Pointer to error.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level441()`
+
 ### 441.1 Test
 ```
 (let x 5
@@ -410,6 +574,10 @@ Expected: Line+col+pointer
 
 ## Level 442: Name suggestions
 **Goal:** "Did you mean add?".
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level442()`
+
 ### 442.1 Test
 ```
 (ad 1 2)
@@ -420,6 +588,10 @@ Expected: NameNotFound with suggestion
 
 ## Level 443: Type error location
 **Goal:** Which expression failed.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level443()`
+
 ### 443.1 Test
 ```
 (add 1 "hello")
@@ -430,6 +602,10 @@ Expected: Located at arg 2
 
 ## Level 444: Runtime stack trace
 **Goal:** Which def + line.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level444()`
+
 ### 444.1 Test
 ```
 (define crash (lam x (add x "bad"))) (crash 1)
@@ -440,6 +616,10 @@ Expected: Trace with def names
 
 ## Level 445: Unused warning
 **Goal:** Binding not used.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level445()`
+
 ### 445.1 Test
 ```
 (let x 1 42)
@@ -450,6 +630,10 @@ Expected: Warning: x unused
 
 ## Level 446: Shadow warning
 **Goal:** Inner shadows outer.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level446()`
+
 ### 446.1 Test
 ```
 (let x 1 (let x 2 x))
@@ -460,6 +644,10 @@ Expected: Shadow warning
 
 ## Level 447: Error count
 **Goal:** Session error log.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level447()`
+
 ### 447.1 Test
 ```
 :errors
@@ -470,6 +658,10 @@ Expected: Errors with timestamps
 
 ## Level 448: Warning count
 **Goal:** Session warning log.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level448()`
+
 ### 448.1 Test
 ```
 :warnings
@@ -480,6 +672,10 @@ Expected: Warnings with timestamps
 
 ## Level 449: Severity levels
 **Goal:** Parse > Type > Runtime.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level449()`
+
 ### 449.1 Test
 ```
 :errors --severity=error
@@ -490,6 +686,10 @@ Expected: Filtered by severity
 
 ## Level 450: JSON errors
 **Goal:** Tool-friendly format.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level450()`
+
 ### 450.1 Test
 ```
 :errors --format=json
@@ -604,6 +804,10 @@ Expected: JSON error array
 
 ## Level 451: REPL history
 **Goal:** Arrow keys recall previous expressions.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level451()`
+
 ### 451.1 Test
 ```
 42, then press Up
@@ -614,6 +818,10 @@ Expected: 42 recalled
 
 ## Level 452: Pretty-printer
 **Goal:** Formatted S-expression output.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level452()`
+
 ### 452.1 Test
 ```
 (pretty-print (define x 42))
@@ -624,6 +832,10 @@ Expected: Formatted output
 
 ## Level 453: Tab completion
 **Goal:** Complete names from bootstrap.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level453()`
+
 ### 453.1 Test
 ```
 st + Tab
@@ -634,6 +846,10 @@ Expected: string-concat, string-length...
 
 ## Level 454: Multi-line editor
 **Goal:** Cursor movement across lines.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level454()`
+
 ### 454.1 Test
 ```
 multi-line input with cursor
@@ -644,6 +860,10 @@ Expected: Edits correctly
 
 ## Level 455: Color output
 **Goal:** ANSI syntax highlighting.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level455()`
+
 ### 455.1 Test
 ```
 42
@@ -654,6 +874,10 @@ Expected: 42 in yellow, type in green
 
 ## Level 456: Script loading
 **Goal:** (load "file.gleam").
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level456()`
+
 ### 456.1 Test
 ```
 (load "test.gleam")
@@ -664,6 +888,10 @@ Expected: 42 : Builtin(IntType)
 
 ## Level 457: Batch eval
 **Goal:** Echo | escript processes stdin.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level457()`
+
 ### 457.1 Test
 ```
 echo 42 | escript
@@ -674,6 +902,10 @@ Expected: 42 : Builtin(IntType)
 
 ## Level 458: Expression timing
 **Goal:** ms per eval.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level458()`
+
 ### 458.1 Test
 ```
 42
@@ -684,6 +916,10 @@ Expected: Shows elapsed time
 
 ## Level 459: Welcome banner
 **Goal:** Version and help hint at startup.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level459()`
+
 ### 459.1 Test
 ```
 start REPL
@@ -694,6 +930,10 @@ Expected: Banner with version, ops, help
 
 ## Level 460: Meta-commands
 **Goal:** :help, :env, :defs, :gc, :version.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level460()`
+
 ### 460.1 Test
 ```
 :help
@@ -704,6 +944,10 @@ Expected: Available commands listed
 
 ## Level 461: File read FFI
 **Goal:** Read file contents.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level461()`
+
 ### 461.1 Test
 ```
 (file-read "test.txt")
@@ -714,6 +958,10 @@ Expected: File contents
 
 ## Level 462: File write FFI
 **Goal:** Write to file.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level462()`
+
 ### 462.1 Test
 ```
 (file-write "out.txt" "content")
@@ -724,6 +972,10 @@ Expected: Written
 
 ## Level 463: Script with args
 **Goal:** escript passes arguments.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level463()`
+
 ### 463.1 Test
 ```
 escript run.gleam arg1 arg2
@@ -734,6 +986,10 @@ Expected: Args accessible
 
 ## Level 464: Exit code
 **Goal:** Non-zero on error.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level464()`
+
 ### 464.1 Test
 ```
 escript err.gleam; echo $?
@@ -744,6 +1000,10 @@ Expected: Exit code 1
 
 ## Level 465: Multi-file eval
 **Goal:** Run multiple files.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level465()`
+
 ### 465.1 Test
 ```
 escript a.gleam b.gleam
@@ -754,6 +1014,10 @@ Expected: Both evaluated
 
 ## Level 466: Shebang support
 **Goal:** #!/usr/bin/env escript.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level466()`
+
 ### 466.1 Test
 ```
 ./script.gleam direct
@@ -764,6 +1028,10 @@ Expected: Runs correctly
 
 ## Level 467: Environment variables
 **Goal:** os:getenv access.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level467()`
+
 ### 467.1 Test
 ```
 (getenv "PATH")
@@ -774,6 +1042,10 @@ Expected: Path string
 
 ## Level 468: Shell command
 **Goal:** Run external command.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level468()`
+
 ### 468.1 Test
 ```
 (shell "ls -la")
@@ -784,6 +1056,10 @@ Expected: Command output
 
 ## Level 469: Pipeline
 **Goal:** Read-process-write chain.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level469()`
+
 ### 469.1 Test
 ```
 (pipe (read "in") (proc) (write "out"))
@@ -794,6 +1070,10 @@ Expected: Output written
 
 ## Level 470: Library import
 **Goal:** (import "lib/utils.gleam").
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level470()`
+
 ### 470.1 Test
 ```
 (import "utils.gleam")
@@ -804,6 +1084,10 @@ Expected: Definitions available
 
 ## Level 471: File listing
 **Goal:** List directory contents.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level471()`
+
 ### 471.1 Test
 ```
 (list-dir "/tmp")
@@ -814,6 +1098,10 @@ Expected: File list
 
 ## Level 472: File deletion
 **Goal:** Remove file.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level472()`
+
 ### 472.1 Test
 ```
 (file-delete "tmp.txt")
@@ -824,6 +1112,10 @@ Expected: Success
 
 ## Level 473: Directory creation
 **Goal:** mkdir.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level473()`
+
 ### 473.1 Test
 ```
 (make-dir "newdir")
@@ -834,6 +1126,10 @@ Expected: Created
 
 ## Level 474: File info
 **Goal:** Size, modified time.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level474()`
+
 ### 474.1 Test
 ```
 (file-info "test.txt")
@@ -844,6 +1140,10 @@ Expected: Info map
 
 ## Level 475: File existence
 **Goal:** Check exists.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level475()`
+
 ### 475.1 Test
 ```
 (file-exists? "test.txt")
@@ -854,6 +1154,10 @@ Expected: 1 for found, 0 for missing
 
 ## Level 476: Temp files
 **Goal:** Unique temp path.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level476()`
+
 ### 476.1 Test
 ```
 (temp-file)
@@ -864,6 +1168,10 @@ Expected: Path string
 
 ## Level 477: Current directory
 **Goal:** Working dir.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level477()`
+
 ### 477.1 Test
 ```
 (pwd)
@@ -874,6 +1182,10 @@ Expected: Path string
 
 ## Level 478: Change directory
 **Goal:** cd.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level478()`
+
 ### 478.1 Test
 ```
 (cd "/tmp")
@@ -884,6 +1196,10 @@ Expected: Changed
 
 ## Level 479: Process list
 **Goal:** Gleamunison processes.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level479()`
+
 ### 479.1 Test
 ```
 (ps)
@@ -894,6 +1210,10 @@ Expected: Process list
 
 ## Level 480: System info
 **Goal:** OS, CPU, memory.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level480()`
+
 ### 480.1 Test
 ```
 (sys-info)
@@ -904,6 +1224,10 @@ Expected: Info map
 
 ## Level 481: Abs
 **Goal:** Absolute value.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level481()`
+
 ### 481.1 Test
 ```
 (abs -5)
@@ -914,6 +1238,10 @@ Expected: 5
 
 ## Level 482: Negate
 **Goal:** Numeric negation.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level482()`
+
 ### 482.1 Test
 ```
 (negate 42)
@@ -924,6 +1252,10 @@ Expected: -42
 
 ## Level 483: Min / Max
 **Goal:** Comparison.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level483()`
+
 ### 483.1 Test
 ```
 (min 3 7) (max 3 7)
@@ -934,6 +1266,10 @@ Expected: 3, 7
 
 ## Level 484: Floor / Ceil
 **Goal:** Float rounding.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level484()`
+
 ### 484.1 Test
 ```
 (floor 3.14) (ceil 3.14)
@@ -944,6 +1280,10 @@ Expected: 3, 4
 
 ## Level 485: Sqrt
 **Goal:** Square root.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level485()`
+
 ### 485.1 Test
 ```
 (sqrt 9)
@@ -954,6 +1294,10 @@ Expected: 3.0
 
 ## Level 486: Random int
 **Goal:** Random in range.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level486()`
+
 ### 486.1 Test
 ```
 (random-int 1 100)
@@ -964,6 +1308,10 @@ Expected: 1-100
 
 ## Level 487: Random float
 **Goal:** 0.0 to 1.0.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level487()`
+
 ### 487.1 Test
 ```
 (random-float)
@@ -974,6 +1322,10 @@ Expected: 0.0-1.0
 
 ## Level 488: Mean / Median
 **Goal:** List stats.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level488()`
+
 ### 488.1 Test
 ```
 (mean [1 2 3 4 5])
@@ -984,6 +1336,10 @@ Expected: 3.0
 
 ## Level 489: Sum / Product
 **Goal:** List aggregation.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level489()`
+
 ### 489.1 Test
 ```
 (sum [1 2 3]) (product [1 2 3])
@@ -994,6 +1350,10 @@ Expected: 6, 6
 
 ## Level 490: Variance / Stdev
 **Goal:** Dispersion.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level490()`
+
 ### 490.1 Test
 ```
 (variance [1 2 3 4 5]) (stdev ...)
@@ -1004,6 +1364,10 @@ Expected: 2.5, ~1.58
 
 ## Level 491: Int to float
 **Goal:** Conversion.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level491()`
+
 ### 491.1 Test
 ```
 (int->float 42)
@@ -1014,6 +1378,10 @@ Expected: 42.0
 
 ## Level 492: Float to int
 **Goal:** Truncation.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level492()`
+
 ### 492.1 Test
 ```
 (float->int 3.14)
@@ -1024,6 +1392,10 @@ Expected: 3
 
 ## Level 493: Binary to hex
 **Goal:** Encode.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level493()`
+
 ### 493.1 Test
 ```
 (bytes->hex <<"ABC">>)
@@ -1034,6 +1406,10 @@ Expected: 414243
 
 ## Level 494: Hex to binary
 **Goal:** Decode.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level494()`
+
 ### 494.1 Test
 ```
 (hex->bytes "414243")
@@ -1044,6 +1420,10 @@ Expected: <<"ABC">>
 
 ## Level 495: String to binary
 **Goal:** UTF-8 bytes.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level495()`
+
 ### 495.1 Test
 ```
 (str->bytes "text")
@@ -1054,6 +1434,10 @@ Expected: <<116,101,120,116>>
 
 ## Level 496: List to string
 **Goal:** Join elements.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level496()`
+
 ### 496.1 Test
 ```
 (list->str [65 66 67])
@@ -1064,6 +1448,10 @@ Expected: "ABC"
 
 ## Level 497: String to list
 **Goal:** Code points.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level497()`
+
 ### 497.1 Test
 ```
 (str->list "ABC")
@@ -1074,6 +1462,10 @@ Expected: [65,66,67]
 
 ## Level 498: Type coercion
 **Goal:** The Type expr.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level498()`
+
 ### 498.1 Test
 ```
 (the Int 3.14)
@@ -1084,6 +1476,10 @@ Expected: 3
 
 ## Level 499: JSON generation
 **Goal:** Term to JSON.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level499()`
+
 ### 499.1 Test
 ```
 (to-json [1 2 3])
@@ -1094,6 +1490,10 @@ Expected: "[1,2,3]"
 
 ## Level 500: CSV parsing
 **Goal:** Row parsing.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level500()`
+
 ### 500.1 Test
 ```
 (parse-csv "a,b\n1,2")

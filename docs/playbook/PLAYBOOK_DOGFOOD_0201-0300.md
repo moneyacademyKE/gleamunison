@@ -2,6 +2,10 @@
 
 **Goal:** Verify every definition in the codebase has a correct hash.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level201()`
+
+
 ### 201.1 Hash consistency
 Insert a definition, then verify the hash matches its bytes:
 ```
@@ -18,6 +22,10 @@ Then query the codebase adapter to verify `hash(def_bytes) == stored_ref`.
 
 **Goal:** Detect and fix corrupt definitions in storage.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level202()`
+
+
 ### 202.1 Rehash
 After inserting N definitions, rehash each and verify:
 - Definitions with matching hashes are kept
@@ -28,6 +36,10 @@ After inserting N definitions, rehash each and verify:
 ## Level 203: Storage adapter benchmark
 
 **Goal:** Measure throughput of in-memory vs DETS vs partitioned storage.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level203()`
+
 
 ### 203.1 Insert throughput
 Time 1000 inserts under each backend:
@@ -44,6 +56,10 @@ Expected: In-memory fastest, then DETS, then partitioned (more file handles)
 
 **Goal:** Insert 100,000 unique definitions and measure time/memory.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level204()`
+
+
 ### 204.1 Mass insert
 Insert 100K definitions with sequential integer terms:
 ```
@@ -57,6 +73,10 @@ Expected: All inserted without crash. Time is sub-linear due to hash-based dedup
 
 **Goal:** Test multiple processes sharing a DETS-backed codebase.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level205()`
+
+
 ### 205.1 Parallel inserts
 Spawn 10 processes, each inserting 100 definitions into the same DETS store.
 Expected: All 1000 definitions stored without corruption.
@@ -66,6 +86,10 @@ Expected: All 1000 definitions stored without corruption.
 ## Level 206: Snapshot serialization
 
 **Goal:** Export entire codebase to a portable binary format.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level206()`
+
 
 ### 206.1 Export
 Insert 10 definitions, then export the codebase to bytes:
@@ -80,6 +104,10 @@ Expected: Binary blob containing all 10 defs with their hashes.
 
 **Goal:** Rebuild codebase from an exported binary snapshot.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level207()`
+
+
 ### 207.1 Import
 From the snapshot bytes from Level 206:
 ```
@@ -93,6 +121,10 @@ Expected: All 10 definitions restored with correct hashes.
 
 **Goal:** Remove unreachable definitions from storage.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level208()`
+
+
 ### 208.1 GC cycle
 Insert 100 defs where only 50 are reachable from the root set.
 Run GC. Verify 50 defs remain and the unreachable 50 are gone.
@@ -102,6 +134,10 @@ Run GC. Verify 50 defs remain and the unreachable 50 are gone.
 ## Level 209: Adapter migration
 
 **Goal:** Copy all definitions from one storage adapter to another.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level209()`
+
 
 ### 209.1 Migrate in-memory to DETS
 ```gleam
@@ -117,6 +153,10 @@ Expected: All definitions readable from DETS.
 
 **Goal:** Compare two codebases and list differences.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level210()`
+
+
 ### 210.1 Diff A vs B
 Insert def [A, B] in codebase A and [A, C] in codebase B.
 Run diff. Expected: B is new in A, C is new in B, A is common.
@@ -127,6 +167,10 @@ Run diff. Expected: B is new in A, C is new in B, A is common.
 
 **Goal:** Arrow keys recall previous expressions.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level211()`
+
+
 ### 211.1 History recall
 Type `42`, press Enter, then press Up.
 Expected: `42` appears again on the input line.
@@ -136,6 +180,10 @@ Expected: `42` appears again on the input line.
 ## Level 212: Meta-commands
 
 **Goal:** `:help`, `:env`, `:defs`, `:gc`, `:version` commands.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level212()`
+
 
 ### 212.1 Help command
 ```
@@ -155,6 +203,10 @@ Expected: List of user-defined names (from prev_defs).
 
 **Goal:** Show AST, type, and compiled Erlang for an expression.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level213()`
+
+
 ### 213.1 Inspect 42
 ```
 (inspect 42)
@@ -166,6 +218,10 @@ Expected: `AST: Int(42), Type: Builtin(IntType), Erlang: 42`
 ## Level 214: Trace mode
 
 **Goal:** Step-by-step execution trace of an expression.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level214()`
+
 
 ### 214.1 Trace add
 ```
@@ -179,6 +235,10 @@ Expected: Each reduction step printed, final result `3`
 
 **Goal:** Time breakdown per pipeline phase.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level215()`
+
+
 ### 215.1 Profile expression
 ```
 :profile (list-length (range 1 1000))
@@ -191,6 +251,10 @@ Expected: Parse: 0.2ms, Elab: 0.5ms, Compile: 1.1ms, Load: 0.3ms, Eval: 0.05ms
 
 **Goal:** Edit across lines with cursor navigation.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level216()`
+
+
 ### 216.1 Multi-line entry
 Type `(let x 1` then Enter (bracket not closed, REPL continues):
 Expected: Continuation prompt `.. `, type `x)` to complete.
@@ -200,6 +264,10 @@ Expected: Continuation prompt `.. `, type `x)` to complete.
 ## Level 217: Tab completion
 
 **Goal:** Tab completes names from bootstrapped + user defs.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level217()`
+
 
 ### 217.1 Complete "st"
 Type `st` then Tab:
@@ -211,6 +279,10 @@ Expected: `string-concat`, `string-length`, `string-contains?` etc. suggested.
 
 **Goal:** Syntax-highlighted results and errors.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level218()`
+
+
 ### 218.1 Colored result
 Type `42`:
 Expected: `42` in yellow, `: Builtin(IntType)` in green (ANSI colors).
@@ -220,6 +292,10 @@ Expected: `42` in yellow, `: Builtin(IntType)` in green (ANSI colors).
 ## Level 219: Error pretty-printer
 
 **Goal:** Structured error display with source context.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level219()`
+
 
 ### 219.1 Parse error display
 Type `(let`:
@@ -237,6 +313,10 @@ Parse Error at line 1, col 5:
 
 **Goal:** Load and evaluate a file.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level220()`
+
+
 ### 220.1 Load script
 Create `test.gleam` with `42`, then in REPL:
 ```
@@ -249,6 +329,10 @@ Expected: `42 : Builtin(IntType)`
 ## Level 221: WebSocket endpoint
 
 **Goal:** HTTP→WebSocket upgrade for real-time communication.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level221()`
+
 
 ### 221.1 Upgrade handshake
 ```
@@ -263,6 +347,10 @@ Expected: 101 Switching Protocols, WebSocket frame exchange.
 
 **Goal:** Server-Sent Events for continuous push.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level222()`
+
+
 ### 222.1 SSE endpoint
 ```
 GET /events
@@ -274,6 +362,10 @@ Expected: `text/event-stream` with periodic data frames.
 ## Level 223: Static file serving
 
 **Goal:** Serve files from a directory.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level223()`
+
 
 ### 223.1 GET static file
 ```
@@ -287,6 +379,10 @@ Expected: 200 OK with file contents, proper Content-Type.
 
 **Goal:** Chain request pre/post processing.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level224()`
+
+
 ### 224.1 Logging middleware
 Each request prints `[timestamp] METHOD /path -> STATUS` to server stdout.
 
@@ -295,6 +391,10 @@ Each request prints `[timestamp] METHOD /path -> STATUS` to server stdout.
 ## Level 225: Web REPL console
 
 **Goal:** Browser-based REPL via WebSocket.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level225()`
+
 
 ### 225.1 Web eval
 Open `http://localhost:8080/`, type `42` in the web REPL input:
@@ -305,6 +405,10 @@ Expected: Result `42 : Builtin(IntType)` displayed on the page.
 ## Level 226: Path routing
 
 **Goal:** Declarative route definitions with path parameters.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level226()`
+
 
 ### 226.1 User route
 ```
@@ -318,6 +422,10 @@ Expected: Route matches `/users/:id` with `id = "42"`.
 
 **Goal:** Auto-encode gleamunison terms as JSON.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level227()`
+
+
 ### 227.1 JSON API
 ```
 GET /api/echo?msg=hello
@@ -329,6 +437,10 @@ Expected: `{"msg": "hello", "type": "Text"}` as JSON.
 ## Level 228: CORS headers
 
 **Goal:** Cross-Origin Resource Sharing support.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level228()`
+
 
 ### 228.1 Preflight
 ```
@@ -343,6 +455,10 @@ Expected: 200 with `Access-Control-Allow-Origin: *`.
 
 **Goal:** Token bucket rate limiter per IP.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level229()`
+
+
 ### 229.1 Rate limit hit
 Send 100 requests in 1 second from the same IP.
 Expected: Request 101 returns 429 Too Many Requests.
@@ -353,6 +469,10 @@ Expected: Request 101 returns 429 Too Many Requests.
 
 **Goal:** Structured request/response logging.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level230()`
+
+
 ### 230.1 Log format
 Each request logs: `[2026-06-27 10:00:00] GET / 200 1.2ms 512B`
 
@@ -361,6 +481,10 @@ Each request logs: `[2026-06-27 10:00:00] GET / 200 1.2ms 512B`
 ## Level 231: Todo app v2
 
 **Goal:** DETS-backed todo list with categories and search.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level231()`
+
 
 ### 231.1 Create todo
 ```
@@ -380,6 +504,10 @@ Expected: `{"todos": [{"id": 1, ...}]}`
 
 **Goal:** WebSocket broadcast with rooms.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level232()`
+
+
 ### 232.1 Join room
 Connect to `ws://localhost:8080/chat/room1`:
 ```
@@ -392,6 +520,10 @@ Expected: `{"type": "system", "msg": "alice joined"}` broadcast to room.
 ## Level 233: URL shortener
 
 **Goal:** POST to create short URLs, GET to redirect.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level233()`
+
 
 ### 233.1 Create short URL
 ```
@@ -410,6 +542,10 @@ Expected: 302 redirect to `https://example.com/long/path`.
 ## Level 234: KV store
 
 **Goal:** Full CRUD REST API for key-value pairs.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level234()`
+
 
 ### 234.1 Create
 ```
@@ -435,6 +571,10 @@ Expected: `{"status": "deleted"}`
 
 **Goal:** Markdown → HTML with templates.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level235()`
+
+
 ### 235.1 Build
 Process a markdown file with YAML frontmatter:
 ```
@@ -452,6 +592,10 @@ Expected: `<h1>Hello</h1>\n<p>World</p>` wrapped in template.
 
 **Goal:** Posts, tags, comments, RSS feed.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level236()`
+
+
 ### 236.1 Create post
 ```
 POST /blog {"title": "My Post", "body": "...", "tags": ["gleamunison"]}
@@ -463,6 +607,10 @@ Expected: Post created with ID, slug, timestamp.
 ## Level 237: Pastebin
 
 **Goal:** Share code/text snippets via short URLs.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level237()`
+
 
 ### 237.1 Create paste
 ```
@@ -476,6 +624,10 @@ Expected: `{"url": "http://localhost:8080/p/a1b2c3"}`
 
 **Goal:** Create polls, vote, see results.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level238()`
+
+
 ### 238.1 Create poll
 ```
 POST /polls {"question": "Best language?", "options": ["Gleam", "Erlang", "Both"]}
@@ -487,6 +639,10 @@ Expected: Poll created with unique ID.
 ## Level 239: Guestbook
 
 **Goal:** Signed visitor messages with timestamps.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level239()`
+
 
 ### 239.1 Sign guestbook
 ```
@@ -500,6 +656,10 @@ Expected: `{"entry": {"id": 1, "name": "Alice", "message": "Great runtime!", "ti
 
 **Goal:** Multipart form file upload and storage.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level240()`
+
+
 ### 240.1 Upload file
 ```
 POST /upload (multipart with file "photo.jpg")
@@ -511,6 +671,10 @@ Expected: `{"url": "/files/photo.jpg", "size": 12345}`
 ## Level 241: Form validation library
 
 **Goal:** Validate and transform input data.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level241()`
+
 
 ### 241.1 Validate email
 ```
@@ -524,6 +688,10 @@ Expected: `{ok, "user@example.com"}` or `{error, "invalid email"}`
 
 **Goal:** Compile templates from gleamunison strings.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level242()`
+
+
 ### 242.1 Render template
 ```
 (render "<h1>{{title}}</h1>" {"title": "Hello"})
@@ -535,6 +703,10 @@ Expected: `"<h1>Hello</h1>"`
 ## Level 243: Routing library
 
 **Goal:** Declarative route definitions.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level243()`
+
 
 ### 243.1 Define route
 ```
@@ -548,6 +720,10 @@ When matched with `/users/42`, calls handler with `{"id": "42"}`.
 
 **Goal:** Cookie-based sessions with DETS storage.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level244()`
+
+
 ### 244.1 Create session
 ```
 POST /session {"user": "alice"}
@@ -559,6 +735,10 @@ Expected: `Set-Cookie: session_id=abc123; HttpOnly` in response headers.
 ## Level 245: Auth middleware
 
 **Goal:** Login-required route wrapper.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level245()`
+
 
 ### 245.1 Protected route
 ```
@@ -573,6 +753,10 @@ With valid session: Expected 200 OK.
 
 **Goal:** Codebase schema version management.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level246()`
+
+
 ### 246.1 Version check
 ```
 (migrate-status)
@@ -584,6 +768,10 @@ Expected: `{"current_version": 3, "latest_version": 5, "pending": ["v4", "v5"]}`
 ## Level 247: Background jobs
 
 **Goal:** Spawn worker processes from a job queue.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level247()`
+
 
 ### 247.1 Enqueue job
 ```
@@ -598,6 +786,10 @@ Worker picks up and processes the job asynchronously.
 
 **Goal:** Accept and dispatch HTTP callbacks.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level248()`
+
+
 ### 248.1 Register webhook
 ```
 POST /webhooks {"url": "https://example.com/callback", "events": ["define", "eval"]}
@@ -609,6 +801,10 @@ Expected: `{"id": "wh_001"}`. When a `define` event occurs, POST to the callback
 ## Level 249: Admin dashboard
 
 **Goal:** System stats, defs browser, process monitor.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level249()`
+
 
 ### 249.1 Dashboard
 ```
@@ -622,6 +818,10 @@ Expected: HTML page showing: codebase size, atom count, process count, loaded mo
 
 **Goal:** Unified routing, auth, rate-limit for microservices.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level250()`
+
+
 ### 250.1 Gateway
 ```
 GET /api/v1/users
@@ -633,6 +833,10 @@ Expected: Route to users service, auth check passes, rate limit not exceeded →
 ## Level 251: S-expression parser in gleamunison
 
 **Goal:** Parse surface syntax from within gleamunison.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level251()`
+
 
 ### 251.1 Tokenize "(+ 1 2)"
 ```
@@ -646,6 +850,10 @@ Expected: `[LParen, Symbol("+"), Int(1), Int(2), RParen]`
 
 **Goal:** Convert AST back to surface syntax string.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level252()`
+
+
 ### 252.1 Unparse integer
 ```
 (unparse (ast.Int 42))
@@ -658,6 +866,10 @@ Expected: `"42"`
 
 **Goal:** Build AST from data, compile, and run.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level253()`
+
+
 ### 253.1 Build and eval
 Build `(add 1 2)` as AST, compile, load, eval.
 Expected: Result `3`.
@@ -667,6 +879,10 @@ Expected: Result `3`.
 ## Level 254: Compiler self-test
 
 **Goal:** Compile a definition, load, eval, verify result.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level254()`
+
 
 ### 254.1 Self-test pipeline
 ```gleam
@@ -683,6 +899,10 @@ Expected: `"42"` as the evaluation result string.
 
 **Goal:** Return gleamunison version metadata.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level255()`
+
+
 ### 255.1 Get version
 ```
 (gleamunison-version)
@@ -694,6 +914,10 @@ Expected: `{"version": "0.1.0", "genesis_count": 50, "levels": 1000}`
 ## Level 256: Test runner
 
 **Goal:** Run multiple test expressions and collect results.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level256()`
+
 
 ### 256.1 Run tests
 Define and run a test suite:
@@ -708,6 +932,10 @@ Expected: "3 passed, 0 failed, 5 total"
 
 **Goal:** Track which definitions/exercises were loaded.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level257()`
+
+
 ### 257.1 Coverage report
 ```
 :coverage
@@ -719,6 +947,10 @@ Expected: List of loaded modules, count of evals per module.
 ## Level 258: Doc generator
 
 **Goal:** Extract comments and produce HTML documentation.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level258()`
+
 
 ### 258.1 Generate docs
 ```
@@ -732,6 +964,10 @@ Expected: HTML documentation of all bootstrapped operations.
 
 **Goal:** Canonical S-expression formatting.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level259()`
+
+
 ### 259.1 Format expression
 ```
 (format "(let x 1 x)")
@@ -743,6 +979,10 @@ Expected: `"(let x 1 x)"` or multi-line formatted version.
 ## Level 260: Static analysis
 
 **Goal:** Detect unused defs, shadowed names, dead code.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level260()`
+
 
 ### 260.1 Unused detection
 ```
@@ -756,6 +996,10 @@ Expected: Warning: `x` is defined but never used.
 
 **Goal:** Time any expression with microsecond precision.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level261()`
+
+
 ### 261.1 Benchmark add
 ```
 (bench (lam () (add 1 2)) 10000)
@@ -768,6 +1012,10 @@ Expected: `{"mean": 0.42, "min": 0.31, "max": 1.23, "samples": 10000}` (μs)
 
 **Goal:** Measure parse/elaborate/compile time per expression.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level262()`
+
+
 ### 262.1 Compile 1000 ints
 Time compilation of `42` repeated 1000 times.
 Expected: Mean compile time < 2000 μs per expression.
@@ -777,6 +1025,10 @@ Expected: Mean compile time < 2000 μs per expression.
 ## Level 263: Runtime benchmark
 
 **Goal:** Measure eval/call overhead.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level263()`
+
 
 ### 263.1 Eval 42
 ```
@@ -790,6 +1042,10 @@ Expected: Mean eval time < 100 μs.
 
 **Goal:** Track process heap growth during evaluation.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level264()`
+
+
 ### 264.1 Heap growth
 Before and after 100 evals, measure `erlang:process_info(self(), heap_size)`.
 Expected: Heap size stable (within noise), no leak.
@@ -799,6 +1055,10 @@ Expected: Heap size stable (within noise), no leak.
 ## Level 265: Atom table monitoring
 
 **Goal:** Monitor `erlang:system_info(atom_count)` during session.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level265()`
+
 
 ### 265.1 Atom growth
 ```
@@ -812,6 +1072,10 @@ Expected: Current atom count. After 100 evals, count increases by < 50.
 
 **Goal:** Monitor `erlang:system_info(process_count)`.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level266()`
+
+
 ### 266.1 Process leak
 Start server, measure process count. Send 100 requests, measure again.
 Expected: Process count stable (no orphaned processes).
@@ -822,6 +1086,10 @@ Expected: Process count stable (no orphaned processes).
 
 **Goal:** Stress test with million-entry codebase.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level267()`
+
+
 ### 267.1 Million inserts
 Insert 1,000,000 unique definitions.
 Expected: Insert time measured, memory usage reported.
@@ -831,6 +1099,10 @@ Expected: Insert time measured, memory usage reported.
 ## Level 268: Ops per second
 
 **Goal:** Measure codebase operations throughput.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level268()`
+
 
 ### 268.1 Throughput
 ```
@@ -844,6 +1116,10 @@ Expected: Ops/sec reported for defines, evals, lookups.
 
 **Goal:** Requests/second on `/eval` and `/counter` endpoints.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level269()`
+
+
 ### 269.1 Load test
 ```
 ab -n 1000 -c 10 http://localhost:8080/
@@ -855,6 +1131,10 @@ Expected: Throughput > 100 req/s, no errors.
 ## Level 270: Connection scaling
 
 **Goal:** 1000 concurrent connections to the web server.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level270()`
+
 
 ### 270.1 Concurrent clients
 ```
@@ -868,6 +1148,10 @@ Expected: All requests complete. No connection drops.
 
 **Goal:** Connect to EPMD for distributed Erlang.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level271()`
+
+
 ### 271.1 Ping node
 ```
 (net-ping "gleamunison@localhost")
@@ -879,6 +1163,10 @@ Expected: `pong` if node is reachable, `pang` if not.
 ## Level 272: Remote spawn
 
 **Goal:** Spawn a function on a remote node.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level272()`
+
 
 ### 272.1 Spawn remote
 ```
@@ -892,6 +1180,10 @@ Expected: PID on remote node, result of `42` when `recv`'d.
 
 **Goal:** Send a message to a registered remote process.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level273()`
+
+
 ### 273.1 Send to remote
 ```
 (send {worker, 'gleamunison@other_node'} "hello")
@@ -904,6 +1196,10 @@ Expected: Message delivered to registered process on remote node.
 
 **Goal:** Sync definitions between two DETS stores.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level274()`
+
+
 ### 274.1 Two-way sync
 Codebase A has defs [1,2]. Codebase B has defs [2,3].
 After sync, both have [1,2,3].
@@ -913,6 +1209,10 @@ After sync, both have [1,2,3].
 ## Level 275: Distributed KV store
 
 **Goal:** Partitioned key-value store across cluster.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level275()`
+
 
 ### 275.1 Put and get across nodes
 ```
@@ -927,6 +1227,10 @@ Expected: `42` retrieved regardless of which node handles the get.
 
 **Goal:** Join/leave detection in a cluster.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level276()`
+
+
 ### 276.1 Node join
 Start a new node that connects to the cluster.
 Expected: Existing nodes detect the join event.
@@ -936,6 +1240,10 @@ Expected: Existing nodes detect the join event.
 ## Level 277: Failure detection
 
 **Goal:** Detect when a remote node becomes unreachable.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level277()`
+
 
 ### 277.1 Kill node
 Kill one node in a 3-node cluster.
@@ -947,6 +1255,10 @@ Expected: Other nodes detect the failure within the timeout window.
 
 **Goal:** Lowest-ID node becomes coordinator.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level278()`
+
+
 ### 278.1 Elect leader
 In a 3-node cluster, the node with the lowest name is elected leader.
 After leader dies, remaining nodes re-elect.
@@ -956,6 +1268,10 @@ After leader dies, remaining nodes re-elect.
 ## Level 279: Distributed counter
 
 **Goal:** Atomic increment across nodes.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level279()`
+
 
 ### 279.1 Increment across cluster
 ```
@@ -969,6 +1285,10 @@ Each node can increment. The total reflects all increments.
 
 **Goal:** Publish/subscribe messaging across nodes.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level280()`
+
+
 ### 280.1 Subscribe and publish
 Node B subscribes to "events". Node A publishes `{"type": "user_created"}`.
 Expected: Node B receives the message.
@@ -978,6 +1298,10 @@ Expected: Node B receives the message.
 ## Level 281: Custom Math ability
 
 **Goal:** Bootstrapped ability with typed operations.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level281()`
+
 
 ### 281.1 Math ability
 ```
@@ -990,6 +1314,10 @@ Expected: `3` via effects dispatch to Math handler.
 ## Level 282: Show ability
 
 **Goal:** Polymorphic `(show x)` → string for any type.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level282()`
+
 
 ### 282.1 Show integer
 ```
@@ -1009,6 +1337,10 @@ Expected: `<<"\"hello\"">>` (quoted string representation)
 
 **Goal:** Handler that accumulates state across effect calls.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level283()`
+
+
 ### 283.1 Counter handler
 ```
 (do State get "count")
@@ -1023,6 +1355,10 @@ Expected: First get returns `0`, set stores `1`, second get returns `1`.
 
 **Goal:** Two abilities active in the same computation.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level284()`
+
+
 ### 284.1 Console + State
 ```
 (do Console print (do State get "count"))
@@ -1034,6 +1370,10 @@ Expected: Console prints the current value of `"count"` from State.
 ## Level 285: Handler forwarding
 
 **Goal:** Handler for A delegates unhandled ops to handler for B.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level285()`
+
 
 ### 285.1 Forward
 ```
@@ -1047,6 +1387,10 @@ Expected: Logger forwards `Console` ops to Console handler.
 
 **Goal:** `(do Abort abort msg)` discards the continuation.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level286()`
+
+
 ### 286.1 Abort
 ```
 (handle (do Abort abort "fail") AbortHandler)
@@ -1058,6 +1402,10 @@ Expected: Computation stops, result from abort handler.
 ## Level 287: Choice effect
 
 **Goal:** Non-deterministic selection via effects.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level287()`
+
 
 ### 287.1 Pick
 ```
@@ -1071,6 +1419,10 @@ Expected: Handler picks one value (e.g., `1`) non-deterministically.
 
 **Goal:** `(do Reader ask)` returns environment value.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level288()`
+
+
 ### 288.1 Ask
 ```
 (handle (do Reader ask) (lam (_ cont) (cont "env-value")) Reader)
@@ -1082,6 +1434,10 @@ Expected: `<<"env-value">>`
 ## Level 289: Writer effect
 
 **Goal:** `(do Writer tell msg)` accumulates log output.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level289()`
+
 
 ### 289.1 Tell
 ```
@@ -1095,6 +1451,10 @@ Expected: Handler accumulates `["step1", "step2"]` in log.
 
 **Goal:** Full State ability using process dictionary.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level290()`
+
+
 ### 290.1 Get and set
 ```
 (handle (do State get) (do State set "x" 42) (do State get) StateHandler)
@@ -1106,6 +1466,10 @@ Expected: First get returns `nil`, set stores `42`, second get returns `42`.
 ## Level 291: Input validation
 
 **Goal:** Validate string constraints.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level291()`
+
 
 ### 291.1 Validate length
 ```
@@ -1119,6 +1483,10 @@ Expected: `{error, "validation failed"}` (string too long)
 
 **Goal:** Token bucket algorithm, per-IP.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level292()`
+
+
 ### 292.1 Rate limit config
 ```
 (rate-limit-config 100 60) ; 100 requests per 60 seconds
@@ -1130,6 +1498,10 @@ Expected: Rate limiter allows 100 requests, rejects 101st with `rate_exceeded`.
 ## Level 293: CORS enforcement
 
 **Goal:** Origin validation with preflight handling.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level293()`
+
 
 ### 293.1 Valid origin
 ```
@@ -1151,6 +1523,10 @@ Expected: 403 Forbidden
 
 **Goal:** Token-based cross-site request forgery protection.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level294()`
+
+
 ### 294.1 Valid token
 ```
 POST /api/data
@@ -1164,6 +1540,10 @@ Expected: 200 OK (token validated)
 
 **Goal:** Signed cookie sessions with expiry.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level295()`
+
+
 ### 295.1 Create session
 ```
 POST /login {"user": "alice", "password": "secret"}
@@ -1175,6 +1555,10 @@ Expected: `Set-Cookie: session=abc123; HttpOnly; Secure; Max-Age=3600`
 ## Level 296: Password hashing
 
 **Goal:** Hash passwords with salt.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level296()`
+
 
 ### 296.1 Hash and verify
 ```
@@ -1189,6 +1573,10 @@ Expected: First returns hash string. Second returns `1` (match).
 
 **Goal:** Bearer token verification.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level297()`
+
+
 ### 297.1 Valid token
 ```
 GET /api/secure
@@ -1201,6 +1589,10 @@ Expected: 200 OK
 ## Level 298: RBAC
 
 **Goal:** Role-based access control middleware.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level298()`
+
 
 ### 298.1 Admin role
 ```
@@ -1222,6 +1614,10 @@ Expected: 403 Forbidden
 
 **Goal:** Timestamped, signed operation log.
 
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level299()`
+
+
 ### 299.1 Log entry
 Each define/eval operation logs: `[timestamp] user:alice action:define target:x`
 Expected: Log queryable via `:audit-log` meta-command.
@@ -1231,6 +1627,10 @@ Expected: Log queryable via `:audit-log` meta-command.
 ## Level 300: Security scan
 
 **Goal:** Inventory all bootstrapped ops for misuse patterns.
+
+**Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
+**Location:** `src/dogfood.gleam` → `level300()`
+
 
 ### 300.1 Scan report
 ```
