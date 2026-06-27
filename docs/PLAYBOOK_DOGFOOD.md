@@ -4715,7 +4715,427 @@ Culmination: full-stack, self-hosting, integrated applications.
 
 ---
 
-## Final Dogfood Index (Complete — 350 levels)
+## Clusters 351–450: Ten more frontiers (10 levels each)
+
+### Cluster 351–360: Effects Integration & Custom Abilities
+Runtime-level effects system extensions. These levels test custom ability definitions, handler chains, and effect composition patterns beyond the built-in Console ability.
+
+- **351**: Register custom ability in elaboration context — surface syntax for declaring new abilities
+- **352**: Multi-op handler module — handler covering multiple operation indices
+- **353**: Effect forwarding between abilities — Console handler delegates to Logger
+- **354**: Effect composition with non-unit results — handler transforms the final value
+- **355**: Abort effect (discard continuation) — `(do Abort abort msg)` stops computation
+- **356**: State effect via process dictionary — `(do State get)` / `(do State set v)`
+- **357**: Reader effect (environment) — `(do Reader ask)` returns env value
+- **358**: Writer effect (accumulation) — `(do Writer tell msg)` accumulates log
+- **359**: Choice / non-determinism — `(do Choice pick [a b c])` runs all branches
+- **360**: Error effect — `(do Error throw msg)` with catch handler
+
+### Cluster 361–370: Error Handling & Recovery
+Systematic testing of error propagation, recovery, and user-facing error quality.
+
+- **361**: Parse error recovery — continue after parse error in multi-expression session
+- **362**: Name error recovery — `NameNotFound` doesn't corrupt elaboration state
+- **363**: Type error recovery — type mismatch doesn't corrupt type cache
+- **364**: Runtime error handling — `(try (do Error throw "bad") catch handler)`
+- **365**: Error after define — define succeeds, eval errors, next define still works
+- **366**: 10 sequential errors with recovery — REPL doesn't degrade or slow down
+- **367**: Parse error line/col accuracy — error position matches source
+- **368**: Type error message clarity — "expected Int, got Text" style messages
+- **369**: Runtime crash doesn't crash REPL — bad arg error caught at eval boundary
+- **370**: Error in effects handler — handler crash doesn't corrupt process dictionary
+
+### Cluster 371–380: Memory & Resource Management
+Monitoring atom tables, process counts, codebase sizes, and memory usage.
+
+- **371**: Atom table baseline — record `erlang:system_info(atom_count)` at startup
+- **372**: Atom table after 100 evaluations — should not grow more than ~20 atoms
+- **373**: Atom table after 100 defines — each define adds ~5 atoms
+- **374**: Process count monitoring — REPL uses 1 process, web server spawns per request
+- **375**: Codebase insert memory — measure memory per definition
+- **376**: Codebase 10K defs memory — total memory for 10,000 definitions
+- **377**: Loader module count — `code:all_loaded()` before and after evaluations
+- **378**: Force purge success rate — `code:soft_purge` returns `true` after eval
+- **379**: Memory leak detection — 1000 eval loop, measure heap growth
+- **380**: Binary reference cleanup — unused binaries freed after eval
+
+### Cluster 381–390: Parser & Tokenizer Hardening
+Edge cases, performance, and correctness of the sexpr parser.
+
+- **381**: Deeply nested s-expression (100 levels of parens) — parse depth limits
+- **382**: Very long identifier (1000 chars) — atom table impact
+- **383**: Large integer in source (100 digits) — `int.parse` limits
+- **384**: Empty program — `parse_string("")` returns `Error("Empty input")`
+- **385**: Comments everywhere — `;` in middle of expressions, strings, inside lists
+- **386**: Nested string quotes — escaped quotes inside string literals
+- **387**: Unicode identifier names — Greek, Cyrillic, CJK in identifiers
+- **388**: Mixed tabs and spaces — tokenizer position tracking
+- **389**: Parser performance — 10,000 parens parsed in < 100ms
+- **390**: Tokenizer performance — 100,000 tokens tokenized in < 1s
+
+### Cluster 391–400: Compiler Optimization
+Code generation patterns that produce more efficient BEAM bytecode.
+
+- **391**: Constant folding — `(add 2 3)` compiles to literal `5`
+- **392**: Dead let elimination — `(let x 1 body)` where `x` unused, remove binding
+- **393**: Inline lambda application — `((lam x body) arg)` inlined to `body[x→arg]`
+- **394**: Match simplification — single-case match compiles to direct eval
+- **395**: Let chaining — `(let a 1 (let b 2 body))` nested Erlang `begin...end`
+- **396**: Apply chain flattening — `(f a b c)` instead of nested `apply` calls
+- **397**: RefTo direct call — `(add 1 2)` generates direct module call, not apply
+- **398**: Dead code branch — match arm with unreachable pattern not compiled
+- **399**: Compile unit size — 1000-definition unit compiles in < 5s
+- **400**: BEAM size optimization — generated module size varies by pattern
+
+---
+
+## Clusters 401–450: More frontiers (10 levels each)
+
+### Cluster 401–410: Type Inference Depth
+Pushing the Hindley-Milner inference engine with complex patterns.
+
+- **401**: Rank-1 polymorphism (let-polymorphism) — `(lam x x)` used at Int and Text
+- **402**: Simple recursive type — `(type List a (Nil) (Cons a (List a)))`
+- **403**: Type variable scope — deeply nested lambdas with shared type vars
+- **404**: Let generalization — `(let id (lam x x) ((id 42) (id "hi")))` should fail (monomorphic)
+- **405**: Type annotation checking — `(the Int 42)` passes, `(the Text 42)` fails
+- **406**: Row polymorphism — records with open tails
+- **407**: Subsumption — narrower type assigned to wider context
+- **408**: Occurs check — `(lam x (x x))` should fail with infinite type
+- **409**: Mutually recursive types — two types referencing each other
+- **410**: Type inference performance — 100-nested lambda types in < 500ms
+
+### Cluster 411–420: Module System
+Multi-definition compilation, cross-reference resolution, and module naming.
+
+- **411**: Define then use across expressions — `(define f (lam x x))` then `(f 42)`
+- **412**: Module name collision — same hash compiles to same module, overwrites cleanly
+- **413**: Module dependency ordering — def A uses def B, B must elaborate before A
+- **414**: Circular dependency detection — A refers to B refers to A → error
+- **415**: Module export listing — query all exports of a loaded module
+- **416**: Module reload cycle — define → load → eval → redefine → reload → eval
+- **417**: Module purge confirmation — `code:delete` + `code:purge` clears all refs
+- **418**: Cross-module type consistency — same type used across two modules
+- **419**: Module atom cleanup — after purge, no orphan atoms remain
+- **420**: 100-module chain — A depends on B depends on C ... 100 deep
+
+### Cluster 421–430: Pattern Matching Extensions
+New pattern forms and match compilation edge cases.
+
+- **421**: Variable reuse in patterns — `(match x (x body))` — var used as pattern
+- **422**: Wildcard pattern — `(match 42 (_ "any"))` catches all
+- **423**: Text pattern — `(match "hi" ("hi" body))`
+- **424**: Nested pattern — `(match (pair 1 2) ((pair x y) body))`
+- **425**: Multi-case match — 10-arm match, all guards covered
+- **426**: Or-pattern — `(match x ((1 2) body))` — matches 1 or 2
+- **427**: As-pattern — `(match (pair 1 2) ((pair x _) as p body))` — bind both
+- **428**: Pattern with effect — `(match x (1 (do Console print "one")))`
+- **429**: Exhaustiveness check — incomplete match emits warning
+- **430**: Redundant pattern detection — unreachable arm flagged
+
+### Cluster 431–440: Codebase & Serialization
+Binary format, introspection, and content-addressed storage patterns.
+
+- **431**: Definition serialization round-trip — Term → bytes → Term
+- **432**: Hash stability — same definition always produces same hash
+- **433**: Codebase listing — `codebase.list()` returns all def refs
+- **434**: Codebase query by type — `codebase.defs_of_kind(TermDef)` filters by kind
+- **435**: Codebase size — count of stored definitions
+- **436**: Definition dependency tree — walk `RefTo` references to build DAG
+- **437**: Codebase diff — compare two codebases, list new/missing/changed refs
+- **438**: Codebase merge — combine two codebases, dedup by hash
+- **439**: Codebase GC mark — walk reachable defs from root set
+- **440**: Codebase GC sweep — remove unreachable defs, verify survivors
+
+### Cluster 441–450: Error Quality & Diagnostics
+User-facing error improvements and diagnostics infrastructure.
+
+- **441**: Parse error with source context — show line + pointer to error
+- **442**: Name error suggestions — `"Did you mean 'add'?"` for typos
+- **443**: Type error source location — which expression caused the mismatch
+- **444**: Runtime error stack trace — which definition + source line
+- **445**: Warning for unused let binding — `(let x 1 42)` warns x unused
+- **446**: Warning for shadowed binding — `(let x 1 (let x 2 body))` warns
+- **447**: Error count in session — `:errors` meta-command shows error log
+- **448**: Warning count in session — `:warnings` shows warning log
+- **449**: Error severity levels — parse > type > runtime severity ordering
+- **450**: Structured error output — JSON-formatted errors for tool integration
+
+---
+
+## Clusters 451–550: More frontiers (10 levels each)
+
+### Cluster 451–460: Developer Tools
+Tooling infrastructure built on the gleamunison runtime.
+
+- **451**: REPL history persistence — arrow keys recall previous expressions
+- **452**: Expression pretty-printer — nicely formatted S-expression output
+- **453**: REPL tab completion — complete names from bootstrap + user defs
+- **454**: Multi-line editor improvements — cursor movement, insert/delete
+- **455**: REPL color output — syntax highlighting in terminal
+- **456**: Script loading from file — `(load "script.gleam")` evaluates file contents
+- **457**: Batch eval mode — `echo "expr" | escript` processes stdin
+- **458**: Expression timing — each eval shows ms elapsed
+- **459**: REPL welcome banner — version, available ops, help hint
+- **460**: Meta-command parser — `:help`, `:env`, `:defs`, `:gc`, `:version`
+
+### Cluster 461–470: Scripting & Automation
+Using gleamunison as a scripting language.
+
+- **461**: File read FFI — `(file-read "path.txt")` returns file contents
+- **462**: File write FFI — `(file-write "path.txt" "content")` writes to file
+- **463**: Script with args — `escript script.gleam arg1 arg2 ...`
+- **464**: Script exit code — non-zero exit on error
+- **465**: Multiple file eval — `escript file1.gleam file2.gleam ...`
+- **466**: Shebang support — `#!/usr/bin/env escript` for gleamunison scripts
+- **467**: Environment variables — `(getenv "PATH")` returns env value
+- **468**: Command execution — `(shell "ls -la")` runs shell command
+- **469**: Pipeline — `(pipe (read "in.txt") (process) (write "out.txt"))`
+- **470**: Script library import — `(import "lib/utils.gleam")` reuses defs
+
+### Cluster 471–480: System Integration
+Interacting with the host OS from gleamunison.
+
+- **471**: File listing — `(list-dir "/tmp")` returns filenames
+- **472**: File deletion — `(file-delete "tmp.txt")` returns success
+- **473**: Directory creation — `(make-dir "newdir")` creates directory
+- **474**: File info — `(file-info "path.txt")` returns size, modified time
+- **475**: File existence — `(file-exists? "path.txt")` returns 1/0
+- **476**: Temporary files — `(temp-file)` returns unique temp path
+- **477**: Current directory — `(pwd)` returns working directory
+- **478**: Change directory — `(cd "/tmp")` changes working directory
+- **479**: Process list — `(ps)` returns running gleamunison processes
+- **480**: System info — `(sys-info)` returns OS, CPU, memory stats
+
+### Cluster 481–490: Numerical Computing
+Math, statistics, and data processing primitives.
+
+- **481**: `abs` — absolute value
+- **482**: `negate` — numeric negation
+- **483**: `min` / `max` — comparison returns smaller/larger
+- **484**: `floor` / `ceil` — float rounding
+- **485**: `sqrt` — square root via Erlang math module
+- **486**: `random-int` — random integer in range
+- **487**: `random-float` — random float 0.0 to 1.0
+- **488**: `mean` / `median` — list statistics
+- **489**: `sum` / `product` — list aggregation
+- **490**: `variance` / `stdev` — statistical dispersion
+
+### Cluster 491–500: Data Transformation
+Converting between data formats and representations.
+
+- **491**: Int to float — `(int->float 42)` → 42.0
+- **492**: Float to int — `(float->int 3.14)` → 3 (truncation)
+- **493**: Binary to hex — `(bytes->hex <<"ABC">>)` → hex string
+- **494**: Hex to binary — `(hex->bytes "414243")` → `<<"ABC">>`
+- **495**: String to binary — `(str->bytes "text")` → UTF-8 bytes
+- **496**: List to string — `(list->str [1,2,3])` → "123"
+- **497**: String to list — `(str->list "ABC")` → `[65,66,67]`
+- **498**: Type coercion — `(the Int 3.14)` float → int
+- **499**: JSON generation — `(to-json 42)` → "42"
+- **500**: CSV parsing — `(parse-csv "a,b,c\n1,2,3")` → list of rows
+
+### Cluster 501–510: Effects Expansion
+New ability patterns beyond the built-in Console.
+
+- **501**: Custom `Math` ability — `(do Math add 1 2)` via effects
+- **502**: Custom `Logger` ability — `(do Logger log "msg")` with level
+- **503**: Custom `Config` ability — `(do Config get "key")` returns value
+- **504**: Custom `Clock` ability — `(do Clock now)` returns timestamp
+- **505**: Effect stack nesting — `Handle A inside Handle B` both active
+- **506**: Effect composition — computation uses both Console and Math
+- **507**: Handler chain — B handler delegates unhandled ops to A handler
+- **508**: Effect aliasing — `(do Console log "msg")` aliased to `(do Logger info "msg")`
+- **509**: Default handlers — ability has fallback handler if none provided
+- **510**: Effect routing — dispatch ops to different handlers by op index
+
+### Cluster 511–520: Web Applications
+Web server features and patterns.
+
+- **511**: JSON API endpoint — `GET /api/echo?msg=hi` returns JSON
+- **512**: Form data parsing — POST with `application/x-www-form-urlencoded`
+- **513**: Cookie parsing — read and set cookies
+- **514**: Session middleware — cookie-based session key
+- **515**: Static file serving — `GET /static/*` serves files from directory
+- **516**: Route parameters — `GET /user/:id` extracts id
+- **517**: Query parameters — `?name=value&page=2` parsed to dict
+- **518**: POST body parsing — raw body, JSON body, form body
+- **519**: Response headers — `Content-Type`, `Cache-Control`, `Set-Cookie`
+- **520**: HTTP status codes — 200, 201, 301, 400, 401, 403, 404, 500
+
+### Cluster 521–530: Database & Storage
+Persistence patterns using DETS and file storage.
+
+- **521**: DETS open with recovery — open existing file after crash
+- **522**: DETS integrity check — verify all entries readable
+- **523**: DETS repair — fix corrupt entries, recover readable data
+- **524**: DETS backup — copy DETS file to backup path
+- **525**: DETS restore — restore from backup
+- **526**: Key-value store — `(kv-set "key" "val")`, `(kv-get "key")`
+- **527**: KV store with types — store typed values (int, text, list)
+- **528**: KV store with expiry — TTL-based auto-delete
+- **529**: KV store with listing — `(kv-keys)` returns all keys
+- **530**: KV store with batch — `(kv-set-many [("a" 1) ("b" 2)])`
+
+### Cluster 531–540: Concurrency & Parallelism
+Process spawning, message passing, and synchronization.
+
+- **531**: Spawn with args — `(spawn fun data)` passes data to function
+- **532**: Spawn and wait — `(spawn f) (recv)` waits for result
+- **533**: Spawn many — 100 concurrent processes, collect results
+- **534**: Send to self — `(send (self) "msg") (recv)` round-trip
+- **535**: Process registry — `(register "worker" pid)` / `(whereis "worker")`
+- **536**: Timeout in receive — `(recv 1000)` times out after 1s
+- **537**: Selective receive — match on message pattern
+- **538**: Process linking — `(link pid)` monitors linked process
+- **539**: Link propagation — linked process crash propagates
+- **540**: Process monitoring — `(monitor pid)` receives DOWN message
+
+### Cluster 541–550: Testing & Verification
+Testing patterns for gleamunison code.
+
+- **541**: Simple assertion — `(assert (= 1 1))` passes, `(assert (= 1 2))` fails
+- **542**: Test runner — `(test "name" (lam () body))` registers + runs
+- **543**: Test grouping — `(suite "math" (test "add" ...) (test "sub" ...))`
+- **544**: Test fixtures — `(with-setup (lam () (define x 1)) (lam () ...))`
+- **545**: Test coverage — track which lines/exprs were evaluated
+- **546**: Property-based testing — `(for-all x (int) (= x x))`
+- **547**: Fuzz testing — random inputs find edge cases
+- **548**: Benchmarking — `(bench "add" 1000 (lam () (add 1 2)))` reports ms
+- **549**: Comparison benchmark — `(vs benchA benchB)` compares two impls
+- **550**: Test report — summary: X passed, Y failed, Z total
+
+---
+
+## Clusters 551–1000: Remaining frontiers (50 levels per cluster)
+
+### Cluster 551–600: Advanced Data Structures & Patterns
+Data structures built in gleamunison, plus design patterns.
+
+- **551**: `Option` type — some/none with `(is-some? x)` and `(with-default x d)`
+- **552**: `Result` type — ok/error with `(is-ok? x)` and `(unwrap x)`
+- **553**: `Either` type — left/right with `(either a b)` type syntax
+- **554**: Linked list — `(cons 1 (cons 2 nil))` with `(car x)` and `(cdr x)`
+- **555**: Binary tree — `(node val left right)` with `(tree-insert)` and `(tree-find)`
+- **556**: Functional queue — `(queue 1 2 3)` with `(dequeue q)`
+- **557**: Stack — `(push s 1)` / `(pop s)` pure functional
+- **558**: Priority queue — min-heap with `(pq-insert)` and `(pq-pop)`
+- **559**: Graph — adjacency list with DFS/BFS traversal
+- **560**: Trie — prefix tree for string search
+
+### Cluster 561–570: Function Composition & Combinators
+Higher-order function patterns.
+
+- **561**: `(compose f g)` — `fun(x) -> f(g(x))`
+- **562**: `(pipe x f)` — `f(x)`, thread-first
+- **563**: `(pipe-last x f)` — `f(x)`, thread-last
+- **564**: `(curry f n)` — convert n-ary to curried
+- **565**: `(uncurry f)` — convert curried to n-ary
+- **566**: `(const x)` — constant function `fun(_) -> x`
+- **567**: `(flip f)` — swap argument order
+- **568**: `(apply f [args...])` — apply list of args
+- **569**: `(iterate f n x)` — apply f n times
+- **570**: `(fix f)` — fixed-point combinator (if type system supports)
+
+### Cluster 571–580: Error & Edge Case Stress
+Finding bugs through adversarial testing.
+
+- **571**: 1000 empty evaluations — `1` repeated 1000 times
+- **572**: 100 symbol errors — `nonexistent` repeated 100 times
+- **573**: Mixed 10K ops — eval, error, define, error, eval alternating
+- **574**: Max atom stress — 10K unique module names
+- **575**: Max binary size — 10MB text literal
+- **576**: Max list size — 100K element list
+- **577**: Max recursion — deeply nested lambda (500 levels)
+- **578**: Process dictionary pollution — 1000 effects with leak check
+- **579**: Codebase overflow — 100K unique definitions
+- **580**: Memory exhaustion detection — REPL doesn't crash on OOM, returns error
+
+### Cluster 581–590: Performance Benchmarking
+Systematic timing of each pipeline stage.
+
+- **581**: Tokenizer benchmark — chars/sec throughput
+- **582**: Parser benchmark — sexpr/sec throughput
+- **583**: Elaboration benchmark — surface→core/sec
+- **584**: Type-check benchmark — expressions/sec
+- **585**: Compile benchmark — definitions/sec
+- **586**: Load benchmark — modules/sec
+- **587**: Eval benchmark — expressions/sec
+- **588**: Codebase insert benchmark — defs/sec
+- **589**: End-to-end pipeline — parse→eval throughput
+- **590**: Steady-state benchmark — 1000 evals, measure avg time
+
+### Cluster 591–600: Release & Distribution
+Packaging and distribution patterns.
+
+- **591**: Escript with all deps — single-file distribution
+- **592**: Custom escript header — version banner, usage info
+- **593**: Escript size optimization — strip debug info
+- **594**: Escript with embedded HTML — web dashboard in binary
+- **595**: Cross-version OTP support — test with OTP 26-30
+- **596**: macOS compatibility — path handling, DETS paths
+- **597**: Linux compatibility — /tmp paths, signals
+- **598**: Windows compatibility — path separators, line endings
+- **599**: CI pipeline — test all levels on push
+- **600**: Release script — version bump, changelog, escript build, tag
+
+---
+
+### Cluster 601–700: Systems & Infrastructure
+
+- **601–610**: Caching — compile cache, type cache, codebase cache hit rates
+- **611–620**: Logging — structured logging, log levels, log file rotation
+- **621–630**: Configuration — config file parsing, hot-reload config
+- **631–640**: Monitoring — process metrics, codebase size, eval throughput
+- **641–650**: Profiling — per-expression breakdown, hot spots
+- **651–660**: Tracing — expression trace, type resolution trace
+- **661–670**: Debugging — step-through eval, variable inspection
+- **671–680**: Error handling patterns — graceful degradation, retry, fallback
+- **681–690**: Resilience — crash recovery, state persistence, auto-restart
+- **691–700**: Security — input validation, sandbox, resource limits
+
+### Cluster 701–800: Language & Compiler
+
+- **701–710**: Type inference improvements — let-polymorphism, type variables
+- **711–720**: Pattern matching extensions — nested patterns, guards, or-patterns
+- **721–730**: Control flow — explicit sequencing, early return, error propagation
+- **731–740**: Module system — import/export, namespacing, cyclic deps
+- **741–750**: Code generation — optimization passes, dead code, inlining
+- **751–760**: Error messages — source locations, suggestions, context
+- **761–770**: REPL features — history, completion, multi-line, scripting
+- **771–780**: FFI — Erlang interop, NIF support, external function calls
+- **781–790**: Effects system — custom abilities, handler composition, routing
+- **791–800**: Serialization — term persistence, binary format, cross-version
+
+### Cluster 801–900: Applications & Ecosystem
+
+- **801–810**: Web framework — routing, middleware, templating, static files
+- **811–820**: HTTP client — requests, headers, body, redirect, error handling
+- **821–830**: Data processing — JSON, CSV, XML parsing and generation
+- **831–840**: Database — DETS-backed KV store, query, indexing, transactions
+- **841–850**: Networking — TCP, UDP, DNS, TLS, WebSocket
+- **851–860**: Concurrency — spawn, send, receive, select, timeout, registry
+- **861–870**: File I/O — read, write, list, delete, watch, temp files
+- **871–880**: System — env vars, CLI args, signals, exit codes, processes
+- **881–890**: Math — arithmetic, trig, random, stats, matrix, vector
+- **891–900**: Testing — assertion, test runner, coverage, property, benchmark
+
+### Cluster 901–1000: Full Applications & Platform
+
+- **901–910**: Todo app — full CRUD, DETS-backed, REST API, web UI
+- **911–920**: Chat app — WebSocket, rooms, history, presence
+- **921–930**: Blog engine — posts, tags, comments, RSS, markdown
+- **931–940**: Static site generator — markdown→HTML, templates, assets
+- **941–950**: Package server — upload, browse, search, depend, version, sync
+- **951–960**: Dashboard — system stats, repl, definitions, processes
+- **961–970**: Script runner — batch eval, scripting API, automation
+- **971–980**: Meta-tester — run all 1000 levels, collect results, generate report
+- **981–990**: Self-hosted REPL — gleamunison REPL inside gleamunison
+- **991–1000**: Platform finale — 1000-level complete suite, integration test
+
+---
+
+## Final Dogfood Index (Complete — 1000 levels)
 
 | # | Name | Type | Primitives Needed | Status |
 |---|---|---|---|---|
@@ -4789,6 +5209,35 @@ Culmination: full-stack, self-hosting, integrated applications.
 | 321–330 | Protocols (10 modules) | Net | TCP echo, UDP, DNS, ping, HTTP/2, TLS, file watch, signals, env, CLI args | Planned |
 | 331–340 | Encoding (10 modules) | Format | datetime, UUID, base64, hex, CRC, compress, serialize, JSON gen, CSV, INI | Planned |
 | 341–350 | Grand finale (10 apps) | App | markdown renderer, JSON parser, HTTP client, script runner, debugger, self-test, notes app, collab editor, API gateway, package server v2 | Planned |
+| 351–360 | Effects integration (10 features) | Effects | Custom ability, multi-op handler, forwarding, composition, abort, state, reader, writer, choice, error effect | Planned |
+| 361–370 | Error handling (10 features) | Error | Parse error recovery, name error recovery, type error recovery, runtime try/catch, sequential errors, line/col accuracy, message clarity, crash recovery, handler crash | Planned |
+| 371–380 | Memory & resources (10 features) | Perf | Atom table baseline/growth, process count, codebase memory, loader count, purge success, leak detection, binary cleanup | Planned |
+| 381–390 | Parser hardening (10 features) | Parser | Deep nesting, long identifiers, large ints, empty program, comment everywhere, escaped quotes, unicode ids, tabs/spaces, perf, tokenizer perf | Planned |
+| 391–400 | Compiler optimization (10 features) | Compile | Constant folding, dead let elim, inline lambda, match simplify, let chaining, apply flatten, ref direct call, dead branch, compile perf, beam size | Planned |
+| 401–410 | Type inference depth (10 features) | Type | Rank-1 poly, recursive type, type var scope, let generalization, annotation check, row poly, subsumption, occurs check, mutual types, perf | Planned |
+| 411–420 | Module system (10 features) | Module | Cross-expression define, name collision, dep ordering, circular dep, export listing, reload cycle, purge confirm, cross-module types, atom cleanup, chain | Planned |
+| 421–430 | Pattern matching (10 features) | Parser | Var reuse, wildcard, text pattern, nested pattern, multi-case, or-pattern, as-pattern, pattern+effect, exhaustiveness, redundant pattern | Planned |
+| 431–440 | Codebase & serialization (10 features) | Storage | Serialization round-trip, hash stability, codebase list, query by type, size count, dep tree, diff, merge, GC mark, GC sweep | Planned |
+| 441–450 | Error quality (10 features) | Error | Source context, name suggestions, type error location, runtime stack trace, unused warning, shadow warning, error count, warning count, severity, structured output | Planned |
+| 451–460 | Developer tools (10 features) | Tool | REPL history, pretty-printer, tab completion, multi-line editor, color output, script loading, batch eval, timing, welcome banner, meta-commands | Planned |
+| 461–470 | Scripting (10 features) | Script | File read FFI, file write FFI, script args, exit code, multi-file eval, shebang, env vars, command exec, pipeline, library import | Planned |
+| 471–480 | System integration (10 features) | Sys | File listing, deletion, directory creation, file info, file exists, temp files, pwd, cd, process list, system info | Planned |
+| 481–490 | Numerical computing (10 features) | Math | abs, negate, min/max, floor/ceil, sqrt, random-int, random-float, mean/median, sum/product, variance/stdev | Planned |
+| 491–500 | Data transformation (10 features) | Data | Int→float, float→int, bytes→hex, hex→bytes, str→bytes, list→str, str→list, type coercion, JSON gen, CSV parse | Planned |
+| 501–510 | Effects expansion (10 features) | Effects | Math ability, Logger ability, Config ability, Clock ability, stack nesting, composition, handler chain, aliasing, default handlers, routing | Planned |
+| 511–520 | Web applications (10 features) | Web | JSON API, form parsing, cookies, sessions, static files, route params, query params, POST body, response headers, status codes | Planned |
+| 521–530 | Database & storage (10 features) | Storage | DETS recovery, integrity, repair, backup, restore, KV store, typed KV, TTL, key listing, batch ops | Planned |
+| 531–540 | Concurrency (10 features) | Conc | Spawn with args, spawn+wait, spawn many, send to self, registry, timeout recv, selective recv, linking, link propagation, monitoring | Planned |
+| 541–550 | Testing (10 features) | Test | Assertion, test runner, test grouping, fixtures, coverage, property-based, fuzz, benchmark, comparison, test report | Planned |
+| 551–560 | Data structures (10 features) | DS | Option, Result, Either, linked list, binary tree, queue, stack, priority queue, graph, trie | Planned |
+| 561–570 | Combinators (10 features) | Func | Compose, pipe, curry, uncurry, const, flip, apply, iterate, fix | Planned |
+| 571–580 | Error stress (10 features) | Stress | 1000 empty evals, symbol errors, mixed 10K ops, max atom, max binary, max list, max recursion, dict pollution, codebase overflow, OOM detection | Planned |
+| 581–590 | Benchmarks (10 features) | Perf | Tokenizer, parser, elaboration, type-check, compile, load, eval, codebase insert, pipeline, steady-state | Planned |
+| 591–600 | Release (10 features) | Rel | Escript all-deps, custom header, size opt, embedded HTML, OTP compat, macOS, Linux, Windows, CI, release script | Planned |
+| 601–700 | Systems (100 features) | Sys | Caching, logging, config, monitoring, profiling, tracing, debugging, error handling, resilience, security | Planned |
+| 701–800 | Language & Compiler (100 features) | Compile | Type inference, pattern extensions, control flow, module system, code gen, error messages, REPL features, FFI, effects system, serialization | Planned |
+| 801–900 | Applications (100 features) | App | Web framework, HTTP client, data processing, database, networking, concurrency, file IO, system, math, testing | Planned |
+| 901–1000 | Platform (100 features) | Plat | Todo app, chat app, blog engine, site generator, package server, dashboard, script runner, meta-tester, self-hosted REPL, platform finale | Planned |
 
 ---
 
