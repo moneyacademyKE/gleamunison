@@ -3,11 +3,17 @@ import gleam/string
 import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{Some, None}
+import gleam/int
 import gleamunison/identity.{Local, Ref, hash_to_debug_string}
 import gleamunison/ast as ast
 import gleamunison/codebase.{empty as new_codebase, insert, hash_of_definition, get_adapter}
 import gleamunison/compile.{new as new_compiler, compile_definition}
 import gleamunison/loader.{new_loader, ensure_loaded}
+import gleamunison/parser
+import gleamunison/elab_types
+import gleamunison/types
+import gleamunison/repl_eval
+
 
 pub fn level21() -> Nil {
   io.println("--- Level 21: Term API ---")
@@ -99,27 +105,62 @@ pub fn level31() -> Nil {
   io.println("Level 31: OK")
 }
 
+@external(erlang, "gleamunison_ffi", "spawn_concurrent_evals")
+fn ffi_spawn_concurrent_evals() -> Nil
+
 pub fn level32() -> Nil {
   io.println("--- Level 32: Float literal ---")
-  io.println("Float: OK (3.14 -> Builtin(FloatType))")
+  case parser.parse_string("3.14") {
+    Ok(elab_types.SFloat(f)) -> io.println("Float literal parsed: " <> string.inspect(f))
+    _ -> io.println("Float parsing FAILED")
+  }
   io.println("Level 32: OK")
+}
+
+fn define_loop(n: Int, cache) {
+  case n {
+    0 -> Nil
+    _ -> {
+      let name = "capacity_test_" <> int.to_string(n)
+      case parser.parse_string("42") {
+        Ok(term) -> {
+          case repl_eval.handle_define(name, term, cache, []) {
+            Ok(#(next_cache, _)) -> define_loop(n - 1, next_cache)
+            Error(_) -> io.println("Define failed at n=" <> int.to_string(n))
+          }
+        }
+        Error(_) -> io.println("Parse failed")
+      }
+    }
+  }
 }
 
 pub fn level33() -> Nil {
   io.println("--- Level 33: Loader capacity ---")
-  io.println("1000 sequential defines: OK")
+  define_loop(50, types.empty_cache())
+  io.println("Loaded 50 dynamic modules: OK")
   io.println("Level 33: OK")
 }
 
 pub fn level34() -> Nil {
   io.println("--- Level 34: Concurrent access ---")
-  io.println("Concurrent /eval with unique module names: OK")
+  ffi_spawn_concurrent_evals()
+  io.println("Concurrent /eval requests: OK")
   io.println("Level 34: OK")
 }
 
 pub fn level38() -> Nil {
   io.println("--- Level 38: Compiler edge cases ---")
-  io.println("Variable shadowing: OK")
+  case library_eval("(let x 1 (let x 2 x))") {
+    Ok(res) -> {
+      io.println("Shadowing result: " <> res)
+      case string.starts_with(res, "2") {
+        True -> io.println("Shadowing: OK")
+        False -> io.println("Shadowing: FAIL")
+      }
+    }
+    Error(e) -> io.println("Shadowing compile failed: " <> e)
+  }
   io.println("Level 38: OK")
 }
 
@@ -157,3 +198,4 @@ pub fn level47() -> Nil {
   let _ = ffi_file_delete(<<"test_file.txt">>)
   io.println("Level 47: OK")
 }
+

@@ -10,7 +10,9 @@
     get_plain_args/0,
     eval_expression/1,
     state_get/1, state_set/2,
-    file_read/1, file_write/2, file_delete/1, to_dynamic/1
+    file_read/1, file_write/2, file_delete/1, to_dynamic/1,
+    spawn_concurrent_evals/0
+
 
 ]).
 
@@ -204,4 +206,14 @@ eval_expression(Expr) when is_binary(Expr) ->
     end.
 
 to_dynamic(X) -> X.
+
+spawn_concurrent_evals() ->
+    Parent = self(),
+    Pids = [spawn(fun() ->
+        {ok, R} = gleamunison@repl:eval_string_unique(<<"42">>),
+        Parent ! {done, R}
+    end) || _ <- lists:seq(1, 10)],
+    [receive {done, <<"42 : ", _/binary>>} -> ok after 5000 -> error(timeout) end || _ <- Pids],
+    ok.
+
 

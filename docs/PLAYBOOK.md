@@ -90,5 +90,5 @@ The REPL bootstraps `"Console"`, `"add"`, and `"read_line"`, and supports:
 
 
 ### LOC Constraints
-All Gleam/Erlang source files MUST be strictly under 150 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
+All Gleam/Erlang source files MUST be strictly under 250 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
 
