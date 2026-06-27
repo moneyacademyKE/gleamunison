@@ -19,7 +19,24 @@ that compiles to BEAM bytecode and loads dynamically into the Erlang VM.
 | Elaboration (Surface → Core) | ✓ Two-phase with name resolution |
 | Effects runtime (process dict stack) | ✓ do_/handle_/push_frame/pop_frame |
 | Sync protocol (pull-based) | ✓ Types + Erlang distribution FFI stubs |
-| escript standalone binary | ✓ 281KB, no Gleam dependency at runtime |
+| escript standalone binary | ✓ 593KB, no Gleam dependency at runtime |
+
+## Why the escript is only 593 KB
+
+The standalone binary (`gleamunison_escript`) contains the full content-addressed runtime — parser, elaborator, typechecker, compiler, loader, codebase, effects system, web server, REPL, 50 genesis modules, and all stdlib dependencies. At 593 KB, it's compact because:
+
+**BEAM bytecode is dense.** The 113 compiled `.beam` files are ~1.2 MB uncompressed; zip compression brings that to ~590 KB.
+
+**No VM bundled.** Unlike Go or Rust binaries that statically link a runtime, the escript relies on the system's Erlang/OTP installation (~150 MB, installed once). The escript itself is just a zip archive with a 50-byte launcher header.
+
+| Format | Size | Dependencies |
+|---|---|---|
+| gleamunison escript | **593 KB** | Erlang/OTP |
+| Go binary | 10–20 MB | None |
+| Rust binary | 5–15 MB | None |
+| Node.js app + deps | 100–500 MB | Node.js |
+
+If you already have Erlang installed, this is as close to a zero-install language runtime as it gets.
 
 ## Modules (12 source modules, 1,450+ lines)
 
