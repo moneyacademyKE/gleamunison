@@ -15,8 +15,25 @@ eval_module(Mod) ->
             Cont(0)
         end
     }},
+    StateHandler = {<<"m_fe60582e">>, #{
+        0 => fun([Key], Cont) ->
+            Val = case erlang:get({state_val, Key}) of
+                undefined -> <<"">>;
+                V -> V
+            end,
+            Cont(Val)
+        end,
+        1 => fun([Key, Val], Cont) ->
+            erlang:put({state_val, Key}, Val),
+            Cont(Val)
+        end
+    }},
     try
-        Val = gleamunison_effets:handle_comp(ConsoleHandler, fun() -> ModuleAtom:'$eval'() end),
+        Val = gleamunison_effets:handle_comp(ConsoleHandler, fun() ->
+            gleamunison_effets:handle_comp(StateHandler, fun() ->
+                ModuleAtom:'$eval'()
+            end)
+        end),
         {ok, list_to_binary(io_lib:format("~tp", [Val]))}
     catch
         Class:Reason:Stacktrace ->

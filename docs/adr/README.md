@@ -31,3 +31,6 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0025](0025-lower-typecheck-module.md) | Code Deconstruction and Lowering-Typecheck Division | Accepted |
 | [ADR-0026](0026-canonical-hash-serialization.md) | Canonical Binary Serialization for Hash Invariants | Accepted |
 | [ADR-0027](0027-community-library-package-integration.md) | Integration of Community Library Packages | Accepted |
+| [ADR-0028](0028-infinite-recursion-detection-in-shadowed-builtins.md) | Infinite Recursion Avoidance in Shadowed Builtins | Accepted |
+| [ADR-0029](0029-state-ability-bootstrapping-and-handler-stack-composition.md) | State Ability Bootstrapping and Handler Stack Composition | Accepted |
+| [ADR-0030](0030-curried-beam-list-fold-ffi-integration.md) | Curried BEAM List Fold FFI Integration | Accepted |

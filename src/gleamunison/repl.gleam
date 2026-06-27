@@ -66,6 +66,10 @@ pub fn start_repl() -> Nil {
     #("Console", elab_types.SurfaceAbilityDef("Console", [
       elab_types.SurfaceOp("print", [elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TInt))
     ])),
+    #("State", elab_types.SurfaceAbilityDef("State", [
+      elab_types.SurfaceOp("get", [elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TText)),
+      elab_types.SurfaceOp("set", [elab_types.TBuiltin(elab_types.TText), elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TText))
+    ])),
     #("add", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("+", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("read_line", SurfaceTermDef(elab_types.SRef(builtin_io_read_line()))),
