@@ -42,12 +42,36 @@ eval_module(Mod) ->
             Cont(Str)
         end
     }},
+    RemoteHandler = {<<"m_ffa98e02">>, #{
+        0 => fun([Location, Computation], Cont) ->
+            Node = erlang:binary_to_atom(Location, utf8),
+            Self = self(),
+            Pid = spawn_link(Node, fun() ->
+                Res = case is_function(Computation, 0) of
+                    true -> Computation();
+                    false -> Computation(nil)
+                end,
+                Self ! {task_result, self(), Res}
+            end),
+            Cont(Pid)
+        end,
+        1 => fun([Pid], Cont) ->
+            receive
+                {task_result, Pid, Res} -> Cont(Res)
+            end
+        end,
+        2 => fun([], Cont) ->
+            Cont(atom_to_binary(node(), utf8))
+        end
+    }},
     try
         Val = gleamunison_effets:handle_comp(ConsoleHandler, fun() ->
             gleamunison_effets:handle_comp(StateHandler, fun() ->
                 gleamunison_effets:handle_comp(MathHandler, fun() ->
                     gleamunison_effets:handle_comp(ShowHandler, fun() ->
-                        ModuleAtom:'$eval'()
+                        gleamunison_effets:handle_comp(RemoteHandler, fun() ->
+                            ModuleAtom:'$eval'()
+                        end)
                     end)
                 end)
             end)

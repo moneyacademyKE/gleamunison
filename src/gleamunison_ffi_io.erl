@@ -4,7 +4,8 @@
     eval_expression/1,
     spawn_concurrent_evals/0,
     sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
-    sync_request_defs/2, sync_push_defs/2
+    sync_request_defs/2, sync_push_defs/2,
+    serialize_term/1, deserialize_term/1
 ]).
 
 %% --- State (process dictionary) ---
@@ -67,3 +68,9 @@ sync_request_defs(_Node, _Refs) -> {ok, []}.
 
 sync_push_defs(<<"test_node">>, _Defs) -> {ok, nil};
 sync_push_defs(_Node, _Defs) -> {ok, nil}.
+
+serialize_term(Term) ->
+    erlang:term_to_binary(Term).
+
+deserialize_term(Bytes) when is_binary(Bytes) ->
+    erlang:binary_to_term(Bytes).

@@ -170,3 +170,39 @@ pub fn repl_bracket_counting_test() {
   let assert 0 = repl_io.count_brackets(" \"(let x 1\" ", False, 0)
   let assert 0 = repl_io.count_brackets(" \"hello \\\" (world \" ", False, 0)
 }
+
+pub fn mnesia_storage_adapter_test() {
+  let assert Ok(adapter) = storage.mnesia("test_mnesia_table")
+  let ref = Ref(hash_bytes(<<"test_mnesia_ref">>))
+  let data = <<"hello mnesia">>
+  let assert Ok(None) = adapter.lookup(ref)
+  let assert Ok(Nil) = adapter.insert(ref, data)
+  let assert Ok(Some(retrieved)) = adapter.lookup(ref)
+  let assert True = retrieved == data
+
+  let assert Ok(refs) = adapter.list_refs()
+  let assert True = list.contains(refs, ref)
+
+  let assert Ok(Nil) = adapter.close()
+}
+
+pub fn serialization_continuation_test() {
+  let original_term = 42
+  let bytes = repl_eval.serialize_term(original_term)
+  let assert True = bytes != <<>>
+  let deserialized: Int = repl_eval.deserialize_term(bytes)
+  let assert 42 = deserialized
+
+  let closure = fn(x) { x + 1 }
+  let closure_bytes = repl_eval.serialize_term(closure)
+  let assert True = closure_bytes != <<>>
+  let deserialized_closure: fn(Int) -> Int = repl_eval.deserialize_term(closure_bytes)
+  let assert 11 = deserialized_closure(10)
+}
+
+@external(erlang, "gleamunison_sup", "test_supervisor_restart")
+fn ffi_test_supervisor_restart() -> Result(Bool, String)
+
+pub fn supervision_tree_test() {
+  let assert Ok(True) = ffi_test_supervisor_restart()
+}

@@ -20,6 +20,12 @@ pub fn unload_binary(mod_name: String) -> Result(Nil, String)
 @external(erlang, "gleamunison_repl_ffi", "eval_module")
 pub fn eval_module(mod_name: String) -> Result(String, String)
 
+@external(erlang, "gleamunison_ffi_io", "serialize_term")
+pub fn serialize_term(term: a) -> BitArray
+
+@external(erlang, "gleamunison_ffi_io", "deserialize_term")
+pub fn deserialize_term(bytes: BitArray) -> a
+
 fn lev_dist_limit(s: List(String), t: List(String), limit: Int) -> Int {
   case limit < 0 {
     True -> 3

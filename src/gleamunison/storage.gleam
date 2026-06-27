@@ -65,6 +65,21 @@ fn ffi_partitioned_dets_close(tab: BitArray) -> Result(Nil, StorageError)
 @external(erlang, "gleamunison_storage", "partitioned_dets_delete_file")
 pub fn partitioned_dets_delete(dir_path: String) -> Result(Nil, StorageError)
 
+@external(erlang, "gleamunison_storage", "mnesia_new")
+fn ffi_mnesia_new(table_name: String) -> Result(BitArray, StorageError)
+
+@external(erlang, "gleamunison_storage", "mnesia_insert")
+fn ffi_mnesia_insert(tab: BitArray, ref: BitArray, bytes: BitArray) -> Result(Nil, StorageError)
+
+@external(erlang, "gleamunison_storage", "mnesia_lookup")
+fn ffi_mnesia_lookup(tab: BitArray, ref: BitArray) -> Result(Option(BitArray), StorageError)
+
+@external(erlang, "gleamunison_storage", "mnesia_list_refs")
+fn ffi_mnesia_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
+
+@external(erlang, "gleamunison_storage", "mnesia_close")
+fn ffi_mnesia_close(tab: BitArray) -> Result(Nil, StorageError)
+
 pub fn inmemory() -> StorageAdapter {
   let tab = ffi_new()
   StorageAdapter(
@@ -130,6 +145,31 @@ pub fn partitioned_dets(dir_path: String) -> Result(StorageAdapter, StorageError
           }
         },
         close: fn() { ffi_partitioned_dets_close(tab) },
+      ))
+    }
+    Error(e) -> Error(e)
+  }
+}
+
+pub fn mnesia(table_name: String) -> Result(StorageAdapter, StorageError) {
+  case ffi_mnesia_new(table_name) {
+    Ok(tab) -> {
+      Ok(StorageAdapter(
+        insert: fn(ref, bytes) {
+          let Ref(h) = ref
+          ffi_mnesia_insert(tab, hash_to_bytes(h), bytes)
+        },
+        lookup: fn(ref) {
+          let Ref(h) = ref
+          ffi_mnesia_lookup(tab, hash_to_bytes(h))
+        },
+        list_refs: fn() {
+          case ffi_mnesia_list_refs(tab) {
+            Ok(lst) -> Ok(list.map(lst, fn(b) { Ref(hash_from_bytes(b)) }))
+            Error(e) -> Error(e)
+          }
+        },
+        close: fn() { ffi_mnesia_close(tab) },
       ))
     }
     Error(e) -> Error(e)

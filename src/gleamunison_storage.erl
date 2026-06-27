@@ -5,6 +5,7 @@
     dets_delete_file/1,
     partitioned_dets_new/1, partitioned_dets_insert/3, partitioned_dets_lookup/2,
     partitioned_dets_list_refs/1, partitioned_dets_close/1, partitioned_dets_delete_file/1,
+    mnesia_new/1, mnesia_insert/3, mnesia_lookup/2, mnesia_list_refs/1, mnesia_close/1,
     test_make_ref/1, get_open_dets_count/1
 ]).
 
@@ -112,3 +113,44 @@ get_open_dets_count(DP) ->
     case erlang:get({gleamunison_open_dets, Dir}) of undefined -> 0; L -> length(L) end.
 
 hex(N) -> case N < 10 of true -> $0 + N; false -> $a + N - 10 end.
+
+mnesia_new(TabName) ->
+    case mnesia:start() of
+        ok ->
+            N = erlang:binary_to_atom(<<"gleamunison_mnesia_", TabName/binary>>, utf8),
+            case mnesia:create_table(N, [{attributes, [key, val]}, {type, set}]) of
+                {atomic, ok} ->
+                    ok = mnesia:wait_for_tables([N], 5000),
+                    {ok, N};
+                {aborted, {already_exists, N}} ->
+                    ok = mnesia:wait_for_tables([N], 5000),
+                    {ok, N};
+                {aborted, R} -> err(R)
+            end;
+        {error, R} -> err(R)
+    end.
+
+mnesia_insert(Tab, Ref, Bytes) ->
+    F = fun() -> mnesia:write({Tab, Ref, Bytes}) end,
+    case mnesia:transaction(F) of
+        {atomic, ok} -> {ok, nil};
+        {aborted, R} -> err(R)
+    end.
+
+mnesia_lookup(Tab, Ref) ->
+    F = fun() -> mnesia:read(Tab, Ref) end,
+    case mnesia:transaction(F) of
+        {atomic, [{Tab, Ref, Bytes}]} -> {ok, {some, Bytes}};
+        {atomic, []} -> {ok, none};
+        {aborted, R} -> err(R)
+    end.
+
+mnesia_list_refs(Tab) ->
+    F = fun() -> mnesia:all_keys(Tab) end,
+    case mnesia:transaction(F) of
+        {atomic, Keys} -> {ok, Keys};
+        {aborted, R} -> err(R)
+    end.
+
+mnesia_close(_Tab) -> {ok, nil}.
+

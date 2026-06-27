@@ -80,6 +80,11 @@ pub fn start_repl() -> Nil {
     #("Show", elab_types.SurfaceAbilityDef("Show", [
       elab_types.SurfaceOp("show", [elab_types.TVar("a")], elab_types.TBuiltin(elab_types.TText))
     ])),
+    #("Remote", elab_types.SurfaceAbilityDef("Remote", [
+      elab_types.SurfaceOp("forkAt", [elab_types.TVar("location"), elab_types.TVar("a")], elab_types.TVar("task")),
+      elab_types.SurfaceOp("await", [elab_types.TVar("task")], elab_types.TVar("a")),
+      elab_types.SurfaceOp("here", [], elab_types.TVar("location"))
+    ])),
     #("add", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("+", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("read_line", SurfaceTermDef(elab_types.SRef(builtin_io_read_line()))),
