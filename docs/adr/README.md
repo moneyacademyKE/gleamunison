@@ -36,3 +36,4 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0030](0030-curried-beam-list-fold-ffi-integration.md) | Curried BEAM List Fold FFI Integration | Accepted |
 | [ADR-0031](0031-modular-ffi-decomposition-for-strict-compliance.md) | Modular FFI Decomposition for Strict Compliance | Accepted |
 | [ADR-0032](0032-parser-string-escape-sequences-and-timeout-resilient-test-runner.md) | Parser String Escape Sequences and Timeout-Resilient Test Runner | Accepted |
+| [ADR-0033](0033-spelling-suggestions-and-bracket-counting.md) | Spelling Suggestions and Bracket Counting | Accepted |

@@ -287,5 +287,21 @@ Using public named ETS tables for global mutable count tracking, preserving proc
 
 **Applied in:** `gleamunison_http.erl`
 
+---
+
+## 23. Depth-Limited Levenshtein Spelling Suggestions
+
+Using a depth-limited recursion for edit-distance spelling suggestions in error message formatting. The limit halts exponential search recursion early, yielding fast and predictable runtime execution over active symbol environments.
+
+**Applied in:** `repl_eval.gleam`
+
+---
+
+## 24. Pipe Deadlock Prevention via Stream Inheritance
+
+Inheriting standard streams (`{:err :inherit}`) for long-running subprocess pipes inside managers to prevent write deadlocks caused by full OS pipe buffers.
+
+**Applied in:** `run_playbook_tests.clj`
+
 
 

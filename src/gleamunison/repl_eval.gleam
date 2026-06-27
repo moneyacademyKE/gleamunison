@@ -1,3 +1,4 @@
+import gleam/int
 import gleam/list
 import gleam/string
 import gleamunison/identity.{type DefinitionRef, Ref}
@@ -19,6 +20,67 @@ pub fn unload_binary(mod_name: String) -> Result(Nil, String)
 @external(erlang, "gleamunison_repl_ffi", "eval_module")
 pub fn eval_module(mod_name: String) -> Result(String, String)
 
+fn lev_dist_limit(s: List(String), t: List(String), limit: Int) -> Int {
+  case limit < 0 {
+    True -> 3
+    False -> {
+      case s, t {
+        [], _ -> {
+          let len = list.length(t)
+          case len <= limit {
+            True -> len
+            False -> 3
+          }
+        }
+        _, [] -> {
+          let len = list.length(s)
+          case len <= limit {
+            True -> len
+            False -> 3
+          }
+        }
+        [x, ..xs], [y, ..ys] -> {
+          case x == y {
+            True -> lev_dist_limit(xs, ys, limit)
+            False -> {
+              let d1 = lev_dist_limit(xs, t, limit - 1) + 1
+              let d2 = lev_dist_limit(s, ys, limit - 1) + 1
+              let d3 = lev_dist_limit(xs, ys, limit - 1) + 1
+              int.min(d1, int.min(d2, d3))
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+fn find_suggestions(name: String, prev_defs: List(#(String, SurfaceDef))) -> List(String) {
+  let name_chars = string.to_graphemes(name)
+  list.filter_map(prev_defs, fn(pair) {
+    let #(def_name, _) = pair
+    let def_chars = string.to_graphemes(def_name)
+    let dist = lev_dist_limit(name_chars, def_chars, 2)
+    case dist <= 2 {
+      True -> Ok(def_name)
+      False -> Error(Nil)
+    }
+  })
+}
+
+fn format_elab_error(err: elab_types.ElaborateError, prev_defs: List(#(String, SurfaceDef))) -> String {
+  case err {
+    elab_types.NameNotFound(name) -> {
+      let suggestions = find_suggestions(name, prev_defs)
+      case suggestions {
+        [] -> "NameNotFound(\"" <> name <> "\")"
+        _ -> "NameNotFound(\"" <> name <> "\"). Did you mean: " <> string.join(suggestions, ", ") <> "?"
+      }
+    }
+    _ -> string.inspect(err)
+  }
+}
+
 pub fn ref_for_name(name: String) -> DefinitionRef {
   Ref(identity.hash_bytes(string_to_binary(name)))
 }
@@ -32,7 +94,7 @@ pub fn do_eval(
   let expr_ref = ref_for_name(name)
   let defs = [#(name, SurfaceTermDef(term)), ..prev_defs]
   case elab.elaborate_unit(SurfaceUnit(expr_ref, defs), cache) {
-    Error(err) -> Error("Typecheck Error: " <> string.inspect(err))
+    Error(err) -> Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
     Ok(#(unit, next_cache)) -> {
       case list.key_find(unit.defs, expr_ref) {
         Error(_) -> Error("No def found")
@@ -70,7 +132,7 @@ pub fn handle_define(
   let prev_defs = list.filter(prev_defs, fn(pair) { pair.0 != name })
   let defs = [#(name, SurfaceTermDef(val)), ..prev_defs]
   case elab.elaborate_unit(SurfaceUnit(ref_for_name("repl_expr"), defs), cache) {
-    Error(err) -> Error("Typecheck Error: " <> string.inspect(err))
+    Error(err) -> Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
     Ok(#(unit, next_cache)) -> {
       case list.key_find(unit.defs, name_ref) {
         Error(_) -> Error("No def found")

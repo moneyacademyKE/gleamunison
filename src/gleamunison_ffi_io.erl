@@ -29,8 +29,8 @@ eval_expression(Expr) when is_binary(Expr) ->
                     {ok, Result} -> {ok, Result};
                     {error, E} -> {error, E}
                 end;
-            {error, Reason} ->
-                {error, iolist_to_binary(io_lib:format("~tp", [Reason]))}
+            {error, ParseReason} ->
+                {error, iolist_to_binary(io_lib:format("~tp", [ParseReason]))}
         end
     catch
         Class:Reason:Stack ->

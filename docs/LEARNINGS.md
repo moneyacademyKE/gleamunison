@@ -177,3 +177,10 @@ A long-running conformance suite parsing and executing user S-expressions can ha
 ## 31. Proactive FFI Splitting for LOC Boundaries
 Maintaining strict file constraints requires proactive splitting of Erlang FFI wrappers before code lines cross boundaries. Dividing modules into core compile/loading operations and volatile transient state/IO concerns separates side effects and makes verification of deterministic behavior easier.
 
+## 32. Spellchecking suggestions via depth-limited Levenshtein
+
+Unresolved name binding errors (NameNotFound) are common developer mistakes. Implementing a depth-limited Levenshtein distance algorithm allows fast and cheap spellchecking calculations on the active environment definitions while pruning the search tree early to avoid exponential recursion overheads.
+
+## 33. Subprocess pipe buffering and state pollution loops
+
+Background subprocess runners using pipes hang if their stderr stream is not inherited/drained, as the OS pipe buffer fills up and blocks writes. Furthermore, continuous REPL session execution can cause state pollution between test levels (such as mutual recursive redefinitions of standard primitives like `add` and `sub`), which must be cleared by selective session restarts at logical boundaries.

@@ -727,7 +727,7 @@ by name. (But the bootstrapped module is still loaded in the VM.)
 
 ### 14.4 Restore original add via full redefine
 ```
-(define add (lam x (lam y (add x y))))
+(define add (lam x (lam y (sub x (sub 0 y)))))
 ```
 After shadowing, can you restore `add`? This would require the bootstrapped
 `add` to still be accessible, but the name `add` now points to your wrapper.

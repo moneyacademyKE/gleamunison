@@ -1,4 +1,5 @@
 import gleam/io
+import gleam/list
 import gleam/string
 import gleam/int
 import gleamunison/identity.{
@@ -132,12 +133,15 @@ pub fn start_repl() -> Nil {
     #("http-get", SurfaceTermDef(elab_types.SRef(builtin_http_get()))),
     #("file-read", SurfaceTermDef(elab_types.SRef(builtin_file_read()))),
   ]
+  let assert Ok(compare_term) =
+    parser.parse_string("(lam a (lam b (if (eq? a b) 0 (if (lt? a b) -1 1))))")
+  let init_defs = list.append(init_defs, [#("compare", SurfaceTermDef(compare_term))])
   let #(cache, bootstrap_list) = repl_eval.bootstrap_defs(init_defs, empty_cache())
   repl_loop(cache, bootstrap_list)
 }
 
 fn help_text() -> String {
-  "Builtins: add + sub mul div mod eq? lt? gt? and or not\n" <>
+  "Builtins: add + sub mul div mod eq? lt? gt? and or not compare\n" <>
   "Strings:  string-concat string-length string-contains? string-slice\n" <>
   "          string-upcase string-downcase string-replace string-split\n" <>
   "          string-trim string->int\n" <>

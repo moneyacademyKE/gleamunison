@@ -20,6 +20,12 @@ pub fn count_brackets(str: String, in_string: Bool, depth: Int) -> Int {
         False -> count_brackets(rest, False, depth)
       }
     }
+    Ok(#("\\", rest)) -> {
+      case string.pop_grapheme(rest) {
+        Ok(#(_, rest2)) -> count_brackets(rest2, in_string, depth)
+        Error(Nil) -> depth
+      }
+    }
     Ok(#(_, rest)) -> count_brackets(rest, in_string, depth)
     Error(Nil) -> depth
   }

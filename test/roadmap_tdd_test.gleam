@@ -6,6 +6,7 @@ import gleamunison/ast
 import gleamunison/elab_types.{SInt, SVar, SList, SLet, SLambda}
 import gleamunison/codebase.{hash_of_definition}
 import gleamunison/parser
+import gleamunison/lexer
 import gleamunison/storage
 import gleamunison/loader
 
@@ -98,7 +99,7 @@ pub fn parser_s_expression_test() {
 }
 
 pub fn parser_coordinate_error_test() {
-  let assert Error(parser.ParseError(_msg, line, col)) =
+  let assert Error(lexer.ParseError(_msg, line, col)) =
     parser.parse_string("\n )")
   let assert 2 = line
   let assert 2 = col
@@ -145,4 +146,27 @@ fn test_soft_purge_scenario() -> Result(#(Bool, Bool), String)
 
 pub fn soft_purge_test() {
   let assert Ok(#(False, True)) = test_soft_purge_scenario()
+}
+
+import gleamunison/repl_eval
+import gleamunison/types.{empty_cache}
+import gleamunison/repl_io
+
+pub fn spelling_suggestions_test() {
+  let prev_defs = [
+    #("secret", elab_types.SurfaceTermDef(SInt(42))),
+    #("guess", elab_types.SurfaceTermDef(SInt(0))),
+  ]
+  let assert Error(err) = repl_eval.do_eval(SVar("secre"), "test_expr", empty_cache(), prev_defs)
+  let assert True = string.contains(err, "Did you mean: secret?")
+
+  let assert Error(err2) = repl_eval.do_eval(SVar("nonexistent"), "test_expr", empty_cache(), prev_defs)
+  let assert False = string.contains(err2, "Did you mean:")
+}
+
+pub fn repl_bracket_counting_test() {
+  let assert 0 = repl_io.count_brackets("(let x 1 x)", False, 0)
+  let assert 1 = repl_io.count_brackets("(let x 1", False, 0)
+  let assert 0 = repl_io.count_brackets(" \"(let x 1\" ", False, 0)
+  let assert 0 = repl_io.count_brackets(" \"hello \\\" (world \" ", False, 0)
 }
