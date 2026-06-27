@@ -164,6 +164,6 @@ Splitting large REPL and HTTP server FFI files into small sub-modules under 150 
 
 Content-addressed insertions must be idempotent (returning Ok on duplicates) rather than returning error values.
 
+## 28. Community library integration gaps
 
-
-
+A gap analysis against `awesome-gleam` packages shows that for compiler and REPL runtimes, adopting dev-dependencies like `birdie` (snapshot testing) and domain libraries like `glam` (pretty printing layout engine) dramatically increases developer efficiency and output aesthetics, while error stack utilities like `snag` are less suitable because domain-level programmatic error recovery (e.g. `NotFound` vs `IoError` in databases) is lost when error types are unified.
