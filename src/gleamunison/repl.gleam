@@ -17,7 +17,8 @@ import gleamunison/identity.{
   builtin_pair, builtin_fst, builtin_snd,
   builtin_left, builtin_right,
   builtin_dict_new, builtin_dict_get, builtin_dict_set,
-  builtin_set_new, builtin_set_insert}
+  builtin_set_new, builtin_set_insert,
+  builtin_json_parse, builtin_http_get, builtin_file_read}
 import gleamunison/parser
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/types.{empty_cache, type TypeCache}
@@ -70,6 +71,14 @@ pub fn start_repl() -> Nil {
       elab_types.SurfaceOp("get", [elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TText)),
       elab_types.SurfaceOp("set", [elab_types.TBuiltin(elab_types.TText), elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TText))
     ])),
+    #("Math", elab_types.SurfaceAbilityDef("Math", [
+      elab_types.SurfaceOp("add", [elab_types.TBuiltin(elab_types.TInt), elab_types.TBuiltin(elab_types.TInt)], elab_types.TBuiltin(elab_types.TInt)),
+      elab_types.SurfaceOp("sub", [elab_types.TBuiltin(elab_types.TInt), elab_types.TBuiltin(elab_types.TInt)], elab_types.TBuiltin(elab_types.TInt)),
+      elab_types.SurfaceOp("mul", [elab_types.TBuiltin(elab_types.TInt), elab_types.TBuiltin(elab_types.TInt)], elab_types.TBuiltin(elab_types.TInt))
+    ])),
+    #("Show", elab_types.SurfaceAbilityDef("Show", [
+      elab_types.SurfaceOp("show", [elab_types.TVar("a")], elab_types.TBuiltin(elab_types.TText))
+    ])),
     #("add", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("+", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
     #("read_line", SurfaceTermDef(elab_types.SRef(builtin_io_read_line()))),
@@ -119,6 +128,9 @@ pub fn start_repl() -> Nil {
     #("dict-set", SurfaceTermDef(elab_types.SRef(builtin_dict_set()))),
     #("set-new", SurfaceTermDef(elab_types.SRef(builtin_set_new()))),
     #("set-insert", SurfaceTermDef(elab_types.SRef(builtin_set_insert()))),
+    #("json-parse", SurfaceTermDef(elab_types.SRef(builtin_json_parse()))),
+    #("http-get", SurfaceTermDef(elab_types.SRef(builtin_http_get()))),
+    #("file-read", SurfaceTermDef(elab_types.SRef(builtin_file_read()))),
   ]
   let #(cache, bootstrap_list) = repl_eval.bootstrap_defs(init_defs, empty_cache())
   repl_loop(cache, bootstrap_list)

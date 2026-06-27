@@ -28,10 +28,28 @@ eval_module(Mod) ->
             Cont(Val)
         end
     }},
+    MathHandler = {<<"m_b514a6e3">>, #{
+        0 => fun([X, Y], Cont) -> Cont(X + Y) end,
+        1 => fun([X, Y], Cont) -> Cont(X - Y) end,
+        2 => fun([X, Y], Cont) -> Cont(X * Y) end
+    }},
+    ShowHandler = {<<"m_d17eaeb6">>, #{
+        0 => fun([Val], Cont) ->
+            Str = case is_binary(Val) of
+                true -> << "\"", Val/binary, "\"" >>;
+                false -> list_to_binary(io_lib:format("~tp", [Val]))
+            end,
+            Cont(Str)
+        end
+    }},
     try
         Val = gleamunison_effets:handle_comp(ConsoleHandler, fun() ->
             gleamunison_effets:handle_comp(StateHandler, fun() ->
-                ModuleAtom:'$eval'()
+                gleamunison_effets:handle_comp(MathHandler, fun() ->
+                    gleamunison_effets:handle_comp(ShowHandler, fun() ->
+                        ModuleAtom:'$eval'()
+                    end)
+                end)
             end)
         end),
         {ok, list_to_binary(io_lib:format("~tp", [Val]))}

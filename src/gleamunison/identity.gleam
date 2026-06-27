@@ -162,3 +162,6 @@ pub fn builtin_dict_get() -> DefinitionRef { Ref(Hash(<<47:256>>)) }
 pub fn builtin_dict_set() -> DefinitionRef { Ref(Hash(<<48:256>>)) }
 pub fn builtin_set_new() -> DefinitionRef { Ref(Hash(<<49:256>>)) }
 pub fn builtin_set_insert() -> DefinitionRef { Ref(Hash(<<50:256>>)) }
+pub fn builtin_json_parse() -> DefinitionRef { Ref(Hash(<<51:256>>)) }
+pub fn builtin_http_get() -> DefinitionRef { Ref(Hash(<<52:256>>)) }
+pub fn builtin_file_read() -> DefinitionRef { Ref(Hash(<<53:256>>)) }

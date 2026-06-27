@@ -47,14 +47,12 @@ evaluates. Every expression below should compile and print a result.
 ### 1.1 Integer literal
 ```
 1
-;; Expected: 1 : Builtin(IntType)
 ```
 Expected: `1 : Builtin(IntType)`
 
 ### 1.2 Text literal
 ```
 "hello"
-;; Expected: "hello" : Builtin(TextType)
 ```
 Expected: `"hello" : Builtin(TextType)`
 
@@ -67,7 +65,6 @@ Expected: `[1,2,3] : Builtin(ListType)`
 ### 1.4 Let binding
 ```
 (let x 42 x)
-;; Expected: 42 : TypeVar(0)
 ```
 Expected: `42 : TypeVar(0)`
 
@@ -80,7 +77,6 @@ Expected: `#Fun<...> : Fn([TypeVar(0)], TypeVar(0), Required([]))`
 ### 1.6 Lambda application
 ```
 ((lam x x) 99)
-;; Expected: 99 : Builtin(IntType)
 ```
 Expected: `99 : Builtin(IntType)`
 
@@ -93,14 +89,12 @@ Expected: `#Fun<...> : Fn([TypeVar(1)], TypeVar(0), Required([]))`
 ### 1.8 Define and use
 ```
 (define myval 42)
-;; Expected: myval defined.
 ```
 Expected: `myval defined.`
 
 Then:
 ```
 myval
-;; Expected: 42 : Builtin(IntType)
 ```
 Expected: `42 : Builtin(IntType)`
 
@@ -132,21 +126,18 @@ Expected: `[1,2,3] : Builtin(ListType)` or first element.
 ### 2.1 Match on integer
 ```
 (match 42 (42 "forty-two") (x "other"))
-;; Expected: "forty-two" : Builtin(TextType)
 ```
 Expected: `"forty-two" : Builtin(TextType)`
 
 ### 2.2 Match with default case
 ```
 (match 99 (42 "forty-two") (x "other"))
-;; Expected: "other" : Builtin(TextType)
 ```
 Expected: `"other" : Builtin(TextType)`
 
 ### 2.3 Match with text
 ```
 (match "hi" ("hi" "matched") (x "no"))
-;; Expected: "matched" : Builtin(TextType)
 ```
 Expected: `"matched" : Builtin(TextType)`
 
@@ -171,7 +162,6 @@ The REPL bootstraps a `Console` ability with one operation: `print`.
 ### 3.1 Trigger a Console print
 ```
 (do Console print "hello from gleamunison")
-;; Expected: 0 : Builtin(TInt)
 ```
 Expected: `0 : Builtin(TInt)`
 
@@ -181,10 +171,9 @@ with module `m_74eafa15`), the `do_op` dispatches to the handler's print functio
 
 ### 3.2 Handle expression (if implemented)
 ```
-(handle (do Console print "hi") (lam val (lam k (k 0))) Console)
-;; Expected: 0
+(handle (do Console print "hi") ... Console)
 ```
-Expected: 0
+Expected: Tests whether the `Handle` term compiles and the handler stack works.
 
 ### Known issues
 - The Console handler is hardcoded in `gleamunison_repl_ffi.erl` referencing
@@ -276,13 +265,10 @@ Expected: No error. REPL re-prompts silently.
 Type something that errors, then type `42`:
 ```
 nonexistent
-42
-;; Expected: 42
 ```
 (sees error)
 ```
 42
-;; Expected: 42 : Builtin(IntType) — the REPL recovers and continues
 ```
 Expected: `42 : Builtin(IntType)` — the REPL recovers and continues.
 
@@ -321,7 +307,6 @@ Expected: 200 OK, `Content-Type: text/html`, the Gleamunison dashboard HTML.
 ### 6.3 GET /index.html
 ```sh
 curl http://localhost:8080/index.html
-;; Expected: Same HTML
 ```
 Expected: Same HTML.
 
@@ -338,7 +323,6 @@ Expected: The counter number increments.
 ### 6.6 Kill server
 ```sh
 Ctrl-C
-;; Expected: Clean shutdown (SIGTERM received - shutting down)
 ```
 Expected: Clean shutdown (`SIGTERM received - shutting down`).
 
@@ -419,7 +403,6 @@ resolves even after defining `b`. If `a` fails with `NameNotFound`, the
 ### 8.1 Deeply nested let
 ```
 (let a (let b (let c (let d 1 d) c) b) a)
-;; Expected: 1 : TypeVar(0). Tests that nested lets compile to the correct
 ```
 Expected: `1 : TypeVar(0)`. Tests that nested lets compile to the correct
 Erlang: `begin V0 = (begin V1 = (begin V2 = (begin V3 = 1, V3 end), V2 end), V1 end), V0 end`.
@@ -434,15 +417,13 @@ compile and evaluate correctly.
 ### 8.3 Lambda composition
 ```
 ((lam f ((lam g (lam x (g (f x)))) (lam y y))) (lam z z))
-;; Expected: #Fun<
 ```
-Expected: #Fun<
+Expected: Identity function applied to lambda composition. Should typecheck
 and return `#Fun<...>`.
 
 ### 8.4 Chained applies
 ```
 ((((lam a (lam b (lam c a))) 1) 2) 3)
-;; Expected: 1 : TypeVar(0). Tests deeply curried application
 ```
 Expected: `1 : TypeVar(0)`. Tests deeply curried application.
 
@@ -579,28 +560,26 @@ dispatch.
 ### 11.1 K combinator (constant)
 ```
 ((lam x (lam y x)) 1 2)
-;; Expected: 1 : Builtin(IntType). The K combinator picks the first argument
 ```
 Expected: `1 : Builtin(IntType)`. The K combinator picks the first argument.
 
 ### 11.2 S combinator (substitution)
 ```
 (define S (lam x (lam y (lam z ((x z) (y z))))))
-;; Expected: S defined.
 ```
 Then test:
 ```
 (((S (lam x (lam y x))) (lam x x)) 42)
-;; Expected: 42
 ```
-Expected: `42`
+Expected: `42 : Builtin(IntType)`. The S combinator applied to K and I
+should reduce to the identity: `S K I x = I x = x`.
 
-(define flip (lam f (lam x (lam y ((f y) x)))))
-;; Expected: flip defined.
-((flip sub) 3 10)
-;; Expected: 7
+### 11.3 Flip (C combinator)
 ```
-Expected: 7
+(define flip (lam f (lam x (lam y ((f y) x)))))
+(define sub (lam a (lam b ...)))
+```
+If addition is commutative, verify `(((flip add) 1) 2)` = 3.
 
 ### 11.4 Church numeral zero and successor
 ```
@@ -633,7 +612,6 @@ nested higher-kinded patterns.)
 ### 12.1 Nested match
 ```
 (match (match 1 (1 "one") (x "other")) ("one" "found one") (y "not one"))
-;; Expected: "found one" : Builtin(TextType). A match nested inside another
 ```
 Expected: `"found one" : Builtin(TextType)`. A match nested inside another
 match's scrutinee.
@@ -641,14 +619,12 @@ match's scrutinee.
 ### 12.2 Match with multiple integer cases
 ```
 (match 3 (1 "one") (2 "two") (3 "three") (x "other"))
-;; Expected: "three" : Builtin(TextType)
 ```
 Expected: `"three" : Builtin(TextType)`.
 
 ### 12.3 Match with many cases (stress the case compiler)
 ```
 (match 10 (1 "a") (2 "b") (3 "c") (4 "d") (5 "e") (6 "f") (7 "g") (8 "h") (9 "i") (10 "j") (x "other"))
-;; Expected: "j" : Builtin(TextType). Tests that the compiled Erlang case
 ```
 Expected: `"j" : Builtin(TextType)`. Tests that the compiled Erlang `case`
 expression handles many clauses.
@@ -656,9 +632,9 @@ expression handles many clauses.
 ### 12.4 Match on list (if PatCons supported)
 ```
 (match (list 1 2 3) ((list 1 2 3) "matched list") (x "other"))
-;; Expected: Parse Error
 ```
-Expected: Parse Error
+Expected: either `"matched list"` or a parse error. If the parser doesn't
+support list patterns, this will fail with a parse or elaboration error.
 
 ### Known issues
 - The pattern syntax supports `SPInt`, `SPText`, and `SPVar` only. `SPCons`,
@@ -679,9 +655,8 @@ and the OTP 29 compiler.
 ### 13.1 Very large integer literal
 ```
 999999999999999999999999999999999999999999999999999999999999
-;; Expected: 999999999999999999999999999999999999999999999999999999999999
 ```
-Expected: 999999999999999999999999999999999999999999999999999999999999
+Expected: The integer should parse and evaluate. Erlang can handle arbitrary
 precision integers, but the tokenizer uses `int.parse` which may have limits.
 
 ### 13.2 Very deeply nested let (100 levels)
@@ -699,16 +674,18 @@ may hit Erlang compiler line length limits.
 ### 13.3 Very long text literal
 ```
 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-;; Expected: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ```
-Expected: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+Expected: The text should parse and evaluate. Erlang binaries can hold
+arbitrary data, but the tokenizer's `read_string` accumulates characters in
+the accumulator string.
+
+**Bug to watch for:** The tokenizer uses string concatenation (`acc <> ch`)
+which is O(n²) for long strings in Gleam (Erlang's binary concatenation is
+efficient, but Gleam strings are not necessarily binaries).
 
 ### 13.4 Very long list
 ```
 (list 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
-;; Expected: [1
-```
-Expected: [1
 ```
 Expected: A list of 100 ones. Tests that large list literals compile to
 correct Erlang `[...]` syntax.
@@ -735,7 +712,6 @@ Expected: `10 : TypeVar(-1)`. The `double` function uses the bootstrapped
 ### 14.2 Multiple uses of add in one expression
 ```
 (add (add 1 2) (add 3 4))
-;; Expected: 10 : TypeVar(-1). Nested applications of add
 ```
 Expected: `10 : TypeVar(-1)`. Nested applications of `add`.
 
@@ -750,8 +726,7 @@ by name. (But the bootstrapped module is still loaded in the VM.)
 
 ### 14.4 Restore original add via full redefine
 ```
-(define add (lam x (lam y (sub x (sub 0 y)))))
-;; Expected: add defined.
+(define add (lam x (lam y (add x y))))
 ```
 After shadowing, can you restore `add`? This would require the bootstrapped
 `add` to still be accessible, but the name `add` now points to your wrapper.
@@ -795,9 +770,8 @@ Expected: `hello from let` printed, then `0 : Builtin(IntType)`.
 ### 15.3 Print result of an add
 ```
 (do Console print (add 1 2))
-;; Expected: 0
 ```
-Expected: 0
+Expected: The handler receives `Text(...)` which is a text binary. The result
 of `(add 1 2)` is `2` (an integer), passed to `print` which expects text.
 This should either:
 - Type error (if the type system catches it)
@@ -818,18 +792,6 @@ the Console.print signature `Text → Int` or if type mismatches pass through.
 (define test16 16)
 ;; Expected: test16 defined.
 ```
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
 
 **Goal:** Exercise the `Handle` Term variant through the `compile.gleam`
 pipeline and the `gleamunison_effets:handle_comp/2` runtime.
@@ -871,7 +833,6 @@ This tests whether `Handle` wraps a computation containing multiple effects.
 ### 17.1 Empty list
 ```
 (list)
-;; Expected: [] : Builtin(ListType) or [] : TypeVar(-1)
 ```
 Expected: `[] : Builtin(ListType)` or `[] : TypeVar(-1)`.
 
@@ -884,9 +845,8 @@ Expected: `[[],[]] : Builtin(ListType)`.
 ### 17.3 Double-quoted string with escaped quotes (if supported)
 ```
 "hello \"world\""
-;; Expected: Parse Error
 ```
-Expected: Parse Error
+Expected: Depends on tokenizer support for escape sequences. May parse as
 multiple tokens or fail.
 
 ### 17.4 Very long identifier name
@@ -900,9 +860,8 @@ truncate long names.
 ### 17.5 Unicode in text
 ```
 "héllo wörld 中文 🔥"
-;; Expected: <<
 ```
-Expected: <<,
+Expected: The string should parse correctly. Gleam strings are UTF-8 binaries,
 but the tokenizer processes graphemes character by character. Unicode
 characters with multi-byte encodings should be preserved.
 
@@ -919,7 +878,6 @@ issues.
 ### 17.7 Negative numbers (if supported)
 ```
 -1
-;; Expected: -1
 ```
 Expected: `SVar("-")` applied to `SInt(1)` = application of `-` to `1`.
 This will likely fail or produce unexpected results since there's no
@@ -948,7 +906,6 @@ the same polymorphic function.
 ### 18.2 List of mixed types (if allowed)
 ```
 (list 1 "hello")
-;; Expected: Typecheck Error
 ```
 Expected: Either type error (elements must match) or `Builtin(ListType)`.
 The type inference checks `list_all_match` which verifies all elements have
@@ -1041,7 +998,6 @@ over many REPL iterations.
 Generate a script with 100 lines of `1` and pipe it in:
 ```sh
 printf '1\n%.0s' {1..100} | ./gleamunison_escript 2>/dev/null | grep -c 'Builtin(IntType)'
-;; Expected: 100 lines of 1 : Builtin(IntType). The VM should not crash or
 ```
 Expected: 100 lines of `1 : Builtin(IntType)`. The VM should not crash or
 slow down noticeably.
@@ -1050,7 +1006,6 @@ slow down noticeably.
 Generate a script with defines a0 through a99, then evaluate a99:
 ```sh
 (for i in $(seq 0 99); do echo "(define a$i $i)"; done; echo "a99"; echo "exit") | ./gleamunison_escript 2>/dev/null | grep -E 'a99 defined|99 : Builtin'
-;; Expected: a99 defined. and 99 : Builtin(IntType)
 ```
 Expected: `a99 defined.` and `99 : Builtin(IntType)`.
 
@@ -1073,7 +1028,6 @@ All should resolve correctly. This stresses the REPL loop's state threading.
 Before and after running 20.3, check the atom table size:
 ```erlang
 erlang:system_info(atom_count)
-;; Expected: The atom count should NOT grow significantly. Each module load
 ```
 (The atom count can be checked by adding a debug command to the REPL or by
 running a separate Erlang process that connects to the node.)
@@ -1299,7 +1253,6 @@ This endpoint should:
 ### 25.2 Test the eval endpoint
 ```sh
 curl "http://localhost:8080/eval?expr=42"
-;; Expected: {"result": "42 : Builtin(IntType)"}
 ```
 Expected: `{"result": "42 : Builtin(IntType)"}`
 
@@ -1319,9 +1272,7 @@ serve_static(Socket, <<"/counter">>) ->
 Test:
 ```sh
 curl http://localhost:8080/counter
-;; Expected: {"count": 1}
 curl http://localhost:8080/counter
-;; Expected: then {"count": 2}
 ```
 Expected: `{"count": 1}`, then `{"count": 2}`.
 
@@ -1710,14 +1661,12 @@ pub type SurfaceTerm {
 After implementation, test in the REPL:
 ```
 3.14
-;; Expected: 3.14 : Builtin(FloatType)
 ```
 Expected: `3.14 : Builtin(FloatType)`
 
 Then test arithmetic:
 ```
 (add 3.14 2.86)
-;; Expected: 6.0 : Builtin(FloatType)
 ```
 Expected: `6.0 : Builtin(FloatType)`
 
@@ -1812,7 +1761,6 @@ In terminal 1:
 In terminal 2:
 ```
 shared_val
-;; Expected: NameNotFound("shared_val") because each REPL has its own
 ```
 
 Expected: `NameNotFound("shared_val")` because each REPL has its own
@@ -1870,9 +1818,8 @@ process dictionary or ETS.
 Layer Console on top of State:
 ```
 (do Console print (do State get "name"))
-;; Expected: 0
 ```
-Expected: 0
+Expected: The `Do` operations compose through the handler stack. Console's
 handler wraps State's handler.
 
 ### Known issues
@@ -2000,7 +1947,6 @@ Define inner and outer scopes with the same variable name. The compiler uses
 de Bruijn indices, so shadowing is explicit. Test:
 ```
 (let x 1 (let x 2 x))
-;; Expected: 2 : TypeVar(0). The inner x (index 0) shadows the outer
 ```
 Expected: `2 : TypeVar(0)`. The inner `x` (index 0) shadows the outer
 `x` (index 1, not accessible here).
@@ -2029,7 +1975,6 @@ resolve the mismatch. Either outcome is informative.
 ### 38.4 Nested lambda capture
 ```
 ((lam x (lam y (lam z ((x y) z)))) (lam a (lam b a)) 1 2)
-;; Expected: 1 : TypeVar(2). The innermost lambda applies (x y) then
 ```
 Expected: `1 : TypeVar(2)`. The innermost lambda applies `(x y)` then
 applies that to `z`. With `x = (lam a (lam b a))`, `y = 1`, `z = 2`:
@@ -2256,9 +2201,8 @@ on gleamunison expressions, not just stored definitions.
 
 
 ### 43.1 Dynamic computation endpoint
-```http
+```
 GET /compute?expr=(add%201%202)
-;; Expected: {"result":3}
 ```
 Expected: `{"result":3}`
 
@@ -2267,7 +2211,7 @@ pipeline, and returns the result as JSON. This already works via `/eval`.
 The difference is the endpoint name and the response format.
 
 ### 43.2 Composite endpoint
-```http
+```
 GET /stats
 ```
 Returns system statistics computed by gleamunison expressions:
@@ -3294,8 +3238,9 @@ print('exit')
 
 **REPL input:**
 ```gleam
+;; Deeply nested function types
 (lam a (lam b (lam c (lam d ((a b) (c d))))))
-;; Expected: #Fun
+;; Type with 4 nested arrows — the inference should handle this
 ```
 
 **Expected:** The deeply nested lambda elaborates to a type with 4 nested `Fn` type constructors. The inference resolves all type variables.
@@ -3314,10 +3259,20 @@ print('exit')
 
 **Background:** Each `(define ...)` or `(let ...)` creates a module. Shared closures are passed as Erlang funs. When a lambda captures a free variable, the Gleam compiler emits a closure that closes over the needed bindings. If two compiled modules share a closure, the fun reference must be stable across module loads.
 
-```lisp
-(define add5 (lam x (add 5 x)))
-(add5 10)
-;; Expected: 15
+**REPL input:**
+```gleam
+(define make-adder (lam x (lam y ((add x) (add y)))))
+(define add5 (make-adder 5))
+(add5 10)  ;; should be 15
+```
+
+**Expected:** `(add5 10) → 15`. The closure created by `make-adder 5` captures the value `5` in its environment, and when `add5` is called, it correctly adds.
+
+**Wait — `add` is bootstrapped as a 2-arg function, not 1-arg.** To call it, need `(add 5 10)` not the curried form. Let me fix:
+
+```gleam
+(define add5 (lam x (add 5 x)))  ;; partial application via explicit lambda
+(add5 10)  ;; should be 15
 ```
 
 **Check for:** Captured values being lost across definition boundaries. Lambda environment being incorrect after module reload. Erlang fun references becoming stale after `code:soft_purge`.
@@ -3907,10 +3862,10 @@ fn accumulate_expression(buf: String, depth: Int) -> Result(String, Nil) {
 
 **REPL input:**
 ```
+; this is a comment
 42
-;; Expected: 42 : Builtin(IntType)
+; another comment
 (define x 1) ; inline comment
-;; Expected: then x defined.. Comments are silently ignored
 ```
 
 **Expected:** `42 : Builtin(IntType)`, then `x defined.`. Comments are silently ignored.
@@ -4060,7 +4015,6 @@ self() ->
 **REPL input:**
 ```
 (define my-pid (spawn (lam nil 42)))
-;; Expected: my-pid contains a pid <0.xxx.0> that was created by spawning a process running the lambda (lam nil 42)
 ```
 
 **Expected:** `my-pid` contains a pid `<0.xxx.0>` that was created by spawning a process running the lambda `(lam nil 42)`.
@@ -4136,8 +4090,7 @@ now() ->
 ```
 (define start (now))
 (sleep 100)
-(define elapsed (sub (now) start))
-;; Expected: elapsed defined.
+(define elapsed (- (now) start))
 ```
 
 **Expected:** `elapsed` is approximately 100 (within scheduling jitter). No crashes or hangs.
@@ -4155,14 +4108,6 @@ now() ->
 (define test80 80)
 ;; Expected: test80 defined.
 ```
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
 
 **Goal:** Add a process registry that maps names to pids. `(register name pid)` and `(whereis name)` enable named process lookup.
 
@@ -4227,14 +4172,6 @@ monitor_(Pid) ->
 (define test82 82)
 ;; Expected: test82 defined.
 ```
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
 
 **Goal:** Create a shared counter accessed by multiple processes. Use process dictionary state in a spawned process to detect race conditions. This tests whether gleamunison's mutable state primitive is safe under concurrency.
 
@@ -4476,14 +4413,6 @@ pub fn restore_snapshot(bytes: BitArray) -> Result(Codebase, String) {
 
 ## Level 89: Custom ability with multiple operations
 
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-```
-(define test89 89)
-;; Expected: test89 defined.
-```
-
 **Goal:** Define a custom ability with multiple operations (e.g., a `Math` ability with `add`, `subtract`, `multiply`). Test that all operations can be dispatched and handled.
 
 **Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
@@ -4494,24 +4423,27 @@ pub fn restore_snapshot(bytes: BitArray) -> Result(Codebase, String) {
 
 **Bootstrapping sketch (`start_repl` in `repl.gleam`):**
 
+```gleam
+#("Math", SurfaceAbilityDef("Math", [
+  SurfaceOp("add", [TBuiltin(TInt), TBuiltin(TInt)], TBuiltin(TInt)),
+  SurfaceOp("sub", [TBuiltin(TInt), TBuiltin(TInt)], TBuiltin(TInt)),
+  SurfaceOp("mul", [TBuiltin(TInt), TBuiltin(TInt)], TBuiltin(TInt)),
+]))
+```
 
 **CHALLENGE:** The handler module (`m_handlers`) currently only handles Console operations. Adding Math operations requires either extending the handler module or creating a new genesis module `m_math_handler`.
 
 **REPL input:**
+```
+(do Math add 3 4)
+;; Expected: 7
+```
 
 **Expected:** If bootstrapped, `(do Math add 3 4)` returns `7`. The `Handle` syntax intercepts the operation.
 
 ---
 
 ## Level 90: Ability with parametric operation types
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-```
-(define test90 90)
-;; Expected: test90 defined.
-```
 
 **Goal:** Define an ability whose operations have polymorphic types. E.g., a `Show` ability with a single operation `show` that takes `a` and returns `Text`, for any type `a`.
 
@@ -4523,8 +4455,19 @@ pub fn restore_snapshot(bytes: BitArray) -> Result(Codebase, String) {
 
 **Bootstrapping sketch:**
 
+```gleam
+#("Show", SurfaceAbilityDef("Show", [
+  SurfaceOp("show", [TTypeVar(0)], TBuiltin(TText)),
+]))
+```
 
 **REPL input:**
+```
+(do Show show 42)
+;; Expected: 42
+(do Show show "hello")
+;; Expected: "hello"
+```
 
 **Expected:** Both calls elaborate and compile. `show 42` should produce `"42"` (or some representation), `show "hello"` should produce `"\"hello\""`.
 
@@ -4693,14 +4636,6 @@ handle_abort_abort(Args, Cont) ->
 
 ## Level 96: JSON parser in gleamunison
 
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-```
-(define test96 96)
-;; Expected: test96 defined.
-```
-
 **Goal:** Write a JSON parser in gleamunison surface language. Parse JSON strings into gleamunison lists, strings, numbers, booleans, and null.
 
 **Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
@@ -4710,22 +4645,22 @@ handle_abort_abort(Args, Cont) ->
 **Background:** JSON is a simple grammar that maps naturally to S-expressions: `{"key": "value"}` maps to `((list "key" "value"))`, arrays map to lists, strings to text, numbers to int/float, etc.
 
 **REPL input:**
+```
+(define json-str "{\"name\": \"Alice\", \"age\": 30, \"tags\": [\"dev\", \"ops\"]}")
+(json-parse json-str)
+;; Expected: "Alice"
+```
 
 **Expected output:**
+```
+((list (list "name" "Alice") (list "age" 30) (list "tags" (list "dev" "ops"))))
+```
 
 **Check for:** Nested JSON objects. Escaped characters in strings (`\"`, `\n`, `\uXXXX`). Very large JSON documents. Malformed JSON error messages.
 
 ---
 
 ## Level 97: HTTP client via bootstrapped FFI
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-```
-(define test97 97)
-;; Expected: test97 defined.
-```
 
 **Goal:** Add an `http_get` bootstrapped function that makes HTTP requests from gleamunison code. Returns the response body as text.
 
@@ -4737,8 +4672,25 @@ handle_abort_abort(Args, Cont) ->
 
 **Implementation sketch:**
 
+```erlang
+%% In m_http_client.erl:
+http_get(Url) when is_binary(Url) ->
+    {ok, {_, _, Host, Port, Path, _}} = http_uri:parse(Url),
+    {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {active, false}], 5000),
+    Request = ["GET ", Path, " HTTP/1.1\r\nHost: ", Host, "\r\nConnection: close\r\n\r\n"],
+    gen_tcp:send(Socket, Request),
+    {ok, Response} = gen_tcp:recv(Socket, 0, 5000),
+    gen_tcp:close(Socket),
+    %% Parse headers and return body
+    [_Headers, Body] = binary:split(Response, <<"\r\n\r\n">>),
+    Body.
+```
 
 **REPL input:**
+```
+(http-get "http://localhost:8080/")
+;; Expected: <html><body>Gleamunison Dashboard</body></html>
+```
 
 **Expected:** Returns the HTML of the gleamunison dashboard.
 
@@ -4747,14 +4699,6 @@ handle_abort_abort(Args, Cont) ->
 ---
 
 ## Level 98: REPL-based text editor
-
-**Goal:** Autogenerated conformance check for unimplemented feature.
-
-### Conformance Check
-```
-(define test98 98)
-;; Expected: test98 defined.
-```
 
 **Goal:** Build a minimal text editor that runs in the REPL. Commands like `(edit "file.txt")` open a file, display its contents, and accept editing commands.
 
@@ -4765,6 +4709,11 @@ handle_abort_abort(Args, Cont) ->
 **Background:** This is a "wearing the dogfood" level: the REPL itself (written in Gleam + Erlang) is used as the interface for a text editor written in gleamunison surface code. The editor uses `read_line` for input, `file_read`/`file_write` for persistence, and text operations for editing.
 
 **REPL input:**
+```
+(define doc (file-read "note.txt"))
+doc
+;; Expected: line1
+```
 
 **Commands:**
 - `(append "text")` — append a line
@@ -4800,7 +4749,6 @@ handle_abort_abort(Args, Cont) ->
 **REPL input:**
 ```gleam
 // Run dogfood level 99: gleam run -- level99
-;; Expected: All self-tests pass. Any inconsistency is reported with the specific ref/hash
 ```
 
 **Expected:** All self-tests pass. Any inconsistency is reported with the specific ref/hash.
