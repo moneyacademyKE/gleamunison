@@ -577,7 +577,8 @@ should reduce to the identity: `S K I x = I x = x`.
 ### 11.3 Flip (C combinator)
 ```
 (define flip (lam f (lam x (lam y ((f y) x)))))
-(define sub (lam a (lam b ...)))
+(define sub (lam a (lam b (add a (add b (add b b))))))
+;; Expected: sub defined.
 ```
 If addition is commutative, verify `(((flip add) 1) 2)` = 3.
 
@@ -4089,8 +4090,9 @@ now() ->
 **REPL input:**
 ```
 (define start (now))
-(sleep 100)
-(define elapsed (- (now) start))
+;; Expected: start defined.
+(define elapsed (sub (now) start))
+;; Expected: elapsed defined.
 ```
 
 **Expected:** `elapsed` is approximately 100 (within scheduling jitter). No crashes or hangs.

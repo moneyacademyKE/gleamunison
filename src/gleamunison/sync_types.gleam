@@ -2,19 +2,19 @@ import gleam/dict.{type Dict}
 import gleam/set.{type Set}
 import gleamunison/identity.{type DefinitionRef}
 
-@external(erlang, "gleamunison_ffi", "sync_connect")
+@external(erlang, "gleamunison_ffi_io", "sync_connect")
 pub fn sync_connect(node: String) -> Result(Nil, String)
 
-@external(erlang, "gleamunison_ffi", "sync_send_refs")
+@external(erlang, "gleamunison_ffi_io", "sync_send_refs")
 pub fn sync_send_refs(node: String, refs: List(String)) -> Result(Nil, String)
 
-@external(erlang, "gleamunison_ffi", "sync_receive_diff")
+@external(erlang, "gleamunison_ffi_io", "sync_receive_diff")
 pub fn sync_receive_diff(node: String) -> Result(List(String), String)
 
-@external(erlang, "gleamunison_ffi", "sync_request_defs")
+@external(erlang, "gleamunison_ffi_io", "sync_request_defs")
 pub fn sync_request_defs(node: String, refs: List(String)) -> Result(List(#(String, BitArray)), String)
 
-@external(erlang, "gleamunison_ffi", "sync_push_defs")
+@external(erlang, "gleamunison_ffi_io", "sync_push_defs")
 pub fn sync_push_defs(node: String, defs: List(#(String, BitArray))) -> Result(Nil, String)
 
 pub type PeerId {

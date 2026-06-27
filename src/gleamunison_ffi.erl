@@ -2,19 +2,13 @@
 -export([
     hash_bytes/1, hash_equal/2, hash_to_hex/1,
     compile_source/1, load_binary/2, string_to_binary/1,
-    sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
-    sync_request_defs/2, sync_push_defs/2, hex_to_bytes/1,
-    unload_binary/1, corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
-    soft_purge_binary/1, test_soft_purge_scenario/0,
+    hex_to_bytes/1,
+    unload_binary/1, soft_purge_binary/1,
+    corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
+    test_soft_purge_scenario/0,
     binary_to_erl_literal/1,
     get_plain_args/0,
-    eval_expression/1,
-    state_get/1, state_set/2,
-    to_dynamic/1,
-    spawn_concurrent_evals/0
-
-
-
+    to_dynamic/1
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -89,22 +83,6 @@ load_binary(Mod, Binary) ->
         {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
     end.
 
-sync_connect(<<"test_node">>) -> {ok, nil};
-sync_connect(_Node) -> {ok, nil}.
-
-sync_send_refs(<<"test_node">>, _Refs) -> {ok, nil};
-sync_send_refs(_Node, _Refs) -> {ok, nil}.
-
-sync_receive_diff(<<"test_node">>) -> {ok, [<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>]};
-sync_receive_diff(_Node) -> {ok, []}.
-
-sync_request_defs(<<"test_node">>, [<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>]) ->
-    {ok, [{<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>, <<"dummy_blob">>}]};
-sync_request_defs(_Node, _Refs) -> {ok, []}.
-
-sync_push_defs(<<"test_node">>, _Defs) -> {ok, nil};
-sync_push_defs(_Node, _Defs) -> {ok, nil}.
-
 hex_to_bytes(Hex) when is_binary(Hex) ->
     binary:decode_hex(Hex).
 
@@ -117,20 +95,6 @@ unload_binary(Mod) ->
     code:purge(ModuleAtom),
     {ok, nil}.
 
-corrupt_handler_stack(Val) ->
-    erlang:put({gleamunison_handlers}, Val),
-    ok.
-
-assert_throws_corrupted_stack(Fun) ->
-    try
-        Fun(),
-        error(did_not_throw)
-    catch
-        error:{corrupted_handler_stack, _} -> ok;
-        error:{invalid_handler_stack, _} -> ok;
-        error:{invalid_handler, _} -> ok
-    end.
-
 soft_purge_binary(Mod) ->
     ModuleAtom = case is_binary(Mod) of
         true -> erlang:binary_to_atom(Mod, utf8);
@@ -139,6 +103,18 @@ soft_purge_binary(Mod) ->
     code:delete(ModuleAtom),
     Res = code:soft_purge(ModuleAtom),
     {ok, Res}.
+
+corrupt_handler_stack(Val) ->
+    erlang:put({gleamunison_handlers}, Val), ok.
+
+assert_throws_corrupted_stack(Fun) ->
+    try
+        Fun(), error(did_not_throw)
+    catch
+        error:{corrupted_handler_stack, _} -> ok;
+        error:{invalid_handler_stack, _} -> ok;
+        error:{invalid_handler, _} -> ok
+    end.
 
 test_soft_purge_scenario() ->
     Source = <<"-module('m_purge_test').\n-export([loop/0]).\nloop() -> timer:sleep(1000), loop().\n">>,
@@ -162,43 +138,4 @@ binary_to_erl_literal(Bin) when is_binary(Bin) ->
 get_plain_args() ->
     [list_to_binary(A) || A <- init:get_plain_arguments()].
 
-state_get(Key) when is_binary(Key) ->
-    case erlang:get(Key) of
-        undefined -> {ok, null};
-        Val -> {ok, Val}
-    end.
-
-state_set(Key, Val) when is_binary(Key) ->
-    erlang:put(Key, Val),
-    {ok, ok}.
-
-
-
-eval_expression(Expr) when is_binary(Expr) ->
-    try
-        case gleamunison@parser:parse_string(Expr) of
-            {ok, _STerm} ->
-                case gleamunison@repl:eval_string_unique(Expr) of
-                    {ok, Result} -> {ok, Result};
-                    {error, E} -> {error, E}
-                end;
-            {error, Reason} ->
-                {error, iolist_to_binary(io_lib:format("~tp", [Reason]))}
-        end
-    catch
-        Class:_Reason:Stack ->
-            {error, iolist_to_binary(io_lib:format("~p:~p at ~p", [Class, _Reason, Stack]))}
-    end.
-
 to_dynamic(X) -> X.
-
-spawn_concurrent_evals() ->
-    Parent = self(),
-    Pids = [spawn(fun() ->
-        {ok, R} = gleamunison@repl:eval_string_unique(<<"42">>),
-        Parent ! {done, R}
-    end) || _ <- lists:seq(1, 10)],
-    [receive {done, <<"42 : ", _/binary>>} -> ok after 5000 -> error(timeout) end || _ <- Pids],
-    ok.
-
-

@@ -62,7 +62,7 @@ pub fn eval_string_unique(expr: String) -> Result(String, String) {
 
 
 pub fn start_repl() -> Nil {
-  io.println("=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit.")
+  io.println("=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit. Type 'help' for builtins.")
   let init_defs = [
     #("Console", elab_types.SurfaceAbilityDef("Console", [
       elab_types.SurfaceOp("print", [elab_types.TBuiltin(elab_types.TText)], elab_types.TBuiltin(elab_types.TInt))
@@ -136,6 +136,22 @@ pub fn start_repl() -> Nil {
   repl_loop(cache, bootstrap_list)
 }
 
+fn help_text() -> String {
+  "Builtins: add + sub mul div mod eq? lt? gt? and or not\n" <>
+  "Strings:  string-concat string-length string-contains? string-slice\n" <>
+  "          string-upcase string-downcase string-replace string-split\n" <>
+  "          string-trim string->int\n" <>
+  "Lists:    list-length list-reverse list-map list-filter list-fold\n" <>
+  "          list-append list-flatten list-member? range list-sort\n" <>
+  "Pairs:    pair fst snd left right\n" <>
+  "Dicts:    dict-new dict-get dict-set set-new set-insert\n" <>
+  "IO:       read_line spawn self send recv sleep now\n" <>
+  "FFI:      json-parse http-get file-read\n" <>
+  "Abilities: Console(print) State(get set) Math(add sub mul) Show(show)\n" <>
+  "Forms:    (define name val) (lam x body) (do Ability op args...)\n" <>
+  "          (handle comp handler Ability) (match val cases...)"
+}
+
 fn repl_loop(cache: TypeCache, prev_defs: List(#(String, elab_types.SurfaceDef))) -> Nil {
   case repl_io.read_expression() {
     Error(_) -> io.println("\nBye!")
@@ -143,6 +159,10 @@ fn repl_loop(cache: TypeCache, prev_defs: List(#(String, elab_types.SurfaceDef))
       let trimmed = string.trim(line)
       case trimmed {
         "exit" | "quit" -> io.println("Bye!")
+        "help" -> {
+          io.println(help_text())
+          repl_loop(cache, prev_defs)
+        }
         "" -> repl_loop(cache, prev_defs)
         _ -> case handle_line(trimmed, cache, prev_defs) {
           Ok(#(next_cache, next_defs)) -> repl_loop(next_cache, next_defs)

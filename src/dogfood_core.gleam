@@ -79,7 +79,7 @@ pub fn level24() -> Nil {
   io.println("Level 24: OK")
 }
 
-@external(erlang, "gleamunison_ffi", "eval_expression")
+@external(erlang, "gleamunison_ffi_io", "eval_expression")
 pub fn server_eval(expr: String) -> String
 
 pub fn level25() -> Nil {
@@ -88,10 +88,10 @@ pub fn level25() -> Nil {
   io.println("Level 25: OK")
 }
 
-@external(erlang, "gleamunison_ffi", "state_get")
+@external(erlang, "gleamunison_ffi_io", "state_get")
 fn ffi_state_get(key: BitArray) -> Result(Dynamic, Dynamic)
 
-@external(erlang, "gleamunison_ffi", "state_set")
+@external(erlang, "gleamunison_ffi_io", "state_set")
 fn ffi_state_set(key: BitArray, val: BitArray) -> Result(Dynamic, Dynamic)
 
 pub fn level31() -> Nil {
@@ -107,7 +107,7 @@ pub fn level31() -> Nil {
   io.println("Level 31: OK")
 }
 
-@external(erlang, "gleamunison_ffi", "spawn_concurrent_evals")
+@external(erlang, "gleamunison_ffi_io", "spawn_concurrent_evals")
 fn ffi_spawn_concurrent_evals() -> Nil
 
 pub fn level32() -> Nil {
