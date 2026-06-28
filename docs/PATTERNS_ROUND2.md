@@ -76,5 +76,17 @@ Resolve name references vs content-addressed storage verification by separating 
 - Insert under structural `computed_ref`
 - Load under name-based `name_ref`
 
+## 10. Polled Restart Verification (Testing Pattern)
+Verify asynchronous supervisor recovery using recursive polling rather than arbitrary delays:
+```erlang
+wait_for_restart(Pid1, Retries) when Retries > 0 ->
+    case whereis(Name) of
+        Pid2 when is_pid(Pid2), Pid2 =/= Pid1 -> Pid2;
+        _ -> timer:sleep(10), wait_for_restart(Pid1, Retries - 1)
+    end;
+wait_for_restart(_, _) -> error(timeout).
+```
+
+
 
 ```

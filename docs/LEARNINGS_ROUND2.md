@@ -20,3 +20,7 @@ Running type/schema validation check guards on every push/pop operation on the p
 
 ## 7. Coordinate Tokenizer
 Tokenizing with line and column offset tracking allows recursive-descent parsers to provide detailed parse error coordinate diagnostics.
+
+## 8. Polled Recovery in Supervisor Trees
+Using a fixed delay like `timer:sleep/50` for asynchronous service recovery checks in supervisor test suites is fragile under heavy load. A recursive polling loop with retries ensures reliable test verification without timing assumptions.
+

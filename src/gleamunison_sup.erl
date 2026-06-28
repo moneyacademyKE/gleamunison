@@ -17,12 +17,22 @@ test_supervisor_restart() ->
     Pid1 = whereis(gleamunison_ets_holder),
     true = is_pid(Pid1),
     exit(Pid1, kill),
-    timer:sleep(50),
-    Pid2 = whereis(gleamunison_ets_holder),
+    Pid2 = wait_for_restart(Pid1, 100),
     true = is_pid(Pid2),
     true = (Pid1 =/= Pid2),
     exit(SupPid, kill),
     {ok, true}.
+
+wait_for_restart(Pid1, Retries) when Retries > 0 ->
+    case whereis(gleamunison_ets_holder) of
+        Pid2 when is_pid(Pid2), Pid2 =/= Pid1 -> Pid2;
+        _ ->
+            timer:sleep(10),
+            wait_for_restart(Pid1, Retries - 1)
+    end;
+wait_for_restart(_, _) ->
+    error(restart_timeout).
+
 
 init([]) ->
     SupFlags = #{strategy => one_for_one, intensity => 3, period => 5},
