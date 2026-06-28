@@ -286,11 +286,11 @@ Handler stack on the process dictionary (`$ability_stack`):
 - `validate_handler/3` checks completeness and arity at compile time
 - `check_linearity/2` validates continuation variables are used exactly once
 
-## Current Dogfood State (Post-Levels-1200)
+## Current Dogfood State (Post-Levels-1250)
 
-**Real levels**: 221 (21 core/bench + 48 v2 + 52 v3 + 50 v4 + 50 v5)
+**Real levels**: 271 (21 core/bench + 48 v2 + 52 v3 + 50 v4 + 50 v5 + 50 v6)
 **Stub levels**: 979
-**Next batch**: Levels 1201–1250 — macros, package registry, LSP protocol handlers, distributed tracing, gleam format
+**Next batch**: Levels 1251–1300 — macros, package registry, LSP protocol handlers, distributed tracing, gleam format
 
 ## Progress Tracking
 
@@ -306,18 +306,19 @@ Handler stack on the process dictionary (`$ability_stack`):
 
 - [x] 50 dogfood levels (1101–1150) — pipeline, storage, sync, REPL, abilities, errors, concurrency, dashboard, performance, integration
 - [x] 50 dogfood levels (1151–1200) — loader LRU, DETS lifecycle, jets, sync+storage, concurrency storms, error stress, effect chains, distributed, integration
-- [x] 221 total real dogfood levels (21 + 48 + 52 + 50 + 50)
+- [x] 50 dogfood levels (1201–1250) — bracket edges, parser/lexer edges, hash identity, JSON edges, crypto edges, datetime+filepath, operations deeper
+- [x] 271 total real dogfood levels (21 + 48 + 52 + 50 + 50 + 50)
 - [x] 51 unit tests pass
 
-### Next 50 Levels (1201–1250)
+### Next 50 Levels (1251–1300)
 | Range | Domain | Levels | Status |
 |---|---|---|---|
-| 1201–1206 | Macros + metaprogramming | 6 | PENDING |
-| 1207–1212 | Package registry | 6 | PENDING |
-| 1213–1218 | LSP protocol handlers | 6 | PENDING |
-| 1219–1224 | Distributed tracing | 6 | PENDING |
-| 1225–1230 | Gleam format + tooling | 6 | PENDING |
-| 1231–1236 | Production deployment | 6 | PENDING |
-| 1237–1242 | Security hardening | 6 | PENDING |
-| 1243–1248 | Documentation gen + API | 6 | PENDING |
-| 1249–1250 | Full release certification | 2 | PENDING |
+| 1251–1256 | Macros + metaprogramming | 6 | PENDING |
+| 1257–1262 | Package registry | 6 | PENDING |
+| 1263–1268 | LSP protocol handlers | 6 | PENDING |
+| 1269–1274 | Distributed tracing | 6 | PENDING |
+| 1275–1280 | Gleam format + tooling | 6 | PENDING |
+| 1281–1286 | Production deployment | 6 | PENDING |
+| 1287–1292 | Security hardening | 6 | PENDING |
+| 1293–1298 | Documentation gen + API | 6 | PENDING |
+| 1299–1300 | Full release certification | 2 | PENDING |

@@ -2,6 +2,23 @@
 
 ---
 
+## What's New in v1.1.2 (2026-06-28)
+
+Release v1.1.2 extends v1.1.1 with 50 additional dogfood conformance levels (1201–1250) covering REPL bracket counting edge cases, parser/lexer edge cases, content-addressed hash identity properties, JSON deep edge cases, crypto edge cases, datetime/filepath stress, and operations deeper. **271 real dogfood levels**, **51 unit tests**, **322 total conformance verifications across 8 playbook files**.
+
+### Dogfood Batch 6
+- **v6 (1201–1250)**: REPL bracket edges (empty, parens, strings, quote, escape, nested, deep, unclosed, extra close, multiline), parser edges (empty parens, whitespace, deep nested, nested strings, error line/col, comments), lexer edges (empty, parens, integers, floats, strings, quotes), hash identity (hex format, distinct, roundtrip, type-inclusive, all variants, genesis struct), JSON edges (flat array, empty object, large int, negative, special chars, unicode), crypto edges (huge input, hex roundtrip, SHA512 hex, zero random, large random, diff keys), datetime+filepath (1-year arithmetic, deep nesting, empty extension, bare filename), operations deeper (multi-level log, counter+gauge mixed, multi-trace)
+
+### Verified Properties
+- Bracket counter correctly handles strings, escapes, quotes
+- Lexer produces 4 tokens for `()()` (not 2)
+- Hash hex is 64 lowercase chars; SHA512 hex is 128
+- Type-inclusive hashing distinguishes Int(42) from Text("42")
+- Random 0 bytes returns empty, 4096 bytes returns 4096
+- Different keys produce different hashes
+
+---
+
 ## What's New in v1.1.1 (2026-06-28)
 
 Release v1.1.1 extends v1.1.0 with 100 additional dogfood conformance levels (1101–1200) covering loader lifecycle, storage endurance, jets, deeper sync protocol, concurrency stress, error stress, effect chains, distributed topology, and full integration certification. **221 real dogfood levels**, **51 unit tests**, **272 total conformance verifications across 7 playbook files**.
