@@ -367,6 +367,15 @@ Compiling expressions with static type errors or unresolved bindings into a dyna
 
 **Applied in:** `docs/gap-analysis-hazel.md`
 
+---
+
+## 33. Trace-Driven Variable Binding
+
+Intercepting and storing incoming dynamic payload envelopes (JSON, headers, parameters) in a queryable DETS repository. The development environment overlays these traces directly onto the editor scope, replacing static mock values with live production snapshots during logic authoring.
+
+**Applied in:** `docs/gap-analysis-darklang.md`
+
+
 
 
 

@@ -118,7 +118,9 @@ From architectural specification to production-grade content-addressed runtime.
 Phase 5 (Distributed) ──┐
                          ├──→ Phase 6 (Ecosystem: LSP, Registry, Dashboard)
                          │         │
-                         │         └──→ Phase 9 (Tooling: depends on LSP from P6)
+                         │         ├──→ Phase 9 (Tooling: depends on LSP from P6)
+                         │         │
+                         │         └──→ Phase 12 (Operations/DX: needs Dashboard from P6)
                          │
                          ├──→ Phase 7 (Language: independent; can parallel P6)
                          │         │
@@ -129,5 +131,18 @@ Phase 5 (Distributed) ──┐
                          └──→ Phase 11 (Advanced: FFI Jets, Linearity, Holes)
 ```
 
+---
+
+## Phase 12: Integrated DX & Operations (Darklang Integrations)
+
+**Goal:** Close the feedback loop between live execution context and developer editing experience.
+
+| # | Feature | Status | Effort | Description |
+|---|---|---|---|
+| 12.1 | Trace-Driven Request Interception | PENDING | S | Capture real incoming HTTP request body and headers as traces in a DETS table. |
+| 12.2 | In-Dashboard Trace Inspector | PENDING | S | Expose traces in the Web Dashboard, allowing developers to inspect live variables inside the editor. |
+| 12.3 | Lazy CAS Type Adapters | PENDING | M | Build automatic schema adapter pipelines to lazily translate old content-addressed type records to newer formats without database downtime. |
+
 Effort key: **S** = Small (days), **M** = Medium (weeks), **L** = Large (month+).
+
 

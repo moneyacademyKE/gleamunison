@@ -221,5 +221,10 @@ In algebraic effect systems, resuming a continuation multiple times (multi-shot)
 
 In live programming environments, compiling or running programs with type conflicts or missing code fragments usually fails. Hazel structures "holes" as dynamic membranes. For a content-addressed runtime on the BEAM, representing a hole as a first-class `ast.Hole` node allows incomplete codebases to typecheck and run successfully. Hitting a hole at runtime triggers an exception or algebraic effect containing the lexical environment. Combined with serializable closures, the runner can pause, serialize the stack context, allow the user to inject the replacement expression in-place, and resume execution without restarting the process.
 
+## 43. Darklang-inspired trace-driven development via request logging
+
+Modern backend debugging requires mock inputs or log extraction. Darklang binds development tightly to production infrastructure by storing real request traces. For a content-addressed language on the BEAM, implementing tracing middleware in the HTTP server that logs request headers and payload parameters to a DETS database table provides live mock contexts. Because the dashboard is unified with the runtime, developers can bind editor variables directly to historic request traces, verifying execution correctness against production payloads before publishing.
+
+
 
 

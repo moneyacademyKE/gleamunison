@@ -50,6 +50,8 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0044](0044-content-addressed-jet-registry.md) | Content-Addressed Jet Registry | Proposed |
 | [ADR-0045](0045-linearity-enforced-single-shot-continuations.md) | Linearity-Enforced Single-Shot Continuations | Proposed |
 | [ADR-0046](0046-first-class-typed-holes-and-dynamic-closures.md) | First-Class Typed Holes and Dynamic Closures | Proposed |
+| [ADR-0047](0047-trace-driven-request-interception-and-analysis.md) | Trace-Driven Request Interception and Analysis | Proposed |
+
 
 
 
