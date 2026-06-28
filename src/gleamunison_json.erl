@@ -9,9 +9,11 @@ encode(Term) ->
     end.
 
 decode(Bin) when is_binary(Bin) ->
-    case json:decode(Bin) of
+    try json:decode(Bin) of
         {ok, Term} -> {ok, erl_to_gleam(Term)};
         {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
+    catch
+        _:Reason -> {error, unicode:characters_to_binary(io_lib:format("~p", [Reason]))}
     end.
 
 erl_to_gleam(Value) when is_integer(Value) -> Value;

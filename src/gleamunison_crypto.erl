@@ -23,6 +23,9 @@ random_bytes(_) ->
 hash_to_hex(Bytes) when is_binary(Bytes) ->
     list_to_binary([io_lib:format("~2.16.0b", [X]) || <<X>> <= Bytes]).
 
+string_to_algo(<<"sha256">>) -> sha256;
+string_to_algo(<<"sha512">>) -> sha512;
+string_to_algo(<<"md5">>) -> md5;
 string_to_algo("sha256") -> sha256;
 string_to_algo("sha512") -> sha512;
 string_to_algo("md5") -> md5;
