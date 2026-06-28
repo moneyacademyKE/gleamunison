@@ -209,4 +209,7 @@ To turn mock synchronization stubs into active cluster node sharing, we can use 
 
 To turn hardcoded mocks (such as static responses for specific URLs or missing test files) into real, production-ready side-effecting operations without breaking the test runner, we can execute real operations first. If the file/connection fails and matches the test signature, we dynamically initialize the resource (e.g. write the test file to disk or return a test fallback response), ensuring that actual real code runs under the hood while maintaining test compatibility.
 
+## 40. Urbit-inspired content-addressed optimization (Jetting)
+
+In extremely simple virtual machines (like Urbit's Nock VM), execution of pure, mathematically minimal functional code is slow. Urbit solves this by using "jets"—pre-loaded native C/Rust functions that intercept execution of a code cell by matching its battery hash. For a content-addressed runtime on the BEAM, we can implement FFI Jets. If the compiler/linker recognizes a specific content-addressed function hash (e.g., standard library math, crypto, matrix calculations), it replaces/links it to a native Erlang FFI module instead of compiling the dynamic AST, maintaining pure representation with native speed.
 

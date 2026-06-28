@@ -47,4 +47,6 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0041](0041-robust-supervisor-testing-and-handler-validation-tradeoffs.md) | Robust Supervisor Testing & Handler Validation Tradeoffs | Accepted |
 | [ADR-0042](0042-supervised-ets-ownership-for-peer-sync.md) | Supervised ETS Table Ownership for Peer Sync | Accepted |
 | [ADR-0043](0043-dynamic-code-shipping-for-process-migration.md) | Dynamic Code Shipping for Process Migration | Accepted |
+| [ADR-0044](0044-content-addressed-jet-registry.md) | Content-Addressed Jet Registry | Proposed |
+
 

@@ -343,3 +343,12 @@ Enabling real P2P sync across clustered nodes by registering the active codebase
 
 **Applied in:** `gleamunison_storage.erl`, `gleamunison_ffi_io.erl`
 
+---
+
+## 30. Content-Addressed Jet Dispatch
+
+Optimizing pure, content-addressed functions by intercepting their execution path during linking/compilation, checking their definition hashes against a static registry of optimized native FFI overrides (jets), and generating native function calls instead of dynamic VM evaluations.
+
+**Applied in:** `docs/gap-analysis-hoon.md`
+
+
