@@ -1,11 +1,14 @@
 import gleam/float
 import gleam/int
 import gleam/list
+import gleam/option
 import gleam/string
 import gleamunison/ast
 import gleamunison/identity.{
   type DefinitionRef, Local, Ref, hash_to_debug_string,
 }
+import gleamunison/jets
+
 
 pub type Compiler {
   Compiler
@@ -127,10 +130,15 @@ pub fn compile_definition(
   ref: DefinitionRef,
 ) -> Result(BitArray, CompileError) {
   let m = module_name_for(ref)
-  let body = case def {
-    ast.TermDef(term:, typ: _) -> emit_term(term)
-    ast.TypeDef(_) -> "ok"
-    ast.AbilityDecl(_) -> "ok"
+  let body = case jets.get_jet(ref) {
+    option.Some(jet_body) -> jet_body
+    option.None -> {
+      case def {
+        ast.TermDef(term:, typ: _) -> emit_term(term)
+        ast.TypeDef(_) -> "ok"
+        ast.AbilityDecl(_) -> "ok"
+      }
+    }
   }
   let #(exports, stubs) = case def {
     ast.AbilityDecl(ast.AbilityDeclaration(name: _, operations: ops)) -> {
