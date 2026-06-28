@@ -351,4 +351,13 @@ Optimizing pure, content-addressed functions by intercepting their execution pat
 
 **Applied in:** `docs/gap-analysis-hoon.md`
 
+---
+
+## 31. Linearity-Tracked Continuation Checking
+
+Asserting at typecheck/elaboration time that a captured continuation variable `k` (passed to effect handlers) is referenced exactly once along all valid control flow branches. This statically prevents double-resumption stack corruption and execution leaks.
+
+**Applied in:** `docs/gap-analysis-koka.md`
+
+
 

@@ -213,3 +213,8 @@ To turn hardcoded mocks (such as static responses for specific URLs or missing t
 
 In extremely simple virtual machines (like Urbit's Nock VM), execution of pure, mathematically minimal functional code is slow. Urbit solves this by using "jets"—pre-loaded native C/Rust functions that intercept execution of a code cell by matching its battery hash. For a content-addressed runtime on the BEAM, we can implement FFI Jets. If the compiler/linker recognizes a specific content-addressed function hash (e.g., standard library math, crypto, matrix calculations), it replaces/links it to a native Erlang FFI module instead of compiling the dynamic AST, maintaining pure representation with native speed.
 
+## 41. Koka-inspired linearity-enforced effect continuation execution
+
+In algebraic effect systems, resuming a continuation multiple times (multi-shot) or dropping it completely (zero-shot) complicates execution pipelines and memory allocations. Koka tracks linearity at the type system level, distinguishing single-shot continuations. For a content-addressed language on the BEAM, enforcing linearity check invariants in the Hindley-Milner type inference engine statically ensures that a continuation parameter `k` is executed exactly once in each branch, avoiding runtime failures and double-resumption stack pollution without requiring complex segmented stacks.
+
+
