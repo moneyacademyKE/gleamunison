@@ -24,3 +24,7 @@ Tokenizing with line and column offset tracking allows recursive-descent parsers
 ## 8. Polled Recovery in Supervisor Trees
 Using a fixed delay like `timer:sleep/50` for asynchronous service recovery checks in supervisor test suites is fragile under heavy load. A recursive polling loop with retries ensures reliable test verification without timing assumptions.
 
+## 9. Transient Table Ownership in RPC Connected Nodes
+Named ETS tables created by RPC connection worker processes are deleted when the RPC finishes and the transient worker process terminates. Initializing shared ETS tables in a long-lived, supervisor-backed background process is necessary to ensure state persistence across RPC lifecycles.
+
+

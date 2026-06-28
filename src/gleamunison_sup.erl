@@ -55,6 +55,8 @@ start_holder() ->
             _ -> ok
         end,
         try ets:new(gleamunison_store_sup, [set, public, named_table]) catch _:_ -> ok end,
+        try ets:new(gleamunison_peer_refs, [set, public, named_table]) catch _:_ -> ok end,
         receive after infinity -> ok end
     end),
     {ok, Pid}.
+

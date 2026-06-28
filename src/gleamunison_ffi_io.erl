@@ -125,14 +125,6 @@ sync_push_defs(NodeBin, Defs) ->
     end.
 
 register_peer_refs(PeerNode, Refs) ->
-    try ets:whereis(gleamunison_peer_refs) of
-        undefined ->
-            ets:new(gleamunison_peer_refs, [set, public, named_table]);
-        _ ->
-            ok
-    catch _:_ ->
-        ets:new(gleamunison_peer_refs, [set, public, named_table])
-    end,
     ets:insert(gleamunison_peer_refs, {PeerNode, Refs}),
     ok.
 

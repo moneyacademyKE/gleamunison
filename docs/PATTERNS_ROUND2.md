@@ -87,6 +87,18 @@ wait_for_restart(Pid1, Retries) when Retries > 0 ->
 wait_for_restart(_, _) -> error(timeout).
 ```
 
+## 11. Supervised Named ETS Creation (Ownership Pattern)
+Prevent table reclamation in transient multi-process/RPC contexts by creating public named tables under a supervised background process on startup:
+```erlang
+start_holder() ->
+    Pid = spawn_link(fun() ->
+        ets:new(gleamunison_peer_refs, [set, public, named_table]),
+        receive after infinity -> ok end
+    end),
+    {ok, Pid}.
+```
+
+
 
 
 ```
