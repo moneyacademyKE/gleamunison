@@ -43,4 +43,6 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0037](0037-repl-eval-io-decomposition.md) | REPL Eval/IO Decomposition | Accepted |
 | [ADR-0038](0038-type-pretty-module.md) | Type Pretty-Printing Module | Accepted |
 | [ADR-0039](0039-in-memory-compilation-and-live-distributed-sync.md) | In-Memory Compilation and Live Distributed Sync | Accepted |
+| [ADR-0040](0040-production-builtins-real-io-http.md) | Production-Grade Genesis Builtins (Real File I/O & HTTP) | Accepted |
+
 
