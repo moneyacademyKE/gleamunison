@@ -2,6 +2,25 @@
 
 ---
 
+## What's New in v1.0.0 (2026-06-28)
+
+Release v1.0.0 addresses critical supervisor test flakiness and transient ETS table lifetime issues.
+
+### 1. Robust Supervisor Restart Testing
+- Implemented a recursive `wait_for_restart/2` polling helper in `gleamunison_sup.erl`, replacing fragile `timer:sleep(50)` timing assumptions.
+- Ensures flake-free test suite execution under high concurrency.
+
+### 2. Supervised ETS Table Ownership
+- Decoupled `gleamunison_peer_refs` named ETS table lifetime from transient RPC execution processes by initializing it under the supervisor-backed `ets_holder` worker process.
+- Prevents silent table deletion when RPC calls exit.
+
+### 3. Architectural Gap Analysis & ADRs
+- Performed thorough Rich Hickey Gap Analyses for Unison 1.0 feature parity and transient ETS table lifetimes.
+- Added ADR-0041 and ADR-0042 documenting these design constraints and implementations.
+- Updated project learnings and design patterns playbooks.
+
+---
+
 ## What's New in v0.9.0 (2026-06-27)
 
 Phase 6.1 Dynamic Web Dashboard + Phase 7.1 Tagged Unions. **28 Gleam modules**, **96 source files** (4,639 lines), **1.2 MB escript**, 24 files changed (+688 / -177).
