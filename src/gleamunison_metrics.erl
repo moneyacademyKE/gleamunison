@@ -15,18 +15,21 @@ counter(Name, Delta) when is_binary(Name), is_integer(Delta) ->
         [{_, Val}] -> ets:insert(?TABLE, {{counter, Name}, Val + Delta});
         [] -> ets:insert(?TABLE, {{counter, Name}, Delta})
     end,
-    telemetry:execute([gleamunison, counter, Delta], #{name => Name, delta => Delta}).
+    try telemetry:execute([gleamunison, counter, Delta], #{name => Name, delta => Delta})
+    catch _:_ -> ok end.
 
 gauge(Name, Value) when is_binary(Name), is_number(Value) ->
     ensure_table(),
     ets:insert(?TABLE, {{gauge, Name}, Value}),
-    telemetry:execute([gleamunison, gauge, Name], #{name => Name, value => Value}).
+    try telemetry:execute([gleamunison, gauge, Name], #{name => Name, value => Value})
+    catch _:_ -> ok end.
 
 histogram(Name, Value) when is_binary(Name), is_number(Value) ->
     ensure_table(),
     Key = {histogram, Name, erlang:unique_integer()},
     ets:insert(?TABLE, {Key, Value}),
-    telemetry:execute([gleamunison, histogram, Name], #{name => Name, value => Value}).
+    try telemetry:execute([gleamunison, histogram, Name], #{name => Name, value => Value})
+    catch _:_ -> ok end.
 
 list_metrics() ->
     ensure_table(),

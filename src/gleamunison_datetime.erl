@@ -5,10 +5,10 @@ now() ->
     erlang:system_time(second).
 
 now_iso8601() ->
-    calendar:system_time_to_rfc3339(erlang:system_time(second), [{offset, "Z"}]).
+    list_to_binary(calendar:system_time_to_rfc3339(erlang:system_time(second), [{offset, "Z"}])).
 
 format_iso8601(Timestamp) when is_integer(Timestamp) ->
-    calendar:system_time_to_rfc3339(Timestamp, [{unit, second}, {offset, "Z"}]).
+    list_to_binary(calendar:system_time_to_rfc3339(Timestamp, [{unit, second}, {offset, "Z"}])).
 
 from_iso8601(IsoString) when is_binary(IsoString) ->
     try calendar:rfc3339_to_system_time(binary_to_list(IsoString), [{unit, second}]) of

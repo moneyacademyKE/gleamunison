@@ -11,10 +11,9 @@ interpolate(Template, Vars) when is_binary(Template), is_list(Vars) ->
 do_interpolate(<<"{{", Rest/binary>>, Vars, Acc) ->
     case binary:split(Rest, <<"}}">>) of
         [VarName, After] ->
-            Var = binary_to_list(VarName),
-            Value = case lists:keyfind(Var, 1, Vars) of
-                {Var, V} -> safe_to_binary(V);
-                false -> throw({template_error, list_to_binary("undefined variable: " ++ Var)})
+            Value = case lists:keyfind(VarName, 1, Vars) of
+                {VarName, V} -> safe_to_binary(V);
+                false -> throw({template_error, <<"undefined variable: ", VarName/binary>>})
             end,
             do_interpolate(After, Vars, <<Acc/binary, Value/binary>>);
         _ ->
