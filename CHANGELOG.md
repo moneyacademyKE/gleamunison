@@ -2,6 +2,24 @@
 
 ---
 
+## What's New in v1.1.1 (2026-06-28)
+
+Release v1.1.1 extends v1.1.0 with 100 additional dogfood conformance levels (1101–1200) covering loader lifecycle, storage endurance, jets, deeper sync protocol, concurrency stress, error stress, effect chains, distributed topology, and full integration certification. **221 real dogfood levels**, **51 unit tests**, **272 total conformance verifications across 7 playbook files**.
+
+### Dogfood Batches 4–5
+- **v4 (1101–1150)**: Pipeline phases, storage adapters, sync protocol, REPL edges, ability handler validation, error recovery, concurrency primitives, dashboard API, performance stress, integration
+- **v5 (1151–1200)**: Loader lifecycle (creation, LRU eviction, idempotent load), DETS lifecycle (open/insert/close/reopen), bulk insert (200 ops), jet registry lookup, sync+storage integration, 5000-counter concurrency storm, extreme float + Unicode text values, deeply nested match, all 15 AST variant hashes, full module integration
+
+### Verified Properties
+- Loader LRU eviction with limit=3 correctly evicts oldest loaded module
+- DETS persistence across reopen retains inserted bytes
+- Unicode text (`"你好世界🌍"`) hashes and inserts cleanly
+- Jet hash 123 returns known jet body; arbitrary hashes return None
+- 15 AST variants all hash deterministically
+- 5000 concurrent counter ops complete without race conditions
+
+---
+
 ## What's New in v1.1.0 (2026-06-28)
 
 Release v1.1.0 completes all remaining small-to-medium roadmap items across Phases 7-12, delivering a standard library, production operations tooling, advanced language features, and Darklang trace integrations. **40 Gleam modules**, **70+ Erlang FFI files**, all 51 tests passing.

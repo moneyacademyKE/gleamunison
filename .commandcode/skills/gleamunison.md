@@ -286,11 +286,11 @@ Handler stack on the process dictionary (`$ability_stack`):
 - `validate_handler/3` checks completeness and arity at compile time
 - `check_linearity/2` validates continuation variables are used exactly once
 
-## Current Dogfood State (Post-Levels-1150)
+## Current Dogfood State (Post-Levels-1200)
 
-**Real levels**: 171 (21 core/bench + 48 v2 + 52 v3 + 50 v4)
+**Real levels**: 221 (21 core/bench + 48 v2 + 52 v3 + 50 v4 + 50 v5)
 **Stub levels**: 979
-**Next batch**: Levels 1151–1200 — macros, package registry, LSP protocol handlers, distributed tracing, gleam format, deployment, security, docs
+**Next batch**: Levels 1201–1250 — macros, package registry, LSP protocol handlers, distributed tracing, gleam format
 
 ## Progress Tracking
 
@@ -305,18 +305,19 @@ Handler stack on the process dictionary (`$ability_stack`):
 - [x] Fixed JSON decode — catch exceptions from json:decode
 
 - [x] 50 dogfood levels (1101–1150) — pipeline, storage, sync, REPL, abilities, errors, concurrency, dashboard, performance, integration
-- [x] 171 total real dogfood levels (21 + 48 + 52 + 50)
+- [x] 50 dogfood levels (1151–1200) — loader LRU, DETS lifecycle, jets, sync+storage, concurrency storms, error stress, effect chains, distributed, integration
+- [x] 221 total real dogfood levels (21 + 48 + 52 + 50 + 50)
 - [x] 51 unit tests pass
 
-### Next 50 Levels (1151–1200)
+### Next 50 Levels (1201–1250)
 | Range | Domain | Levels | Status |
 |---|---|---|---|
-| 1151–1156 | Macros + metaprogramming | 6 | PENDING |
-| 1157–1162 | Package registry | 6 | PENDING |
-| 1163–1168 | LSP protocol handlers | 6 | PENDING |
-| 1169–1174 | Distributed tracing | 6 | PENDING |
-| 1175–1180 | Gleam format + tooling | 6 | PENDING |
-| 1181–1186 | Production deployment | 6 | PENDING |
-| 1187–1192 | Security hardening | 6 | PENDING |
-| 1193–1198 | Documentation gen + API | 6 | PENDING |
-| 1199–1200 | Full release certification | 2 | PENDING |
+| 1201–1206 | Macros + metaprogramming | 6 | PENDING |
+| 1207–1212 | Package registry | 6 | PENDING |
+| 1213–1218 | LSP protocol handlers | 6 | PENDING |
+| 1219–1224 | Distributed tracing | 6 | PENDING |
+| 1225–1230 | Gleam format + tooling | 6 | PENDING |
+| 1231–1236 | Production deployment | 6 | PENDING |
+| 1237–1242 | Security hardening | 6 | PENDING |
+| 1243–1248 | Documentation gen + API | 6 | PENDING |
+| 1249–1250 | Full release certification | 2 | PENDING |

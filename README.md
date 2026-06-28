@@ -67,7 +67,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Project State
 
-**Production-grade runtime (Phases 0–12 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 1150 playbook conformance levels (171 real implementations, 51 unit tests, 0 failures). **v1.1.0** adds standard library (http, json, datetime, filepath, crypto, template), production ops (logging, metrics, health, config, runbook), language features (guard clauses, holes, use, labeled args, type aliases), Darklang traces, linearity enforcement, and CAS adapters.
+**Production-grade runtime (Phases 0–12 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 1200 playbook conformance levels (221 real implementations, 51 unit tests, 0 failures). **v1.1.0** adds standard library (http, json, datetime, filepath, crypto, template), production ops (logging, metrics, health, config, runbook), language features (guard clauses, holes, use, labeled args, type aliases), Darklang traces, linearity enforcement, CAS adapters, plus the loader lifecycle, jets, storage endurance, and full integration test batches.
 
 | Step | Status |
 |---|---|
@@ -105,7 +105,7 @@ The standalone binary (`gleamunison_escript`) contains the full content-addresse
 
 If you already have Erlang installed, this is as close to a zero-install language runtime as it gets.
 
-## Modules (40 Gleam source modules, 70+ Erlang FFI files, 52 genesis modules, 171 real dogfood levels)
+## Modules (40 Gleam source modules, 70+ Erlang FFI files, 52 genesis modules, 221 real dogfood levels)
 
 | Module | Concern | Status |
 |---|---|---|
