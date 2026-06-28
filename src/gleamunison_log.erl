@@ -15,6 +15,6 @@ ensure_table() ->
     case ets:whereis(?ETS_TABLE) of
         undefined ->
             ets:new(?ETS_TABLE, [ordered_set, public, named_table]),
-            ets:insert(?ETS_TABLE, 0);
+            ets:insert(?ETS_TABLE, {erlang:unique_integer()});
         _ -> ok
     end.

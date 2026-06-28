@@ -60,7 +60,7 @@ fn range(start: Int, end: Int) -> List(Int) {
 }
 
 fn run_all_levels(levels: dict.Dict(String, fn() -> Nil)) -> Nil {
-  let r = range(1, 1000)
+  let r = range(1, 1050)
   list.each(r, fn(n) {
     let key = "level" <> int.to_string(n)
     case dict.get(levels, key) {
@@ -68,7 +68,7 @@ fn run_all_levels(levels: dict.Dict(String, fn() -> Nil)) -> Nil {
       Error(_) -> Nil
     }
   })
-  io.println("=== All 1000 levels complete ===")
+  io.println("=== All 1050 levels complete ===")
 }
 
 fn print_help() -> Nil {
@@ -76,6 +76,6 @@ fn print_help() -> Nil {
   io.println("Usage: gleam run -- <command>")
   io.println("  server [port]   — start web server (default port 8080)")
   io.println("  repl            — interactive REPL")
-  io.println("  all             — run all levels (1-1000)")
-  io.println("  levelN          — run level N (1-1000)")
+  io.println("  all             — run all levels (1-1050)")
+  io.println("  levelN          — run level N (1-1050)")
 }
