@@ -46,3 +46,5 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0040](0040-production-builtins-real-io-http.md) | Production-Grade Genesis Builtins (Real File I/O & HTTP) | Accepted |
 | [ADR-0041](0041-robust-supervisor-testing-and-handler-validation-tradeoffs.md) | Robust Supervisor Testing & Handler Validation Tradeoffs | Accepted |
 | [ADR-0042](0042-supervised-ets-ownership-for-peer-sync.md) | Supervised ETS Table Ownership for Peer Sync | Accepted |
+| [ADR-0043](0043-dynamic-code-shipping-for-process-migration.md) | Dynamic Code Shipping for Process Migration | Accepted |
+
