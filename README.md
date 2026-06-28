@@ -33,9 +33,37 @@ Gleamunison combines the type-safe concurrency of the BEAM (via Gleam) with Unis
 
 Gleamunison combines the scheduling, distribution, and runtime efficiency of the BEAM with the content-addressing and algebraic effects constraints of Unison:
 
-1. **Zero-Downtime Stateful Actor Upgrades**: Hot-swapping active actor code on-the-fly without state loss. Standard Gleam module updates clash on name/version collisions, and Unison lacks native actor scheduling. Gleamunison addresses both.
-2. **Decoupled Multi-tenant Sandboxing**: Running untrusted third-party plugins concurrently where namespaces are isolated by hash, and capabilities (like IO/network) are dynamically sandboxed by wrapping compilation thunks in algebraic effects `Handle` terms.
-3. **Resilient P2P Job Stealing**: Edge computing nodes dynamically pulling (`pull_sync`), structurally verifying, local-compiling, and running job definitions securely.
+### Hot-Upgrades & Evolution
+1. **Zero-Downtime Stateful Actor Upgrades**: Hot-swapping active actor code on-the-fly without state loss. Standard Gleam module updates clash on name collisions; Gleamunison addresses this by compiling into hash-named modules.
+2. **Stateful Chatbot Hot-Upgrades**: Preserve active user conversation states in Erlang actors. Swaps the actor message-handling loop to a new hash definition on the fly without state or connection loss.
+3. **IoT Firmware Hot-Patching**: IoT devices download modular function hashes instead of heavy firmware images, updating local logic dynamically without device resets.
+4. **Dynamic API Gateways**: Route HTTP requests based on endpoint definition hashes, dynamically compiling and loading handlers on demand.
+
+### Secure Sandboxing & Multitenancy
+5. **Decoupled Multi-tenant Sandboxing**: Run untrusted plugins concurrently. Process boundaries isolate resource usage, while algebraic effects intercept and sandbox system actions (file, network).
+6. **Zero-Trust Serverless Executions**: Execute third-party thunks securely. The host caps execution time via process CPU schedulers and restricts access using custom effect handlers.
+7. **Capabilities-as-Code**: Database and network handles are represented strictly as abilities. User code only typechecks if the required abilities match their group access privileges.
+8. **Sandbox Game Modding**: Run game modding scripts in isolated BEAM processes. Mod APIs are exposed as abilities, preventing malicious access to the host filesystem.
+
+### Distributed Compute & Edge topographies
+9. **Resilient P2P Job Stealing**: Edge nodes dynamically pull, structurally verify, locally compile, and run job definitions by hash.
+10. **Live Process Migration**: Serialize a running actor's continuation closure, ship it to a remote node, sync missing code dependencies via pull protocol, and resume execution.
+11. **Zero-Config Clustered Map-Reduce**: Parallelize map-reduce workflows. Code dependencies are automatically resolved and shipped by the runtime on target locations using Merkle sync.
+12. **Edge-Cloud Compute Offloading**: IoT devices offload heavy compute thunks to BEAM cloud nodes, verifying code integrity by hash to prevent remote exploits.
+13. **Content-Addressable CDN Handlers**: CDNs compile custom request handlers, push them to edge nodes by hash, and process CDN requests concurrently on edge processes.
+14. **P2P Software Distribution**: Sync codebases incrementally. Nodes exchange root hashes and request only missing modules, reducing patching bandwidth.
+
+### Determinism, Auditing & Tools
+15. **Time-Traveling Replay Debugging**: Capture trace logs of execution. Replay the exact execution path deterministically using mock clock/random effect handlers.
+16. **Distributed Event Sourcing with Code Auditing**: Event stores record event payloads alongside the handler's hash, allowing historic events to be replayed with the exact code version.
+17. **Smart Contract Workflows**: Execute decentralized workflows. All state mutations and payments are modeled as abilities, sandboxed by host-defined contract handlers.
+18. **Multi-Tenant Concurrent Parsers**: Compile user-provided parser grammar thunks. Preemptive BEAM scheduling prevents a single bad parsing loop from blocking others.
+19. **Self-Documenting Code Registries**: Code definitions are hashed and immutable. Documentation and tests are linked directly to hashes; renaming never breaks documentation.
+20. **Immutable Cloud Shell**: Run interactive REPL sessions where every expression is compiled and stored. Keeps old module versions in memory for historic comparisons.
+21. **Content-Addressable Microservices**: Services call others by passing function hashes over RPC. The runtime resolves, syncs, and loads the code dynamically.
+22. **Decentralized Knowledge Graph**: A wiki-like graph where nodes are content-addressed definitions and links are type-safe references forming a Merkle DAG.
+23. **Reproducible Monte Carlo Simulations**: Replay complex stochastic simulations by mock-handling random generator and timer abilities using fixed seeds.
+
 
 ## Project State
 
