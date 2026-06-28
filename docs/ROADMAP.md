@@ -100,6 +100,18 @@ From architectural specification to production-grade content-addressed runtime.
 | 10.6 | Distributed tracing | L | OpenTelemetry integration, typed span propagation |
 | 10.7 | Operations runbook | S | `docs/OPERATIONS.md`: deploy, configure, monitor, upgrade, troubleshoot |
 
+---
+
+## Phase 11: Advanced Paradigms (Urbit, Koka, & Hazel Integrations)
+
+**Goal:** Incorporate bleeding-edge optimization, correctness, and live development paradigms into the core compiler and runtime.
+
+| # | Feature | Status | Effort | Description |
+|---|---|---|---|
+| 11.1 | FFI Compiler Jets | ✓ DONE | S | Map pure content-addressed function hashes directly to native Erlang/Gleam overrides, avoiding dynamic compilation overhead. |
+| 11.2 | Linearity-Enforced Continuations | PENDING | M | Statically verify at typecheck time that captured continuation variables `k` are resumed exactly once, preventing stack corruption. |
+| 11.3 | First-Class Typed Holes | PENDING | M | Support holes `?` as membranes. Compile code with holes to runtime suspensions, allowing interactive fill-and-resume workflows. |
+
 ### Phase Dependency Graph
 
 ```
@@ -108,11 +120,14 @@ Phase 5 (Distributed) ──┐
                          │         │
                          │         └──→ Phase 9 (Tooling: depends on LSP from P6)
                          │
-                         └──→ Phase 7 (Language: independent; can parallel P6)
-                                   │
-                                   └──→ Phase 8 (Stdlib: needs P7 type features)
-                                             │
-                                             └──→ Phase 10 (Operations: needs P8 stdlib)
+                         ├──→ Phase 7 (Language: independent; can parallel P6)
+                         │         │
+                         │         └──→ Phase 8 (Stdlib: needs P7 type features)
+                         │                   │
+                         │                   └──→ Phase 10 (Operations: needs P8 stdlib)
+                         │
+                         └──→ Phase 11 (Advanced: FFI Jets, Linearity, Holes)
 ```
 
 Effort key: **S** = Small (days), **M** = Medium (weeks), **L** = Large (month+).
+

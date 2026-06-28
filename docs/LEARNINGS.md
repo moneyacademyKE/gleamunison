@@ -217,4 +217,9 @@ In extremely simple virtual machines (like Urbit's Nock VM), execution of pure, 
 
 In algebraic effect systems, resuming a continuation multiple times (multi-shot) or dropping it completely (zero-shot) complicates execution pipelines and memory allocations. Koka tracks linearity at the type system level, distinguishing single-shot continuations. For a content-addressed language on the BEAM, enforcing linearity check invariants in the Hindley-Milner type inference engine statically ensures that a continuation parameter `k` is executed exactly once in each branch, avoiding runtime failures and double-resumption stack pollution without requiring complex segmented stacks.
 
+## 42. Hazel-inspired live execution via dynamic hole closures
+
+In live programming environments, compiling or running programs with type conflicts or missing code fragments usually fails. Hazel structures "holes" as dynamic membranes. For a content-addressed runtime on the BEAM, representing a hole as a first-class `ast.Hole` node allows incomplete codebases to typecheck and run successfully. Hitting a hole at runtime triggers an exception or algebraic effect containing the lexical environment. Combined with serializable closures, the runner can pause, serialize the stack context, allow the user to inject the replacement expression in-place, and resume execution without restarting the process.
+
+
 

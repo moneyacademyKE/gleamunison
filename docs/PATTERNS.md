@@ -359,5 +359,14 @@ Asserting at typecheck/elaboration time that a captured continuation variable `k
 
 **Applied in:** `docs/gap-analysis-koka.md`
 
+---
+
+## 32. First-Class Hole Execution Membrane
+
+Compiling expressions with static type errors or unresolved bindings into a dynamic `Hole` membrane that preserves local scope. When execution runs into the hole, the runtime suspends the actor, capturing its serialized continuation and context for interactive fill-and-resume debugging.
+
+**Applied in:** `docs/gap-analysis-hazel.md`
+
+
 
 
