@@ -225,6 +225,30 @@ In live programming environments, compiling or running programs with type confli
 
 Modern backend debugging requires mock inputs or log extraction. Darklang binds development tightly to production infrastructure by storing real request traces. For a content-addressed language on the BEAM, implementing tracing middleware in the HTTP server that logs request headers and payload parameters to a DETS database table provides live mock contexts. Because the dashboard is unified with the runtime, developers can bind editor variables directly to historic request traces, verifying execution correctness against production payloads before publishing.
 
+## 44. Double-effect of removing semicolons from case branches
+
+Gleam v1.0+ removed semicolons as whitespace separators in case branches. Branches must now use only newlines (or pipe syntax) as separators. Case arms like `Ok(s) -> s; Error(_) -> ""` cause compile errors. The correct form is `Ok(s) -> s` followed by `Error(_) -> ""` on the next line, or using `_ -> ""` as a catch-all. This aligns with the Gleam philosophy of structural clarity over syntactic flexibility.
+
+## 45. `bit_array.to_string/1` returns Result, not String
+
+The Gleam standard library's `bit_array.to_string/1` returns `Result(String, Nil)`, not a bare `String`. This means every conversion from binary to string requires either explicit unwrapping or a helper function. A common pattern is a local `unpack` helper: `fn unpack(b) { case bit_array.to_string(b) { Ok(s) -> s _ -> "" } }`. This design prevents silent data loss from invalid UTF-8 but adds syntactic overhead to every string conversion.
+
+## 46. Labeled argument pattern matching requires destructuring
+
+Gleam's custom types with labeled fields (like `ast.Lambda(binder: LocalVar, body: Term)`) can't be partially matched in a case arm. A pattern like `ast.Lambda(binder: _, body) -> body` fails because labeled arguments must be complete. The workaround is to match the constructor with `..` (wildcard for all fields), then destructure with a let-binding: `ast.Lambda(..) -> { let ast.Lambda(binder: _, body: b) = term; b }`.
+
+## 47. Erlang BIF name conflicts with module exports
+
+The Erlang BIF `apply/2` shadows any module-exported function named `apply/2`. When exporting a helper `apply/2` from a custom Erlang module, the compiler warns "function apply/2 undefined, did you mean apply/3?". The fix is to rename the export to a non-conflicting name (e.g., `adapt/2`). This applies to any BIF name (`apply`, `spawn`, `list_to_binary`, etc.).
+
+## 48. Guard clauses compound the hashing contract
+
+Adding a `Guard` field to `ast.Case` means every constructor/case in the codebase must provide a guard value. This cascades through the hasher, compiler, elaboration, parser, and all test files. Content-addressing means structural changes to the AST ripple universally. The pattern for backward-compatible AST extension is to add a new field with a default value (`option.None`) and update all constructors atomically.
+
+## 49. Property-based testing with `rand` over `random`
+
+Erlang/OTP 27+ deprecates the `random` module in favor of `rand`. Property-based testing generators (`int_gen`, `bool_gen`, `list_gen`) should use `rand:uniform/1` instead of `random:uniform/1` to avoid deprecation warnings and ensure cryptographic-quality randomness.
+
 
 
 

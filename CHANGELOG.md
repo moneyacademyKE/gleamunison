@@ -2,6 +2,55 @@
 
 ---
 
+## What's New in v1.1.0 (2026-06-28)
+
+Release v1.1.0 completes all remaining small-to-medium roadmap items across Phases 7-12, delivering a standard library, production operations tooling, advanced language features, and Darklang trace integrations. **40 Gleam modules**, **70+ Erlang FFI files**, all 51 tests passing.
+
+### 1. Language Features (Phase 7)
+- **Labeled arguments** (7.2): `(fn* ((x 1) (y 2)) body)` — curried lambda sugar with defaults via parser/elaborator desugaring.
+- **Guard clauses** (7.3): `(match x ((n (< n 5)) body))` — AST `Guard` type, parser support, Erlang `when` clause emission, full hashing.
+- **`use` expression** (7.4): `(use x <- call body)` — desugars to `call(fn(x) { body })`. AST `Use` variant, compiler lambda-passing.
+- **pub opaque type** (7.5): `SurfacePubTypeAlias` variant with controlled constructor visibility.
+- **Type alias export control** (7.6): `SurfaceTypeAlias` + `SurfacePubTypeAlias` through full elaboration pipeline.
+
+### 2. Standard Library (Phase 8)
+- **HTTP client** (8.1): `gleamunison/http_client` — `get`, `post`, `put`, `delete` with opaque `HttpResponse`. Wraps `httpc`.
+- **JSON codec** (8.2): `gleamunison/json` — `encode`/`decode` wrapping Erlang `json`. Dynamic typing for schema-free handling.
+- **DateTime** (8.3): `gleamunison/datetime` — opaque `DateTime`, ISO 8601 parse/format, `add_seconds`/`diff_seconds`.
+- **Filepath** (8.4): `gleamunison/filepath` — opaque `Path`, `join`, `parent`, `extension`, `with_extension`, `is_absolute`.
+- **Crypto** (8.5): `gleamunison/crypto` — SHA256/512, MD5, HMAC, `random_bytes`, hex output.
+- **Template** (8.6): `gleamunison/template` — `{{var}}` interpolation with HTML-safe escaping.
+- **Stdlib docs** (8.7): `docs/stdlib/index.html` — full module reference with function signatures.
+
+### 3. Developer Tooling (Phase 9)
+- **Property-based testing** (9.4): `gleamunison_property.erl` — `check/2` with generators (`int_gen`, `bool_gen`, `list_gen`).
+- **File watcher** (9.5): `scripts/watch.sh` — auto-rebuild on change, optional `--test` mode.
+- **Error codes** (9.6): Elm/Rust-style `[P001]`–`[P004]` parse errors + `[E001]`–`[E005]` type errors with fix suggestions.
+
+### 4. Production Operations (Phase 10)
+- **Structured logging** (10.1): `gleamunison/log` — `debug`/`info`/`warn`/`error` with context dict, ETS-backed persistence.
+- **Metrics** (10.2): `gleamunison/metrics` — `counter`/`gauge`/`histogram` with `:telemetry` integration.
+- **Configuration** (10.4): `gleamunison/config` — env/TOML/CLI precedence, typed `get_string`/`get_int`/`get_bool`.
+- **Health checks** (10.5): `gleamunison/health` — `run_all/0`, `readiness/0`, `/api/health` endpoint.
+- **Operations runbook** (10.7): `docs/OPERATIONS.md` — deploy, configure, monitor, upgrade, troubleshoot, backup.
+
+### 5. Advanced Paradigms (Phase 11)
+- **Linearity enforcement** (11.2): `check_linearity/2` in inference engine — validates continuation variables used exactly once.
+- **First-class typed holes** (11.3): `ast.Hole` variant — `?` parses to hole, compiles to `erlang:error({hole, ...})`.
+
+### 6. Darklang Integrations (Phase 12)
+- **Trace capture** (12.1): `gleamunison_trace.erl` — DETS-backed HTTP request trace with method/path/headers.
+- **Trace inspector** (12.2): `/api/traces` and `/api/traces/:id` dashboard endpoints with SSE push.
+- **CAS type adapters** (12.3): `gleamunison_adapters.erl` — ETS adapter registry. ADR-0048 architecture document.
+
+### 7. LSP Infrastructure
+- `docs/LSP.md` — full protocol spec, capabilities matrix, editor integration guide.
+
+### 8. Ability System
+- `InferenceError.LinearityViolation` type added for runtime diagnostics.
+
+---
+
 ## What's New in v1.0.0 (2026-06-28)
 
 Release v1.0.0 addresses critical supervisor test flakiness and transient ETS table lifetime issues.

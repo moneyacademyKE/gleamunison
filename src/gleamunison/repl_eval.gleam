@@ -89,16 +89,38 @@ fn format_elab_error(
     elab_types.NameNotFound(name) -> {
       let suggestions = find_suggestions(name, prev_defs)
       case suggestions {
-        [] -> "NameNotFound(\"" <> name <> "\")"
-        _ ->
-          "NameNotFound(\""
+        [] ->
+          "[E001] undefined variable `"
           <> name
-          <> "\"). Did you mean: "
+          <> "`. Define it with (define "
+          <> name
+          <> " <expr>)."
+        _ ->
+          "[E001] undefined variable `"
+          <> name
+          <> "`. Did you mean: "
           <> string.join(suggestions, ", ")
-          <> "?"
+          <> "? Define it with (define "
+          <> name
+          <> " <expr>)."
       }
     }
-    _ -> string.inspect(err)
+    elab_types.UnknownOperation(ab, op) ->
+      "[E002] unknown operation `"
+      <> op
+      <> "` in ability `"
+      <> ab
+      <> "`. Check the ability declaration for available operations."
+    elab_types.MissingAbilityDecl(ab) ->
+      "[E003] undefined ability `"
+      <> ab
+      <> "`. Declare it with (ability "
+      <> ab
+      <> " (op1 args ret) ...)."
+    elab_types.InferFailed(msg) ->
+      "[E004] type error: " <> msg <> ". The expression could not be type-checked."
+    elab_types.UnsupportedTypeRef(desc) ->
+      "[E005] unsupported type reference: " <> desc <> "."
   }
 }
 

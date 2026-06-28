@@ -79,5 +79,23 @@ handle_route(Socket, <<"/api/logs">>) ->
     gleamunison_http_routes:handle_logs_route(Socket);
 handle_route(Socket, <<"/api/modules">>) ->
     gleamunison_http_routes:handle_enhanced_modules_route(Socket);
+handle_route(Socket, <<"/api/traces">>) ->
+    gleamunison_http_routes:handle_traces_route(Socket);
+handle_route(Socket, <<"/api/traces/", Id/binary>>) ->
+    gleamunison_http_routes:handle_trace_detail_route(Socket, Id);
+handle_route(Socket, <<"/api/health">>) ->
+    handle_health_route(Socket);
 handle_route(Socket, Path) ->
     gleamunison_http_routes:serve_static(Socket, Path).
+
+handle_health_route(Socket) ->
+    {_Node, ModCount, _MemMB} = gleamunison_health:node_status(),
+    Status = case ModCount > 0 of
+        true -> <<"healthy">>;
+        false -> <<"unhealthy">>
+    end,
+    Json = iolist_to_binary(io_lib:format(
+        "{\"status\":\"~s\",\"loaded_modules\":~p}",
+        [Status, ModCount])),
+    gleamunison_http_util:send_json(Socket, 200, Json).
+

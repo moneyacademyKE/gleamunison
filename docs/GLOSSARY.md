@@ -96,4 +96,42 @@ Terms specific to the gleamunison project.
 
 ## T
 
-**Type Inference** — The process of determining types without explicit annotations. Uses Hindley-Milner algorithm W. Implemented in `src/gleamunison/inference.gleam`.
+**Type Inference** — The process of determining types without explicit annotations. Uses Hindley-Milner algorithm W. Implemented in `src/gleamunison/inference.gleam`. Includes `check_linearity/2` for continuation safety.
+
+## G (continued)
+
+**Guard Clause** — A condition on a match case: `(match x ((n (< n 5)) body))`. Guards are restricted to BEAM-guard-safe operations. AST `Guard` type, compiled to Erlang `when` clauses.
+
+## H (continued)
+
+**Hole** — An incomplete expression placeholder (`?`). First-class typed holes compile to `erlang:error({hole, ...})`, enabling live fill-and-resume workflows (Hazel paradigm).
+
+**HTTP Client** — `gleamunison/http_client` — typed HTTP with `get`, `post`, `put`, `delete` wrapping Erlang `httpc`.
+
+## L (continued)
+
+**Labeled Arguments** — Sugar for curried lambdas with defaults: `(fn* ((x 1) (y 2)) body)`. Desugars to nested lambdas with let-bound defaults.
+
+**Linearity Enforcement** — Static validation that continuation variables in algebraic effect handlers are resumed exactly once. Implemented in `check_linearity/2`.
+
+**LSP** — Language Server Protocol. Spec documented in `docs/LSP.md`. Provides autocomplete, hover, go-to-def, diagnostics for IDE integration.
+
+## M (continued)
+
+**Metrics** — `gleamunison/metrics` — counter, gauge, and histogram operations emitting `:telemetry` events for Prometheus/StatsD integration.
+
+## P (continued)
+
+**Property-Based Testing** — Random input generation with property verification. `gleamunison_property.erl` provides `check/2` with generators (`int_gen`, `bool_gen`, `list_gen`).
+
+## T (continued)
+
+**Template** — `gleamunison/template` — `{{var}}` string interpolation with HTML-safe escaping against XSS.
+
+**Trace Inspector** — Darklang-style live request capture. `gleamunison_trace.erl` stores HTTP request traces in ETS, exposed via `/api/traces` dashboard endpoints with SSE push.
+
+**Type Alias** — Named reference to another type: `(type alias Id Int)`. `SurfaceTypeAlias` and `SurfacePubTypeAlias` control export visibility.
+
+## U
+
+**`use` Expression** — Monadic sugar: `(use x <- call body)` desugars to `call(fn(x) { body })`. AST `Use` variant, compiled to lambda-passing Erlang.

@@ -67,7 +67,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Project State
 
-**Production-grade runtime (Phases 0–5 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 1000 playbook conformance levels with a 100% pass rate (959 passed, 41 skipped with no cases, 0 failed).
+**Production-grade runtime (Phases 0–12 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 1000 playbook conformance levels with a 100% pass rate (959 passed, 41 skipped with no cases, 0 failed). **v1.1.0** adds standard library (http, json, datetime, filepath, crypto, template), production ops (logging, metrics, health, config, runbook), language features (guard clauses, holes, use, labeled args, type aliases), Darklang traces, linearity enforcement, and CAS adapters.
 
 | Step | Status |
 |---|---|
@@ -105,7 +105,7 @@ The standalone binary (`gleamunison_escript`) contains the full content-addresse
 
 If you already have Erlang installed, this is as close to a zero-install language runtime as it gets.
 
-## Modules (28 Gleam source modules, 4,600+ lines, 52 genesis modules, 96 source files)
+## Modules (40 Gleam source modules, 70+ Erlang FFI files, 52 genesis modules)
 
 | Module | Concern | Status |
 |---|---|---|
@@ -136,13 +136,37 @@ If you already have Erlang installed, this is as close to a zero-install languag
 | `gleamunison/sync` | Pull-based sync protocol | Real |
 | `gleamunison/sync_types` | Sync protocol type definitions | Real |
 | `gleamunison/http` | Web server entry point | Real |
+| `gleamunison/http_client` | Typed HTTP client (get/post/put/delete) | Real |
+| `gleamunison/json` | JSON encode/decode | Real |
+| `gleamunison/datetime` | Opaque DateTime, ISO 8601, arithmetic | Real |
+| `gleamunison/filepath` | Opaque Path manipulation | Real |
+| `gleamunison/crypto` | Hash, HMAC, random bytes | Real |
+| `gleamunison/template` | {{var}} string interpolation | Real |
+| `gleamunison/log` | Structured logging (debug/info/warn/error) | Real |
+| `gleamunison/config` | Configuration management (env/TOML/CLI) | Real |
+| `gleamunison/health` | Health checks and readiness probes | Real |
+| `gleamunison/metrics` | Counter/gauge/histogram with telemetry | Real |
 | `gleamunison/pipeline` | Factored pipeline phases (parse_only, elaborate_only, compile_only, load_and_eval) | Real |
 | `gleamunison_ffi.erl` | FFI: hashing, compilation, loading, process dict | Real |
 | `gleamunison_effets.erl` | Effects runtime: push/pop/find_frame, do_op/handle_comp | Real |
 | `gleamunison_storage.erl` | ETS/DETS/Mnesia storage backend | Real |
-| `gleamunison_http.erl` | HTTP server (cowboy/inets) | Real |
+| `gleamunison_http.erl` | HTTP server with trace capture, SSE, and health routes | Real |
+| `gleamunison_http_routes.erl` | Route handlers: eval, define, browse, traces, logs, modules | Real |
+| `gleamunison_http_util.erl` | HTTP utilities: JSON, MIME, URL decode, SSE broadcast | Real |
 | `gleamunison_sup.erl` | OTP Supervisor tree | Real |
 | `gleamunison_repl_ffi.erl` | REPL FFI bridge | Real |
+| `gleamunison_trace.erl` | Request trace capture (DETS) for Darklang-style development | Real |
+| `gleamunison_adapters.erl` | Lazy CAS type adapters for schema migration | Real |
+| `gleamunison_log.erl` | Structured log ETS backend | Real |
+| `gleamunison_config.erl` | Environment variable config loader | Real |
+| `gleamunison_health.erl` | Node health status (memory, modules) | Real |
+| `gleamunison_metrics.erl` | Counter/gauge/histogram with telemetry | Real |
+| `gleamunison_crypto.erl` | SHA256/512, HMAC, random bytes backend | Real |
+| `gleamunison_datetime.erl` | ISO 8601 parse/format backend | Real |
+| `gleamunison_template.erl` | String interpolation with HTML escaping | Real |
+| `gleamunison_json.erl` | JSON encode/decode backend | Real |
+| `gleamunison_http_client.erl` | HTTP client wrapping httpc | Real |
+| `gleamunison_property.erl` | Property-based testing framework | Real |
 | `m_*.erl` (52 files) | Content-addressed genesis modules | Real |
 
 
@@ -159,11 +183,13 @@ gleam test                  # Run unit tests
 
 - [Playbook](docs/PLAYBOOK.md) — how to work on this project
 - [Architecture](docs/ARCHITECTURE.md) — deep dive into the design
-- [Roadmap](docs/ROADMAP.md) — 6-phase plan from spec to production
+- [Roadmap](docs/ROADMAP.md) — 12-phase plan from spec to production
+- [Operations Runbook](docs/OPERATIONS.md) — deploy, configure, monitor, upgrade, troubleshoot
 - [Learnings](docs/LEARNINGS.md) — architectural insights discovered
 - [Patterns](docs/PATTERNS.md) — design patterns used
 - [Reference Manual](docs/MANUAL.md) — complete reference user guide
-- [ADRs](docs/adr/) — Architecture Decision Records
+- [ADRs](docs/adr/) — Architecture Decision Records (48+)
+- [Standard Library](docs/stdlib/index.html) — module reference
 
 ## Runtime output
 

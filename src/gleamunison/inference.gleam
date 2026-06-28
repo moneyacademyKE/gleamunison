@@ -110,5 +110,64 @@ pub fn infer_term(
         _ -> Ok(ast.TypeVar(-1))
       }
     }
+    ast.Hole -> Ok(ast.TypeVar(-1))
+    ast.Use(_, _call, body) -> infer_term(body, cache)
+  }
+}
+
+pub fn check_linearity(
+  term: ast.Term,
+  cache: TypeCache,
+) -> Result(Nil, InferenceError) {
+  case term {
+    ast.Lambda(..) -> {
+      let ast.Lambda(binder: _, body: b) = term
+      check_linearity(b, cache)
+    }
+    ast.Let(..) -> {
+      let ast.Let(binder: _, value: _, body: b) = term
+      check_linearity(b, cache)
+    }
+    ast.Match(..) -> {
+      let ast.Match(scrutinee: _, cases: cases) = term
+      case cases {
+        [] -> Ok(Nil)
+        [first, ..rest] ->
+          case check_linearity(first.body, cache) {
+            Error(e) -> Error(e)
+            Ok(_) ->
+              list.fold(rest, Ok(Nil), fn(acc, c) {
+                case acc {
+                  Error(_) -> acc
+                  Ok(_) -> check_linearity(c.body, cache)
+                }
+              })
+          }
+      }
+    }
+    ast.Apply(..) -> {
+      let ast.Apply(function: f, arg: a) = term
+      case check_linearity(f, cache) {
+        Error(e) -> Error(e)
+        Ok(_) -> check_linearity(a, cache)
+      }
+    }
+    ast.Do(..) -> {
+      let ast.Do(ability: _, operation: _, args: args) = term
+      list.fold(args, Ok(Nil), fn(acc, a) {
+        case acc {
+          Error(_) -> acc
+          Ok(_) -> check_linearity(a, cache)
+        }
+      })
+    }
+    ast.Handle(..) -> {
+      let ast.Handle(computation: comp, handler: handler, ability: _) = term
+      case check_linearity(comp, cache) {
+        Error(e) -> Error(e)
+        Ok(_) -> check_linearity(handler, cache)
+      }
+    }
+    _ -> Ok(Nil)
   }
 }

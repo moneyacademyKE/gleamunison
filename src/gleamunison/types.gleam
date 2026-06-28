@@ -28,6 +28,7 @@ pub type InferenceError {
   InfiniteType(variable: Int, typ: ast.Type)
   UnhandledAbility(ast.AbilityRef)
   ImpureContext(ast.Requirement)
+  LinearityViolation(term: String, expected: String)
 }
 
 pub type HandlerError {

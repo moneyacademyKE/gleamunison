@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gleamunison Standard Library — v1.1.0</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 2em; background: #0d1117; color: #c9d1d9; }
+  h1 { border-bottom: 2px solid #30363d; padding-bottom: 0.3em; color: #58a6ff; }
+  h2 { margin-top: 2em; color: #f0883e; }
+  h3 { color: #d2a8ff; }
+  .module { background: #161b22; border: 1px solid #30363d; padding: 1em; margin: 0.8em 0; border-radius: 6px; }
+  .fn { margin: 0.3em 0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9em; }
+  .fn strong { color: #79c0ff; }
+  code { background: #1c2128; padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.9em; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+  th, td { padding: 0.5em; border: 1px solid #30363d; text-align: left; }
+  th { background: #161b22; }
+  .new { background: #1b3a1b; padding: 0.1em 0.4em; border-radius: 3px; font-size: 0.8em; color: #7ee787; }
+  footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #30363d; color: #8b949e; font-size: 0.85em; }
+  a { color: #58a6ff; }
+</style>
+</head>
+<body>
+<h1>Gleamunison Standard Library</h1>
+<p>Version 1.1.0 — Content-addressed language runtime on the BEAM</p>
+
+<h2>Core Modules</h2>
+
+<div class="module">
+<h3>gleamunison/identity</h3>
+<p>Content-addressed identity primitives. Opaque Hash type, SHA256 hashing, definition references, local variables (de Bruijn indices), and 40+ genesis builtins.</p>
+<div class="fn"><strong>hash_bytes/1</strong> — Compute SHA256 hash from bytes</div>
+<div class="fn"><strong>hash_equal/2</strong> — Compare two hashes for equality</div>
+<div class="fn"><strong>hash_to_debug_string/1</strong> — Hex string for display</div>
+<div class="fn"><strong>builtin_int_add/0</strong> — Genesis builtin: integer addition</div>
+<div class="fn"><strong>builtin_http_get/0</strong> — Genesis builtin: HTTP GET</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/ast</h3>
+<p>Core AST types: Type, Term (15 variants), Pattern, Case (with optional Guard), Definition, Unit. All identity is structural — no names in the AST.</p>
+<div class="fn"><strong>Term</strong> — Int, Float, Text, List, Lambda, Apply, Let, Match, Do, Handle, Construct, Hole <span class="new">NEW</span>, Use <span class="new">NEW</span></div>
+<div class="fn"><strong>Guard</strong> <span class="new">NEW</span> — GuardTerm wrapping a BEAM-guard-safe Term</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/types</h3>
+<p>Type checking infrastructure: TypeCache, InferenceError (with LinearityViolation <span class="new">NEW</span>), HandlerError, validate_handler.</p>
+<div class="fn"><strong>validate_handler/3</strong> — Compile-time handler validation against ability declarations</div>
+<div class="fn"><strong>check_linearity/2</strong> <span class="new">NEW</span> — Validate continuation variables used exactly once</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/compile</h3>
+<p>Erlang source generation from AST, in-memory compilation via erl_scan/erl_parse, and module loading. Supports Guard <span class="new">NEW</span>, Hole <span class="new">NEW</span>, and Use <span class="new">NEW</span> variants.</p>
+<div class="fn"><strong>compile_definition/3</strong> — Compile a Definition to BEAM binary</div>
+<div class="fn"><strong>module_name_for/1</strong> — Generate m_ prefixed module name from hash</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/codebase</h3>
+<p>Content-addressed definition store. Hash-of-definition computation for all 15 Term variants, insertion with hash verification.</p>
+<div class="fn"><strong>hash_of_definition/1</strong> — Compute SHA256 hash from AST + inferred type</div>
+<div class="fn"><strong>insert/2</strong> — Insert verified definitions into codebase</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/effects</h3>
+<p>Algebraic effects runtime: HandlerFrame, OpHandler, RuntimeConfig.</p>
+<div class="fn"><strong>run/2</strong> — Execute computation with ambient handler stack</div>
+</div>
+
+<h2>Standard Library</h2>
+
+<div class="module">
+<h3>gleamunison/http_client <span class="new">NEW</span></h3>
+<p>Typed HTTP client wrapping Erlang httpc. Opaque HttpResponse with status code, headers, and body.</p>
+<div class="fn"><strong>get/1</strong> — HTTP GET request</div>
+<div class="fn"><strong>post/2</strong> — HTTP POST with binary body</div>
+<div class="fn"><strong>put/2</strong> — HTTP PUT with binary body</div>
+<div class="fn"><strong>delete/1</strong> — HTTP DELETE request</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/json <span class="new">NEW</span></h3>
+<p>JSON encode/decode wrapping Erlang json. Dynamic typing for schema-free handling.</p>
+<div class="fn"><strong>encode/1</strong> — Encode any Erlang term to JSON binary</div>
+<div class="fn"><strong>decode/1</strong> — Decode JSON binary to dynamic term</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/datetime <span class="new">NEW</span></h3>
+<p>Typed date/time with opaque DateTime. ISO 8601 parsing and formatting.</p>
+<div class="fn"><strong>now/0</strong> — Current timestamp as DateTime</div>
+<div class="fn"><strong>now_iso8601/0</strong> — Current time as ISO 8601 string</div>
+<div class="fn"><strong>from_iso8601/1</strong> — Parse ISO 8601 string to DateTime</div>
+<div class="fn"><strong>to_iso8601/1</strong> — Format DateTime to ISO 8601 string</div>
+<div class="fn"><strong>add_seconds/2, diff_seconds/2</strong> — DateTime arithmetic</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/filepath <span class="new">NEW</span></h3>
+<p>Typed path manipulation — never raw strings. Opaque Path type with absolute/relative tracking.</p>
+<div class="fn"><strong>from_string/1</strong> — Parse string to Path</div>
+<div class="fn"><strong>join/2</strong> — Join segment to Path</div>
+<div class="fn"><strong>parent/1</strong> — Get parent directory Path</div>
+<div class="fn"><strong>extension/1</strong> — Get file extension</div>
+<div class="fn"><strong>with_extension/2</strong> — Replace file extension</div>
+<div class="fn"><strong>is_absolute/1</strong> — Check if path is absolute</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/crypto <span class="new">NEW</span></h3>
+<p>Typed cryptographic operations wrapping Erlang crypto module.</p>
+<div class="fn"><strong>hash/2</strong> — Compute hash (SHA256, SHA512, MD5)</div>
+<div class="fn"><strong>hmac/3</strong> — Compute HMAC with key</div>
+<div class="fn"><strong>random_bytes/1</strong> — Generate cryptographically strong random bytes</div>
+<div class="fn"><strong>hash_hex/2</strong> — Hash with hexadecimal output</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/template <span class="new">NEW</span></h3>
+<p>Compile-time safe string interpolation with HTML escaping via <code>{{var}}</code> syntax.</p>
+<div class="fn"><strong>render/2</strong> — Interpolate variables into template string</div>
+</div>
+
+<h2>Operations</h2>
+
+<div class="module">
+<h3>gleamunison/log <span class="new">NEW</span></h3>
+<p>Structured logging with debug/info/warn/error levels, context dictionaries, and ETS-backed persistence.</p>
+<div class="fn"><strong>debug/1, info/1, warn/1, error/1</strong> — Level-logged messages</div>
+<div class="fn"><strong>debug_context/2, info_context/2, warn_context/2, error_context/2</strong> — Log with context dict</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/config <span class="new">NEW</span></h3>
+<p>Configuration management with env/TOML/CLI precedence.</p>
+<div class="fn"><strong>load/0</strong> — Load from environment variables</div>
+<div class="fn"><strong>with_cli/2</strong> — Override with CLI values (highest precedence)</div>
+<div class="fn"><strong>get/2</strong> — Get value by key (CLI > TOML > env)</div>
+<div class="fn"><strong>get_string/2, get_int/2, get_bool/2</strong> — Typed getters</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/health <span class="new">NEW</span></h3>
+<p>Health checks and readiness probes for production operation.</p>
+<div class="fn"><strong>run_all/0</strong> — Run default memory and module checks</div>
+<div class="fn"><strong>run_checks/1</strong> — Run custom health check list</div>
+<div class="fn"><strong>readiness/0</strong> — Boolean: is node ready to serve?</div>
+</div>
+
+<div class="module">
+<h3>gleamunison/metrics <span class="new">NEW</span></h3>
+<p>Counter, gauge, and histogram operations with :telemetry integration.</p>
+<div class="fn"><strong>counter/2</strong> — Increment named counter</div>
+<div class="fn"><strong>gauge/2</strong> — Set named gauge value</div>
+<div class="fn"><strong>histogram/2</strong> — Record histogram observation</div>
+</div>
+
+<h2>HTTP API Reference</h2>
+
+<table>
+<tr><th>Endpoint</th><th>Description</th><th>Version</th></tr>
+<tr><td><code>GET /api/health</code></td><td>Health check (status, loaded_modules)</td><td><span class="new">v1.1</span></td></tr>
+<tr><td><code>GET /api/status</code></td><td>Node status, memory, uptime</td><td>v0.9</td></tr>
+<tr><td><code>GET /api/processes</code></td><td>Process list with memory/reductions/queue</td><td>v0.9</td></tr>
+<tr><td><code>GET /api/modules</code></td><td>Loaded module list with sizes and timestamps</td><td>v0.9</td></tr>
+<tr><td><code>GET /api/traces</code></td><td>Request trace log (method, path, headers)</td><td><span class="new">v1.1</span></td></tr>
+<tr><td><code>GET /api/traces/:id</code></td><td>Trace detail view</td><td><span class="new">v1.1</span></td></tr>
+<tr><td><code>GET /api/events</code></td><td>SSE event stream (eval, define, trace events)</td><td>v0.9</td></tr>
+<tr><td><code>GET /api/logs</code></td><td>Structured log entries (last 50)</td><td>v0.9</td></tr>
+<tr><td><code>GET /api/sync-status</code></td><td>Genesis count, loaded modules, beam files</td><td>v0.9</td></tr>
+<tr><td><code>GET /api/redefinitions</code></td><td>Recent redefinitions with timestamps</td><td>v0.9</td></tr>
+<tr><td><code>GET /eval?expr=...</code></td><td>Evaluate S-expression</td><td>v0.9</td></tr>
+<tr><td><code>GET /define?name=...&expr=...</code></td><td>Define named term</td><td>v0.9</td></tr>
+<tr><td><code>GET /counter</code></td><td>Increment and return request counter</td><td>v0.9</td></tr>
+<tr><td><code>GET /browse</code></td><td>List notebook definitions</td><td>v0.9</td></tr>
+</table>
+
+<footer>
+  Generated by gleamunison stdlib doc generator. Version 1.1.0. <a href="../ROADMAP.md">Roadmap</a> · <a href="../ARCHITECTURE.md">Architecture</a> · <a href="../MANUAL.md">Manual</a>
+</footer>
+</body>
+</html>

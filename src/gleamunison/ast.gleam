@@ -1,3 +1,4 @@
+import gleam/option.{type Option}
 import gleamunison/identity.{type DefinitionRef, type LocalVar}
 
 pub type Type {
@@ -44,10 +45,16 @@ pub type Term {
   Do(ability: DefinitionRef, operation: LocalVar, args: List(Term))
   Handle(computation: Term, handler: Term, ability: DefinitionRef)
   Construct(ctor_ref: DefinitionRef, args: List(Term))
+  Hole
+  Use(binder: LocalVar, call: Term, body: Term)
 }
 
 pub type Case {
-  Case(pattern: Pattern, body: Term)
+  Case(pattern: Pattern, guard: Option(Guard), body: Term)
+}
+
+pub type Guard {
+  GuardTerm(term: Term)
 }
 
 pub type Pattern {

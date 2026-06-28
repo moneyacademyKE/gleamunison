@@ -6,10 +6,11 @@ import gleamunison/elab_def
 import gleamunison/elab_types.{
   type ElaborateError, type SurfaceDef, type SurfaceUnit, InferFailed,
   SurfaceAbilityDef, SurfaceTermDef, SurfaceTypeDef, SurfaceUnit,
+  SurfaceTypeAlias, SurfacePubTypeAlias,
 }
-import gleamunison/identity.{type DefinitionRef, Ref}
+import gleamunison/identity.{type DefinitionRef, Local, Ref}
 import gleamunison/typecheck
-import gleamunison/types.{type TypeCache}
+import gleamunison/types.{type TypeCache, CTType, TypeCache}
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
 fn string_to_binary(_s: String) -> BitArray
@@ -77,6 +78,11 @@ pub fn elaborate_unit(
                   elab_def.elab_type_def(t, ref, current_cache)
                 SurfaceAbilityDef(_, ops) ->
                   elab_def.elab_ability_def(ops, ref, current_cache)
+                SurfaceTypeAlias(_, _) | SurfacePubTypeAlias(_, _) -> {
+                  let next_cache =
+                    TypeCache(dict.insert(current_cache.entries, ref, CTType))
+                  Ok(#(ast.TypeDef(ast.Structural(Local(0), [], [])), next_cache))
+                }
               }
               case res {
                 Ok(#(def, next_cache)) ->

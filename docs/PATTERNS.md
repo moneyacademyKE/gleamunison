@@ -375,7 +375,56 @@ Intercepting and storing incoming dynamic payload envelopes (JSON, headers, para
 
 **Applied in:** `docs/gap-analysis-darklang.md`
 
+---
 
+## 34. Guard Clause Guard Emission
 
+Adding an optional `Guard` field to match case constructors that compiles to Erlang `when` clauses for BEAM-guard-safe conditional pattern matching. Works by emitting the guard term as opaque Erlang source between the pattern and `->`. All case constructors must provide a guard value (typically `option.None`).
 
+**Applied in:** `ast.gleam`, `compile.gleam`, `codebase.gleam`, `parser.gleam`
+
+---
+
+## 35. Desugar `use` to Lambda-Passing
+
+The `use` expression (`(use x <- call body)`) is not a runtime primitive but a compile-time transformation: it desugars to `call(fn(x) { body })` by wrapping the body in a lambda and applying it as the last argument to the call expression. This is the standard Gleam monadic convention.
+
+**Applied in:** `ast.gleam`, `compile.gleam`, `elab_term.gleam`, `parser.gleam`
+
+---
+
+## 36. CAS Adapter Registry Pattern
+
+Lazy type migration uses an ETS table (`gleamunison_adapters`) mapping `{old_hash, new_hash}` pairs to pure adapter functions. On access, the codebase layer checks if the requested definition hash has an adapter registered. If so, the adapter runs transparently, converting old data to the new format without downtime or bulk migration.
+
+**Applied in:** `gleamunison_adapters.erl`, `docs/adr/0048-cas-type-adapters.md`
+
+---
+
+## 37. Erlang `bit_array.to_string` Unpack Helper
+
+Since `gleam/bit_array.to_string/1` returns `Result(String, Nil)`, every binary-to-string conversion needs unwrapping. A local `unpack` helper pattern avoids repetition:
+```gleam
+fn unpack(b: BitArray) -> String {
+  case bit_array.to_string(b) { Ok(s) -> s _ -> "" }
+}
+```
+
+**Applied in:** `http_client.gleam`, `datetime.gleam`, `template.gleam`
+
+---
+
+## 38. Avoid Erlang BIF Names in Module Exports
+
+Erlang BIFs like `apply/2`, `spawn/1`, and `list_to_binary/1` shadow any module-exported functions with the same name and arity. Custom modules must avoid these names. Use alternatives like `adapt/2`, `start_task/1`, or `to_bin/1`.
+
+**Applied in:** `gleamunison_adapters.erl`
+
+---
+
+## 39. Telemetry-Integrated Metrics
+
+Metrics are recorded via ETS for local queries and simultaneously emitted as `:telemetry` events for external reporters (Prometheus, StatsD). This dual-write pattern ensures zero-config local monitoring while supporting production-grade observability infrastructure.
+
+**Applied in:** `gleamunison_metrics.erl`, `metrics.gleam`
 

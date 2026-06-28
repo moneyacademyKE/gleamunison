@@ -38,8 +38,8 @@ pub fn hash_term_distinct_test() {
 }
 
 pub fn hash_term_canonical_test() {
-  let m1 = ast.Match(ast.Int(1), [ast.Case(ast.PatInt(1), ast.Int(42))])
-  let m2 = ast.Match(ast.Int(1), [ast.Case(ast.PatInt(2), ast.Int(42))])
+  let m1 = ast.Match(ast.Int(1), [ast.Case(ast.PatInt(1), option.None, ast.Int(42))])
+  let m2 = ast.Match(ast.Int(1), [ast.Case(ast.PatInt(2), option.None, ast.Int(42))])
   let def1 = TermDef(m1, ast.Builtin(ast.IntType))
   let def2 = TermDef(m2, ast.Builtin(ast.IntType))
   let h1 = hash_of_definition(def1)
@@ -48,7 +48,7 @@ pub fn hash_term_canonical_test() {
 }
 
 pub fn type_inference_match_test() {
-  let m = ast.Match(ast.Int(1), [ast.Case(ast.PatInt(1), ast.Int(42))])
+  let m = ast.Match(ast.Int(1), [ast.Case(ast.PatInt(1), option.None, ast.Int(42))])
   let assert Ok(ast.Builtin(ast.IntType)) = infer_term(m, empty_cache())
 }
 

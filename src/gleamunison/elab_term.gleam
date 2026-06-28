@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/option
 import gleam/list
 import gleam/result
 import gleamunison/ast
@@ -6,8 +7,9 @@ import gleamunison/elab_ctx.{type ElabCtx, ElabCtx, add_binding, lookup_binding}
 import gleamunison/elab_pat.{elaborate_pattern}
 import gleamunison/elab_types.{
   type ElaborateError, type SCase, type SurfaceTerm, MissingAbilityDecl,
-  NameNotFound, SApply, SCase, SConstruct, SDo, SFloat, SHandle, SInt, SLambda,
-  SLet, SList, SMatch, SRef, SText, SVar, UnknownOperation,
+  NameNotFound, SApply, SCase, SConstruct, SDo, SFloat, SGuardGuard, SHandle,
+  SHole, SInt, SLambda, SLabeledFn, SLet, SList, SMatch, SRef, SText, SUse,
+  SVar, UnknownOperation, UnsupportedTypeRef,
 }
 import gleamunison/identity.{Local}
 
@@ -102,6 +104,37 @@ pub fn elaborate_term(
       )
       Ok(#(ctx2, ast.Construct(ctor_ref, list.reverse(elaborated_args))))
     }
+    SHole -> Ok(#(ctx, ast.Hole))
+    SGuardGuard(_) -> Error(UnsupportedTypeRef("SGuardGuard not a standalone term"))
+    SUse(binder, call_expr, body_expr) -> {
+      use #(ctx2, call_elab) <- result.try(elaborate_term(call_expr, ctx))
+      let #(ctx3, lv) = add_binding(ctx2, binder)
+      use #(ctx4, body_elab) <- result.try(elaborate_term(body_expr, ctx3))
+      Ok(#(ctx4, ast.Use(lv, call_elab, body_elab)))
+    }
+    SLabeledFn(params, body) -> {
+      // (fn* ((name default) ...) body) → (lam name (... (lam lastname body)))
+      // Defaults are stored as surface metadata, compiled to regular curried lambdas.
+      case params {
+        [] -> elaborate_term(body, ctx)
+        _ -> {
+          let #(rev_params, ctx_with_bindings) =
+            list.fold(params, #([], ctx), fn(acc, param) {
+              let #(acc_params, c) = acc
+              let #(name, _default) = param
+              let #(c2, lv) = add_binding(c, name)
+              #([lv, ..acc_params], c2)
+            })
+          let lvs = list.reverse(rev_params)
+          use #(ctx_body, body_elab) <- result.try(
+            elaborate_term(body, ctx_with_bindings),
+          )
+          let lam_wrapped =
+            list.fold(lvs, body_elab, fn(acc, lv) { ast.Lambda(lv, acc) })
+          Ok(#(ctx_body, lam_wrapped))
+        }
+      }
+    }
   }
 }
 
@@ -109,10 +142,17 @@ fn elaborate_case(
   sc: SCase,
   ctx: ElabCtx,
 ) -> Result(#(ElabCtx, ast.Case), ElaborateError) {
-  let SCase(pattern: sp, body: sb) = sc
+  let SCase(pattern: sp, guard: sg, body: sb) = sc
   use #(ctx2, pat) <- result.try(elaborate_pattern(sp, ctx))
   use #(ctx3, b) <- result.try(elaborate_term(sb, ctx2))
-  Ok(#(ctx3, ast.Case(pattern: pat, body: b)))
+  let guard_elab = case sg {
+    option.Some(g) -> {
+      let #(_, g_term) = elaborate_term(g, ctx3) |> result.unwrap(#(ctx3, ast.Int(0)))
+      option.Some(ast.GuardTerm(g_term))
+    }
+    option.None -> option.None
+  }
+  Ok(#(ctx3, ast.Case(pattern: pat, guard: guard_elab, body: b)))
 }
 
 fn elaborate_cases(

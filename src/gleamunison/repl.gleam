@@ -19,6 +19,7 @@ import gleamunison/identity.{
   builtin_string_trim, builtin_string_upcase, builtin_sub, builtin_timer_now,
   builtin_timer_sleep,
 }
+import gleamunison/lexer
 import gleamunison/parser
 import gleamunison/repl_eval
 import gleamunison/repl_io
@@ -30,7 +31,7 @@ fn ffi_unique_integer() -> Int
 
 pub fn eval_string(expr: String) -> Result(String, String) {
   case parser.parse_string(expr) {
-    Error(e) -> Error("Parse Error: " <> e.message)
+    Error(e) -> Error(format_parse_error(e))
     Ok(elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), _])) ->
       Error("Define not supported in eval endpoint: " <> name)
     Ok(term) -> {
@@ -43,9 +44,39 @@ pub fn eval_string(expr: String) -> Result(String, String) {
   }
 }
 
+fn format_parse_error(e: lexer.ParseError) -> String {
+  let lexer.ParseError(msg, line, col) = e
+  case msg {
+    "Unexpected EOF" ->
+      "[P001] unexpected end of input at line "
+      <> int.to_string(line)
+      <> ", col "
+      <> int.to_string(col)
+      <> ". Did you forget a closing parenthesis?"
+    "Empty input" ->
+      "[P002] empty expression. Type an S-expression or 'help' for available commands."
+    _ ->
+      case string.contains(msg, "Unclosed") {
+        True ->
+          "[P003] unclosed parentheses at line "
+          <> int.to_string(line)
+          <> ", col "
+          <> int.to_string(col)
+          <> ". Every ( needs a matching )."
+        False ->
+          "[P004] parse error at line "
+          <> int.to_string(line)
+          <> ", col "
+          <> int.to_string(col)
+          <> ": "
+          <> msg
+      }
+  }
+}
+
 pub fn eval_string_unique(expr: String) -> Result(String, String) {
   case parser.parse_string(expr) {
-    Error(e) -> Error("Parse Error: " <> e.message)
+    Error(e) -> Error(format_parse_error(e))
     Ok(elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), _])) ->
       Error("Define not supported in eval endpoint: " <> name)
     Ok(term) -> {
@@ -270,12 +301,7 @@ fn handle_line(
       case err.message {
         "Empty input" -> Error(Nil)
         _ -> {
-          io.println(
-            "Parse Error: "
-            <> err.message
-            <> " at line "
-            <> string.inspect(err.line),
-          )
+          io.println(format_parse_error(err))
           Error(Nil)
         }
       }

@@ -1,3 +1,4 @@
+import gleam/option.{type Option}
 import gleamunison/identity.{type DefinitionRef}
 
 pub type SurfaceTerm {
@@ -14,10 +15,14 @@ pub type SurfaceTerm {
   SDo(ability: String, operation: String, args: List(SurfaceTerm))
   SHandle(computation: SurfaceTerm, handler: SurfaceTerm, ability: String)
   SConstruct(name: String, args: List(SurfaceTerm))
+  SLabeledFn(params: List(#(String, SurfaceTerm)), body: SurfaceTerm)
+  SHole
+  SGuardGuard(guard: SurfaceTerm)
+  SUse(binder: String, call: SurfaceTerm, body: SurfaceTerm)
 }
 
 pub type SCase {
-  SCase(pattern: SPattern, body: SurfaceTerm)
+  SCase(pattern: SPattern, guard: Option(SurfaceTerm), body: SurfaceTerm)
 }
 
 pub type SPattern {
@@ -38,6 +43,8 @@ pub type SurfaceDef {
   SurfaceTermDef(SurfaceTerm)
   SurfaceTypeDef(Typ)
   SurfaceAbilityDef(name: String, ops: List(SurfaceOp))
+  SurfaceTypeAlias(name: String, target: Typ)
+  SurfacePubTypeAlias(name: String, target: Typ)
 }
 
 pub type Typ {

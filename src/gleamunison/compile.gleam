@@ -58,7 +58,11 @@ fn emit_term(t: ast.Term) -> String {
         list.map(cases, fn(c) {
           let body_str = emit_term(c.body)
           let pat_str = emit_pattern_body_aware(c.pattern, body_str)
-          pat_str <> " -> " <> body_str
+          let guard_clause = case c.guard {
+            option.Some(ast.GuardTerm(g)) -> " when " <> emit_term(g)
+            option.None -> ""
+          }
+          pat_str <> guard_clause <> " -> " <> body_str
         })
       "case ("
       <> emit_term(scrutinee)
@@ -90,6 +94,15 @@ fn emit_term(t: ast.Term) -> String {
       <> ", "
       <> string.join(list.map(args, emit_term), ", ")
       <> "}"
+    ast.Hole -> "erlang:error({hole, incomplete_expression})"
+    ast.Use(binder: Local(i), call:, body:) ->
+      "begin ("
+      <> emit_term(call)
+      <> ")(fun(V"
+      <> int.to_string(i)
+      <> ") -> "
+      <> emit_term(body)
+      <> " end) end"
   }
 }
 

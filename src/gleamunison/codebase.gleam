@@ -5,6 +5,7 @@ import gleam/int
 import gleam/list
 import gleam/string
 
+import gleam/option
 import gleamunison/ast
 import gleamunison/identity.{
   type DefinitionRef, type Hash, Local, Ref, hash_bytes, hash_equal,
@@ -104,10 +105,15 @@ fn hash_pattern(p: ast.Pattern) -> Hash {
 }
 
 fn hash_case(c: ast.Case) -> Hash {
+  let guard_hash = case c.guard {
+    option.Some(ast.GuardTerm(t)) -> hash_term(t)
+    option.None -> hash_bytes(str_to_bits("noguard"))
+  }
   hash_bytes(
     bit_array.concat([
       str_to_bits("case:"),
       hash_to_binary(hash_pattern(c.pattern)),
+      hash_to_binary(guard_hash),
       hash_to_binary(hash_term(c.body)),
     ]),
   )
@@ -181,6 +187,15 @@ fn hash_term(term: ast.Term) -> Hash {
           str_to_bits("construct:"),
           hash_to_binary(h),
           ..list.map(args, fn(a) { hash_to_binary(hash_term(a)) })
+        ]),
+      )
+    ast.Hole -> hash_bytes(str_to_bits("hole"))
+    ast.Use(binder: Local(i), call:, body:) ->
+      hash_bytes(
+        bit_array.concat([
+          str_to_bits("use:" <> int.to_string(i) <> ":"),
+          hash_to_binary(hash_term(call)),
+          hash_to_binary(hash_term(body)),
         ]),
       )
   }

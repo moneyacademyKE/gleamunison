@@ -3,7 +3,8 @@
 -export([handle_eval_route/2, handle_counter_route/1, handle_define_route/2, handle_browse_route/1,
          serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
          handle_processes_route/1, handle_sync_status_route/1, handle_redefinitions_route/1,
-         handle_logs_route/1, handle_enhanced_modules_route/1]).
+         handle_logs_route/1, handle_enhanced_modules_route/1,
+         handle_traces_route/1, handle_trace_detail_route/2]).
 
 handle_eval_route(Socket, <<"?expr=", Expr/binary>>) ->
     handle_eval_route(Socket, Expr);
@@ -235,3 +236,36 @@ modified_ts(Path) ->
             iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ", [Y, Mo, D, H, Mi, S]));
         _ -> <<"unknown">>
     end.
+
+handle_traces_route(Socket) ->
+    gleamunison_trace:start_trace(),
+    Traces = gleamunison_trace:list_traces(),
+    Parts = [format_trace(T) || T <- Traces],
+    Json = <<"{\"traces\":[", (binary:join(Parts, <<",">>))/binary, "]}">>,
+    gleamunison_http_util:send_json(Socket, 200, Json).
+
+handle_trace_detail_route(Socket, Id) ->
+    gleamunison_trace:start_trace(),
+    case gleamunison_trace:get_trace(Id) of
+        {ok, {TS, Id, Method, Path, Headers}} ->
+            HeaderJson = encode_headers(Headers),
+            Json = iolist_to_binary(io_lib:format(
+                "{\"id\":\"~s\",\"timestamp\":\"~s\",\"method\":\"~s\",\"path\":\"~s\",\"headers\":~s}",
+                [Id, TS, Method, Path, HeaderJson])),
+            gleamunison_http_util:send_json(Socket, 200, Json);
+        {error, _} ->
+            gleamunison_http_util:send_json(Socket, 404, <<"{\"error\":\"not found\"}">>)
+    end.
+
+format_trace({TS, Id, Method, Path, _Headers}) ->
+    iolist_to_binary(io_lib:format(
+        "{\"id\":\"~s\",\"timestamp\":\"~s\",\"method\":\"~s\",\"path\":\"~s\"}",
+        [Id, TS, Method, Path])).
+
+encode_headers(Headers) ->
+    Parts = [begin
+        {K, V} = H,
+        iolist_to_binary(io_lib:format("\"~s\":\"~s\"", [K, V]))
+    end || H <- Headers],
+    <<"{", (binary:join(Parts, <<",">>))/binary, "}">>.
+

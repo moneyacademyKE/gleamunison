@@ -1,8 +1,10 @@
 import gleam/list
+import gleam/option
 import gleam/result
 import gleam/string
 import gleamunison/elab_types.{
   type SurfaceTerm, SCase, SFloat, SInt, SLambda, SLet, SList, SMatch,
+  SHole, SUse,
   SPConstructor, SPInt, SPText, SPVar, SVar,
 }
 import gleamunison/lexer.{
@@ -55,6 +57,7 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
   case sexpr {
     SAtom(IntVal(n), _, _) -> Ok(SInt(n))
     SAtom(FloatVal(f), _, _) -> Ok(SFloat(f))
+    SAtom(Symbol("?"), _, _) -> Ok(SHole)
     SAtom(Symbol(name), _, _) -> {
       case string.starts_with(name, "\"") && string.ends_with(name, "\"") {
         True -> {
@@ -76,6 +79,11 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
           use body_t <- result.try(sexpr_to_term(body))
           Ok(SLambda(name, body_t))
         }
+        [SAtom(Symbol("fn*"), _, _), params_list, body] -> {
+          use parsed_params <- result.try(parse_labeled_params(params_list))
+          use body_t <- result.try(sexpr_to_term(body))
+          Ok(elab_types.SLabeledFn(parsed_params, body_t))
+        }
         [SAtom(Symbol("define"), _, _), SAtom(Symbol(name), _, _), val] -> {
           use val_t <- result.try(sexpr_to_term(val))
           Ok(SList([SVar("define"), SVar(name), val_t]))
@@ -86,8 +94,8 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
           use else_t <- result.try(sexpr_to_term(else_expr))
           Ok(
             elab_types.SMatch(cond_t, [
-              elab_types.SCase(elab_types.SPInt(1), then_t),
-              elab_types.SCase(elab_types.SPVar("_"), else_t),
+              elab_types.SCase(elab_types.SPInt(1), option.None, then_t),
+              elab_types.SCase(elab_types.SPVar("_"), option.None, else_t),
             ]),
           )
         }
@@ -123,13 +131,37 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
                 SListExpr([pat_expr, body_expr], _, _) -> {
                   use pat <- result.try(sexpr_to_pattern(pat_expr))
                   use body <- result.try(sexpr_to_term(body_expr))
-                  Ok(SCase(pattern: pat, body: body))
+                  Ok(SCase(pattern: pat, guard: option.None, body: body))
+                }
+                SListExpr([pat_expr, guard_expr, body_expr], _, _) -> {
+                  use pat <- result.try(sexpr_to_pattern(pat_expr))
+                  use guard_t <- result.try(sexpr_to_term(guard_expr))
+                  use body <- result.try(sexpr_to_term(body_expr))
+                  Ok(SCase(pattern: pat, guard: option.Some(guard_t), body: body))
                 }
                 _ -> Error(ParseError("Invalid match case", 0, 0))
               }
             }),
           )
           Ok(SMatch(scrutinee_t, parsed_cases))
+        }
+        [SAtom(Symbol("use"), _, _), binder, call_expr, body_expr] -> {
+          case binder {
+            SAtom(Symbol(name), _, _) -> {
+              use call_t <- result.try(sexpr_to_term(call_expr))
+              use body_t <- result.try(sexpr_to_term(body_expr))
+              Ok(SUse(name, call_t, body_t))
+            }
+            SListExpr([SAtom(Symbol(name), _, _), rest], _, _) -> {
+              use call_t <- result.try(sexpr_to_term(call_expr))
+              use body_t <- result.try(sexpr_to_term(body_expr))
+              use rest_t <- result.try(sexpr_to_term(rest))
+              Ok(
+                SLet(name, rest_t, SUse(name, call_t, body_t)),
+              )
+            }
+            _ -> Error(ParseError("Invalid use binder", 0, 0))
+          }
         }
         [first, ..rest] -> {
           use f_term <- result.try(sexpr_to_term(first))
@@ -161,6 +193,27 @@ fn sexpr_to_pattern(sexpr: SExpr) -> Result(elab_types.SPattern, ParseError) {
       Ok(SPConstructor(ctor_name, parsed_args))
     }
     _ -> Error(ParseError("Invalid pattern", 0, 0))
+  }
+}
+
+fn parse_labeled_params(
+  sexpr: SExpr,
+) -> Result(List(#(String, SurfaceTerm)), ParseError) {
+  case sexpr {
+    SListExpr([], _, _) -> Ok([])
+    SListExpr(params, _, _) ->
+      list.try_map(params, fn(p) {
+        case p {
+          SListExpr(
+            [SAtom(Symbol(name), _, _), default_val], _, _,
+          ) -> {
+            use default_t <- result.try(sexpr_to_term(default_val))
+            Ok(#(name, default_t))
+          }
+          _ -> Error(ParseError("Invalid labeled parameter", 0, 0))
+        }
+      })
+    _ -> Error(ParseError("Expected parameter list for fn*", 0, 0))
   }
 }
 

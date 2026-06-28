@@ -1,3 +1,4 @@
+import gleam/option
 import gleamunison/ast
 import gleamunison/elab_types.{
   SCase, SInt, SMatch, SPVar, SVar, SurfaceTermDef, SurfaceUnit,
@@ -23,8 +24,8 @@ pub fn elaborate_case_index_test() {
   let cache = empty_cache()
   let m =
     SMatch(SInt(42), [
-      SCase(pattern: SPVar("x"), body: SVar("x")),
-      SCase(pattern: SPVar("y"), body: SVar("y")),
+      SCase(pattern: SPVar("x"), guard: option.None, body: SVar("x")),
+      SCase(pattern: SPVar("y"), guard: option.None, body: SVar("y")),
     ])
   let surface =
     SurfaceUnit(root: Ref(hash_bytes(<<"root">>)), defs: [
@@ -37,10 +38,12 @@ pub fn elaborate_case_index_test() {
   ) = unit
   let assert ast.Case(
     pattern: ast.PatVar(Local(i1)),
+    guard: option.None,
     body: ast.LocalVarRef(Local(v1)),
   ) = c1
   let assert ast.Case(
     pattern: ast.PatVar(Local(i2)),
+    guard: option.None,
     body: ast.LocalVarRef(Local(v2)),
   ) = c2
   let assert True = i1 == v1

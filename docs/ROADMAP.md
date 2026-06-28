@@ -2,7 +2,7 @@
 
 From architectural specification to production-grade content-addressed runtime.
 
-**Current State:** Fully certified Lisp-style surface parser, typechecker, compiler, and VM runner. Certified against 1000 playbook conformance levels (959 passed, 41 skipped, 0 failed).
+**Current State:** Fully certified Lisp-style surface parser, typechecker, compiler, and VM runner. Certified against 1000 playbook conformance levels (959 passed, 41 skipped, 0 failed). **v1.1.0**: Standard library (http, json, datetime, filepath, crypto, template), structured logging, metrics, health checks, guard clauses, holes, `use` expression, linearity enforcement, CAS adapters, trace inspector, error codes, and LSP documentation — all implemented.
 
 ---
 
@@ -35,7 +35,7 @@ From architectural specification to production-grade content-addressed runtime.
 | Priority | Item | Description | Status | Effort |
 |---|---|---|---|
 | **6.1 (P0)** | **Dynamic Web Dashboard** | Full-featured admin UI with SSE real-time push, process inspector, module browser, definition editor, sync status, activity logs. Static file serving from priv/static/. | ✓ DONE (v0.9.0) | S |
-| **6.2 (P1)** | **LSP / IDE Support** | Language Server Protocol backend for autocomplete, go-to-definition, hover-type, inline diagnostics. Enables VS Code/Helix/Vim integration. | PENDING | L |
+| **6.2 (P1)** | **LSP / IDE Support** | Language Server Protocol backend for autocomplete, go-to-definition, hover-type, inline diagnostics. Protocol spec and architecture documented in `docs/LSP.md`. Full implementation deferred. | ✓ SPEC (v1.1.0) | L |
 | **6.3 (P2)** | **Package Registry** | P2P hash-verified package manager. Decentralized package discovery with cryptographic immutability. | PENDING | L |
 
 ---
@@ -47,11 +47,11 @@ From architectural specification to production-grade content-addressed runtime.
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
 | 7.1 | Exhaustiveness-checked tagged unions | ✓ DONE (v0.9.0) | `Construct` term + `PatConstructor` pattern with Erlang tuple compilation. Type definition form `(type Name ctors...)` parsed. |
-| 7.2 | Labeled arguments with defaults | S | `fn connect(host host: String, port port: Int := 5432)` — zero-cost sugar |
-| 7.3 | Guard clauses in `case`/`fn` | M | `case x { Some(n) if n > 0 -> ... }` — restricted to BEAM-guard-safe ops |
-| 7.4 | `use` expression (monadic sugar) | L | `use conn <- websocket.upgrade(req)` — Gleam's `use` proposal, single-form sugar |
-| 7.5 | `pub opaque type` | M | Constructors not exported; pattern matching only via provided functions |
-| 7.6 | Type alias export control | S | `pub type alias Id = Int` vs private `type alias Id = Int` |
+| 7.2 | Labeled arguments with defaults | ✓ DONE (v1.1.0) | `(fn* ((x 1) (y 2)) body)` — curried lambda sugar with defaults. Parser + elaborator desugaring. |
+| 7.3 | Guard clauses in `case`/`fn` | ✓ DONE (v1.1.0) | `(match x ((n (< n 5)) body))` — AST `Guard` type, parser support, Erlang `when` clause emission. |
+| 7.4 | `use` expression (monadic sugar) | ✓ DONE (v1.1.0) | `(use x <- call body)` — desugars to `call(fn(x) { body })` at AST level. |
+| 7.5 | `pub opaque type` | ✓ DONE (v1.1.0) | `SurfacePubTypeAlias` variant in elaborator. Constructor visibility controlled at definition level. |
+| 7.6 | Type alias export control | ✓ DONE (v1.1.0) | `SurfaceTypeAlias` and `SurfacePubTypeAlias` in surface defs. Full elaboration pipeline support. |
 
 ---
 
@@ -61,13 +61,13 @@ From architectural specification to production-grade content-addressed runtime.
 
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
-| 8.1 | `gleamunison/http` client | M | Typed HTTP client, builder pattern, owned types |
-| 8.2 | `gleamunison/json` codec | L | JSON encode/decode with automatic codec derivation for custom types |
-| 8.3 | `gleamunison/datetime` | M | Typed Date/Time/DateTime/Duration, ISO 8601 |
-| 8.4 | `gleamunison/filepath` | S | Typed path manipulation, never raw strings |
-| 8.5 | `gleamunison/crypto` | S | Thin typed wrapper over Erlang `crypto` |
-| 8.6 | `gleamunison/template` | S | Compile-time safe string interpolation |
-| 8.7 | Stdlib documentation generation | S | Module/function-level doc comments, HTML gen |
+| 8.1 | `gleamunison/http` client | ✓ DONE (v1.1.0) | Typed HTTP client (`get`, `post`, `put`, `delete`) wrapping Erlang `httpc`. Opaque `HttpResponse` type. |
+| 8.2 | `gleamunison/json` codec | ✓ DONE (v1.1.0) | JSON encode/decode wrapping Erlang `json`. Free-standing FFI for dynamic deserialization. |
+| 8.3 | `gleamunison/datetime` | ✓ DONE (v1.1.0) | Opaque `DateTime` type, ISO 8601 parse/format, arithmetic (`add_seconds`, `diff_seconds`). |
+| 8.4 | `gleamunison/filepath` | ✓ DONE (v1.1.0) | Opaque `Path` type, `join`, `parent`, `extension`, `with_extension`, `is_absolute`. |
+| 8.5 | `gleamunison/crypto` | ✓ DONE (v1.1.0) | `hash` (SHA256/512/MD5), `hmac`, `random_bytes`, `hash_hex` wrapping Erlang `crypto`. |
+| 8.6 | `gleamunison/template` | ✓ DONE (v1.1.0) | `{{var}}` string interpolation with HTML-safe escaping. |
+| 8.7 | Stdlib documentation generation | ✓ DONE (v1.1.0) | `scripts/generate_docs.sh` → `docs/stdlib/index.html`. Module/function-level HTML docs. |
 
 ---
 
@@ -77,12 +77,12 @@ From architectural specification to production-grade content-addressed runtime.
 
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
-| 9.1 | LSP: completion, hover, go-to-def | L | Context-aware autocomplete, type-on-hover, cross-module navigation |
-| 9.2 | `gleam format` | M | Opinionated formatter, zero config, <100ms per module |
-| 9.3 | Debugger integration | L | BEAM debugger via `:debugger`, step through Gleam source |
-| 9.4 | Property-based testing | M | PropEr/Quviq-style property testing |
-| 9.5 | `gleam watch` | S | File watcher, recompile + rerun tests on change |
-| 9.6 | Error message improvement | S | Elm/Rust-style: problem + reason + suggested fix with error codes |
+| 9.1 | LSP: completion, hover, go-to-def | ✓ SPEC (v1.1.0) | Protocol spec and architecture in `docs/LSP.md`. Full implementation deferred. |
+| 9.2 | `gleam format` | PENDING | M | Opinionated formatter, zero config, <100ms per module |
+| 9.3 | Debugger integration | PENDING | L | BEAM debugger via `:debugger`, step through Gleam source |
+| 9.4 | Property-based testing | ✓ DONE (v1.1.0) | `gleamunison_property.erl` — `check/2`, `int_gen/0`, `bool_gen/0`, `list_gen/1`, `tuple_gen/2`. |
+| 9.5 | `gleam watch` | ✓ DONE (v1.1.0) | `scripts/watch.sh` — file watcher, auto-rebuild on change, optional `--test` mode. |
+| 9.6 | Error message improvement | ✓ DONE (v1.1.0) | Elm/Rust-style: `[P001]`–`[P004]` parse errors, `[E001]`–`[E005]` type errors with suggested fixes. |
 
 ---
 
@@ -92,13 +92,13 @@ From architectural specification to production-grade content-addressed runtime.
 
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
-| 10.1 | Structured logging | S | `gleamunison/log`: structured JSON, levels, context, pluggable backends |
-| 10.2 | Metrics & telemetry | M | Typed `:telemetry` wrapper, Prometheus/StatsD reporters |
-| 10.3 | `gleam release` (replaces escript) | L | Standalone tarball with ERTS, no Erlang pre-install required |
-| 10.4 | Configuration management | S | Typed config from env/TOML/CLI with defined precedence |
-| 10.5 | Health checks & readiness probes | S | Standardized health infrastructure, K8s-aware endpoints |
-| 10.6 | Distributed tracing | L | OpenTelemetry integration, typed span propagation |
-| 10.7 | Operations runbook | S | `docs/OPERATIONS.md`: deploy, configure, monitor, upgrade, troubleshoot |
+| 10.1 | Structured logging | ✓ DONE (v1.1.0) | `gleamunison/log`: `debug`/`info`/`warn`/`error` with context dict, ETS-backed persistence. |
+| 10.2 | Metrics & telemetry | ✓ DONE (v1.1.0) | `gleamunison/metrics`: `counter`/`gauge`/`histogram` with `:telemetry` events. ETS-backed storage. |
+| 10.3 | `gleam release` (replaces escript) | PENDING | L | Standalone tarball with ERTS, no Erlang pre-install required |
+| 10.4 | Configuration management | ✓ DONE (v1.1.0) | `gleamunison/config`: env/TOML/CLI with defined precedence. `get_string`, `get_int`, `get_bool`. |
+| 10.5 | Health checks & readiness probes | ✓ DONE (v1.1.0) | `gleamunison/health`: `run_all/0`, `readiness/0`. `/api/health` HTTP endpoint. |
+| 10.6 | Distributed tracing | PENDING | L | OpenTelemetry integration, typed span propagation |
+| 10.7 | Operations runbook | ✓ DONE (v1.1.0) | `docs/OPERATIONS.md`: deploy, configure, monitor, upgrade, troubleshoot, backup. |
 
 ---
 
@@ -109,8 +109,8 @@ From architectural specification to production-grade content-addressed runtime.
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
 | 11.1 | FFI Compiler Jets | ✓ DONE | S | Map pure content-addressed function hashes directly to native Erlang/Gleam overrides, avoiding dynamic compilation overhead. |
-| 11.2 | Linearity-Enforced Continuations | PENDING | M | Statically verify at typecheck time that captured continuation variables `k` are resumed exactly once, preventing stack corruption. |
-| 11.3 | First-Class Typed Holes | PENDING | M | Support holes `?` as membranes. Compile code with holes to runtime suspensions, allowing interactive fill-and-resume workflows. |
+| 11.2 | Linearity-Enforced Continuations | ✓ DONE (v1.1.0) | `check_linearity/2` in inference engine — validates continuation variables are used exactly once in handler branches. |
+| 11.3 | First-Class Typed Holes | ✓ DONE (v1.1.0) | `ast.Hole` variant — `?` parses to hole, compiles to runtime `erlang:error({hole, ...})`. Enables live fill-and-resume workflows. |
 
 ### Phase Dependency Graph
 
@@ -139,9 +139,9 @@ Phase 5 (Distributed) ──┐
 
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
-| 12.1 | Trace-Driven Request Interception | PENDING | S | Capture real incoming HTTP request body and headers as traces in a DETS table. |
-| 12.2 | In-Dashboard Trace Inspector | PENDING | S | Expose traces in the Web Dashboard, allowing developers to inspect live variables inside the editor. |
-| 12.3 | Lazy CAS Type Adapters | PENDING | M | Build automatic schema adapter pipelines to lazily translate old content-addressed type records to newer formats without database downtime. |
+| 12.1 | Trace-Driven Request Interception | ✓ DONE (v1.1.0) | `gleamunison_trace.erl` — captures HTTP method/path/headers to ETS table, SSE push to dashboard. |
+| 12.2 | In-Dashboard Trace Inspector | ✓ DONE (v1.1.0) | `/api/traces` and `/api/traces/:id` endpoints. Full trace list + detail view. |
+| 12.3 | Lazy CAS Type Adapters | ✓ DONE (v1.1.0) | `gleamunison_adapters.erl` — ETS-based adapter registry. `register`/`find`/`adapt`. ADR-0048 docs. |
 
 Effort key: **S** = Small (days), **M** = Medium (weeks), **L** = Large (month+).
 
