@@ -26,47 +26,45 @@ string_to_binary(S) when is_binary(S) -> S;
 string_to_binary(S) when is_list(S) -> list_to_binary(S).
 
 compile_source(Source) when is_binary(Source) ->
-    ModuleName = case Source of
-        <<"-module('", Rest/binary>> ->
-            case binary:split(Rest, <<"'">>) of
-                [Name, _] -> Name;
-                _ -> <<"unknown">>
+    case erl_scan:string(binary_to_list(Source)) of
+        {ok, Tokens, _} ->
+            case split_and_parse_forms(Tokens, [], []) of
+                {ok, Forms} ->
+                    case compile:forms(Forms, [binary, return]) of
+                        {ok, _Mod, Bin} -> {ok, Bin};
+                        {ok, _Mod, Bin, _Warnings} -> {ok, Bin};
+                        {error, Errors, _Warnings} ->
+                            io:format("Failed Source:~n~s~n", [Source]),
+                            {error, flatten_errors(Errors)};
+                        error ->
+                            {error, <<"compiler failed without errors info">>}
+                    end;
+                {error, {parse_error, Line, Err}} ->
+                    {error, list_to_binary(io_lib:format("parse error at line ~p: ~p", [Line, Err]))};
+                {error, Err} ->
+                    {error, list_to_binary(io_lib:format("parse error: ~p", [Err]))}
             end;
-        _ -> <<"unknown">>
-    end,
-    TmpDir = case os:getenv("TMPDIR") of false -> "/tmp"; Dir -> Dir end,
-    TmpFile = filename:join(TmpDir, binary_to_list(ModuleName) ++ ".erl"),
-    BeamFile = filename:rootname(TmpFile) ++ ".beam",
-    try
-        ok = file:write_file(TmpFile, Source),
-        case compile:file(TmpFile, [{outdir, TmpDir}, return]) of
-            {ok, _Mod} ->
-                case file:read_file(BeamFile) of
-                    {ok, Bin} -> {ok, Bin};
-                    {error, R} -> {error, list_to_binary(io_lib:format("read failed: ~p", [R]))}
-                end;
-            {ok, _Mod, Bin} when is_binary(Bin), byte_size(Bin) > 0 -> {ok, Bin};
-            {ok, _Mod, _Other} ->
-                case file:read_file(BeamFile) of
-                    {ok, Bin} -> {ok, Bin};
-                    {error, R} -> {error, list_to_binary(io_lib:format("read2 failed: ~p", [R]))}
-                end;
-            {ok, _Mod, Bin, _Ws} when is_binary(Bin), byte_size(Bin) > 0 -> {ok, Bin};
-            {ok, _Mod, _Other, _Ws} ->
-                case file:read_file(BeamFile) of
-                    {ok, Bin} -> {ok, Bin};
-                    {error, R} -> {error, list_to_binary(io_lib:format("read3 failed: ~p", [R]))}
-                end;
-            {error, Errors, _Ws} ->
-                io:format("Failed Source:~n~s~n", [Source]),
-                {error, flatten_errors(Errors)}
-        end
-    after
-        catch file:delete(TmpFile),
-        catch file:delete(BeamFile),
-        ok
+        {error, ErrorInfo, _} ->
+            {error, list_to_binary(io_lib:format("scan error: ~p", [ErrorInfo]))}
     end;
 compile_source(_) -> {error, <<"source must be binary">>}.
+
+split_and_parse_forms([], [], Forms) ->
+    {ok, lists:reverse(Forms)};
+split_and_parse_forms([], CurrentForm, Forms) ->
+    case erl_parse:parse_form(lists:reverse(CurrentForm)) of
+        {ok, Form} -> {ok, lists:reverse([Form | Forms])};
+        {error, Err} -> {error, Err}
+    end;
+split_and_parse_forms([ {dot, Line} = Dot | Rest ], CurrentForm, Forms) ->
+    case erl_parse:parse_form(lists:reverse([Dot | CurrentForm])) of
+        {ok, Form} ->
+            split_and_parse_forms(Rest, [], [Form | Forms]);
+        {error, Err} ->
+            {error, {parse_error, Line, Err}}
+    end;
+split_and_parse_forms([ Tok | Rest ], CurrentForm, Forms) ->
+    split_and_parse_forms(Rest, [Tok | CurrentForm], Forms).
 
 flatten_errors(Errors) ->
     list_to_binary(lists:flatten(io_lib:format("~p", [Errors]))).

@@ -326,3 +326,20 @@ Spawning supervisor trees in dedicated worker threads to isolate active Erlang n
 Implementing storage replication and transactional security across distributed nodes using Erlang's Mnesia database transactions (`mnesia:transaction/1`).
 
 **Applied in:** `storage.gleam`, `gleamunison_storage.erl`
+
+---
+
+## 28. In-Memory Compilation Pipeline
+
+Compiling source code text dynamically directly in-memory to bypass slower disk write-read file lifecycles. We scan source text to Erlang tokens, split the tokens at dot markers, parse the segments into abstract forms, and pass the forms directly to the compiler.
+
+**Applied in:** `gleamunison_ffi.erl`
+
+---
+
+## 29. Cluster Node Sync via RPC and Global Registry
+
+Enabling real P2P sync across clustered nodes by registering the active codebase adapter in `persistent_term` during startup, allowing remote peer processes to look up and sync stored definitions using Erlang distribution and RPC calls.
+
+**Applied in:** `gleamunison_storage.erl`, `gleamunison_ffi_io.erl`
+

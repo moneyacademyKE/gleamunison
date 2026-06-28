@@ -42,3 +42,5 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0036](0036-dogfood-benchmarking.md) | Dogfood Benchmarking Methodology | Accepted |
 | [ADR-0037](0037-repl-eval-io-decomposition.md) | REPL Eval/IO Decomposition | Accepted |
 | [ADR-0038](0038-type-pretty-module.md) | Type Pretty-Printing Module | Accepted |
+| [ADR-0039](0039-in-memory-compilation-and-live-distributed-sync.md) | In-Memory Compilation and Live Distributed Sync | Accepted |
+

@@ -11,7 +11,12 @@
 
 new() ->
     P = self(), R = make_ref(),
-    spawn(fun() -> T = ets:new(gleamunison_store, [set, public]), P ! {R, T}, receive after infinity -> ok end end),
+    spawn(fun() ->
+        T = ets:new(gleamunison_store, [set, public]),
+        persistent_term:put({gleamunison, active_storage}, {ets, T}),
+        P ! {R, T},
+        receive after infinity -> ok end
+    end),
     receive {R, T} -> T after 5000 -> error(timeout) end.
 
 insert(Tab, Ref, Bytes) -> ets:insert(Tab, {Ref, Bytes}), {ok, nil}.
@@ -29,7 +34,9 @@ err(R) -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}.
 dets_new(Path) ->
     N = erlang:binary_to_atom(<<"gleamunison_dets_", Path/binary>>, utf8),
     case dets:open_file(N, [{file, binary_to_list(Path)}, {type, set}]) of
-        {ok, N} -> {ok, N};
+        {ok, N} ->
+            persistent_term:put({gleamunison, active_storage}, {dets, N}),
+            {ok, N};
         {error, R} -> err(R)
     end.
 
@@ -54,7 +61,9 @@ dets_delete_file(Path) ->
 
 partitioned_dets_new(DP) ->
     Dir = case binary:last(DP) of $/ -> DP; _ -> <<DP/binary, "/">> end,
-    ok = filelib:ensure_dir(filename:join(binary_to_list(Dir), "x")), {ok, Dir}.
+    ok = filelib:ensure_dir(filename:join(binary_to_list(Dir), "x")),
+    persistent_term:put({gleamunison, active_storage}, {partitioned_dets, Dir}),
+    {ok, Dir}.
 
 ensure_dets_open(Dir, P) ->
     Key = {gleamunison_open_dets, Dir},
@@ -121,9 +130,11 @@ mnesia_new(TabName) ->
             case mnesia:create_table(N, [{attributes, [key, val]}, {type, set}]) of
                 {atomic, ok} ->
                     ok = mnesia:wait_for_tables([N], 5000),
+                    persistent_term:put({gleamunison, active_storage}, {mnesia, N}),
                     {ok, N};
                 {aborted, {already_exists, N}} ->
                     ok = mnesia:wait_for_tables([N], 5000),
+                    persistent_term:put({gleamunison, active_storage}, {mnesia, N}),
                     {ok, N};
                 {aborted, R} -> err(R)
             end;

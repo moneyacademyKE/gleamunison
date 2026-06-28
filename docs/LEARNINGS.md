@@ -196,3 +196,12 @@ ETS and DETS storage adapters are limited to a single node. Erlang's Mnesia data
 ## 36. Supervisor process link isolation for test runners
 
 Using `supervisor:start_link` starts the supervisor and links it to the calling process. During unit testing, calling `exit(SupPid, kill)` triggers a cascaded exit signal that kills the test runner process. Spawning the supervisor inside an isolated process wraps the link topology, preventing test runner crash propagation.
+
+## 37. In-memory scanner-parser compilation to bypass file I/O
+
+Writing source files to `/tmp` and compiling via `compile:file/2` introduces latency and dependencies on filesystem write availability. We can compile Erlang source text in-memory by scanning it into tokens with `erl_scan:string/1`, splitting the token list at `{dot, _}` markers, parsing the segments into forms with `erl_parse:parse_form/1`, and passing the abstract forms list to `compile:forms/2`.
+
+## 38. Erlang RPC and persistent_term storage lookup for live synchronization
+
+To turn mock synchronization stubs into active cluster node sharing, we can use Erlang node distribution and `rpc:call/4`. By storing active storage references in `persistent_term` during initialization, target nodes can dynamically resolve table types (ETS, DETS, Partitioned DETS, Mnesia) and list or retrieve raw binary definitions on the fly.
+
