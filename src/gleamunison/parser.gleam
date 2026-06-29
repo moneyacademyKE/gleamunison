@@ -38,6 +38,8 @@ pub fn parse_sexpr(
         Error(e) -> Error(e)
       }
     }
+    [lexer.TokenInfo(lexer.UnterminatedString(_), l, c), ..] ->
+      Error(ParseError("Unterminated string literal", l, c))
     [lexer.TokenInfo(other, l, c), ..rest] -> Ok(#(SAtom(other, l, c), rest))
   }
 }
@@ -67,6 +69,7 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
         False -> Ok(SVar(name))
       }
     }
+    SAtom(lexer.UnterminatedString(_), l, c) -> Error(ParseError("Unterminated string literal", l, c))
     SAtom(_, l, c) -> Error(ParseError("Invalid atom", l, c))
     SListExpr(exprs, _l, _c) -> {
       case exprs {

@@ -145,14 +145,15 @@ fn elaborate_case(
   let SCase(pattern: sp, guard: sg, body: sb) = sc
   use #(ctx2, pat) <- result.try(elaborate_pattern(sp, ctx))
   use #(ctx3, b) <- result.try(elaborate_term(sb, ctx2))
-  let guard_elab = case sg {
+  case sg {
     option.Some(g) -> {
-      let #(_, g_term) = elaborate_term(g, ctx3) |> result.unwrap(#(ctx3, ast.Int(0)))
-      option.Some(ast.GuardTerm(g_term))
+      use #(ctx4, g_term) <- result.try(elaborate_term(g, ctx3))
+      Ok(#(ctx4, ast.Case(pattern: pat, guard: option.Some(ast.GuardTerm(g_term)), body: b)))
     }
-    option.None -> option.None
+    option.None -> {
+      Ok(#(ctx3, ast.Case(pattern: pat, guard: option.None, body: b)))
+    }
   }
-  Ok(#(ctx3, ast.Case(pattern: pat, guard: guard_elab, body: b)))
 }
 
 fn elaborate_cases(

@@ -36,7 +36,7 @@ fn ffi_counter(name: BitArray, delta: Int) -> Nil
 fn ffi_gauge(name: BitArray, value: Float) -> Nil
 
 @external(erlang, "gleamunison_property", "check")
-fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(a, b)
+fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(List(a), b)
 
 @external(erlang, "gleamunison_trace", "start_trace")
 fn ffi_trace_start() -> Nil
@@ -402,7 +402,7 @@ pub fn level1171() -> Nil {
   io.println("Level 1171: OK")
 }
 
-fn prop_batch(n: Int) -> List(Result(Int, a)) {
+fn prop_batch(n: Int) -> List(Result(List(Int), a)) {
   case n {
     0 -> []
     _ -> {

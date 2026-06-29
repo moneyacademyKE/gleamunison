@@ -97,8 +97,54 @@ start_holder() ->
     end),
     {ok, Pid}.
 ```
+## 12. Error Injection via Test-Only Value Mapping (Testing Pattern)
+To cover defensive `try-catch` error handling blocks in utility or FFI functions where arguments are heavily guarded by types, map a specific test-only constant to an operation that crashes the lower-level runtime library.
+```erlang
+string_to_algo(<<"trigger_error">>) -> trigger_error;
+...
+hash(Algo, Data) ->
+    try
+        {ok, crypto:hash(string_to_algo(Algo), Data)}
+    catch
+        error:_ -> {error, <<"hash failed">>}
+    end.
+```
+By passing `<<"trigger_error">>`, `crypto:hash` is called with the invalid atom `trigger_error`, triggering a `badarg` exception. This executes the `catch` block and returns `{error, <<"hash failed">>}` successfully without bypassing function type guards.
 
+## 13. Invalid Token Variant Error Propagation (Parsing Pattern)
+Instead of returning a result wrapper from a tokenizer which requires changing signature bindings across a large code surface, introduce an explicit error token (e.g. `UnterminatedString(String)`). This enables standard, signature-compliant list returns from tokenizers while delegating syntactical error handling to downstream case matches in parsers.
+```gleam
+pub type Token {
+  Symbol(String)
+  ...
+  UnterminatedString(String)
+}
+```
 
+## 14. Monadic Error Bubble Up (Compiler Pattern)
+When compiling or elaborating nested S-Expressions/AST nodes, ensure that all sub-evaluations are wrapped inside monadic binds (such as `use` or `result.try`). This prevents nested errors from being lost or bypassed and ensures compilation state propagation without breaking helper function type signatures.
+```gleam
+case sub_expr {
+  Some(expr) -> {
+    use #(ctx_next, result) <- result.try(elaborate(expr, ctx))
+    Ok(#(ctx_next, Success(result)))
+  }
+  None -> Ok(#(ctx, Empty))
+}
+```
 
-
+## 15. Binary String FFI Key Mapping (FFI Pattern)
+When writing Erlang FFI modules that return structured key-value maps to Gleam, use binary string keys rather than atom keys. This enables Gleam to represent the resulting map natively as `Dict(String, Dynamic)` without atom key leakage or uppercase inspect formatting.
+```erlang
+%% Erlang side
+{error, #{
+    <<"counterexample">> => Value,
+    <<"reason">> => Reason,
+    <<"passed">> => Passed
+}}
+```
+```gleam
+// Gleam side
+@external(erlang, "my_ffi", "check")
+fn check() -> Result(a, dict.Dict(String, Dynamic))
 ```

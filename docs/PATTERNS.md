@@ -635,7 +635,29 @@ Stress testing follows a scalable pattern: (1) choose a representative operation
 
 **Applied in:** Levels 2101-2105, `dogfood_v21.gleam`
 
-## 70. AST Interpreter for Dynamic Code Evaluation in Sandboxed Environments
+## PA-70. AbilityDecl Compilation Generates Per-Operation Exports and Stubs
+
+When compiling an `AbilityDecl` with N operations, the compiler generates N exported stubs: `'op_0'/2, 'op_1'/2, ..., 'op_N-1'/2` with bodies `'op_N'(_Args, _Cont) -> ok.`. Each operation gets exported and available for `do_op` dispatch. The export list is constructed via `list.index_map` + `string.join`, and stubs via `list.map` + `string.join`. This must be tested for 0, 1, and 5 operations to verify the guard handles empty lists correctly.
+
+**Applied in:** Level 2255 (5 ops), Level 1926 (3 ops), Level 1728 (0 ops), `dogfood_v22.gleam`
+
+## PA-71. count_brackets Depth Verification Under Any Nesting Level
+
+The `count_brackets` function uses tail-recursive mutual recursion with `read_string` in the lexer. Testing at extremes (500-level nesting, all-open, all-close, empty string, whitespace-only) verifies that neither stack overflow nor correctness degradation occurs at scale. The pattern: (1) construct input via `string.repeat`, (2) call `count_brackets(input, False, 0)`, (3) assert the expected depth (0 for balanced, positive for all-open, negative for all-close).
+
+**Applied in:** Levels 2220 (500-level), 2222 (all-open), 2223 (empty), `dogfood_v22.gleam`
+
+## PA-72. Inter-Def Reference Resolution in Elaboration Context
+
+When a `SurfaceUnit` contains multiple definitions, the elaboration context (`ElabCtx`) tracks `names: Dict(String, DefinitionRef)` and `abilities: Dict(String, DefinitionRef)`. A `SurfaceTermDef` that references another definition by name (via `SVar`) resolves through `lookup_binding`/`dict.get(ctx.names)`. The pattern for testing: (1) create a unit with `SurfaceAbilityDef` + `SurfaceTermDef(SVar(ability_name))`, (2) elaborate, (3) verify the term's `SVar` resolves to the ability's `DefinitionRef`.
+
+**Applied in:** Level 2229, `dogfood_v22.gleam`
+
+## PA-73. REPL Builtin Chain Verification Through eval_string
+
+Each REPL builtin (pair, dict, bool, list, string, arithmetic) must be verified through `eval_string` with real expressions that exercise the builtin in context. The pattern: (1) construct an S-expression string using the builtin, (2) pass to `eval_string`, (3) assert the result matches expected. Builtins tested this way: pair fst+snd, dict-new/get/set, and/or/not, list-reverse+length, string-slice+concat.
+
+**Applied in:** Levels 2244-2248, `dogfood_v22.gleam`
 
 When deploying runtimes to highly sandboxed platforms that disallow dynamic compilation (e.g. Cloudflare Workers, WebAssembly V8 isolates), dynamic evaluation cannot be achieved via code compilation and dynamic loading. The solution is the **AST Interpreter Pattern**:
 1. Implement a parser and typechecker that runs statically on the host.

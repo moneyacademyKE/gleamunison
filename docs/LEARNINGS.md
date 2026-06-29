@@ -466,6 +466,32 @@ The `|>` operator pipes a value into a function: `value |> function`. It cannot 
 
 The parser transforms `(if cond then else)` into `SMatch(cond, [SCase(SPInt(1), None, then), SCase(SPVar("_"), None, else)])`. Level 2112 verifies this transformation through elaboration. The `define` form is wrapped as `SList([SVar("define"), SVar(name), val])` — level 2113 verifies this intermediate representation survives elaboration.
 
+## 104. `count_brackets` handles 500-level nesting without stack overflow
+
+The `count_brackets` function uses tail recursion with accumulator-style mutual recursion between `count_brackets` and `read_string`. Level 2220 verifies that 500 levels of nested parentheses (`"(" * 500 + "x" + ")" * 500`) compute correctly with `depth=0` (balanced). Level 2222 verifies all-open `"((((((("` produces positive depth. Gleam's TCO guarantees this works at any depth.
+
+## 105. `compile_only` + `load_and_eval` roundtrip works for Apply chains
+
+The `Apply` AST node compiles to `erlang:apply(f, [a])` and executes successfully through `load_and_eval`. Level 2202 verifies this with a 4-level deep apply chain. Level 2257 tests `Apply(Apply(Apply(Int, Int), Int), Int)` — the limit is Erlang's nested apply, not the compiler.
+
+## 106. AbilityDecl with 5 operations compiles to 5 exported `op_N/2` stubs
+
+When `compile_definition` sees an `AbilityDecl` with 5 operations, it generates `-export([..., 'op_0'/2, 'op_1'/2, 'op_2'/2, 'op_3'/2, 'op_4'/2])` and five stub functions `'op_N'(_Args, _Cont) -> ok.`. Level 2255 verifies this produces valid BEAM. The same pattern works for TypeDef with 3 constructors (level 2254).
+
+## 107. REPL eval supports pair, dict, and bool operations through bootstrap_defs
+
+The REPL's `bootstrap_defs` registers `pair`, `fst`, `snd`, `dict-new`, `dict-get`, `dict-set`, `and`, `or`, `not` as builtins. Levels 2246-2248 verify these through `eval_string` expressions: `(add (fst (pair 3 4)) (snd (pair 5 6)))`, `(if (and ...) 1 0)`, and `(dict-get (dict-set (dict-new) "key" 42) "key")`.
+
+## 108. `list_all_match` returns True for empty lists and False for heterogeneous lists
+
+`list_all_match([], t, cache, infer_fn)` returns `True` because the empty case is `True`. For `[Int(1), Text("x"), Int(3)]`, it returns `False` because `infer_term(Text("x"))` produces `TextType`, which doesn't match `IntType`. Level 2253 verifies the heterogeneous case.
+
+## 109. `surface_elab_ability_with_term` resolves ability references across definitions
+
+When a `SurfaceUnit` contains both a `SurfaceAbilityDef` and a `SurfaceTermDef` that references the ability by name (via `SVar`), the elaboration context resolves the ability name to its `DefinitionRef` through `ctx.names`. Level 2229 verifies this inter-def reference resolution.
+
+
+
 
 
 

@@ -82,3 +82,20 @@ pub fn typedef_constructor_distinct_local_test() {
   ) = unit
   let assert False = name == c_name
 }
+
+pub fn elaborate_guard_error_test() {
+  let cache = empty_cache()
+  let m =
+    SMatch(SInt(42), [
+      SCase(
+        pattern: SPVar("x"),
+        guard: option.Some(SVar("undefined_var_1234")),
+        body: SVar("x"),
+      ),
+    ])
+  let surface =
+    SurfaceUnit(root: Ref(hash_bytes(<<"root">>)), defs: [
+      #("test_match", SurfaceTermDef(m)),
+    ])
+  let assert Error(_) = elab.elaborate_unit(surface, cache)
+}

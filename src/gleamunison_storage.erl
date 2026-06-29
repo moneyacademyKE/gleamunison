@@ -115,6 +115,7 @@ partitioned_dets_delete_file(DP) ->
     partitioned_dets_close(Dir),
     [file:delete(<<Dir/binary, P, ".dets">>) || P <- "0123456789abcdef"], {ok, nil}.
 
+%% @private Test helpers
 test_make_ref(Bytes) -> {ref, {hash, Bytes}}.
 
 get_open_dets_count(DP) ->

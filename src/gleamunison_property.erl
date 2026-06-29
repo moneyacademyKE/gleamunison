@@ -9,13 +9,28 @@ check_loop(_Generator, _Property, 0, Acc) ->
     {ok, lists:reverse(Acc)};
 check_loop(Generator, Property, N, Acc) ->
     Value = Generator(),
-    case Property(Value) of
+    try Property(Value) of
         true ->
             check_loop(Generator, Property, N - 1, [Value | Acc]);
         {false, Reason} when is_binary(Reason) ->
-            {error, #{counterexample => Value, reason => Reason, passed => length(Acc)}};
+            {error, #{
+                <<"counterexample">> => Value,
+                <<"reason">> => Reason,
+                <<"passed">> => length(Acc)
+            }};
         false ->
-            {error, #{counterexample => Value, reason => <<"property returned false">>, passed => length(Acc)}}
+            {error, #{
+                <<"counterexample">> => Value,
+                <<"reason">> => <<"property returned false">>,
+                <<"passed">> => length(Acc)
+            }}
+    catch
+        Class:Reason:_ ->
+            {error, #{
+                <<"counterexample">> => Value,
+                <<"reason">> => list_to_binary(io_lib:format("exception ~p:~p", [Class, Reason])),
+                <<"passed">> => length(Acc)
+            }}
     end.
 
 int_gen() ->

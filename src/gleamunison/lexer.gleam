@@ -9,6 +9,7 @@ pub type Token {
   LParen
   RParen
   Quote
+  UnterminatedString(String)
 }
 
 pub type TokenInfo {
@@ -64,7 +65,7 @@ fn do_tokenize(chars, acc, sl, sc, l, c) {
 
 fn read_string(chars, acc, sl, sc, l, c) {
   case chars {
-    [] -> [TokenInfo(Symbol(acc <> "\""), sl, sc)]
+    [] -> [TokenInfo(UnterminatedString(acc), sl, sc)]
     ["\n", ..rest] -> read_string(rest, acc <> "\n", sl, sc, l + 1, 1)
     ["\\", "\"", ..rest] -> read_string(rest, acc <> "\"", sl, sc, l, c + 2)
     ["\\", "n", ..rest] -> read_string(rest, acc <> "\n", sl, sc, l, c + 2)

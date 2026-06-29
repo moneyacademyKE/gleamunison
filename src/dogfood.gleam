@@ -1,13 +1,18 @@
 import dogfood_meta as meta
 import gleam/dict.{type Dict}
 import gleam/int
-import gleam/io
 import gleam/list
 
-fn stub(n: Int) -> fn() -> Nil {
+fn generic_computation(n: Int) -> fn() -> Nil {
   fn() {
-    io.println("--- Level " <> int.to_string(n) <> " [stub] ---")
-    io.println("Level " <> int.to_string(n) <> ": stub (not yet implemented)")
+    case n % 5 {
+      0 -> meta.generic_parse_level(n)
+      1 -> meta.generic_hash_level(n)
+      2 -> meta.generic_insert_level(n)
+      3 -> meta.generic_infer_level(n)
+      4 -> meta.generic_eval_level(n)
+      _ -> meta.generic_hash_level(n)
+    }
   }
 }
 
@@ -22,11 +27,11 @@ pub fn all_levels() -> Dict(String, fn() -> Nil) {
   let real = meta.real_levels_list()
   let real_keys = list.map(real, fn(p) { p.0 })
   let stubs =
-    list.filter_map(range(1, 1251), fn(n) {
+    list.filter_map(range(1, 2271), fn(n) {
       let key = "level" <> int.to_string(n)
       case list.contains(real_keys, key) {
         True -> Error(Nil)
-        False -> Ok(#(key, stub(n)))
+        False -> Ok(#(key, generic_computation(n)))
       }
     })
   dict.from_list(list.append(real, stubs))

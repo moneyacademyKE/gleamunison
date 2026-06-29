@@ -37,7 +37,7 @@ fn ffi_counter(name: BitArray, delta: Int) -> Nil
 fn ffi_gauge(name: BitArray, value: Float) -> Nil
 
 @external(erlang, "gleamunison_property", "check")
-fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(a, b)
+fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(List(a), b)
 
 @external(erlang, "gleamunison_trace", "start_trace")
 fn ffi_trace_start() -> Nil

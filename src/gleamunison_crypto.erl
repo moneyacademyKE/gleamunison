@@ -26,6 +26,7 @@ hash_to_hex(Bytes) when is_binary(Bytes) ->
 string_to_algo(<<"sha256">>) -> sha256;
 string_to_algo(<<"sha512">>) -> sha512;
 string_to_algo(<<"md5">>) -> md5;
+string_to_algo(<<"trigger_error">>) -> trigger_error;
 string_to_algo("sha256") -> sha256;
 string_to_algo("sha512") -> sha512;
 string_to_algo("md5") -> md5;

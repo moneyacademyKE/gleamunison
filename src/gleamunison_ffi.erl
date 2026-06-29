@@ -4,11 +4,11 @@
     compile_source/1, load_binary/2, string_to_binary/1,
     hex_to_bytes/1,
     unload_binary/1, soft_purge_binary/1,
-    corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
-    test_soft_purge_scenario/0,
     binary_to_erl_literal/1,
     get_plain_args/0,
-    to_dynamic/1
+    to_dynamic/1,
+    corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
+    test_soft_purge_scenario/0
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -102,6 +102,7 @@ soft_purge_binary(Mod) ->
     Res = code:soft_purge(ModuleAtom),
     {ok, Res}.
 
+%% @private Test helpers
 corrupt_handler_stack(Val) ->
     erlang:put({gleamunison_handlers}, Val), ok.
 

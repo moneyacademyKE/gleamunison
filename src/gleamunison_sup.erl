@@ -6,6 +6,7 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+%% @private Test helper
 test_supervisor_restart() ->
     Parent = self(),
     spawn(fun() ->

@@ -67,7 +67,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Project State
 
-**Production-grade runtime (Phases 0–12 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 1250 playbook conformance levels (271 real implementations, 51 unit tests, 0 failures). **v1.1.0** adds standard library (http, json, datetime, filepath, crypto, template), production ops (logging, metrics, health, config, runbook), language features (guard clauses, holes, use, labeled args, type aliases), Darklang traces, linearity enforcement, CAS adapters, loader lifecycle, jets, storage endurance, and full integration test batches.
+**Production-grade runtime (Phases 0–12 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 2270 playbook conformance levels (1240 real implementations, 53 unit tests, 1293 verifications, 0 failures). **v3.4.0** adds compile→load→eval roundtrip (Apply, text, float, let), 7 deep cross-module chains (4-8 modules), template no-vars+adjacent, config env-only, count_brackets 500-level, elaborate 2-op ability+ability-term refs, inference+linearity deep (Hole, Use, Apply chain, Let+Apply), DETS list_refs, REPL pair+dict+bool ops, TypeDef 3 ctors, AbilityDecl 5 ops, 5-case match, and construct roundtrip.
 
 | Step | Status |
 |---|---|
@@ -83,7 +83,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Conformance Tests
 
-To execute the suite of 1000 playbook conformance levels:
+To execute the suite of 1500 playbook conformance levels:
 ```sh
 bb scripts/run_playbook_tests.clj
 ```
@@ -105,7 +105,7 @@ The standalone binary (`gleamunison_escript`) contains the full content-addresse
 
 If you already have Erlang installed, this is as close to a zero-install language runtime as it gets.
 
-## Modules (40 Gleam source modules, 70+ Erlang FFI files, 52 genesis modules, 271 real dogfood levels)
+## Modules (44 Gleam source modules, 70+ Erlang FFI files, 52 genesis modules, 471 real dogfood levels)
 
 | Module | Concern | Status |
 |---|---|---|

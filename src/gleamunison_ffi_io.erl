@@ -6,7 +6,8 @@
     sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
     sync_request_defs/2, sync_push_defs/2,
     serialize_term/1, deserialize_term/1,
-    register_peer_refs/2, compute_diff/1, fetch_defs_binary/1, receive_pushed_defs/1
+    register_peer_refs/2, compute_diff/1, fetch_defs_binary/1, receive_pushed_defs/1,
+    node_atom/1, hex_to_ref/1, ref_to_hex/1
 ]).
 
 %% --- State (process dictionary) ---
@@ -50,16 +51,39 @@ spawn_concurrent_evals() ->
     [receive {done, <<"42 : ", _/binary>>} -> ok after 5000 -> error(timeout) end || _ <- Pids],
     ok.
 
-%% --- Sync stubs (peer networking) ---
+%% --- Sync protocol (peer networking) ---
 
 node_atom(NodeBin) ->
     list_to_atom(binary_to_list(NodeBin)).
 
-is_real_node(NodeBin) ->
-    binary:match(NodeBin, <<"@">>) =/= nomatch.
+has_node_at(Name) ->
+    binary:match(Name, <<"@">>) =/= nomatch.
+
+parse_host_port(Name) ->
+    NameStr = binary_to_list(Name),
+    case string:rchr(NameStr, $:) of
+        0 -> {Name, gleamunison_tcp_sync:get_port()};
+        I ->
+            Host = list_to_binary(string:substr(NameStr, 1, I - 1)),
+            Port = list_to_integer(string:substr(NameStr, I + 1)),
+            {Host, Port}
+    end.
+
+tcp_call(PeerName, Message) ->
+    {Host, Port} = parse_host_port(PeerName),
+    Annotated = {self_name(), Message},
+    case gleamunison_tcp_sync:send_message({Host, Port}, Annotated) of
+        {ok, ok} -> {ok, nil};
+        {ok, {ok, Data}} -> {ok, Data};
+        {ok, {error, Reason}} -> {error, Reason};
+        {error, Reason} -> {error, list_to_binary(io_lib:format("TCP: ~p", [Reason]))}
+    end.
+
+self_name() ->
+    list_to_binary(atom_to_list(node())).
 
 sync_connect(NodeBin) ->
-    case is_real_node(NodeBin) of
+    case has_node_at(NodeBin) of
         true ->
             NodeAtom = node_atom(NodeBin),
             case net_adm:ping(NodeAtom) of
@@ -67,11 +91,11 @@ sync_connect(NodeBin) ->
                 pang -> {error, <<"Connection failed (pang)">>}
             end;
         false ->
-            {ok, nil}
+            tcp_call(NodeBin, {connect, node()})
     end.
 
 sync_send_refs(NodeBin, Refs) ->
-    case is_real_node(NodeBin) of
+    case has_node_at(NodeBin) of
         true ->
             NodeAtom = node_atom(NodeBin),
             case rpc:call(NodeAtom, gleamunison_ffi_io, register_peer_refs, [node(), Refs]) of
@@ -79,11 +103,11 @@ sync_send_refs(NodeBin, Refs) ->
                 Res -> {ok, Res}
             end;
         false ->
-            {ok, nil}
+            tcp_call(NodeBin, {send_refs, Refs})
     end.
 
 sync_receive_diff(NodeBin) ->
-    case is_real_node(NodeBin) of
+    case has_node_at(NodeBin) of
         true ->
             NodeAtom = node_atom(NodeBin),
             case rpc:call(NodeAtom, gleamunison_ffi_io, compute_diff, [node()]) of
@@ -91,14 +115,11 @@ sync_receive_diff(NodeBin) ->
                 Res -> {ok, Res}
             end;
         false ->
-            case NodeBin of
-                <<"test_node">> -> {ok, [<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>]};
-                _ -> {ok, []}
-            end
+            tcp_call(NodeBin, {receive_diff, []})
     end.
 
 sync_request_defs(NodeBin, Refs) ->
-    case is_real_node(NodeBin) of
+    case has_node_at(NodeBin) of
         true ->
             NodeAtom = node_atom(NodeBin),
             case rpc:call(NodeAtom, gleamunison_ffi_io, fetch_defs_binary, [Refs]) of
@@ -106,14 +127,11 @@ sync_request_defs(NodeBin, Refs) ->
                 Res -> {ok, Res}
             end;
         false ->
-            case NodeBin of
-                <<"test_node">> -> {ok, [{<<"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20">>, <<"dummy_blob">>}]};
-                _ -> {ok, []}
-            end
+            tcp_call(NodeBin, {request_defs, Refs})
     end.
 
 sync_push_defs(NodeBin, Defs) ->
-    case is_real_node(NodeBin) of
+    case has_node_at(NodeBin) of
         true ->
             NodeAtom = node_atom(NodeBin),
             case rpc:call(NodeAtom, gleamunison_ffi_io, receive_pushed_defs, [Defs]) of
@@ -121,16 +139,24 @@ sync_push_defs(NodeBin, Defs) ->
                 Res -> {ok, Res}
             end;
         false ->
-            {ok, nil}
+            tcp_call(NodeBin, {push_defs, Defs})
     end.
 
-register_peer_refs(PeerNode, Refs) ->
-    ets:insert(gleamunison_peer_refs, {PeerNode, Refs}),
+register_peer_refs(Peer, Refs) ->
+    ensure_table(gleamunison_peer_refs),
+    ets:insert(gleamunison_peer_refs, {Peer, Refs}),
     ok.
 
-compute_diff(PeerNode) ->
-    PeerRefs = case catch ets:lookup(gleamunison_peer_refs, PeerNode) of
-        [{PeerNode, R}] -> R;
+ensure_table(Name) ->
+    case ets:whereis(Name) of
+        undefined -> ets:new(Name, [set, public, named_table]);
+        _ -> ok
+    end.
+
+compute_diff(Peer) ->
+    ensure_table(gleamunison_peer_refs),
+    PeerRefs = case catch ets:lookup(gleamunison_peer_refs, Peer) of
+        [{Peer, R}] -> R;
         _ -> []
     end,
     PeerRefsSet = sets:from_list(PeerRefs),
@@ -142,15 +168,15 @@ fetch_defs_binary(Refs) ->
         undefined -> [];
         {Type, Tab} ->
             Lookup = fun(Hex) ->
-                Ref = hex_to_ref(Hex),
+                Key = gleamunison_ffi:hex_to_bytes(Hex),
                 case Type of
-                    ets -> gleamunison_storage:lookup(Tab, Ref);
-                    dets -> gleamunison_storage:dets_lookup(Tab, Ref);
-                    partitioned_dets -> gleamunison_storage:partitioned_dets_lookup(Tab, Ref);
-                    mnesia -> gleamunison_storage:mnesia_lookup(Tab, Ref)
+                    ets -> gleamunison_storage:lookup(Tab, Key);
+                    dets -> gleamunison_storage:dets_lookup(Tab, Key);
+                    partitioned_dets -> gleamunison_storage:partitioned_dets_lookup(Tab, Key);
+                    mnesia -> gleamunison_storage:mnesia_lookup(Tab, Key)
                 end
             end,
-            lists:filter_map(fun(Hex) ->
+            lists:filtermap(fun(Hex) ->
                 case Lookup(Hex) of
                     {ok, {some, Bytes}} -> {true, {Hex, Bytes}};
                     _ -> false
@@ -163,12 +189,12 @@ receive_pushed_defs(Defs) ->
         undefined -> ok;
         {Type, Tab} ->
             Insert = fun(Hex, Bytes) ->
-                Ref = hex_to_ref(Hex),
+                Key = gleamunison_ffi:hex_to_bytes(Hex),
                 case Type of
-                    ets -> gleamunison_storage:insert(Tab, Ref, Bytes);
-                    dets -> gleamunison_storage:dets_insert(Tab, Ref, Bytes);
-                    partitioned_dets -> gleamunison_storage:partitioned_dets_insert(Tab, Ref, Bytes);
-                    mnesia -> gleamunison_storage:mnesia_insert(Tab, Ref, Bytes)
+                    ets -> gleamunison_storage:insert(Tab, Key, Bytes);
+                    dets -> gleamunison_storage:dets_insert(Tab, Key, Bytes);
+                    partitioned_dets -> gleamunison_storage:partitioned_dets_insert(Tab, Key, Bytes);
+                    mnesia -> gleamunison_storage:mnesia_insert(Tab, Key, Bytes)
                 end
             end,
             lists:foreach(fun({Hex, Bytes}) ->
@@ -194,6 +220,8 @@ get_local_refs_hex() ->
     end.
 
 ref_to_hex({ref, {hash, Bytes}}) ->
+    iolist_to_binary(gleamunison_ffi:hash_to_hex(Bytes));
+ref_to_hex(Bytes) when is_binary(Bytes) ->
     iolist_to_binary(gleamunison_ffi:hash_to_hex(Bytes)).
 
 hex_to_ref(Hex) ->
