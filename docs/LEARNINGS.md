@@ -482,3 +482,7 @@ Cloudflare Workers run in highly-restricted V8 isolates where dynamic code compi
 ## 105. Cloudflare Workers Serverless Edge Hosting Tradeoffs
 
 Hosting on Cloudflare Workers replaces DevOps cluster operations with global edge routing, near-zero cold starts, and cost efficiency. However, the trade-off is the loss of BEAM-native stateful execution properties (ETS, Mnesia, and hot code reloading). For a compiler-driven language platform like Unison, running an AST interpreter in a 128MB memory-limited, network-bound serverless isolate limits throughput and increases execution latency compared to running on native VM instances.
+
+## 106. Zero-Deploy Code Syncing and Trace-Replay Debugging
+
+By separating the static runtime (the V8 Worker engine) from the dynamic application logic (stored as content-addressed AST definitions in KV), Cloudflare-hosted `gleamunison` apps achieve a zero-deploy, compile-free lifecycle. Deploying code changes does not require a bundler build or Worker update, eliminating compilation latency and cold starts. Debugging is also simplified through deterministic trace replay: since all I/O is managed as algebraic effects, complete execution history can be captured and replayed locally with mock handlers, bypassing complex browser reactivity charts or source map step-debugging.

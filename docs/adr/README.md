@@ -59,3 +59,4 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0053](0053-standardize-property-failure-path-and-types.md) | Standardize Property Failure Path and FFI Signatures | Accepted |
 | [ADR-0054](0054-cloudflare-wasm-compatibility-analysis.md) | Cloudflare Workers and WebAssembly Compatibility Analysis | Accepted |
 | [ADR-0055](0055-cloudflare-workers-hosting-topology.md) | Cloudflare Workers Hosting Topology Decisions | Accepted |
+| [ADR-0056](0056-gleamunison-cloudflare-application-architecture.md) | Gleamunison Cloudflare Application Architecture Decisions | Accepted |

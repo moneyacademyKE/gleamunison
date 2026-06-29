@@ -648,3 +648,10 @@ To balance operational costs, global distribution, and VM capabilities:
 1. Deploy a heavy, stateful, always-on VM cluster (e.g. Erlang/OTP BEAM) in a central region to act as the primary compilation, REPL, and actor migration coordinate node.
 2. Deploy lightweight, serverless edge workers (e.g. Cloudflare Workers running an AST interpreter) globally to handle read-heavy request routing, static caching, edge middleware, and lightweight sandboxed user actions.
 3. Node synchronizations (Merkle sync) route edge definition requests to the central cluster.
+
+## 72. Separation of Static Host Engine and Content-Addressed Database Logic
+
+For applications deployed in environments with strict update policies:
+1. Bundle the parsing, typechecking, and execution interpreter as a static **Host Engine** that is deployed once and rarely updated.
+2. Store the application logic (the actual functions, handlers, and types) strictly as **data** (content-addressed AST values) in a distributed database or key-value store (e.g. Cloudflare KV).
+3. Synchronize new code via Merkle differential sync directly to database storage. This enables immediate hot upgrades without modifying the host, restarting instances, or incurring cold starts.
