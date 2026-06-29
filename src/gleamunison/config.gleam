@@ -8,7 +8,11 @@ pub type ConfigValue {
 }
 
 pub type Config {
-  Config(env: Dict(String, ConfigValue), toml: Dict(String, ConfigValue), cli: Dict(String, ConfigValue))
+  Config(
+    env: Dict(String, ConfigValue),
+    toml: Dict(String, ConfigValue),
+    cli: Dict(String, ConfigValue),
+  )
 }
 
 @external(erlang, "gleamunison_config", "get_all_env")
@@ -16,14 +20,18 @@ fn ffi_get_all_env() -> List(#(String, String))
 
 pub fn load() -> Config {
   let pairs = ffi_get_all_env()
-  let env = list.fold(pairs, dict.new(), fn(acc, pair) {
-    let #(k, v) = pair
-    dict.insert(acc, k, StringVal(v))
-  })
+  let env =
+    list.fold(pairs, dict.new(), fn(acc, pair) {
+      let #(k, v) = pair
+      dict.insert(acc, k, StringVal(v))
+    })
   Config(env, dict.new(), dict.new())
 }
 
-pub fn with_cli(config: Config, overrides: Dict(String, ConfigValue)) -> Config {
+pub fn with_cli(
+  config: Config,
+  overrides: Dict(String, ConfigValue),
+) -> Config {
   Config(..config, cli: overrides)
 }
 

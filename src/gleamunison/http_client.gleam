@@ -10,7 +10,9 @@ pub type HttpError {
 }
 
 @external(erlang, "gleamunison_http_client", "get")
-fn ffi_get(url: BitArray) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
+fn ffi_get(
+  url: BitArray,
+) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
 
 @external(erlang, "gleamunison_http_client", "post")
 fn ffi_post(
@@ -43,10 +45,11 @@ fn unpack(b: BitArray) -> String {
 fn map_headers(
   headers: List(#(BitArray, BitArray)),
 ) -> List(#(String, String)) {
-  let res = list.map(headers, fn(kv) {
-    let #(k, v) = kv
-    #(unpack(k), unpack(v))
-  })
+  let res =
+    list.map(headers, fn(kv) {
+      let #(k, v) = kv
+      #(unpack(k), unpack(v))
+    })
   res
 }
 

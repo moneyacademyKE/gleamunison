@@ -58,7 +58,8 @@ pub fn loader_memoization_and_details_test() {
 pub fn structural_hashing_round4_test() {
   let t1 = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
   let t2 = ast.TermDef(ast.Match(ast.Int(42), []), ast.Builtin(ast.IntType))
-  let assert False = hash_equal(codebase.hash_of_definition(t1), codebase.hash_of_definition(t2))
+  let assert False =
+    hash_equal(codebase.hash_of_definition(t1), codebase.hash_of_definition(t2))
 }
 
 pub fn compile_and_evaluate_handle_test() {

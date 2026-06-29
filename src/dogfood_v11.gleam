@@ -8,24 +8,24 @@ import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/compile.{compile_definition, module_name_for, new as new_compiler}
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
 import gleamunison/effects.{HandlerFrame, RuntimeConfig, run as effects_run}
-import gleamunison/elab_ctx.{ElabCtx, empty_elab_ctx, add_binding}
+import gleamunison/elab_ctx.{ElabCtx, add_binding, empty_elab_ctx}
 import gleamunison/elab_pat.{elaborate_pattern}
 import gleamunison/elab_term.{elaborate_term}
 import gleamunison/elab_types
 import gleamunison/elaborate.{elaborate_unit}
-import gleamunison/identity.{
-  Local, Ref, hash_bytes, hash_to_debug_string,
-}
+import gleamunison/identity.{Local, Ref, hash_bytes, hash_to_debug_string}
 import gleamunison/inference.{infer_term}
-import gleamunison/lexer.{tokenize, TokenInfo}
+import gleamunison/lexer.{TokenInfo, tokenize}
 import gleamunison/loader.{ensure_loaded, is_loaded, new_loader_with_limit}
 import gleamunison/log
 import gleamunison/parser.{parse_string}
 import gleamunison/pipeline.{compile_only, elaborate_only, load_and_eval}
 import gleamunison/repl_eval
-import gleamunison/storage.{inmemory, dets}
+import gleamunison/storage.{dets, inmemory}
 import gleamunison/sync_types.{PeerId}
 import gleamunison/types.{empty_cache}
 
@@ -45,7 +45,11 @@ fn ffi_counter(name: BitArray, delta: Int) -> Nil
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn ffi_to_dynamic(val: any) -> Dynamic
@@ -286,7 +290,15 @@ pub fn level1472() -> Nil {
 pub fn level1473() -> Nil {
   io.println("--- Level 1473: Effects ability_key deterministic ---")
   let ref = identity.builtin_state_get()
-  let hex = hash_to_debug_string(ref |> fn(r) { case r { Ref(h) -> h } })
+  let hex =
+    hash_to_debug_string(
+      ref
+      |> fn(r) {
+        case r {
+          Ref(h) -> h
+        }
+      },
+    )
   let key = "m_" <> string.slice(hex, string.length(hex) - 8, 8)
   io.println("Ability key: " <> key)
   let assert 10 = string.length(key)
@@ -303,8 +315,14 @@ pub fn level1474() -> Nil {
 
 pub fn level1475() -> Nil {
   io.println("--- Level 1475: Effects single handler invocation ---")
-  let op0: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_args, cont) { cont(ffi_to_dynamic(99)) }
-  let hf = HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, op0)]))
+  let op0: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(
+    _args,
+    cont,
+  ) {
+    cont(ffi_to_dynamic(99))
+  }
+  let hf =
+    HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, op0)]))
   let cfg = RuntimeConfig([hf])
   let result = effects_run(cfg, fn() { ffi_to_dynamic(1) })
   io.println("Handler thunk: " <> string.inspect(result))
@@ -315,13 +333,14 @@ pub fn level1475() -> Nil {
 
 pub fn level1476() -> Nil {
   io.println("--- Level 1476: Property with non-trivial check ---")
-  let r = ffi_prop(
-    fn() -> Int {
-      let _ = ffi_hash(<<"sha256">>, bit_array.from_string("nontrivial"))
-      0
-    },
-    fn(x: Int) -> Bool { x >= 0 },
-  )
+  let r =
+    ffi_prop(
+      fn() -> Int {
+        let _ = ffi_hash(<<"sha256">>, bit_array.from_string("nontrivial"))
+        0
+      },
+      fn(x: Int) -> Bool { x >= 0 },
+    )
   io.println("Property always-true: " <> string.inspect(r))
   io.println("Level 1476: OK")
 }
@@ -333,7 +352,9 @@ pub fn level1477() -> Nil {
     #("secret", elab_types.SurfaceTermDef(elab_types.SInt(42))),
     #("select", elab_types.SurfaceTermDef(elab_types.SInt(99))),
   ]
-  case repl_eval.do_eval(elab_types.SVar("secret"), "test_spell", cache, prev_defs) {
+  case
+    repl_eval.do_eval(elab_types.SVar("secret"), "test_spell", cache, prev_defs)
+  {
     Ok(#(result, _, _)) -> io.println("secret = " <> result)
     Error(e) -> io.println("Error: " <> e)
   }
@@ -346,7 +367,14 @@ pub fn level1478() -> Nil {
   let prev_defs: List(#(String, elab_types.SurfaceDef)) = [
     #("compute", elab_types.SurfaceTermDef(elab_types.SInt(1))),
   ]
-  case repl_eval.do_eval(elab_types.SVar("comupte"), "test_spell2", cache, prev_defs) {
+  case
+    repl_eval.do_eval(
+      elab_types.SVar("comupte"),
+      "test_spell2",
+      cache,
+      prev_defs,
+    )
+  {
     Ok(_) -> io.println("Unexpected success")
     Error(e) -> {
       let assert True = string.contains(e, "Did you mean")
@@ -437,8 +465,10 @@ fn bulk_n(adapter: storage.StorageAdapter, n: Int) -> Nil {
   case n {
     0 -> Nil
     _ -> {
-      let r = Ref(hash_bytes(bit_array.from_string("bulk11_" <> int.to_string(n))))
-      let _ = adapter.insert(r, bit_array.from_string("d11_" <> int.to_string(n)))
+      let r =
+        Ref(hash_bytes(bit_array.from_string("bulk11_" <> int.to_string(n))))
+      let _ =
+        adapter.insert(r, bit_array.from_string("d11_" <> int.to_string(n)))
       bulk_n(adapter, n - 1)
     }
   }
@@ -495,7 +525,13 @@ pub fn level1486() -> Nil {
   let tokens = tokenize("(let\n  x\n  42)")
   let _ = case tokens {
     [TokenInfo(lexer.LParen, l1, c1), ..] -> {
-      io.println("First token position: (" <> int.to_string(l1) <> "," <> int.to_string(c1) <> ")")
+      io.println(
+        "First token position: ("
+        <> int.to_string(l1)
+        <> ","
+        <> int.to_string(c1)
+        <> ")",
+      )
     }
     _ -> io.println("Unexpected tokens")
   }
@@ -512,7 +548,9 @@ pub fn level1487() -> Nil {
 
 pub fn level1488() -> Nil {
   io.println("--- Level 1488: Parser nested patterns ---")
-  case parse_string("(match (pair 1 (pair 2 3)) ((pair a (pair b c)) (add a b)))") {
+  case
+    parse_string("(match (pair 1 (pair 2 3)) ((pair a (pair b c)) (add a b)))")
+  {
     Ok(term) -> io.println("Nested pattern: " <> string.inspect(term))
     Error(e) -> io.println("Parse error: " <> e.message)
   }
@@ -532,14 +570,18 @@ pub fn level1489() -> Nil {
 
 pub fn level1490() -> Nil {
   io.println("--- Level 1490: Compile guarded match ---")
-  let t = ast.Match(ast.Int(42), [
-    ast.Case(ast.PatInt(42), Some(ast.GuardTerm(ast.Int(1))), ast.Int(100)),
-    ast.Case(ast.PatInt(0), None, ast.Int(0)),
-  ])
+  let t =
+    ast.Match(ast.Int(42), [
+      ast.Case(ast.PatInt(42), Some(ast.GuardTerm(ast.Int(1))), ast.Int(100)),
+      ast.Case(ast.PatInt(0), None, ast.Int(0)),
+    ])
   let d = ast.TermDef(t, ast.Builtin(ast.IntType))
   let r = Ref(hash_of_definition(d))
   case compile_definition(new_compiler(), d, r) {
-    Ok(b) -> io.println("Guarded match: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "Guarded match: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("Compile error: " <> string.inspect(e))
   }
   io.println("Level 1490: OK")
@@ -548,17 +590,28 @@ pub fn level1490() -> Nil {
 pub fn level1491() -> Nil {
   io.println("--- Level 1491: Compile TypeDef + AbilityDecl ---")
   let td = ast.TypeDef(ast.Structural(Local(0), [], []))
-  let rt = Ref(hash_of_definition(ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))))
+  let rt =
+    Ref(hash_of_definition(ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))))
   case compile_definition(new_compiler(), td, rt) {
-    Ok(b) -> io.println("TypeDef: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "TypeDef: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("TypeDef error: " <> string.inspect(e))
   }
-  let ad = ast.AbilityDecl(ast.AbilityDeclaration(Local(0), [
-    ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
-  ]))
-  let ra = Ref(hash_of_definition(ast.TermDef(ast.Int(2), ast.Builtin(ast.IntType))))
+  let ad =
+    ast.AbilityDecl(
+      ast.AbilityDeclaration(Local(0), [
+        ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
+      ]),
+    )
+  let ra =
+    Ref(hash_of_definition(ast.TermDef(ast.Int(2), ast.Builtin(ast.IntType))))
   case compile_definition(new_compiler(), ad, ra) {
-    Ok(b) -> io.println("AbilityDecl: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "AbilityDecl: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("AbilityDecl error: " <> string.inspect(e))
   }
   io.println("Level 1491: OK")
@@ -572,14 +625,15 @@ pub fn level1492() -> Nil {
   let r1 = Ref(hash_of_definition(d1))
   let r2 = Ref(hash_of_definition(d2))
   case ensure_loaded(ld, r1, d1) {
-    Ok(ld2) -> case ensure_loaded(ld2, r2, d2) {
-      Ok(ld3) -> {
-        let assert True = is_loaded(ld3, r1)
-        let assert True = is_loaded(ld3, r2)
-        io.println("Both loaded: OK")
+    Ok(ld2) ->
+      case ensure_loaded(ld2, r2, d2) {
+        Ok(ld3) -> {
+          let assert True = is_loaded(ld3, r1)
+          let assert True = is_loaded(ld3, r2)
+          io.println("Both loaded: OK")
+        }
+        Error(_) -> io.println("Load r2 failed")
       }
-      Error(_) -> io.println("Load r2 failed")
-    }
     Error(_) -> io.println("Load r1 failed")
   }
   io.println("Level 1492: OK")
@@ -616,7 +670,9 @@ pub fn level1495() -> Nil {
 
 pub fn level1496() -> Nil {
   io.println("--- Level 1496: Parse + Elaborate + Eval cross ---")
-  case library_eval("(list-length (list-map (lam x (add x 10)) (list 1 2 3)))") {
+  case
+    library_eval("(list-length (list-map (lam x (add x 10)) (list 1 2 3)))")
+  {
     Ok(r) -> io.println("pipeline = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
   }
@@ -633,7 +689,10 @@ pub fn level1497() -> Nil {
   let def = ast.TermDef(ast.Int(77), ast.Builtin(ast.IntType))
   let r = Ref(hash_of_definition(def))
   case compile_definition(new_compiler(), def, r) {
-    Ok(b) -> io.println("Compiled: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "Compiled: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("Compile error: " <> string.inspect(e))
   }
   io.println("Level 1497: OK")
@@ -654,18 +713,34 @@ pub fn level1498() -> Nil {
 pub fn level1499() -> Nil {
   io.println("--- Level 1499: Batch 11 summary ---")
   io.println("v11 levels 1451-1500")
-  io.println("  Arithmetic builtins (1451-1458): add, sub, mul, div, mod, eq?, lt?, gt?, lambdas + apply")
+  io.println(
+    "  Arithmetic builtins (1451-1458): add, sub, mul, div, mod, eq?, lt?, gt?, lambdas + apply",
+  )
   io.println("  String builtins (1459-1462): length, upcase, contains?, concat")
-  io.println("  List+Pair builtins (1463-1466): list-length, reverse, map, pair fst snd")
+  io.println(
+    "  List+Pair builtins (1463-1466): list-length, reverse, map, pair fst snd",
+  )
   io.println("  Bool builtins (1467-1468): and, or, not")
   io.println("  Let+Match (1469-1471): nested let, match int, match variable")
-  io.println("  Effects dispatch (1472-1475): do+print, ability_key, empty handler, single handler")
-  io.println("  Property+Spelling (1476-1478): non-trivial property, distance 0, distance 2")
+  io.println(
+    "  Effects dispatch (1472-1475): do+print, ability_key, empty handler, single handler",
+  )
+  io.println(
+    "  Property+Spelling (1476-1478): non-trivial property, distance 0, distance 2",
+  )
   io.println("  Typecheck+Elaborate (1479-1481): multi-ref, guard, handle+do")
-  io.println("  Storage deeper (1482-1485): Mnesia lifecycle, 1000-insert, DETS survive, list_refs")
-  io.println("  Lexer+Parser (1486-1489): token positions, complex escapes, nested patterns, use rest")
-  io.println("  Compile+Load (1490-1492): guarded match, TypeDef+AbilityDecl, dual loader")
-  io.println("  Integration (1493-1500): chain eval, string-slice, list-filter, pipeline, cross-module, summary, cert")
+  io.println(
+    "  Storage deeper (1482-1485): Mnesia lifecycle, 1000-insert, DETS survive, list_refs",
+  )
+  io.println(
+    "  Lexer+Parser (1486-1489): token positions, complex escapes, nested patterns, use rest",
+  )
+  io.println(
+    "  Compile+Load (1490-1492): guarded match, TypeDef+AbilityDecl, dual loader",
+  )
+  io.println(
+    "  Integration (1493-1500): chain eval, string-slice, list-filter, pipeline, cross-module, summary, cert",
+  )
   io.println("Level 1499: OK")
 }
 
@@ -675,13 +750,27 @@ pub fn level1500() -> Nil {
   io.println("  v2 (1001-1048): Language features + stdlib basics")
   io.println("  v3 (1049-1100): HTTP, JSON, DateTime, Filepath, Crypto")
   io.println("  v4 (1101-1150): Pipeline, Storage, Sync, REPL, Abilities")
-  io.println("  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed")
-  io.println("  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules")
-  io.println("  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs")
-  io.println("  v8 (1301-1350): HTTP client, Parser special forms, Config deeper, Health deeper, Datetime deeper, Filepath deeper, Inference errors, Elaboration deeper, Codebase deeper, Lower+Jets, Storage part DETS")
-  io.println("  v9 (1351-1400): TCP sync deep, Compile all variants, Inference helpers, Loader deeper, Elaboration AbilityDef, Effects multi-op, Jet+REPL+Property, Parser patterns, Elaboration context, Codebase deeper")
-  io.println("  v10 (1401-1450): HTTP route coverage, normalize+substitute deeper, REPL error codes, Lexer edges, Parser edges, Codebase stress, SConstruct elaboration, Compile edges, Inference deeper, Sync+Jet+Property")
-  io.println("  v11 (1451-1500): Arithmetic builtins, String builtins, List+Pair builtins, Bool builtins, Let+Match expressions, Effects dispatch, Property+Spelling, Typecheck+Elaborate, Storage Mnesia, Lexer+Parser, Compile+Load, Integration")
+  io.println(
+    "  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed",
+  )
+  io.println(
+    "  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules",
+  )
+  io.println(
+    "  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs",
+  )
+  io.println(
+    "  v8 (1301-1350): HTTP client, Parser special forms, Config deeper, Health deeper, Datetime deeper, Filepath deeper, Inference errors, Elaboration deeper, Codebase deeper, Lower+Jets, Storage part DETS",
+  )
+  io.println(
+    "  v9 (1351-1400): TCP sync deep, Compile all variants, Inference helpers, Loader deeper, Elaboration AbilityDef, Effects multi-op, Jet+REPL+Property, Parser patterns, Elaboration context, Codebase deeper",
+  )
+  io.println(
+    "  v10 (1401-1450): HTTP route coverage, normalize+substitute deeper, REPL error codes, Lexer edges, Parser edges, Codebase stress, SConstruct elaboration, Compile edges, Inference deeper, Sync+Jet+Property",
+  )
+  io.println(
+    "  v11 (1451-1500): Arithmetic builtins, String builtins, List+Pair builtins, Bool builtins, Let+Match expressions, Effects dispatch, Property+Spelling, Typecheck+Elaborate, Storage Mnesia, Lexer+Parser, Compile+Load, Integration",
+  )
   io.println("Total real dogfood levels: 521")
   io.println("  + 51 unit tests")
   io.println("  = 572 total conformance verifications")

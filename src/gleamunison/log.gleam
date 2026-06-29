@@ -14,7 +14,12 @@ pub type LogEntry {
 }
 
 @external(erlang, "gleamunison_log", "log_entry")
-fn ffi_log_entry(level: String, message: String, context_keys: List(String), context_vals: List(String)) -> Nil
+fn ffi_log_entry(
+  level: String,
+  message: String,
+  context_keys: List(String),
+  context_vals: List(String),
+) -> Nil
 
 fn level_to_string(level: LogLevel) -> String {
   case level {
@@ -25,11 +30,13 @@ fn level_to_string(level: LogLevel) -> String {
   }
 }
 
-fn emit(level: LogLevel, message: String, context: Dict(String, String)) -> Nil {
+fn emit(
+  level: LogLevel,
+  message: String,
+  context: Dict(String, String),
+) -> Nil {
   let keys = dict.keys(context)
-  let vals = list.map(keys, fn(k) {
-    result.unwrap(dict.get(context, k), "")
-  })
+  let vals = list.map(keys, fn(k) { result.unwrap(dict.get(context, k), "") })
   ffi_log_entry(level_to_string(level), message, keys, vals)
 }
 

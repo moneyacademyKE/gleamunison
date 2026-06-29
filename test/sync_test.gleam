@@ -34,8 +34,11 @@ pub fn pull_sync_over_tcp_test() {
 
   case pull_sync(state, peer, cb) {
     Ok(#(_next_state, _cb, new_refs)) ->
-      io.println("Sync returned " <> int.to_string(list.length(new_refs)) <> " refs")
-    Error(e) -> io.println("Sync error (may be expected): " <> string.inspect(e))
+      io.println(
+        "Sync returned " <> int.to_string(list.length(new_refs)) <> " refs",
+      )
+    Error(e) ->
+      io.println("Sync error (may be expected): " <> string.inspect(e))
   }
 }
 

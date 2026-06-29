@@ -1,72 +1,88 @@
 import gleam/bit_array
+import gleam/dict
 import gleam/int
 import gleam/io
-import gleam/string
-import gleam/dict
 import gleam/list
 import gleam/option
-import gleamunison/identity.{type DefinitionRef, type Hash, Ref, Local, hash_bytes, hash_to_short_string, hash_to_debug_string}
-import gleamunison/crypto as crypto
-import gleamunison/json
-import gleamunison/metrics
-import gleamunison/http_client.{get as http_get}
-import gleamunison/http.{start_server, stop_server}
-import gleamunison/log
-import gleamunison/health.{
-  type HealthStatus, type HealthCheck, HealthCheck, Healthy, Degraded, Unhealthy,
-  run_checks, readiness, run_all,
-}
-import gleamunison/datetime.{now, to_iso8601, add_seconds}
-import gleamunison/filepath.{from_string, to_string, join, has_extension, is_absolute, root, with_extension}
-import gleamunison/template.{render}
-import gleamunison/config.{StringVal, IntVal, BoolVal, load, with_cli, get_string, get_int, get_bool}
-import gleamunison/effects.{type RuntimeConfig, RuntimeConfig}
+import gleam/string
 import gleamunison/ast
-import gleamunison/types.{
-  type TypeCache, CTAbility, CTTerm, TypeCache, empty_cache,
-  type OperationType, OperationType, validate_handler,
-}
-import gleamunison/inference.{infer_term, check_linearity}
-import gleamunison/infer_helper.{substitute, normalize_type, list_all_match}
-import gleamunison/compile.{new as new_compiler, compile_definition, module_name_for}
-import gleamunison/loader.{new_loader, new_loader_with_limit, ensure_loaded, is_loaded}
-import gleamunison/storage.{inmemory, dets, type StorageAdapter}
 import gleamunison/codebase.{
-  insert as cb_insert, hash_of_definition, empty as empty_codebase,
+  empty as empty_codebase, hash_of_definition, insert as cb_insert,
 }
-import gleamunison/repl.{eval_string, eval_string_unique}
-import gleamunison/parser.{parse_string}
-import gleamunison/elaborate.{elaborate_unit}
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
+import gleamunison/config.{
+  BoolVal, IntVal, StringVal, get_bool, get_int, get_string, load, with_cli,
+}
+import gleamunison/crypto
+import gleamunison/datetime.{add_seconds, now, to_iso8601}
+import gleamunison/effects.{type RuntimeConfig, RuntimeConfig}
 import gleamunison/elab_types.{
-  SurfaceUnit, SurfaceTermDef, SurfaceAbilityDef, SurfaceTypeAlias,
-  SurfacePubTypeAlias, TVar, TFun, TBuiltin, TInt, TFloat, TText, TList,
+  SurfaceAbilityDef, SurfacePubTypeAlias, SurfaceTermDef, SurfaceTypeAlias,
+  SurfaceUnit, TBuiltin, TFloat, TFun, TInt, TList, TText, TVar,
 }
-import gleamunison/typecheck.{typecheck_unit}
+import gleamunison/elaborate.{elaborate_unit}
+import gleamunison/filepath.{
+  from_string, has_extension, is_absolute, join, root, to_string, with_extension,
+}
+import gleamunison/health.{
+  type HealthCheck, type HealthStatus, Degraded, HealthCheck, Healthy, Unhealthy,
+  readiness, run_all, run_checks,
+}
+import gleamunison/http.{start_server, stop_server}
+import gleamunison/http_client.{get as http_get}
+import gleamunison/identity.{
+  type DefinitionRef, type Hash, Local, Ref, hash_bytes, hash_to_debug_string,
+  hash_to_short_string,
+}
+import gleamunison/infer_helper.{list_all_match, normalize_type, substitute}
+import gleamunison/inference.{check_linearity, infer_term}
+import gleamunison/jets.{get_jet}
+import gleamunison/json
+import gleamunison/lexer.{tokenize}
+import gleamunison/loader.{
+  ensure_loaded, is_loaded, new_loader, new_loader_with_limit,
+}
+import gleamunison/log
+import gleamunison/metrics
+import gleamunison/parser.{parse_string}
+import gleamunison/pipeline.{compile_only, load_and_eval, ref_for_name}
+import gleamunison/repl.{eval_string, eval_string_unique}
+import gleamunison/repl_io.{count_brackets}
+import gleamunison/storage.{type StorageAdapter, dets, inmemory}
 import gleamunison/sync.{new_sync_state, pull_sync, push_sync}
 import gleamunison/sync_types.{
-  Connected, Disconnected, Syncing, Failed, PeerId, ConnectionFailed, PeerNotFound,
+  Connected, ConnectionFailed, Disconnected, Failed, PeerId, PeerNotFound,
+  Syncing,
 }
-import gleamunison/jets.{get_jet}
-import gleamunison/pipeline.{compile_only, load_and_eval, ref_for_name}
-import gleamunison/lexer.{tokenize}
-import gleamunison/repl_io.{count_brackets}
+import gleamunison/template.{render}
 import gleamunison/type_pretty.{pretty_print}
+import gleamunison/typecheck.{typecheck_unit}
+import gleamunison/types.{
+  type OperationType, type TypeCache, CTAbility, CTTerm, OperationType,
+  TypeCache, empty_cache, validate_handler,
+}
 
-fn range(_start: Int, _end: Int) -> List(Int) { [] }
+fn range(_start: Int, _end: Int) -> List(Int) {
+  []
+}
 
 // --- COMPILE STRESS (2101-2103) ---
 
 pub fn level2101() -> Nil {
   io.println("--- Level 2101: Compile 500 simple int defs ---")
   let compiler = new_compiler()
-  let ok = list.fold(range(1, 500), 0, fn(a, n) {
-    let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
-    let h = hash_bytes(bit_array.from_string("s500_" <> int.to_string(n) <> "_v21"))
-    case compile_definition(compiler, def, Ref(h)) {
-      Ok(_) -> a + 1
-      Error(_) -> a
-    }
-  })
+  let ok =
+    list.fold(range(1, 500), 0, fn(a, n) {
+      let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
+      let h =
+        hash_bytes(bit_array.from_string("s500_" <> int.to_string(n) <> "_v21"))
+      case compile_definition(compiler, def, Ref(h)) {
+        Ok(_) -> a + 1
+        Error(_) -> a
+      }
+    })
   io.println("Compiled " <> int.to_string(ok) <> "/500 int defs")
   io.println("Level 2101: OK")
 }
@@ -74,17 +90,22 @@ pub fn level2101() -> Nil {
 pub fn level2102() -> Nil {
   io.println("--- Level 2102: Compile 200 lambda defs ---")
   let compiler = new_compiler()
-  let ok = list.fold(range(1, 200), 0, fn(a, n) {
-    let lam = ast.TermDef(
-      ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
-      ast.Fn([ast.TypeVar(0)], ast.TypeVar(0), ast.Required([])),
-    )
-    let h = hash_bytes(bit_array.from_string("lam200_" <> int.to_string(n) <> "_v21"))
-    case compile_definition(compiler, lam, Ref(h)) {
-      Ok(_) -> a + 1
-      Error(_) -> a
-    }
-  })
+  let ok =
+    list.fold(range(1, 200), 0, fn(a, n) {
+      let lam =
+        ast.TermDef(
+          ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
+          ast.Fn([ast.TypeVar(0)], ast.TypeVar(0), ast.Required([])),
+        )
+      let h =
+        hash_bytes(bit_array.from_string(
+          "lam200_" <> int.to_string(n) <> "_v21",
+        ))
+      case compile_definition(compiler, lam, Ref(h)) {
+        Ok(_) -> a + 1
+        Error(_) -> a
+      }
+    })
   io.println("Compiled " <> int.to_string(ok) <> "/200 lambda defs")
   io.println("Level 2102: OK")
 }
@@ -92,23 +113,37 @@ pub fn level2102() -> Nil {
 pub fn level2103() -> Nil {
   io.println("--- Level 2103: Compile TypeDef + AbilityDecl stress ---")
   let compiler = new_compiler()
-  let td_ok = list.fold(range(1, 100), 0, fn(a, n) {
-    let td = ast.TypeDef(ast.Structural(name: Local(0), parameters: [], constructors: []))
-    let h = hash_bytes(bit_array.from_string("td100_" <> int.to_string(n) <> "_v21"))
-    case compile_definition(compiler, td, Ref(h)) {
-      Ok(_) -> a + 1
-      Error(_) -> a
-    }
-  })
-  let ab_ok = list.fold(range(1, 100), 0, fn(a, n) {
-    let ab = ast.AbilityDecl(ast.AbilityDeclaration(name: Local(0), operations: []))
-    let h = hash_bytes(bit_array.from_string("ab100_" <> int.to_string(n) <> "_v21"))
-    case compile_definition(compiler, ab, Ref(h)) {
-      Ok(_) -> a + 1
-      Error(_) -> a
-    }
-  })
-  io.println("TypeDefs " <> int.to_string(td_ok) <> "/100, AbilityDecls " <> int.to_string(ab_ok) <> "/100")
+  let td_ok =
+    list.fold(range(1, 100), 0, fn(a, n) {
+      let td =
+        ast.TypeDef(
+          ast.Structural(name: Local(0), parameters: [], constructors: []),
+        )
+      let h =
+        hash_bytes(bit_array.from_string("td100_" <> int.to_string(n) <> "_v21"))
+      case compile_definition(compiler, td, Ref(h)) {
+        Ok(_) -> a + 1
+        Error(_) -> a
+      }
+    })
+  let ab_ok =
+    list.fold(range(1, 100), 0, fn(a, n) {
+      let ab =
+        ast.AbilityDecl(ast.AbilityDeclaration(name: Local(0), operations: []))
+      let h =
+        hash_bytes(bit_array.from_string("ab100_" <> int.to_string(n) <> "_v21"))
+      case compile_definition(compiler, ab, Ref(h)) {
+        Ok(_) -> a + 1
+        Error(_) -> a
+      }
+    })
+  io.println(
+    "TypeDefs "
+    <> int.to_string(td_ok)
+    <> "/100, AbilityDecls "
+    <> int.to_string(ab_ok)
+    <> "/100",
+  )
   io.println("Level 2103: OK")
 }
 
@@ -117,13 +152,17 @@ pub fn level2103() -> Nil {
 pub fn level2104() -> Nil {
   io.println("--- Level 2104: Inmemory 10000 insert stress ---")
   let adapter: StorageAdapter = inmemory()
-  let ok = list.fold(range(1, 10000), 0, fn(a, n) {
-    let ref = hash_bytes(bit_array.from_string("mem10k_" <> int.to_string(n) <> "_v21"))
-    case adapter.insert(Ref(ref), bit_array.from_string("d")) {
-      Ok(_) -> a + 1
-      Error(_) -> a
-    }
-  })
+  let ok =
+    list.fold(range(1, 10_000), 0, fn(a, n) {
+      let ref =
+        hash_bytes(bit_array.from_string(
+          "mem10k_" <> int.to_string(n) <> "_v21",
+        ))
+      case adapter.insert(Ref(ref), bit_array.from_string("d")) {
+        Ok(_) -> a + 1
+        Error(_) -> a
+      }
+    })
   io.println("Inmemory 10k: " <> int.to_string(ok) <> " inserts")
   io.println("Level 2104: OK")
 }
@@ -131,26 +170,33 @@ pub fn level2104() -> Nil {
 pub fn level2105() -> Nil {
   io.println("--- Level 2105: Loader 100 sequential with limit=20 ---")
   let ldr = new_loader_with_limit(20)
-  let result = list.fold(range(1, 100), #(ldr, 0), fn(a, n) {
-    let #(cur, ok) = a
-    let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
-    let ref = Ref(hash_bytes(bit_array.from_string("l100_" <> int.to_string(n) <> "_v21")))
-    case ensure_loaded(cur, ref, def) {
-      Ok(nxt) -> #(nxt, ok + 1)
-      Error(#(nxt, _)) -> #(nxt, ok)
-    }
-  })
+  let result =
+    list.fold(range(1, 100), #(ldr, 0), fn(a, n) {
+      let #(cur, ok) = a
+      let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
+      let ref =
+        Ref(
+          hash_bytes(bit_array.from_string(
+            "l100_" <> int.to_string(n) <> "_v21",
+          )),
+        )
+      case ensure_loaded(cur, ref, def) {
+        Ok(nxt) -> #(nxt, ok + 1)
+        Error(#(nxt, _)) -> #(nxt, ok)
+      }
+    })
   io.println("Loader 100 loads: " <> int.to_string(result.1) <> " loaded")
   io.println("Level 2105: OK")
 }
 
 pub fn level2106() -> Nil {
   io.println("--- Level 2106: Codebase 200-def insert ---")
-  let defs = list.map(range(1, 200), fn(n) {
-    let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
-    let h = hash_of_definition(def)
-    #(Ref(h), def)
-  })
+  let defs =
+    list.map(range(1, 200), fn(n) {
+      let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
+      let h = hash_of_definition(def)
+      #(Ref(h), def)
+    })
   let unit = ast.Unit(Ref(hash_bytes(bit_array.from_string("u200_v21"))), defs)
   case cb_insert(empty_codebase(), unit) {
     Ok(_) -> io.println("200-def unit: OK")
@@ -163,7 +209,10 @@ pub fn level2106() -> Nil {
 
 pub fn level2107() -> Nil {
   io.println("--- Level 2107: type_pretty App multi-param ---")
-  let t = ast.App(Ref(hash_bytes(bit_array.from_string("P_v21"))), [ast.Builtin(ast.IntType)])
+  let t =
+    ast.App(Ref(hash_bytes(bit_array.from_string("P_v21"))), [
+      ast.Builtin(ast.IntType),
+    ])
   let s = pretty_print(t)
   io.println("App → " <> s)
   io.println("Level 2107: OK")
@@ -179,7 +228,12 @@ pub fn level2108() -> Nil {
 
 pub fn level2109() -> Nil {
   io.println("--- Level 2109: type_pretty Fn 3 params + ReqVar ---")
-  let t = ast.Fn([ast.Builtin(ast.IntType), ast.Builtin(ast.IntType)], ast.Builtin(ast.IntType), ast.Required([ast.ReqVar(0)]))
+  let t =
+    ast.Fn(
+      [ast.Builtin(ast.IntType), ast.Builtin(ast.IntType)],
+      ast.Builtin(ast.IntType),
+      ast.Required([ast.ReqVar(0)]),
+    )
   let s = pretty_print(t)
   io.println("Fn+ReqVar → " <> s)
   io.println("Level 2109: OK")
@@ -195,7 +249,18 @@ pub fn level2110() -> Nil {
 
 pub fn level2111() -> Nil {
   io.println("--- Level 2111: type_pretty all 6 builtins ---")
-  let ts = list.map([ast.IntType, ast.FloatType, ast.TextType, ast.BoolType, ast.ListType, ast.HandlerType], fn(b) { ast.Builtin(b) })
+  let ts =
+    list.map(
+      [
+        ast.IntType,
+        ast.FloatType,
+        ast.TextType,
+        ast.BoolType,
+        ast.ListType,
+        ast.HandlerType,
+      ],
+      fn(b) { ast.Builtin(b) },
+    )
   io.println("Builtins: " <> string.join(list.map(ts, pretty_print), " "))
   io.println("Level 2111: OK")
 }
@@ -206,7 +271,10 @@ pub fn level2112() -> Nil {
   io.println("--- Level 2112: Elaborate if form ---")
   case parse_string("(if (eq? 2 2) 10 20)") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("if_v21"))), [#("t", SurfaceTermDef(st))])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("if_v21"))), [
+          #("t", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("if elaborated: OK")
         Error(e) -> io.println("if elab err: " <> string.inspect(e))
@@ -221,7 +289,10 @@ pub fn level2113() -> Nil {
   io.println("--- Level 2113: Elaborate define form ---")
   case parse_string("(define x 42)") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("def_v21"))), [#("x", SurfaceTermDef(st))])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("def_v21"))), [
+          #("x", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("define elaborated: OK")
         Error(e) -> io.println("def elab err: " <> string.inspect(e))
@@ -236,7 +307,10 @@ pub fn level2114() -> Nil {
   io.println("--- Level 2114: Elaborate list form ---")
   case parse_string("(list 1 2 3)") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("list_v21"))), [#("l", SurfaceTermDef(st))])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("list_v21"))), [
+          #("l", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("list elaborated: OK")
         Error(e) -> io.println("list elab err: " <> string.inspect(e))
@@ -251,7 +325,10 @@ pub fn level2115() -> Nil {
   io.println("--- Level 2115: Elaborate string literal ---")
   case parse_string("\"hello world\"") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("str_v21"))), [#("s", SurfaceTermDef(st))])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("str_v21"))), [
+          #("s", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("string elaborated: OK")
         Error(e) -> io.println("str elab err: " <> string.inspect(e))
@@ -284,7 +361,9 @@ pub fn level2117() -> Nil {
 
 pub fn level2118() -> Nil {
   io.println("--- Level 2118: eval_string string ops chain ---")
-  case eval_string("(string-length (string-trim (string-upcase \" hello \")))") {
+  case
+    eval_string("(string-length (string-trim (string-upcase \" hello \")))")
+  {
     Ok(r) -> io.println("String chain: " <> r)
     Error(e) -> io.println("String chain error: " <> string.inspect(e))
   }
@@ -302,13 +381,17 @@ pub fn level2119() -> Nil {
 
 pub fn level2120() -> Nil {
   io.println("--- Level 2120: eval_string_unique 5 calls ---")
-  let rs = list.map(range(1, 5), fn(n) { eval_string_unique("(add " <> int.to_string(n) <> " 10)") })
-  let okc = list.fold(rs, 0, fn(a, r) {
-    case r {
-      Ok(_) -> a + 1
-      Error(_) -> a
-    }
-  })
+  let rs =
+    list.map(range(1, 5), fn(n) {
+      eval_string_unique("(add " <> int.to_string(n) <> " 10)")
+    })
+  let okc =
+    list.fold(rs, 0, fn(a, r) {
+      case r {
+        Ok(_) -> a + 1
+        Error(_) -> a
+      }
+    })
   io.println("5 unique evals ok: " <> int.to_string(okc))
   io.println("Level 2120: OK")
 }
@@ -317,7 +400,11 @@ pub fn level2120() -> Nil {
 
 pub fn level2121() -> Nil {
   io.println("--- Level 2121: compile_only + load_and_eval identity ---")
-  let def = ast.TermDef(ast.Lambda(Local(0), ast.LocalVarRef(Local(0))), ast.Fn([ast.TypeVar(0)], ast.TypeVar(0), ast.Required([])))
+  let def =
+    ast.TermDef(
+      ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
+      ast.Fn([ast.TypeVar(0)], ast.TypeVar(0), ast.Required([])),
+    )
   let h = hash_bytes(bit_array.from_string("rt_v21"))
   case compile_only(def, Ref(h)) {
     Ok(b) -> {
@@ -337,7 +424,8 @@ pub fn level2122() -> Nil {
   let def = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
   let h = hash_bytes(bit_array.from_string("ci_v21"))
   case compile_only(def, Ref(h)) {
-    Ok(b) -> { let m = module_name_for(Ref(h))
+    Ok(b) -> {
+      let m = module_name_for(Ref(h))
       case load_and_eval(m, b) {
         Ok(r) -> io.println("Int roundtrip: " <> r)
         Error(e) -> io.println("L&E err: " <> string.inspect(e))
@@ -350,10 +438,15 @@ pub fn level2122() -> Nil {
 
 pub fn level2123() -> Nil {
   io.println("--- Level 2123: compile_only + load_and_eval text ---")
-  let def = ast.TermDef(ast.Text(bit_array.from_string("hi")), ast.Builtin(ast.TextType))
+  let def =
+    ast.TermDef(
+      ast.Text(bit_array.from_string("hi")),
+      ast.Builtin(ast.TextType),
+    )
   let h = hash_bytes(bit_array.from_string("ct_v21"))
   case compile_only(def, Ref(h)) {
-    Ok(b) -> { let m = module_name_for(Ref(h))
+    Ok(b) -> {
+      let m = module_name_for(Ref(h))
       case load_and_eval(m, b) {
         Ok(r) -> io.println("Text: " <> string.slice(r, 0, 20))
         Error(e) -> io.println("L&E err: " <> string.inspect(e))
@@ -366,10 +459,12 @@ pub fn level2123() -> Nil {
 
 pub fn level2124() -> Nil {
   io.println("--- Level 2124: compile_only + load_and_eval list ---")
-  let def = ast.TermDef(ast.List([ast.Int(1), ast.Int(2)]), ast.Builtin(ast.ListType))
+  let def =
+    ast.TermDef(ast.List([ast.Int(1), ast.Int(2)]), ast.Builtin(ast.ListType))
   let h = hash_bytes(bit_array.from_string("cl_v21"))
   case compile_only(def, Ref(h)) {
-    Ok(b) -> { let m = module_name_for(Ref(h))
+    Ok(b) -> {
+      let m = module_name_for(Ref(h))
       case load_and_eval(m, b) {
         Ok(r) -> io.println("List: " <> string.slice(r, 0, 20))
         Error(e) -> io.println("L&E err: " <> string.inspect(e))
@@ -385,7 +480,8 @@ pub fn level2125() -> Nil {
   let def = ast.TermDef(ast.List([]), ast.Builtin(ast.ListType))
   let h = hash_bytes(bit_array.from_string("ce_v21"))
   case compile_only(def, Ref(h)) {
-    Ok(b) -> { let m = module_name_for(Ref(h))
+    Ok(b) -> {
+      let m = module_name_for(Ref(h))
       case load_and_eval(m, b) {
         Ok(r) -> io.println("Empty list: " <> string.slice(r, 0, 20))
         Error(e) -> io.println("L&E err: " <> string.inspect(e))
@@ -441,10 +537,12 @@ pub fn level2131() -> Nil {
   let o = dict.from_list([#("t", IntVal(8)), #("v", BoolVal(False))])
   let c2 = with_cli(cfg, o)
   case get_int(c2, "t") {
-    Ok(t) -> case get_bool(c2, "v") {
-      Ok(v) -> io.println("t=" <> int.to_string(t) <> " v=" <> string.inspect(v))
-      Error(_) -> io.println("v not found")
-    }
+    Ok(t) ->
+      case get_bool(c2, "v") {
+        Ok(v) ->
+          io.println("t=" <> int.to_string(t) <> " v=" <> string.inspect(v))
+        Error(_) -> io.println("v not found")
+      }
     Error(_) -> io.println("t not found")
   }
   io.println("Level 2131: OK")
@@ -452,7 +550,7 @@ pub fn level2131() -> Nil {
 
 pub fn level2132() -> Nil {
   io.println("--- Level 2132: Template repeated variable ---")
-  case render("{{x}} + {{x}} = {{y}}", [#("x","5"), #("y","10")]) {
+  case render("{{x}} + {{x}} = {{y}}", [#("x", "5"), #("y", "10")]) {
     Ok(r) -> io.println("Repeated var: " <> r)
     Error(e) -> io.println("Tmpl error: " <> string.inspect(e))
   }
@@ -461,7 +559,7 @@ pub fn level2132() -> Nil {
 
 pub fn level2133() -> Nil {
   io.println("--- Level 2133: Template curly braces in text ---")
-  case render("Result: {{v}} (raw: {})", [#("v","OK")]) {
+  case render("Result: {{v}} (raw: {})", [#("v", "OK")]) {
     Ok(r) -> io.println("Curly in text: " <> r)
     Error(e) -> io.println("Tmpl error: " <> string.inspect(e))
   }
@@ -481,10 +579,26 @@ pub fn level2134() -> Nil {
 pub fn level2135() -> Nil {
   io.println("--- Level 2135: validate_handler 2 ops, handler for 1 ---")
   let ab = Ref(hash_bytes(bit_array.from_string("val2_v21")))
-  let cache = TypeCache(entries: dict.from_list([#(ab, CTAbility([
-    OperationType(name: option.Some("a"), inputs: [], output: ast.Builtin(ast.IntType)),
-    OperationType(name: option.Some("b"), inputs: [ast.Builtin(ast.IntType)], output: ast.Builtin(ast.IntType)),
-  ]))]))
+  let cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(
+          ab,
+          CTAbility([
+            OperationType(
+              name: option.Some("a"),
+              inputs: [],
+              output: ast.Builtin(ast.IntType),
+            ),
+            OperationType(
+              name: option.Some("b"),
+              inputs: [ast.Builtin(ast.IntType)],
+              output: ast.Builtin(ast.IntType),
+            ),
+          ]),
+        ),
+      ]),
+    )
   case validate_handler(cache, ab, dict.from_list([#(0, #("a", 0))])) {
     Ok(_) -> io.println("Partial handler: OK")
     Error(e) -> io.println("Partial err: " <> string.inspect(e))
@@ -495,7 +609,19 @@ pub fn level2135() -> Nil {
 pub fn level2136() -> Nil {
   io.println("--- Level 2136: infer_term RefTo with Fn cache hit ---")
   let fn_ref = Ref(hash_bytes(bit_array.from_string("fncache_v21")))
-  let cache = TypeCache(entries: dict.from_list([#(fn_ref, CTTerm(ast.Fn([ast.Builtin(ast.IntType)], ast.Builtin(ast.IntType), ast.Required([]))))]))
+  let cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(
+          fn_ref,
+          CTTerm(ast.Fn(
+            [ast.Builtin(ast.IntType)],
+            ast.Builtin(ast.IntType),
+            ast.Required([]),
+          )),
+        ),
+      ]),
+    )
   case infer_term(ast.RefTo(fn_ref), cache) {
     Ok(typ) -> io.println("RefTo Fn: " <> string.inspect(typ))
     Error(e) -> io.println("RefTo err: " <> string.inspect(e))
@@ -505,7 +631,8 @@ pub fn level2136() -> Nil {
 
 pub fn level2137() -> Nil {
   io.println("--- Level 2137: check_linearity on Construct ---")
-  let c = ast.Construct(Ref(hash_bytes(bit_array.from_string("lc_v21"))), [ast.Int(1)])
+  let c =
+    ast.Construct(Ref(hash_bytes(bit_array.from_string("lc_v21"))), [ast.Int(1)])
   case check_linearity(c, empty_cache()) {
     Ok(_) -> io.println("Construct linearity: OK")
     Error(e) -> io.println("Linearity err: " <> string.inspect(e))
@@ -524,7 +651,12 @@ pub fn level2138() -> Nil {
 
 pub fn level2139() -> Nil {
   io.println("--- Level 2139: check_linearity on RefTo ---")
-  case check_linearity(ast.RefTo(Ref(hash_bytes(bit_array.from_string("lr_v21")))), empty_cache()) {
+  case
+    check_linearity(
+      ast.RefTo(Ref(hash_bytes(bit_array.from_string("lr_v21")))),
+      empty_cache(),
+    )
+  {
     Ok(_) -> io.println("RefTo linearity: OK")
     Error(e) -> io.println("Linearity err: " <> string.inspect(e))
   }
@@ -534,7 +666,8 @@ pub fn level2139() -> Nil {
 pub fn level2140() -> Nil {
   io.println("--- Level 2140: list_all_match 5 homogeneous ---")
   let terms = list.map(range(1, 5), fn(n) { ast.Int(n) })
-  let r = list_all_match(terms, ast.Builtin(ast.IntType), empty_cache(), infer_term)
+  let r =
+    list_all_match(terms, ast.Builtin(ast.IntType), empty_cache(), infer_term)
   io.println("list_all_match 5 ints: " <> string.inspect(r))
   io.println("Level 2140: OK")
 }
@@ -562,14 +695,15 @@ pub fn level2142() -> Nil {
 pub fn level2143() -> Nil {
   io.println("--- Level 2143: PeerStatus all 4 variants ---")
   let ss = [Connected, Disconnected, Syncing, Failed("x")]
-  let ls = list.map(ss, fn(s) {
-    case s {
-      Connected -> "C"
-      Disconnected -> "D"
-      Syncing -> "S"
-      Failed(_) -> "F"
-    }
-  })
+  let ls =
+    list.map(ss, fn(s) {
+      case s {
+        Connected -> "C"
+        Disconnected -> "D"
+        Syncing -> "S"
+        Failed(_) -> "F"
+      }
+    })
   io.println("PeerStatus: " <> string.join(ls, ","))
   io.println("Level 2143: OK")
 }
@@ -587,7 +721,7 @@ pub fn level2144() -> Nil {
 
 pub fn level2145() -> Nil {
   io.println("--- Level 2145: Log all 4 context levels ---")
-  let ctx = dict.from_list([#("k1","v1"), #("k2","v2")])
+  let ctx = dict.from_list([#("k1", "v1"), #("k2", "v2")])
   log.debug_context("b21 debug", ctx)
   log.info_context("b21 info", ctx)
   log.warn_context("b21 warn", ctx)

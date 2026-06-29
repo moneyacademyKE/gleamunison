@@ -15,7 +15,8 @@ pub fn jet_compilation_and_execution_test() {
   let jet_def = TermDef(term: Int(0), typ: ast.Builtin(ast.IntType))
 
   // 2. Compile the jet definition
-  let assert Ok(jet_beam) = compile.compile_definition(compiler, jet_def, jet_ref)
+  let assert Ok(jet_beam) =
+    compile.compile_definition(compiler, jet_def, jet_ref)
 
   // 3. Load the jet module
   let _ = repl_eval.unload_binary(jet_mod)
@@ -29,7 +30,8 @@ pub fn jet_compilation_and_execution_test() {
   let caller_def = TermDef(term: caller_term, typ: ast.Builtin(ast.IntType))
 
   // 5. Compile the caller
-  let assert Ok(caller_beam) = compile.compile_definition(compiler, caller_def, caller_ref)
+  let assert Ok(caller_beam) =
+    compile.compile_definition(compiler, caller_def, caller_ref)
 
   // 6. Load the caller module
   let _ = repl_eval.unload_binary(caller_mod)

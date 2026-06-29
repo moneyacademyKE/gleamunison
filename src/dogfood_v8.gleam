@@ -6,8 +6,12 @@ import gleam/option.{None, Some}
 import gleam/set
 import gleam/string
 import gleamunison/ast
-import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert, insert_raw}
-import gleamunison/compile.{compile_definition, module_name_for, new as new_compiler}
+import gleamunison/codebase.{
+  empty as new_codebase, hash_of_definition, insert, insert_raw,
+}
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
 import gleamunison/config
 import gleamunison/datetime
 import gleamunison/elab_ctx.{empty_elab_ctx}
@@ -16,22 +20,22 @@ import gleamunison/elab_term.{elaborate_term}
 import gleamunison/elab_types
 import gleamunison/elaborate.{elaborate_unit}
 import gleamunison/filepath
-import gleamunison/health.{
-  HealthCheck, run_checks, readiness,
-}
+import gleamunison/health.{HealthCheck, readiness, run_checks}
 import gleamunison/http.{start_server, stop_server}
 import gleamunison/http_client.{delete, get, post, put}
 import gleamunison/identity.{
   Local, Ref, hash_bytes, hash_from_bytes, hash_to_debug_string,
 }
-import gleamunison/inference.{infer_term, check_linearity}
+import gleamunison/inference.{check_linearity, infer_term}
 import gleamunison/jets.{get_jet}
 import gleamunison/lexer.{tokenize}
 import gleamunison/log
 import gleamunison/lower.{lower_type_ref}
 import gleamunison/metrics.{histogram}
 import gleamunison/parser.{parse_string}
-import gleamunison/pipeline.{compile_only, elaborate_only, load_and_eval, parse_only, ref_for_name}
+import gleamunison/pipeline.{
+  compile_only, elaborate_only, load_and_eval, parse_only, ref_for_name,
+}
 import gleamunison/repl_io
 import gleamunison/storage.{inmemory, partitioned_dets}
 import gleamunison/sync.{new_sync_state, pull_sync}
@@ -68,7 +72,11 @@ fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(List(a), b)
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_trace", "list_traces")
 fn ffi_trace_list() -> List(a)
@@ -80,7 +88,7 @@ fn ffi_time() -> Int
 
 pub fn level1301() -> Nil {
   io.println("--- Level 1301: HTTP client get health endpoint ---")
-  start_server(18201)
+  start_server(18_201)
   case get("http://localhost:18201/api/health") {
     Ok(resp) -> io.println("GET /api/health: " <> string.inspect(resp))
     Error(e) -> io.println("GET error: " <> string.inspect(e))
@@ -91,8 +99,10 @@ pub fn level1301() -> Nil {
 
 pub fn level1302() -> Nil {
   io.println("--- Level 1302: HTTP client post ---")
-  start_server(18202)
-  case post("http://localhost:18202/api/eval?expr=42", bit_array.from_string("")) {
+  start_server(18_202)
+  case
+    post("http://localhost:18202/api/eval?expr=42", bit_array.from_string(""))
+  {
     Ok(resp) -> io.println("POST /api/eval: " <> string.inspect(resp))
     Error(e) -> io.println("POST error: " <> string.inspect(e))
   }
@@ -102,8 +112,10 @@ pub fn level1302() -> Nil {
 
 pub fn level1303() -> Nil {
   io.println("--- Level 1303: HTTP client put ---")
-  start_server(18203)
-  case put("http://localhost:18203/api/eval?expr=99", bit_array.from_string("")) {
+  start_server(18_203)
+  case
+    put("http://localhost:18203/api/eval?expr=99", bit_array.from_string(""))
+  {
     Ok(resp) -> io.println("PUT /api/eval: " <> string.inspect(resp))
     Error(e) -> io.println("PUT error: " <> string.inspect(e))
   }
@@ -113,7 +125,7 @@ pub fn level1303() -> Nil {
 
 pub fn level1304() -> Nil {
   io.println("--- Level 1304: HTTP client delete ---")
-  start_server(18204)
+  start_server(18_204)
   case delete("http://localhost:18204/api/health") {
     Ok(resp) -> io.println("DELETE /api/health: " <> string.inspect(resp))
     Error(e) -> io.println("DELETE error: " <> string.inspect(e))
@@ -133,7 +145,7 @@ pub fn level1305() -> Nil {
 
 pub fn level1306() -> Nil {
   io.println("--- Level 1306: HTTP client status route ---")
-  start_server(18206)
+  start_server(18_206)
   case get("http://localhost:18206/api/status") {
     Ok(resp) -> io.println("GET /api/status: " <> string.inspect(resp))
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -243,18 +255,23 @@ pub fn level1316() -> Nil {
 pub fn level1317() -> Nil {
   io.println("--- Level 1317: Config full precedence chain ---")
   let cfg = config.load()
-  let with_toml = config.Config(
-    env: cfg.env,
-    toml: dict.from_list([#("TIER", config.StringVal("toml_val"))]),
-    cli: dict.new(),
-  )
+  let with_toml =
+    config.Config(
+      env: cfg.env,
+      toml: dict.from_list([#("TIER", config.StringVal("toml_val"))]),
+      cli: dict.new(),
+    )
   case config.get_string(with_toml, "TIER") {
     Ok("toml_val") -> io.println("TOML fallback: OK")
     _ -> io.println("TOML fallback: unexpected")
   }
-  let with_cli = config.with_cli(with_toml, dict.from_list([
-    #("TIER", config.StringVal("cli_val")),
-  ]))
+  let with_cli =
+    config.with_cli(
+      with_toml,
+      dict.from_list([
+        #("TIER", config.StringVal("cli_val")),
+      ]),
+    )
   case config.get_string(with_cli, "TIER") {
     Ok("cli_val") -> io.println("CLI over TOML: OK")
     _ -> io.println("CLI precedence: unexpected")
@@ -348,7 +365,8 @@ pub fn level1324() -> Nil {
 pub fn level1325() -> Nil {
   io.println("--- Level 1325: Filepath chained joins ---")
   let p = filepath.root()
-  let p2 = filepath.join(p, "usr") |> filepath.join("local") |> filepath.join("bin")
+  let p2 =
+    filepath.join(p, "usr") |> filepath.join("local") |> filepath.join("bin")
   let s = filepath.to_string(p2)
   io.println("Chained: " <> s)
   let assert "/usr/local/bin" = s
@@ -404,15 +422,21 @@ pub fn level1330() -> Nil {
 pub fn level1331() -> Nil {
   io.println("--- Level 1331: Inference Do op index out of bounds ---")
   let ab_ref = Ref(hash_bytes(bit_array.from_string("test_ab_v8")))
-  let cache = types.TypeCache(entries: dict.from_list([
-    #(ab_ref, types.CTAbility([
-      types.OperationType(
-        name: Some("get"),
-        inputs: [],
-        output: ast.Builtin(ast.IntType),
-      ),
-    ])),
-  ]))
+  let cache =
+    types.TypeCache(
+      entries: dict.from_list([
+        #(
+          ab_ref,
+          types.CTAbility([
+            types.OperationType(
+              name: Some("get"),
+              inputs: [],
+              output: ast.Builtin(ast.IntType),
+            ),
+          ]),
+        ),
+      ]),
+    )
   let do_term = ast.Do(ab_ref, Local(999), [])
   case infer_term(do_term, cache) {
     Ok(_) -> io.println("Unexpected success on out-of-bounds op")
@@ -447,10 +471,11 @@ pub fn level1334() -> Nil {
   io.println("--- Level 1334: Elaborate SurfaceTypeAlias ---")
   let typ = elab_types.TBuiltin(elab_types.TInt)
   let surf_def = elab_types.SurfaceTypeAlias("MyInt", typ)
-  let unit = elab_types.SurfaceUnit(
-    Ref(hash_bytes(bit_array.from_string("type_alias_v8"))),
-    [#("my_int", surf_def)],
-  )
+  let unit =
+    elab_types.SurfaceUnit(
+      Ref(hash_bytes(bit_array.from_string("type_alias_v8"))),
+      [#("my_int", surf_def)],
+    )
   case elaborate_unit(unit, empty_cache()) {
     Ok(#(ast_unit, _, _)) -> {
       io.println("TypeAlias elaborated: " <> string.inspect(ast_unit))
@@ -478,10 +503,11 @@ pub fn level1335() -> Nil {
 
 pub fn level1336() -> Nil {
   io.println("--- Level 1336: Elaborate empty def unit ---")
-  let unit = elab_types.SurfaceUnit(
-    Ref(hash_bytes(bit_array.from_string("empty_unit_v8"))),
-    [],
-  )
+  let unit =
+    elab_types.SurfaceUnit(
+      Ref(hash_bytes(bit_array.from_string("empty_unit_v8"))),
+      [],
+    )
   case elaborate_unit(unit, empty_cache()) {
     Ok(#(ast_unit, _, _)) -> {
       case ast_unit {
@@ -498,10 +524,11 @@ pub fn level1337() -> Nil {
   io.println("--- Level 1337: Elaborate SurfacePubTypeAlias ---")
   let typ = elab_types.TBuiltin(elab_types.TText)
   let surf_def = elab_types.SurfacePubTypeAlias("MyText", typ)
-  let unit = elab_types.SurfaceUnit(
-    Ref(hash_bytes(bit_array.from_string("pub_type_alias_v8"))),
-    [#("my_text", surf_def)],
-  )
+  let unit =
+    elab_types.SurfaceUnit(
+      Ref(hash_bytes(bit_array.from_string("pub_type_alias_v8"))),
+      [#("my_text", surf_def)],
+    )
   case elaborate_unit(unit, empty_cache()) {
     Ok(#(_, _, _)) -> io.println("PubTypeAlias elaborated: OK")
     Error(e) -> io.println("Elaborate error: " <> string.inspect(e))
@@ -551,13 +578,18 @@ pub fn level1339() -> Nil {
 
 pub fn level1340() -> Nil {
   io.println("--- Level 1340: Codebase insert with AbilityDecl ---")
-  let ad = ast.AbilityDecl(ast.AbilityDeclaration(
-    Local(0),
-    [ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType))],
-  ))
-  let def = ast.AbilityDecl(ast.AbilityDeclaration(Local(0), [
-    ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
-  ]))
+  let ad =
+    ast.AbilityDecl(
+      ast.AbilityDeclaration(Local(0), [
+        ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
+      ]),
+    )
+  let def =
+    ast.AbilityDecl(
+      ast.AbilityDeclaration(Local(0), [
+        ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
+      ]),
+    )
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
   case insert(new_codebase(), unit) {
@@ -591,9 +623,43 @@ pub fn level1342() -> Nil {
 
 pub fn level1343() -> Nil {
   io.println("--- Level 1343: Jet fib hash check ---")
-  let fib_ref = Ref(hash_from_bytes(
-    <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,123:256>>,
-  ))
+  let fib_ref =
+    Ref(
+      hash_from_bytes(<<
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        123:256,
+      >>),
+    )
   case get_jet(fib_ref) {
     Some(body) -> io.println("Fib jet: " <> body)
     None -> io.println("Jet miss (unexpected)")
@@ -619,9 +685,11 @@ pub fn level1345() -> Nil {
   case partitioned_dets(dir) {
     Ok(adapter) -> {
       let ref = Ref(hash_bytes(bit_array.from_string("part_ref_v8")))
-      let assert Ok(Nil) = adapter.insert(ref, bit_array.from_string("part_data"))
+      let assert Ok(Nil) =
+        adapter.insert(ref, bit_array.from_string("part_data"))
       case adapter.lookup(ref) {
-        Ok(Some(data)) -> io.println("Partitioned DETS: " <> string.inspect(data))
+        Ok(Some(data)) ->
+          io.println("Partitioned DETS: " <> string.inspect(data))
         _ -> io.println("Partitioned DETS lookup failed")
       }
       let _ = adapter.close()
@@ -645,7 +713,9 @@ pub fn level1346() -> Nil {
       let assert Ok(Nil) = adapter.insert(ref2, bit_array.from_string("d2"))
       case adapter.list_refs() {
         Ok(refs) ->
-          io.println("Partitioned list_refs: " <> string.inspect(list.length(refs)))
+          io.println(
+            "Partitioned list_refs: " <> string.inspect(list.length(refs)),
+          )
         Error(e) -> io.println("list_refs error: " <> string.inspect(e))
       }
       let _ = adapter.close()
@@ -664,7 +734,8 @@ pub fn level1347() -> Nil {
   let ref = Ref(hash_bytes(bit_array.from_string("persist_part_v8")))
   case partitioned_dets(dir) {
     Ok(adapter) -> {
-      let assert Ok(Nil) = adapter.insert(ref, bit_array.from_string("persistent"))
+      let assert Ok(Nil) =
+        adapter.insert(ref, bit_array.from_string("persistent"))
       let _ = adapter.close()
       io.println("First open+close done")
     }
@@ -673,8 +744,7 @@ pub fn level1347() -> Nil {
   case partitioned_dets(dir) {
     Ok(adapter2) -> {
       case adapter2.lookup(ref) {
-        Ok(Some(data)) ->
-          io.println("Reopen found: " <> string.inspect(data))
+        Ok(Some(data)) -> io.println("Reopen found: " <> string.inspect(data))
         _ -> io.println("Reopen: data missing")
       }
       let _ = adapter2.close()
@@ -707,17 +777,39 @@ pub fn level1348() -> Nil {
 pub fn level1349() -> Nil {
   io.println("--- Level 1349: Batch 8 summary ---")
   io.println("v8 levels 1301-1350")
-  io.println("  HTTP client (1301-1306): get/health, post/eval, put/eval, delete/health, invalid URL, status route")
-  io.println("  Parser special (1307-1314): if, match+guard, use+rest, quote, define, empty input, extra tokens")
-  io.println("  Config deeper (1315-1317): get_bool, CLI bool, full precedence chain (cli>toml>env)")
-  io.println("  Health deeper (1318-1320): custom checks, empty checks, failing checks")
-  io.println("  Datetime deeper (1321-1324): invalid parse, negative diff, zero delta, iso8601 roundtrip")
-  io.println("  Filepath deeper (1325-1329): chained joins, parent-of-root, to_string root, multi-dot ext, join empty")
-  io.println("  Inference errors (1330-1333): heterogeneous list, op out-of-bounds, non-function apply, check_linearity")
-  io.println("  Elaboration deeper (1334-1337): TypeAlias, SRef, empty unit, PubTypeAlias")
-  io.println("  Codebase deeper (1338-1340): insert_raw, multi-def unit, AbilityDecl insert")
-  io.println("  Lower+Jets+Pipeline (1341-1344): TFun error, jet miss, fib jet check, parse error")
-  io.println("  Storage part DETS (1345-1347): lifecycle, list_refs, reopen persistence")
+  io.println(
+    "  HTTP client (1301-1306): get/health, post/eval, put/eval, delete/health, invalid URL, status route",
+  )
+  io.println(
+    "  Parser special (1307-1314): if, match+guard, use+rest, quote, define, empty input, extra tokens",
+  )
+  io.println(
+    "  Config deeper (1315-1317): get_bool, CLI bool, full precedence chain (cli>toml>env)",
+  )
+  io.println(
+    "  Health deeper (1318-1320): custom checks, empty checks, failing checks",
+  )
+  io.println(
+    "  Datetime deeper (1321-1324): invalid parse, negative diff, zero delta, iso8601 roundtrip",
+  )
+  io.println(
+    "  Filepath deeper (1325-1329): chained joins, parent-of-root, to_string root, multi-dot ext, join empty",
+  )
+  io.println(
+    "  Inference errors (1330-1333): heterogeneous list, op out-of-bounds, non-function apply, check_linearity",
+  )
+  io.println(
+    "  Elaboration deeper (1334-1337): TypeAlias, SRef, empty unit, PubTypeAlias",
+  )
+  io.println(
+    "  Codebase deeper (1338-1340): insert_raw, multi-def unit, AbilityDecl insert",
+  )
+  io.println(
+    "  Lower+Jets+Pipeline (1341-1344): TFun error, jet miss, fib jet check, parse error",
+  )
+  io.println(
+    "  Storage part DETS (1345-1347): lifecycle, list_refs, reopen persistence",
+  )
   io.println("  Integration (1348-1350): full module, batch summary, full cert")
   io.println("Level 1349: OK")
 }
@@ -728,10 +820,18 @@ pub fn level1350() -> Nil {
   io.println("  v2 (1001-1048): Language features + stdlib basics")
   io.println("  v3 (1049-1100): HTTP, JSON, DateTime, Filepath, Crypto")
   io.println("  v4 (1101-1150): Pipeline, Storage, Sync, REPL, Abilities")
-  io.println("  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed")
-  io.println("  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules")
-  io.println("  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs")
-  io.println("  v8 (1301-1350): HTTP client, Parser special forms, Config deeper, Health deeper, Datetime deeper, Filepath deeper, Inference errors, Elaboration deeper, Codebase deeper, Lower+Jets, Storage part DETS")
+  io.println(
+    "  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed",
+  )
+  io.println(
+    "  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules",
+  )
+  io.println(
+    "  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs",
+  )
+  io.println(
+    "  v8 (1301-1350): HTTP client, Parser special forms, Config deeper, Health deeper, Datetime deeper, Filepath deeper, Inference errors, Elaboration deeper, Codebase deeper, Lower+Jets, Storage part DETS",
+  )
   io.println("Total real dogfood levels: 371")
   io.println("  + 51 unit tests")
   io.println("  = 422 total conformance verifications")

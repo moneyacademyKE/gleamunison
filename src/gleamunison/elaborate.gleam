@@ -5,8 +5,8 @@ import gleamunison/elab_ctx.{type ElabCtx, ElabCtx, empty_elab_ctx}
 import gleamunison/elab_def
 import gleamunison/elab_types.{
   type ElaborateError, type SurfaceDef, type SurfaceUnit, InferFailed,
-  SurfaceAbilityDef, SurfaceTermDef, SurfaceTypeDef, SurfaceUnit,
-  SurfaceTypeAlias, SurfacePubTypeAlias,
+  SurfaceAbilityDef, SurfacePubTypeAlias, SurfaceTermDef, SurfaceTypeAlias,
+  SurfaceTypeDef, SurfaceUnit,
 }
 import gleamunison/identity.{type DefinitionRef, Local, Ref}
 import gleamunison/typecheck
@@ -81,7 +81,10 @@ pub fn elaborate_unit(
                 SurfaceTypeAlias(_, _) | SurfacePubTypeAlias(_, _) -> {
                   let next_cache =
                     TypeCache(dict.insert(current_cache.entries, ref, CTType))
-                  Ok(#(ast.TypeDef(ast.Structural(Local(0), [], [])), next_cache))
+                  Ok(#(
+                    ast.TypeDef(ast.Structural(Local(0), [], [])),
+                    next_cache,
+                  ))
                 }
               }
               case res {

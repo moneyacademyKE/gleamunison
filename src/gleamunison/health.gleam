@@ -53,11 +53,7 @@ pub fn run_checks(checks: List(HealthCheck)) -> HealthStatus {
     0 -> {
       let #(node, _, mem) = ffi_node_status()
       Healthy(
-        "node="
-        <> node
-        <> " memory_mb="
-        <> int.to_string(mem)
-        <> " checks=ok",
+        "node=" <> node <> " memory_mb=" <> int.to_string(mem) <> " checks=ok",
       )
     }
     _ if failed_count == total -> {
@@ -72,8 +68,22 @@ pub fn run_checks(checks: List(HealthCheck)) -> HealthStatus {
         list.map(failures, fn(f) { f.0 })
         |> string.join(", ")
       let passed = total - failed_count
-      log.warn("Health check partial failure (" <> int.to_string(passed) <> "/" <> int.to_string(total) <> "): " <> failed_names)
-      Degraded("Passed " <> int.to_string(passed) <> "/" <> int.to_string(total) <> ", failed: " <> failed_names)
+      log.warn(
+        "Health check partial failure ("
+        <> int.to_string(passed)
+        <> "/"
+        <> int.to_string(total)
+        <> "): "
+        <> failed_names,
+      )
+      Degraded(
+        "Passed "
+        <> int.to_string(passed)
+        <> "/"
+        <> int.to_string(total)
+        <> ", failed: "
+        <> failed_names,
+      )
     }
   }
 }

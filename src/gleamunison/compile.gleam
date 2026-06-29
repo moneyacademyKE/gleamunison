@@ -9,7 +9,6 @@ import gleamunison/identity.{
 }
 import gleamunison/jets
 
-
 pub type Compiler {
   Compiler
 }

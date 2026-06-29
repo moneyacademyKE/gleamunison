@@ -118,7 +118,9 @@ fn format_elab_error(
       <> ab
       <> " (op1 args ret) ...)."
     elab_types.InferFailed(msg) ->
-      "[E004] type error: " <> msg <> ". The expression could not be type-checked."
+      "[E004] type error: "
+      <> msg
+      <> ". The expression could not be type-checked."
     elab_types.UnsupportedTypeRef(desc) ->
       "[E005] unsupported type reference: " <> desc <> "."
   }

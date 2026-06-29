@@ -8,7 +8,9 @@ import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/compile.{compile_definition, module_name_for, new as new_compiler}
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
 import gleamunison/effects.{HandlerFrame, RuntimeConfig, run as effects_run}
 import gleamunison/elab_ctx.{ElabCtx, empty_elab_ctx}
 import gleamunison/elab_term.{elaborate_term}
@@ -18,8 +20,8 @@ import gleamunison/http_client.{get}
 import gleamunison/identity.{
   Local, Ref, hash_bytes, hash_from_bytes, hash_to_debug_string,
 }
-import gleamunison/inference.{infer_term, check_linearity}
-import gleamunison/infer_helper.{substitute, normalize_type}
+import gleamunison/infer_helper.{normalize_type, substitute}
+import gleamunison/inference.{check_linearity, infer_term}
 import gleamunison/jets.{get_jet}
 import gleamunison/lexer.{tokenize}
 import gleamunison/loader.{ensure_loaded, is_loaded, new_loader_with_limit}
@@ -49,7 +51,11 @@ fn ffi_counter(name: BitArray, delta: Int) -> Nil
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn ffi_to_dynamic(val: any) -> Dynamic
@@ -100,7 +106,7 @@ pub fn level1553() -> Nil {
 
 pub fn level1554() -> Nil {
   io.println("--- Level 1554: Eval http-get ---")
-  start_server(18401)
+  start_server(18_401)
   case library_eval("(http-get \"http://localhost:18401/api/health\")") {
     Ok(r) -> io.println("http-get = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
@@ -147,13 +153,16 @@ pub fn level1557() -> Nil {
 
 pub fn level1558() -> Nil {
   io.println("--- Level 1558: Effects single handler args verification ---")
-  let handler: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic =
-    fn(args, cont) {
-      let count = list.length(args)
-      io.println("Handler called with " <> int.to_string(count) <> " args")
-      cont(ffi_to_dynamic(count))
-    }
-  let hf = HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, handler)]))
+  let handler: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(
+    args,
+    cont,
+  ) {
+    let count = list.length(args)
+    io.println("Handler called with " <> int.to_string(count) <> " args")
+    cont(ffi_to_dynamic(count))
+  }
+  let hf =
+    HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, handler)]))
   let cfg = RuntimeConfig([hf])
   let result = effects_run(cfg, fn() { ffi_to_dynamic(0) })
   io.println("Thunk result: " <> string.inspect(result))
@@ -162,12 +171,21 @@ pub fn level1558() -> Nil {
 
 pub fn level1559() -> Nil {
   io.println("--- Level 1559: Effects triple handler chain ---")
-  let h1: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_a, c) { c(ffi_to_dynamic(1)) }
-  let h2: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_a, c) { c(ffi_to_dynamic(2)) }
-  let h3: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_a, c) { c(ffi_to_dynamic(3)) }
-  let f1 = HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, h1)]))
-  let f2 = HandlerFrame(identity.builtin_io_read_line(), dict.from_list([#(0, h2)]))
-  let f3 = HandlerFrame(identity.builtin_process_spawn(), dict.from_list([#(0, h3)]))
+  let h1: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_a, c) {
+    c(ffi_to_dynamic(1))
+  }
+  let h2: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_a, c) {
+    c(ffi_to_dynamic(2))
+  }
+  let h3: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_a, c) {
+    c(ffi_to_dynamic(3))
+  }
+  let f1 =
+    HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, h1)]))
+  let f2 =
+    HandlerFrame(identity.builtin_io_read_line(), dict.from_list([#(0, h2)]))
+  let f3 =
+    HandlerFrame(identity.builtin_process_spawn(), dict.from_list([#(0, h3)]))
   let cfg = RuntimeConfig([f1, f2, f3])
   let result = effects_run(cfg, fn() { ffi_to_dynamic(999) })
   io.println("Triple chain: " <> string.inspect(result))
@@ -178,7 +196,7 @@ pub fn level1559() -> Nil {
 
 pub fn level1560() -> Nil {
   io.println("--- Level 1560: HTTP /eval?expr=... route ---")
-  start_server(18402)
+  start_server(18_402)
   case get("http://localhost:18402/eval?expr=(add%201%202)") {
     Ok(resp) -> io.println("GET /eval?expr=: " <> string.inspect(resp))
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -189,7 +207,7 @@ pub fn level1560() -> Nil {
 
 pub fn level1561() -> Nil {
   io.println("--- Level 1561: HTTP /define?name=...&expr=... route ---")
-  start_server(18403)
+  start_server(18_403)
   case get("http://localhost:18403/define?name=foo&expr=42") {
     Ok(resp) -> io.println("GET /define: " <> string.inspect(resp))
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -200,7 +218,7 @@ pub fn level1561() -> Nil {
 
 pub fn level1562() -> Nil {
   io.println("--- Level 1562: HTTP /browse route ---")
-  start_server(18404)
+  start_server(18_404)
   case get("http://localhost:18404/browse") {
     Ok(resp) -> io.println("GET /browse: " <> string.inspect(resp))
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -211,7 +229,7 @@ pub fn level1562() -> Nil {
 
 pub fn level1563() -> Nil {
   io.println("--- Level 1563: HTTP /api/status route ---")
-  start_server(18405)
+  start_server(18_405)
   case get("http://localhost:18405/api/status") {
     Ok(resp) -> io.println("GET /api/status: " <> string.inspect(resp))
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -222,7 +240,7 @@ pub fn level1563() -> Nil {
 
 pub fn level1564() -> Nil {
   io.println("--- Level 1564: HTTP /api/health route ---")
-  start_server(18406)
+  start_server(18_406)
   case get("http://localhost:18406/api/health") {
     Ok(resp) -> io.println("GET /api/health: " <> string.inspect(resp))
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -233,7 +251,7 @@ pub fn level1564() -> Nil {
 
 pub fn level1565() -> Nil {
   io.println("--- Level 1565: HTTP /api/processes route ---")
-  start_server(18407)
+  start_server(18_407)
   case get("http://localhost:18407/api/processes") {
     Ok(resp) -> io.println("GET /api/processes: " <> string.inspect(resp))
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -244,7 +262,7 @@ pub fn level1565() -> Nil {
 
 pub fn level1566() -> Nil {
   io.println("--- Level 1566: HTTP define+browse workflow ---")
-  start_server(18408)
+  start_server(18_408)
   let _ = get("http://localhost:18408/define?name=bar&expr=(add%203%204)")
   case get("http://localhost:18408/browse") {
     Ok(resp) -> io.println("Browse after define: " <> string.inspect(resp))
@@ -289,11 +307,12 @@ pub fn level1569() -> Nil {
   let r1 = Ref(hash_bytes(bit_array.from_string("td_v13")))
   let r2 = Ref(hash_bytes(bit_array.from_string("ad_v13")))
   let r3 = Ref(hash_bytes(bit_array.from_string("term_v13")))
-  let unit = ast.Unit(r1, [
-    #(r1, ast.TypeDef(ast.Structural(Local(0), [], []))),
-    #(r2, ast.AbilityDecl(ast.AbilityDeclaration(Local(0), []))),
-    #(r3, ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))),
-  ])
+  let unit =
+    ast.Unit(r1, [
+      #(r1, ast.TypeDef(ast.Structural(Local(0), [], []))),
+      #(r2, ast.AbilityDecl(ast.AbilityDeclaration(Local(0), []))),
+      #(r3, ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))),
+    ])
   let _ = case typecheck.typecheck_unit(unit, empty_cache()) {
     Ok(#(_, _)) -> io.println("Mixed unit typecheck: OK")
     Error(e) -> io.println("Unexpected error: " <> string.inspect(e))
@@ -305,13 +324,20 @@ pub fn level1569() -> Nil {
 
 pub fn level1570() -> Nil {
   io.println("--- Level 1570: Compile PatConstructor pattern ---")
-  let pat = ast.PatConstructor(identity.builtin_pair(), [ast.PatInt(1), ast.PatInt(2)])
+  let pat =
+    ast.PatConstructor(identity.builtin_pair(), [ast.PatInt(1), ast.PatInt(2)])
   let c = ast.Case(pat, None, ast.Int(42))
-  let t = ast.Match(ast.Construct(identity.builtin_pair(), [ast.Int(1), ast.Int(2)]), [c])
+  let t =
+    ast.Match(ast.Construct(identity.builtin_pair(), [ast.Int(1), ast.Int(2)]), [
+      c,
+    ])
   let d = ast.TermDef(t, ast.Builtin(ast.IntType))
   let r = Ref(hash_of_definition(d))
   case compile_definition(new_compiler(), d, r) {
-    Ok(b) -> io.println("PatConstructor: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "PatConstructor: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("Error: " <> string.inspect(e))
   }
   io.println("Level 1570: OK")
@@ -325,7 +351,8 @@ pub fn level1571() -> Nil {
   let d = ast.TermDef(t, ast.Builtin(ast.IntType))
   let r = Ref(hash_of_definition(d))
   case compile_definition(new_compiler(), d, r) {
-    Ok(b) -> io.println("PatAs: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println("PatAs: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
     Error(e) -> io.println("Error: " <> string.inspect(e))
   }
   io.println("Level 1571: OK")
@@ -336,7 +363,8 @@ pub fn level1572() -> Nil {
   let d = ast.TermDef(ast.Hole, ast.Builtin(ast.IntType))
   let r = Ref(hash_of_definition(d))
   case compile_definition(new_compiler(), d, r) {
-    Ok(b) -> io.println("Hole: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println("Hole: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
     Error(e) -> io.println("Hole compile: " <> string.inspect(e))
   }
   io.println("Level 1572: OK")
@@ -344,14 +372,23 @@ pub fn level1572() -> Nil {
 
 pub fn level1573() -> Nil {
   io.println("--- Level 1573: Compile AbilityDecl with 3 ops ---")
-  let ad = ast.AbilityDecl(ast.AbilityDeclaration(Local(0), [
-    ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
-    ast.Operation(Local(1), [], ast.TypeRefBuiltin(ast.TextType)),
-    ast.Operation(Local(2), [], ast.TypeRefBuiltin(ast.FloatType)),
-  ]))
-  let r = Ref(hash_of_definition(ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))))
+  let ad =
+    ast.AbilityDecl(
+      ast.AbilityDeclaration(Local(0), [
+        ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
+        ast.Operation(Local(1), [], ast.TypeRefBuiltin(ast.TextType)),
+        ast.Operation(Local(2), [], ast.TypeRefBuiltin(ast.FloatType)),
+      ]),
+    )
+  let r =
+    Ref(hash_of_definition(ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))))
   case compile_definition(new_compiler(), ad, r) {
-    Ok(b) -> io.println("AbilityDecl 3 ops: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "AbilityDecl 3 ops: "
+        <> int.to_string(bit_array.byte_size(b))
+        <> " bytes",
+      )
     Error(e) -> io.println("Error: " <> string.inspect(e))
   }
   io.println("Level 1573: OK")
@@ -380,7 +417,9 @@ pub fn level1575() -> Nil {
 
 pub fn level1576() -> Nil {
   io.println("--- Level 1576: REPL send + recv ---")
-  case library_eval("(let p (self) (let _ (spawn (lam _ (send p 99))) (recv)))") {
+  case
+    library_eval("(let p (self) (let _ (spawn (lam _ (send p 99))) (recv)))")
+  {
     Ok(r) -> io.println("send+recv = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
   }
@@ -402,12 +441,13 @@ pub fn level1578() -> Nil {
   io.println("--- Level 1578: Sync push-then-pull roundtrip ---")
   ffi_start_tcp()
   let port = ffi_tcp_port()
-  let def = ast.TermDef(ast.Int(12345), ast.Builtin(ast.IntType))
+  let def = ast.TermDef(ast.Int(12_345), ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
   let assert Ok(cb) = insert(new_codebase(), unit)
   let adapter = inmemory()
-  let assert Ok(Nil) = adapter.insert(ref, bit_array.from_string("roundtrip_v13"))
+  let assert Ok(Nil) =
+    adapter.insert(ref, bit_array.from_string("roundtrip_v13"))
   let state = new_sync_state()
   let peer = PeerId("localhost:" <> int.to_string(port))
   case push_sync(state, peer, [ref], adapter) {
@@ -415,7 +455,9 @@ pub fn level1578() -> Nil {
       io.println("Push: " <> int.to_string(count) <> " defs")
       case pull_sync(state, peer, cb) {
         Ok(#(_, _, new_refs)) ->
-          io.println("Pull: " <> int.to_string(list.length(new_refs)) <> " new refs")
+          io.println(
+            "Pull: " <> int.to_string(list.length(new_refs)) <> " new refs",
+          )
         Error(e) -> io.println("Pull error: " <> string.inspect(e))
       }
     }
@@ -436,7 +478,11 @@ pub fn level1579() -> Nil {
   let peer = PeerId("localhost:" <> int.to_string(port))
   case pull_sync(state, peer, cb) {
     Ok(#(_, _, new_refs)) ->
-      io.println("Pull with empty known: " <> int.to_string(list.length(new_refs)) <> " refs")
+      io.println(
+        "Pull with empty known: "
+        <> int.to_string(list.length(new_refs))
+        <> " refs",
+      )
     Error(e) -> io.println("Pull error: " <> string.inspect(e))
   }
   io.println("Level 1579: OK")
@@ -480,9 +526,10 @@ pub fn level1582() -> Nil {
 
 pub fn level1583() -> Nil {
   io.println("--- Level 1583: check_linearity on Match+Apply+Do ---")
-  let t = ast.Match(ast.Int(1), [
-    ast.Case(ast.PatInt(1), None, ast.Apply(ast.Int(1), ast.Int(2))),
-  ])
+  let t =
+    ast.Match(ast.Int(1), [
+      ast.Case(ast.PatInt(1), None, ast.Apply(ast.Int(1), ast.Int(2))),
+    ])
   case check_linearity(t, empty_cache()) {
     Ok(Nil) -> io.println("Linearity Match+Apply: OK")
     Error(e) -> io.println("Error: " <> string.inspect(e))
@@ -538,12 +585,18 @@ pub fn level1587() -> Nil {
   io.println("--- Level 1587: Elaborate SDo with known ability ---")
   let ctx = empty_elab_ctx()
   let console_ref = Ref(hash_bytes(bit_array.from_string("Console_v13")))
-  let ctx2 = elab_ctx.ElabCtx(
-    ..ctx,
-    abilities: dict.from_list([#("Console", console_ref)]),
-    ops: dict.from_list([#(#("Console", "print"), 0)]),
-  )
-  case elab_term.elaborate_term(elab_types.SDo("Console", "print", [elab_types.SText(<<"hi">>)]), ctx2) {
+  let ctx2 =
+    elab_ctx.ElabCtx(
+      ..ctx,
+      abilities: dict.from_list([#("Console", console_ref)]),
+      ops: dict.from_list([#(#("Console", "print"), 0)]),
+    )
+  case
+    elab_term.elaborate_term(
+      elab_types.SDo("Console", "print", [elab_types.SText(<<"hi">>)]),
+      ctx2,
+    )
+  {
     Ok(#(_, term)) -> io.println("Do elaborated: " <> string.inspect(term))
     Error(e) -> io.println("Error: " <> string.inspect(e))
   }
@@ -554,13 +607,17 @@ pub fn level1588() -> Nil {
   io.println("--- Level 1588: Elaborate SHandle with ability ---")
   let ctx = empty_elab_ctx()
   let console_ref = Ref(hash_bytes(bit_array.from_string("Console2_v13")))
-  let ctx2 = elab_ctx.ElabCtx(
-    ..ctx,
-    abilities: dict.from_list([#("Console", console_ref)]),
-  )
-  case elab_term.elaborate_term(
-    elab_types.SHandle(elab_types.SInt(42), elab_types.SInt(99), "Console"), ctx2,
-  ) {
+  let ctx2 =
+    elab_ctx.ElabCtx(
+      ..ctx,
+      abilities: dict.from_list([#("Console", console_ref)]),
+    )
+  case
+    elab_term.elaborate_term(
+      elab_types.SHandle(elab_types.SInt(42), elab_types.SInt(99), "Console"),
+      ctx2,
+    )
+  {
     Ok(#(_, term)) -> io.println("Handle elaborated: " <> string.inspect(term))
     Error(e) -> io.println("Error: " <> string.inspect(e))
   }
@@ -580,9 +637,43 @@ pub fn level1589() -> Nil {
 
 pub fn level1590() -> Nil {
   io.println("--- Level 1590: Jet fib hash verification ---")
-  let fib_r = Ref(hash_from_bytes(
-    <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,123:256>>,
-  ))
+  let fib_r =
+    Ref(
+      hash_from_bytes(<<
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        123:256,
+      >>),
+    )
   case get_jet(fib_r) {
     Some(body) -> {
       let assert True = string.contains(body, "fib")
@@ -595,7 +686,9 @@ pub fn level1590() -> Nil {
 
 pub fn level1591() -> Nil {
   io.println("--- Level 1591: Eval string operations chain ---")
-  case library_eval("(string-length (string-upcase (string-trim \"  hello  \")))") {
+  case
+    library_eval("(string-length (string-upcase (string-trim \"  hello  \")))")
+  {
     Ok(r) -> io.println("string chain = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
   }
@@ -604,7 +697,11 @@ pub fn level1591() -> Nil {
 
 pub fn level1592() -> Nil {
   io.println("--- Level 1592: Eval list operations depth ---")
-  case library_eval("(let double (lam x (mul x 2)) (list-fold (lam acc (lam x (add acc x))) 0 (list-map double (range 1 10))))") {
+  case
+    library_eval(
+      "(let double (lam x (mul x 2)) (list-fold (lam acc (lam x (add acc x))) 0 (list-map double (range 1 10))))",
+    )
+  {
     Ok(r) -> io.println("list depth = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
   }
@@ -642,7 +739,7 @@ pub fn level1594() -> Nil {
 
 pub fn level1595() -> Nil {
   io.println("--- Level 1595: HTTP + Log + Counter cross ---")
-  start_server(18409)
+  start_server(18_409)
   log.info("v13 cross http")
   ffi_counter(<<"v13.cross">>, 1)
   case get("http://localhost:18409/api/health") {
@@ -655,7 +752,11 @@ pub fn level1595() -> Nil {
 
 pub fn level1596() -> Nil {
   io.println("--- Level 1596: REPL eval with all builtin combinations ---")
-  case library_eval("(add (mul (string-length \"hello\") 2) (list-length (range 1 5)))") {
+  case
+    library_eval(
+      "(add (mul (string-length \"hello\") 2) (list-length (range 1 5)))",
+    )
+  {
     Ok(r) -> io.println("all builtins = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
   }
@@ -664,7 +765,11 @@ pub fn level1596() -> Nil {
 
 pub fn level1597() -> Nil {
   io.println("--- Level 1597: REPL recursive list building ---")
-  case library_eval("(let build (lam n (match n (0 (list)) (_ (list-append (list n) (build (sub n 1)))))) (list-length (build 10)))") {
+  case
+    library_eval(
+      "(let build (lam n (match n (0 (list)) (_ (list-append (list n) (build (sub n 1)))))) (list-length (build 10)))",
+    )
+  {
     Ok(r) -> io.println("recursive list = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
   }
@@ -673,7 +778,11 @@ pub fn level1597() -> Nil {
 
 pub fn level1598() -> Nil {
   io.println("--- Level 1598: Eval pair + dict operations ---")
-  case library_eval("(let d (dict-set (dict-new) \"x\" (fst (pair 42 99))) (dict-get d \"x\"))") {
+  case
+    library_eval(
+      "(let d (dict-set (dict-new) \"x\" (fst (pair 42 99))) (dict-get d \"x\"))",
+    )
+  {
     Ok(r) -> io.println("pair+dict = " <> r)
     Error(e) -> io.println("Eval error: " <> e)
   }
@@ -683,16 +792,36 @@ pub fn level1598() -> Nil {
 pub fn level1599() -> Nil {
   io.println("--- Level 1599: Batch 13 summary ---")
   io.println("v13 levels 1551-1600")
-  io.println("  I/O builtins (1551-1555): file-read, now+sleep, self, http-get, json-parse error")
-  io.println("  Effects errors (1556-1559): empty stack, ability_key deterministic, handler args, triple chain")
-  io.println("  HTTP routes (1560-1566): eval, define, browse, status, health, processes, define+browse workflow")
-  io.println("  Typecheck cross-def (1567-1569): mismatch, valid, TypeDef+AbilityDecl pass through")
-  io.println("  Compile edges (1570-1573): PatConstructor, PatAs, Hole term, AbilityDecl 3 ops")
-  io.println("  REPL bootstrap (1574-1577): bootstrap_defs, spawn+self, send+recv, lambda chains")
-  io.println("  Sync roundtrip (1578-1580): push-then-pull, known_refs pull, connection failed")
-  io.println("  Codebase+Inference (1581-1584): normalize passthrough, substitute passthrough, linearity match, 2000-def stress")
-  io.println("  Lexer+Parser+Elaborate (1585-1588): token positions, string pattern, SDo ability, SHandle ability")
-  io.println("  Integration (1589-1600): FFI eval, jet fib, string chain, list depth, hash+codebase+loader, effects+typecheck, http+log+counter, all builtins, recursive list, pair+dict, summary, cert")
+  io.println(
+    "  I/O builtins (1551-1555): file-read, now+sleep, self, http-get, json-parse error",
+  )
+  io.println(
+    "  Effects errors (1556-1559): empty stack, ability_key deterministic, handler args, triple chain",
+  )
+  io.println(
+    "  HTTP routes (1560-1566): eval, define, browse, status, health, processes, define+browse workflow",
+  )
+  io.println(
+    "  Typecheck cross-def (1567-1569): mismatch, valid, TypeDef+AbilityDecl pass through",
+  )
+  io.println(
+    "  Compile edges (1570-1573): PatConstructor, PatAs, Hole term, AbilityDecl 3 ops",
+  )
+  io.println(
+    "  REPL bootstrap (1574-1577): bootstrap_defs, spawn+self, send+recv, lambda chains",
+  )
+  io.println(
+    "  Sync roundtrip (1578-1580): push-then-pull, known_refs pull, connection failed",
+  )
+  io.println(
+    "  Codebase+Inference (1581-1584): normalize passthrough, substitute passthrough, linearity match, 2000-def stress",
+  )
+  io.println(
+    "  Lexer+Parser+Elaborate (1585-1588): token positions, string pattern, SDo ability, SHandle ability",
+  )
+  io.println(
+    "  Integration (1589-1600): FFI eval, jet fib, string chain, list depth, hash+codebase+loader, effects+typecheck, http+log+counter, all builtins, recursive list, pair+dict, summary, cert",
+  )
   io.println("Level 1599: OK")
 }
 
@@ -702,15 +831,33 @@ pub fn level1600() -> Nil {
   io.println("  v2 (1001-1048): Language features + stdlib basics")
   io.println("  v3 (1049-1100): HTTP, JSON, DateTime, Filepath, Crypto")
   io.println("  v4 (1101-1150): Pipeline, Storage, Sync, REPL, Abilities")
-  io.println("  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed")
-  io.println("  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules")
-  io.println("  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs")
-  io.println("  v8 (1301-1350): HTTP client, Parser special forms, Config deeper, Health deeper, Datetime deeper, Filepath deeper, Inference errors, Elaboration deeper, Codebase deeper, Lower+Jets, Storage part DETS")
-  io.println("  v9 (1351-1400): TCP sync deep, Compile all variants, Inference helpers, Loader deeper, Elaboration AbilityDef, Effects multi-op, Jet+REPL+Property, Parser patterns, Elaboration context, Codebase deeper")
-  io.println("  v10 (1401-1450): HTTP route coverage, normalize+substitute deeper, REPL error codes, Lexer edges, Parser edges, Codebase stress, SConstruct elaboration, Compile edges, Inference deeper, Sync+Jet+Property")
-  io.println("  v11 (1451-1500): Arithmetic builtins, String builtins, List+Pair builtins, Bool builtins, Let+Match expressions, Effects dispatch, Property+Spelling, Typecheck+Elaborate, Storage Mnesia, Lexer+Parser, Compile+Load, Integration")
-  io.println("  v12 (1501-1550): Remaining string builtins, list builtins, data structure builtins, recursion+HOF, compile pattern edges, guard+sync+codebase, effects+inference, loader+storage, builtin+cross, integration")
-  io.println("  v13 (1551-1600): I/O builtins, effects error paths, HTTP remaining routes, typecheck cross-def, compile PatConstructor/PatAs/Hole, REPL bootstrap+spawn+send+recv, sync roundtrip, codebase 2000-def stress, lexer+parser+elaborate SDo/SHandle, integration")
+  io.println(
+    "  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed",
+  )
+  io.println(
+    "  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules",
+  )
+  io.println(
+    "  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs",
+  )
+  io.println(
+    "  v8 (1301-1350): HTTP client, Parser special forms, Config deeper, Health deeper, Datetime deeper, Filepath deeper, Inference errors, Elaboration deeper, Codebase deeper, Lower+Jets, Storage part DETS",
+  )
+  io.println(
+    "  v9 (1351-1400): TCP sync deep, Compile all variants, Inference helpers, Loader deeper, Elaboration AbilityDef, Effects multi-op, Jet+REPL+Property, Parser patterns, Elaboration context, Codebase deeper",
+  )
+  io.println(
+    "  v10 (1401-1450): HTTP route coverage, normalize+substitute deeper, REPL error codes, Lexer edges, Parser edges, Codebase stress, SConstruct elaboration, Compile edges, Inference deeper, Sync+Jet+Property",
+  )
+  io.println(
+    "  v11 (1451-1500): Arithmetic builtins, String builtins, List+Pair builtins, Bool builtins, Let+Match expressions, Effects dispatch, Property+Spelling, Typecheck+Elaborate, Storage Mnesia, Lexer+Parser, Compile+Load, Integration",
+  )
+  io.println(
+    "  v12 (1501-1550): Remaining string builtins, list builtins, data structure builtins, recursion+HOF, compile pattern edges, guard+sync+codebase, effects+inference, loader+storage, builtin+cross, integration",
+  )
+  io.println(
+    "  v13 (1551-1600): I/O builtins, effects error paths, HTTP remaining routes, typecheck cross-def, compile PatConstructor/PatAs/Hole, REPL bootstrap+spawn+send+recv, sync roundtrip, codebase 2000-def stress, lexer+parser+elaborate SDo/SHandle, integration",
+  )
   io.println("Total real dogfood levels: 621")
   io.println("  + 51 unit tests")
   io.println("  = 672 total conformance verifications")

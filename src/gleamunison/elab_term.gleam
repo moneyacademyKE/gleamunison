@@ -1,6 +1,6 @@
 import gleam/dict
-import gleam/option
 import gleam/list
+import gleam/option
 import gleam/result
 import gleamunison/ast
 import gleamunison/elab_ctx.{type ElabCtx, ElabCtx, add_binding, lookup_binding}
@@ -8,8 +8,8 @@ import gleamunison/elab_pat.{elaborate_pattern}
 import gleamunison/elab_types.{
   type ElaborateError, type SCase, type SurfaceTerm, MissingAbilityDecl,
   NameNotFound, SApply, SCase, SConstruct, SDo, SFloat, SGuardGuard, SHandle,
-  SHole, SInt, SLambda, SLabeledFn, SLet, SList, SMatch, SRef, SText, SUse,
-  SVar, UnknownOperation, UnsupportedTypeRef,
+  SHole, SInt, SLabeledFn, SLambda, SLet, SList, SMatch, SRef, SText, SUse, SVar,
+  UnknownOperation, UnsupportedTypeRef,
 }
 import gleamunison/identity.{Local}
 
@@ -105,7 +105,8 @@ pub fn elaborate_term(
       Ok(#(ctx2, ast.Construct(ctor_ref, list.reverse(elaborated_args))))
     }
     SHole -> Ok(#(ctx, ast.Hole))
-    SGuardGuard(_) -> Error(UnsupportedTypeRef("SGuardGuard not a standalone term"))
+    SGuardGuard(_) ->
+      Error(UnsupportedTypeRef("SGuardGuard not a standalone term"))
     SUse(binder, call_expr, body_expr) -> {
       use #(ctx2, call_elab) <- result.try(elaborate_term(call_expr, ctx))
       let #(ctx3, lv) = add_binding(ctx2, binder)
@@ -126,9 +127,10 @@ pub fn elaborate_term(
               #([lv, ..acc_params], c2)
             })
           let lvs = list.reverse(rev_params)
-          use #(ctx_body, body_elab) <- result.try(
-            elaborate_term(body, ctx_with_bindings),
-          )
+          use #(ctx_body, body_elab) <- result.try(elaborate_term(
+            body,
+            ctx_with_bindings,
+          ))
           let lam_wrapped =
             list.fold(lvs, body_elab, fn(acc, lv) { ast.Lambda(lv, acc) })
           Ok(#(ctx_body, lam_wrapped))
@@ -148,7 +150,14 @@ fn elaborate_case(
   case sg {
     option.Some(g) -> {
       use #(ctx4, g_term) <- result.try(elaborate_term(g, ctx3))
-      Ok(#(ctx4, ast.Case(pattern: pat, guard: option.Some(ast.GuardTerm(g_term)), body: b)))
+      Ok(#(
+        ctx4,
+        ast.Case(
+          pattern: pat,
+          guard: option.Some(ast.GuardTerm(g_term)),
+          body: b,
+        ),
+      ))
     }
     option.None -> {
       Ok(#(ctx3, ast.Case(pattern: pat, guard: option.None, body: b)))

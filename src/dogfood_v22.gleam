@@ -1,43 +1,65 @@
 import gleam/bit_array
+import gleam/dict
 import gleam/int
 import gleam/io
-import gleam/string
-import gleam/dict
 import gleam/list
 import gleam/option
-import gleamunison/identity.{type DefinitionRef, type Hash, Ref, Local, hash_bytes, hash_to_short_string, hash_to_debug_string, hash_equal}
-import gleamunison/crypto as crypto
-import gleamunison/json
-import gleamunison/metrics
-import gleamunison/http_client.{get as http_get}
-import gleamunison/http.{start_server, stop_server}
-import gleamunison/log
-import gleamunison/health.{type HealthCheck, HealthCheck, Healthy, Degraded, Unhealthy, run_checks, readiness}
-import gleamunison/datetime.{now, to_iso8601, add_seconds, diff_seconds}
-import gleamunison/filepath.{from_string, to_string, join, extension, has_extension, root}
-import gleamunison/template.{render}
-import gleamunison/config.{StringVal, IntVal, BoolVal, load, with_cli, get_string, get_int, get_bool}
+import gleam/string
 import gleamunison/ast
-import gleamunison/types.{type TypeCache, CTAbility, CTTerm, TypeCache, empty_cache, type OperationType, OperationType}
-import gleamunison/inference.{infer_term, check_linearity}
-import gleamunison/infer_helper.{substitute, normalize_type, list_all_match}
-import gleamunison/compile.{new as new_compiler, compile_definition, module_name_for}
-import gleamunison/loader.{new_loader, ensure_loaded, is_loaded}
-import gleamunison/storage.{inmemory, dets, type StorageAdapter}
-import gleamunison/codebase.{insert as cb_insert, hash_of_definition, empty as empty_codebase}
-import gleamunison/repl.{eval_string}
-import gleamunison/parser.{parse_string}
+import gleamunison/codebase.{
+  empty as empty_codebase, hash_of_definition, insert as cb_insert,
+}
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
+import gleamunison/config.{
+  BoolVal, IntVal, StringVal, get_bool, get_int, get_string, load, with_cli,
+}
+import gleamunison/crypto
+import gleamunison/datetime.{add_seconds, diff_seconds, now, to_iso8601}
+import gleamunison/elab_types.{
+  SVar, SurfaceAbilityDef, SurfaceOp, SurfaceTermDef, SurfaceTypeAlias,
+  SurfaceUnit, TBuiltin, TInt, TText,
+}
 import gleamunison/elaborate.{elaborate_unit}
-import gleamunison/elab_types.{SurfaceUnit, SurfaceTermDef, SurfaceAbilityDef, SurfaceTypeAlias, SurfaceOp, SVar, TBuiltin, TInt, TText}
-import gleamunison/typecheck.{typecheck_unit}
+import gleamunison/filepath.{
+  extension, from_string, has_extension, join, root, to_string,
+}
+import gleamunison/health.{
+  type HealthCheck, Degraded, HealthCheck, Healthy, Unhealthy, readiness,
+  run_checks,
+}
+import gleamunison/http.{start_server, stop_server}
+import gleamunison/http_client.{get as http_get}
+import gleamunison/identity.{
+  type DefinitionRef, type Hash, Local, Ref, hash_bytes, hash_equal,
+  hash_to_debug_string, hash_to_short_string,
+}
+import gleamunison/infer_helper.{list_all_match, normalize_type, substitute}
+import gleamunison/inference.{check_linearity, infer_term}
+import gleamunison/jets.{get_jet}
+import gleamunison/json
+import gleamunison/lexer.{tokenize}
+import gleamunison/loader.{ensure_loaded, is_loaded, new_loader}
+import gleamunison/log
+import gleamunison/metrics
+import gleamunison/parser.{parse_string}
+import gleamunison/pipeline.{compile_only, load_and_eval, ref_for_name}
+import gleamunison/repl.{eval_string}
+import gleamunison/repl_io.{count_brackets}
+import gleamunison/storage.{type StorageAdapter, dets, inmemory}
 import gleamunison/sync.{new_sync_state, pull_sync}
 import gleamunison/sync_types.{PeerId}
-import gleamunison/jets.{get_jet}
-import gleamunison/pipeline.{compile_only, load_and_eval, ref_for_name}
-import gleamunison/lexer.{tokenize}
-import gleamunison/repl_io.{count_brackets}
+import gleamunison/template.{render}
+import gleamunison/typecheck.{typecheck_unit}
+import gleamunison/types.{
+  type OperationType, type TypeCache, CTAbility, CTTerm, OperationType,
+  TypeCache, empty_cache,
+}
 
-fn range(_start: Int, _end: Int) -> List(Int) { [] }
+fn range(_start: Int, _end: Int) -> List(Int) {
+  []
+}
 
 // --- JET FIB EXECUTION + COMPILE+LOAD+EVAL DEEP (2201-2205) ---
 
@@ -57,10 +79,8 @@ pub fn level2201() -> Nil {
 
 pub fn level2202() -> Nil {
   io.println("--- Level 2202: compile_only + load_and_eval apply chain ---")
-  let def = ast.TermDef(
-    ast.Apply(ast.Int(0), ast.Int(42)),
-    ast.Builtin(ast.IntType),
-  )
+  let def =
+    ast.TermDef(ast.Apply(ast.Int(0), ast.Int(42)), ast.Builtin(ast.IntType))
   let h = hash_bytes(bit_array.from_string("apply_v22"))
   case compile_only(def, Ref(h)) {
     Ok(beam) -> {
@@ -77,7 +97,11 @@ pub fn level2202() -> Nil {
 
 pub fn level2203() -> Nil {
   io.println("--- Level 2203: compile_only + load_and_eval text type ---")
-  let def = ast.TermDef(ast.Text(bit_array.from_string("hello_v22")), ast.Builtin(ast.TextType))
+  let def =
+    ast.TermDef(
+      ast.Text(bit_array.from_string("hello_v22")),
+      ast.Builtin(ast.TextType),
+    )
   let h = hash_bytes(bit_array.from_string("text_v22"))
   case compile_only(def, Ref(h)) {
     Ok(beam) -> {
@@ -111,10 +135,11 @@ pub fn level2204() -> Nil {
 
 pub fn level2205() -> Nil {
   io.println("--- Level 2205: compile_only + load_and_eval let expression ---")
-  let def = ast.TermDef(
-    ast.Let(Local(0), ast.Int(10), ast.LocalVarRef(Local(0))),
-    ast.Builtin(ast.IntType),
-  )
+  let def =
+    ast.TermDef(
+      ast.Let(Local(0), ast.Int(10), ast.LocalVarRef(Local(0))),
+      ast.Builtin(ast.IntType),
+    )
   let h = hash_bytes(bit_array.from_string("let_v22"))
   case compile_only(def, Ref(h)) {
     Ok(beam) -> {
@@ -135,9 +160,10 @@ pub fn level2206() -> Nil {
   io.println("--- Level 2206: 6-chain: Parser+Elab+TC+Infer+Compile+Load ---")
   case parse_string("42") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("six_v22"))), [
-        #("v", SurfaceTermDef(st)),
-      ])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("six_v22"))), [
+          #("v", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(unit, cache, _)) -> {
           case typecheck_unit(unit, cache) {
@@ -150,9 +176,13 @@ pub fn level2206() -> Nil {
                   let ldr = new_loader()
                   case ensure_loaded(ldr, Ref(h), def) {
                     Ok(ldr2) -> {
-                      io.println("6-chain loaded: " <> string.inspect(is_loaded(ldr2, Ref(h))))
+                      io.println(
+                        "6-chain loaded: "
+                        <> string.inspect(is_loaded(ldr2, Ref(h))),
+                      )
                     }
-                    Error(#(_, err)) -> io.println("Load err: " <> string.inspect(err))
+                    Error(#(_, err)) ->
+                      io.println("Load err: " <> string.inspect(err))
                   }
                 }
                 Error(e) -> io.println("Compile err: " <> string.inspect(e))
@@ -170,7 +200,9 @@ pub fn level2206() -> Nil {
 }
 
 pub fn level2207() -> Nil {
-  io.println("--- Level 2207: 7-chain: REPL+Typecheck+Compile+Load+Codebase+Storage+Identity ---")
+  io.println(
+    "--- Level 2207: 7-chain: REPL+Typecheck+Compile+Load+Codebase+Storage+Identity ---",
+  )
   case eval_string("(add 3 4)") {
     Ok(_) -> {
       let def = ast.TermDef(ast.Int(7), ast.Builtin(ast.IntType))
@@ -179,7 +211,11 @@ pub fn level2207() -> Nil {
       case cb_insert(empty_codebase(), unit) {
         Ok(_) -> {
           let adapter: StorageAdapter = inmemory()
-          let _ = adapter.insert(Ref(hash_bytes(bit_array.from_string("seven_v22"))), bit_array.from_string("data"))
+          let _ =
+            adapter.insert(
+              Ref(hash_bytes(bit_array.from_string("seven_v22"))),
+              bit_array.from_string("data"),
+            )
           let short = hash_to_short_string(h)
           io.println("7-chain: " <> short)
         }
@@ -192,7 +228,9 @@ pub fn level2207() -> Nil {
 }
 
 pub fn level2208() -> Nil {
-  io.println("--- Level 2208: 8-chain: HTTP+Config+Health+Metrics+Log+Template+Filepath+DateTime ---")
+  io.println(
+    "--- Level 2208: 8-chain: HTTP+Config+Health+Metrics+Log+Template+Filepath+DateTime ---",
+  )
   start_server(0)
   let cfg = load()
   let o = dict.from_list([#("N", StringVal("node22"))])
@@ -220,12 +258,15 @@ pub fn level2208() -> Nil {
 }
 
 pub fn level2209() -> Nil {
-  io.println("--- Level 2209: 5-elab chain: ElabCtx+ElabDef+ElabPat+ElabTerm+Elaborate ---")
+  io.println(
+    "--- Level 2209: 5-elab chain: ElabCtx+ElabDef+ElabPat+ElabTerm+Elaborate ---",
+  )
   case parse_string("(lam x (add x 1))") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("elab5_v22"))), [
-        #("f", SurfaceTermDef(st)),
-      ])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("elab5_v22"))), [
+          #("f", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("5-elab chain: OK")
         Error(e) -> io.println("Elab err: " <> string.inspect(e))
@@ -237,11 +278,25 @@ pub fn level2209() -> Nil {
 }
 
 pub fn level2210() -> Nil {
-  io.println("--- Level 2210: 5-infer chain: Infer+InferHelper+Typecheck+Types+TypeCache ---")
+  io.println(
+    "--- Level 2210: 5-infer chain: Infer+InferHelper+Typecheck+Types+TypeCache ---",
+  )
   let ab_ref = Ref(hash_bytes(bit_array.from_string("iab_v22")))
-  let cache = TypeCache(entries: dict.from_list([
-    #(ab_ref, CTAbility([OperationType(name: option.None, inputs: [], output: ast.Builtin(ast.IntType))])),
-  ]))
+  let cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(
+          ab_ref,
+          CTAbility([
+            OperationType(
+              name: option.None,
+              inputs: [],
+              output: ast.Builtin(ast.IntType),
+            ),
+          ]),
+        ),
+      ]),
+    )
   let do_term = ast.Do(ab_ref, Local(0), [])
   case infer_term(do_term, cache) {
     Ok(typ) -> {
@@ -283,7 +338,9 @@ pub fn level2211() -> Nil {
 }
 
 pub fn level2212() -> Nil {
-  io.println("--- Level 2212: 5-chain: Jet+Compile+Loader+Storage+Pipeline cross ---")
+  io.println(
+    "--- Level 2212: 5-chain: Jet+Compile+Loader+Storage+Pipeline cross ---",
+  )
   case get_jet(Ref(hash_bytes(bit_array.from_string("fib_v22")))) {
     option.None -> {
       let def = ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))
@@ -292,7 +349,11 @@ pub fn level2212() -> Nil {
         Ok(beam) -> {
           let m = module_name_for(Ref(h))
           let adapter: StorageAdapter = inmemory()
-          let _ = adapter.insert(Ref(hash_bytes(bit_array.from_string("jv22"))), bit_array.from_string("d"))
+          let _ =
+            adapter.insert(
+              Ref(hash_bytes(bit_array.from_string("jv22"))),
+              bit_array.from_string("d"),
+            )
           case load_and_eval(m, beam) {
             Ok(r) -> io.println("5-chain: " <> r)
             Error(e) -> io.println("L&E err: " <> string.inspect(e))
@@ -319,7 +380,7 @@ pub fn level2213() -> Nil {
 
 pub fn level2214() -> Nil {
   io.println("--- Level 2214: Template with 3 adjacent variables ---")
-  case render("{{a}}{{b}}{{c}}", [#("a","A"), #("b","B"), #("c","C")]) {
+  case render("{{a}}{{b}}{{c}}", [#("a", "A"), #("b", "B"), #("c", "C")]) {
     Ok(r) -> io.println("3 adjacent: '" <> r <> "'")
     Error(e) -> io.println("Tmpl err: " <> string.inspect(e))
   }
@@ -335,7 +396,9 @@ pub fn level2215() -> Nil {
 }
 
 pub fn level2216() -> Nil {
-  io.println("--- Level 2216: Config get_string env lookup (no CLI override) ---")
+  io.println(
+    "--- Level 2216: Config get_string env lookup (no CLI override) ---",
+  )
   let cfg = load()
   case get_string(cfg, "HOME") {
     Ok(home) -> io.println("HOME: " <> string.slice(home, 0, 20) <> "...")
@@ -377,12 +440,20 @@ pub fn level2220() -> Nil {
   let nested = string.repeat("(", 500) <> "x" <> string.repeat(")", 500)
   let d = count_brackets(nested, False, 0)
   let balanced = d == 0
-  io.println("500-level: " <> string.inspect(balanced) <> " (d=" <> int.to_string(d) <> ")")
+  io.println(
+    "500-level: "
+    <> string.inspect(balanced)
+    <> " (d="
+    <> int.to_string(d)
+    <> ")",
+  )
   io.println("Level 2220: OK")
 }
 
 pub fn level2221() -> Nil {
-  io.println("--- Level 2221: count_brackets with escaped newline in string ---")
+  io.println(
+    "--- Level 2221: count_brackets with escaped newline in string ---",
+  )
   let src = "\"line1 \\n line2\" ()"
   let d = count_brackets(src, False, 0)
   io.println("Escaped newline: " <> int.to_string(d))
@@ -444,12 +515,16 @@ pub fn level2227() -> Nil {
 
 pub fn level2228() -> Nil {
   io.println("--- Level 2228: Elaborate SurfaceAbilityDef with 2 ops ---")
-  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("ab2_v22"))), [
-    #("AB", SurfaceAbilityDef("AB", [
-      SurfaceOp("op1", [], TBuiltin(TInt)),
-      SurfaceOp("op2", [TBuiltin(TText)], TBuiltin(TInt)),
-    ])),
-  ])
+  let su =
+    SurfaceUnit(Ref(hash_bytes(bit_array.from_string("ab2_v22"))), [
+      #(
+        "AB",
+        SurfaceAbilityDef("AB", [
+          SurfaceOp("op1", [], TBuiltin(TInt)),
+          SurfaceOp("op2", [TBuiltin(TText)], TBuiltin(TInt)),
+        ]),
+      ),
+    ])
   case elaborate_unit(su, empty_cache()) {
     Ok(#(_, _, _)) -> io.println("2-op ability elaborated: OK")
     Error(e) -> io.println("Elab err: " <> string.inspect(e))
@@ -458,13 +533,19 @@ pub fn level2228() -> Nil {
 }
 
 pub fn level2229() -> Nil {
-  io.println("--- Level 2229: Elaborate SurfaceAbilityDef + SurfaceTermDef together ---")
-  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("abterm_v22"))), [
-    #("Console", SurfaceAbilityDef("Console", [
-      SurfaceOp("print", [TBuiltin(TText)], TBuiltin(TInt)),
-    ])),
-    #("main", SurfaceTermDef(SVar("Console"))),
-  ])
+  io.println(
+    "--- Level 2229: Elaborate SurfaceAbilityDef + SurfaceTermDef together ---",
+  )
+  let su =
+    SurfaceUnit(Ref(hash_bytes(bit_array.from_string("abterm_v22"))), [
+      #(
+        "Console",
+        SurfaceAbilityDef("Console", [
+          SurfaceOp("print", [TBuiltin(TText)], TBuiltin(TInt)),
+        ]),
+      ),
+      #("main", SurfaceTermDef(SVar("Console"))),
+    ])
   case elaborate_unit(su, empty_cache()) {
     Ok(#(_, _, _)) -> io.println("Ability+Term elaborated: OK")
     Error(e) -> io.println("Elab err: " <> string.inspect(e))
@@ -476,9 +557,10 @@ pub fn level2230() -> Nil {
   io.println("--- Level 2230: Elaborate surface int literal ---")
   case parse_string("42") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("sint_v22"))), [
-        #("x", SurfaceTermDef(st)),
-      ])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("sint_v22"))), [
+          #("x", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("Int literal elaborated: OK")
         Error(e) -> io.println("Elab err: " <> string.inspect(e))
@@ -493,9 +575,10 @@ pub fn level2231() -> Nil {
   io.println("--- Level 2231: Elaborate surface float literal ---")
   case parse_string("3.14") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("sfloat_v22"))), [
-        #("f", SurfaceTermDef(st)),
-      ])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("sfloat_v22"))), [
+          #("f", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("Float literal elaborated: OK")
         Error(e) -> io.println("Elab err: " <> string.inspect(e))
@@ -510,9 +593,10 @@ pub fn level2232() -> Nil {
   io.println("--- Level 2232: Elaborate empty list surface literal ---")
   case parse_string("()") {
     Ok(st) -> {
-      let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("sempty_v22"))), [
-        #("nil", SurfaceTermDef(st)),
-      ])
+      let su =
+        SurfaceUnit(Ref(hash_bytes(bit_array.from_string("sempty_v22"))), [
+          #("nil", SurfaceTermDef(st)),
+        ])
       case elaborate_unit(su, empty_cache()) {
         Ok(#(_, _, _)) -> io.println("Empty list elaborated: OK")
         Error(e) -> io.println("Elab err: " <> string.inspect(e))
@@ -528,9 +612,21 @@ pub fn level2232() -> Nil {
 pub fn level2233() -> Nil {
   io.println("--- Level 2233: infer_term Do with cache hit ---")
   let ab_ref = Ref(hash_bytes(bit_array.from_string("docache_v22")))
-  let cache = TypeCache(entries: dict.from_list([
-    #(ab_ref, CTAbility([OperationType(name: option.None, inputs: [], output: ast.Builtin(ast.IntType))])),
-  ]))
+  let cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(
+          ab_ref,
+          CTAbility([
+            OperationType(
+              name: option.None,
+              inputs: [],
+              output: ast.Builtin(ast.IntType),
+            ),
+          ]),
+        ),
+      ]),
+    )
   let d = ast.Do(ab_ref, Local(0), [])
   case infer_term(d, cache) {
     Ok(typ) -> io.println("Do cache hit: " <> string.inspect(typ))
@@ -542,9 +638,12 @@ pub fn level2233() -> Nil {
 pub fn level2234() -> Nil {
   io.println("--- Level 2234: infer_term Construct with cache hit ---")
   let ctor = Ref(hash_bytes(bit_array.from_string("ctorcache_v22")))
-  let cache = TypeCache(entries: dict.from_list([
-    #(ctor, CTTerm(ast.Builtin(ast.IntType))),
-  ]))
+  let cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(ctor, CTTerm(ast.Builtin(ast.IntType))),
+      ]),
+    )
   case infer_term(ast.Construct(ctor, []), cache) {
     Ok(typ) -> io.println("Construct cache hit: " <> string.inspect(typ))
     Error(e) -> io.println("Construct infer err: " <> string.inspect(e))
@@ -555,9 +654,15 @@ pub fn level2234() -> Nil {
 pub fn level2235() -> Nil {
   io.println("--- Level 2235: Typecheck empty unit with cache ---")
   let unit = ast.Unit(Ref(hash_bytes(bit_array.from_string("emptyu_v22"))), [])
-  let cache = TypeCache(entries: dict.from_list([
-    #(Ref(hash_bytes(bit_array.from_string("x_v22"))), CTTerm(ast.Builtin(ast.IntType))),
-  ]))
+  let cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(
+          Ref(hash_bytes(bit_array.from_string("x_v22"))),
+          CTTerm(ast.Builtin(ast.IntType)),
+        ),
+      ]),
+    )
   case typecheck_unit(unit, cache) {
     Ok(#(_, _)) -> io.println("Empty unit TC: OK")
     Error(e) -> io.println("TC err: " <> string.inspect(e))
@@ -577,7 +682,12 @@ pub fn level2236() -> Nil {
 
 pub fn level2237() -> Nil {
   io.println("--- Level 2237: check_linearity on Let with nested Apply ---")
-  let t = ast.Let(Local(0), ast.Int(1), ast.Apply(ast.Int(0), ast.LocalVarRef(Local(0))))
+  let t =
+    ast.Let(
+      Local(0),
+      ast.Int(1),
+      ast.Apply(ast.Int(0), ast.LocalVarRef(Local(0))),
+    )
   case check_linearity(t, empty_cache()) {
     Ok(_) -> io.println("Let+Apply linearity: OK")
     Error(e) -> io.println("Linearity err: " <> string.inspect(e))
@@ -594,7 +704,9 @@ pub fn level2238() -> Nil {
       let _ = w.insert(Ref(r), bit_array.from_string("d"))
       case w.list_refs() {
         Ok(refs) -> {
-          io.println("DETS list_refs count: " <> int.to_string(list.length(refs)))
+          io.println(
+            "DETS list_refs count: " <> int.to_string(list.length(refs)),
+          )
           let _ = w.close()
           io.println("DETS list_refs: OK")
         }
@@ -616,7 +728,10 @@ pub fn level2239() -> Nil {
   let st = new_sync_state()
   let cb = empty_codebase()
   case pull_sync(st, PeerId("some_peer_v22"), cb) {
-    Ok(#(_, _, refs)) -> io.println("Pull sync: " <> int.to_string(list.length(refs)) <> " new refs")
+    Ok(#(_, _, refs)) ->
+      io.println(
+        "Pull sync: " <> int.to_string(list.length(refs)) <> " new refs",
+      )
     Error(e) -> io.println("Pull err: " <> string.inspect(e))
   }
   io.println("Level 2239: OK")
@@ -688,7 +803,9 @@ pub fn level2246() -> Nil {
 
 pub fn level2247() -> Nil {
   io.println("--- Level 2247: eval_string bool and + or ---")
-  case eval_string("(if (and (eq? (add 1 1) 2) (or (lt? 0 1) (gt? 0 1))) 1 0)") {
+  case
+    eval_string("(if (and (eq? (add 1 1) 2) (or (lt? 0 1) (gt? 0 1))) 1 0)")
+  {
     Ok(r) -> io.println("Bool chain: " <> r)
     Error(e) -> io.println("Eval err: " <> string.inspect(e))
   }
@@ -697,7 +814,11 @@ pub fn level2247() -> Nil {
 
 pub fn level2248() -> Nil {
   io.println("--- Level 2248: eval_string dict ops ---")
-  case eval_string("(let ((d (dict-set (dict-new) \"key\" 42))) (dict-get d \"key\"))") {
+  case
+    eval_string(
+      "(let ((d (dict-set (dict-new) \"key\" 42))) (dict-get d \"key\"))",
+    )
+  {
     Ok(r) -> io.println("Dict ops: " <> r)
     Error(e) -> io.println("Eval err: " <> string.inspect(e))
   }
@@ -717,7 +838,12 @@ pub fn level2249() -> Nil {
 
 pub fn level2250() -> Nil {
   io.println("--- Level 2250: infer_term Use ---")
-  case infer_term(ast.Use(Local(0), ast.Int(1), ast.LocalVarRef(Local(0))), empty_cache()) {
+  case
+    infer_term(
+      ast.Use(Local(0), ast.Int(1), ast.LocalVarRef(Local(0))),
+      empty_cache(),
+    )
+  {
     Ok(typ) -> io.println("Use inferred: " <> string.inspect(typ))
     Error(e) -> io.println("Use infer err: " <> string.inspect(e))
   }
@@ -726,7 +852,11 @@ pub fn level2250() -> Nil {
 
 pub fn level2251() -> Nil {
   io.println("--- Level 2251: substitute App type ---")
-  let t = ast.App(Ref(hash_bytes(bit_array.from_string("sub_v22"))), [ast.TypeVar(0), ast.Builtin(ast.IntType)])
+  let t =
+    ast.App(Ref(hash_bytes(bit_array.from_string("sub_v22"))), [
+      ast.TypeVar(0),
+      ast.Builtin(ast.IntType),
+    ])
   let r = substitute(t, 0, ast.Builtin(ast.FloatType))
   io.println("App substitute: OK")
   io.println("Level 2251: OK")
@@ -734,7 +864,12 @@ pub fn level2251() -> Nil {
 
 pub fn level2252() -> Nil {
   io.println("--- Level 2252: normalize_type App ---")
-  let t = ast.App(Ref(hash_bytes(bit_array.from_string("norm_v22"))), [ast.TypeVar(5), ast.TypeVar(3), ast.TypeVar(5)])
+  let t =
+    ast.App(Ref(hash_bytes(bit_array.from_string("norm_v22"))), [
+      ast.TypeVar(5),
+      ast.TypeVar(3),
+      ast.TypeVar(5),
+    ])
   case normalize_type(t) {
     _ -> io.println("App normalize: OK")
   }
@@ -753,14 +888,23 @@ pub fn level2253() -> Nil {
 
 pub fn level2254() -> Nil {
   io.println("--- Level 2254: compile TypeDef with 3 constructors ---")
-  let td = ast.TypeDef(ast.Structural(name: Local(0), parameters: [], constructors: [
-    ast.Constructor(name: Local(1), args: []),
-    ast.Constructor(name: Local(2), args: [ast.TypeRefBuiltin(ast.IntType)]),
-    ast.Constructor(name: Local(3), args: [ast.TypeRefBuiltin(ast.IntType), ast.TypeRefBuiltin(ast.TextType)]),
-  ]))
+  let td =
+    ast.TypeDef(
+      ast.Structural(name: Local(0), parameters: [], constructors: [
+        ast.Constructor(name: Local(1), args: []),
+        ast.Constructor(name: Local(2), args: [ast.TypeRefBuiltin(ast.IntType)]),
+        ast.Constructor(name: Local(3), args: [
+          ast.TypeRefBuiltin(ast.IntType),
+          ast.TypeRefBuiltin(ast.TextType),
+        ]),
+      ]),
+    )
   let h = hash_of_definition(td)
   case compile_definition(new_compiler(), td, Ref(h)) {
-    Ok(b) -> io.println("TypeDef 3 ctors: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "TypeDef 3 ctors: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("Compile err: " <> string.inspect(e))
   }
   io.println("Level 2254: OK")
@@ -768,16 +912,47 @@ pub fn level2254() -> Nil {
 
 pub fn level2255() -> Nil {
   io.println("--- Level 2255: compile AbilityDecl with 5 ops ---")
-  let ab = ast.AbilityDecl(ast.AbilityDeclaration(name: Local(0), operations: [
-    ast.Operation(name: Local(0), inputs: [], output: ast.TypeRefBuiltin(ast.IntType)),
-    ast.Operation(name: Local(1), inputs: [ast.TypeRefBuiltin(ast.IntType)], output: ast.TypeRefBuiltin(ast.FloatType)),
-    ast.Operation(name: Local(2), inputs: [ast.TypeRefBuiltin(ast.IntType), ast.TypeRefBuiltin(ast.IntType)], output: ast.TypeRefBuiltin(ast.IntType)),
-    ast.Operation(name: Local(3), inputs: [], output: ast.TypeRefBuiltin(ast.TextType)),
-    ast.Operation(name: Local(4), inputs: [ast.TypeRefBuiltin(ast.TextType)], output: ast.TypeRefBuiltin(ast.BoolType)),
-  ]))
+  let ab =
+    ast.AbilityDecl(
+      ast.AbilityDeclaration(name: Local(0), operations: [
+        ast.Operation(
+          name: Local(0),
+          inputs: [],
+          output: ast.TypeRefBuiltin(ast.IntType),
+        ),
+        ast.Operation(
+          name: Local(1),
+          inputs: [ast.TypeRefBuiltin(ast.IntType)],
+          output: ast.TypeRefBuiltin(ast.FloatType),
+        ),
+        ast.Operation(
+          name: Local(2),
+          inputs: [
+            ast.TypeRefBuiltin(ast.IntType),
+            ast.TypeRefBuiltin(ast.IntType),
+          ],
+          output: ast.TypeRefBuiltin(ast.IntType),
+        ),
+        ast.Operation(
+          name: Local(3),
+          inputs: [],
+          output: ast.TypeRefBuiltin(ast.TextType),
+        ),
+        ast.Operation(
+          name: Local(4),
+          inputs: [ast.TypeRefBuiltin(ast.TextType)],
+          output: ast.TypeRefBuiltin(ast.BoolType),
+        ),
+      ]),
+    )
   let h = hash_of_definition(ab)
   case compile_definition(new_compiler(), ab, Ref(h)) {
-    Ok(b) -> io.println("AbilityDecl 5 ops: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "AbilityDecl 5 ops: "
+        <> int.to_string(bit_array.byte_size(b))
+        <> " bytes",
+      )
     Error(e) -> io.println("Compile err: " <> string.inspect(e))
   }
   io.println("Level 2255: OK")
@@ -785,19 +960,27 @@ pub fn level2255() -> Nil {
 
 pub fn level2256() -> Nil {
   io.println("--- Level 2256: Compile match with 5 cases ---")
-  let dm = ast.TermDef(
-    ast.Match(ast.Int(3), [
-      ast.Case(pattern: ast.PatInt(0), guard: option.None, body: ast.Int(100)),
-      ast.Case(pattern: ast.PatInt(1), guard: option.None, body: ast.Int(200)),
-      ast.Case(pattern: ast.PatInt(2), guard: option.None, body: ast.Int(300)),
-      ast.Case(pattern: ast.PatInt(3), guard: option.None, body: ast.Int(400)),
-      ast.Case(pattern: ast.PatVar(Local(0)), guard: option.None, body: ast.Int(0)),
-    ]),
-    ast.Builtin(ast.IntType),
-  )
+  let dm =
+    ast.TermDef(
+      ast.Match(ast.Int(3), [
+        ast.Case(pattern: ast.PatInt(0), guard: option.None, body: ast.Int(100)),
+        ast.Case(pattern: ast.PatInt(1), guard: option.None, body: ast.Int(200)),
+        ast.Case(pattern: ast.PatInt(2), guard: option.None, body: ast.Int(300)),
+        ast.Case(pattern: ast.PatInt(3), guard: option.None, body: ast.Int(400)),
+        ast.Case(
+          pattern: ast.PatVar(Local(0)),
+          guard: option.None,
+          body: ast.Int(0),
+        ),
+      ]),
+      ast.Builtin(ast.IntType),
+    )
   let h = hash_of_definition(dm)
   case compile_definition(new_compiler(), dm, Ref(h)) {
-    Ok(b) -> io.println("5-case match: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "5-case match: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("Compile err: " <> string.inspect(e))
   }
   io.println("Level 2256: OK")
@@ -805,22 +988,20 @@ pub fn level2256() -> Nil {
 
 pub fn level2257() -> Nil {
   io.println("--- Level 2257: Compile nested Apply 4 levels ---")
-  let t = ast.TermDef(
-    ast.Apply(
+  let t =
+    ast.TermDef(
       ast.Apply(
-        ast.Apply(
-          ast.Int(0),
-          ast.Int(1),
-        ),
-        ast.Int(2),
+        ast.Apply(ast.Apply(ast.Int(0), ast.Int(1)), ast.Int(2)),
+        ast.Int(3),
       ),
-      ast.Int(3),
-    ),
-    ast.TypeVar(0),
-  )
+      ast.TypeVar(0),
+    )
   let h = hash_of_definition(t)
   case compile_definition(new_compiler(), t, Ref(h)) {
-    Ok(b) -> io.println("4-apply: " <> int.to_string(bit_array.byte_size(b)) <> " bytes")
+    Ok(b) ->
+      io.println(
+        "4-apply: " <> int.to_string(bit_array.byte_size(b)) <> " bytes",
+      )
     Error(e) -> io.println("Compile err: " <> string.inspect(e))
   }
   io.println("Level 2257: OK")
@@ -828,10 +1009,14 @@ pub fn level2257() -> Nil {
 
 pub fn level2258() -> Nil {
   io.println("--- Level 2258: compile_only + load_and_eval construct ---")
-  let def = ast.TermDef(
-    ast.Construct(Ref(hash_bytes(bit_array.from_string("pair_v22"))), [ast.Int(10), ast.Int(20)]),
-    ast.Builtin(ast.IntType),
-  )
+  let def =
+    ast.TermDef(
+      ast.Construct(Ref(hash_bytes(bit_array.from_string("pair_v22"))), [
+        ast.Int(10),
+        ast.Int(20),
+      ]),
+      ast.Builtin(ast.IntType),
+    )
   let h = hash_bytes(bit_array.from_string("construct_v22"))
   case compile_only(def, Ref(h)) {
     Ok(beam) -> {
@@ -861,10 +1046,14 @@ pub fn level2269() -> Nil {
   io.println("    Template: no vars, 3 adjacent vars")
   io.println("    Filepath: extension on path without dot")
   io.println("    Config: env-only lookup, nonexistent env key")
-  io.println("    count_brackets: escaped bslash+quote, quote+parens, 500-level, escaped newline, all open")
+  io.println(
+    "    count_brackets: escaped bslash+quote, quote+parens, 500-level, escaped newline, all open",
+  )
   io.println("    Lexer: empty string, whitespace only")
   io.println("    Parser: nested let, 3-case match, do expression")
-  io.println("    Elaborate: 2-op ability, ability+term, int/float/empty list literals")
+  io.println(
+    "    Elaborate: 2-op ability, ability+term, int/float/empty list literals",
+  )
   io.println("    Inference: Do cache hit, Construct cache hit, Hole, Use")
   io.println("    Typecheck: empty unit with cache")
   io.println("    Linearity: Apply chain, Let+Apply nested")
@@ -874,8 +1063,12 @@ pub fn level2269() -> Nil {
   io.println("    Health: single check, readiness")
   io.println("    Log: all levels in sequence")
   io.println("    REPL: reverse+length, slice+concat, pair, bool, dict ops")
-  io.println("    Inference helpers: substitute App, normalize App, list_all_match heterogeneous")
-  io.println("    Compile: TypeDef 3 ctors, AbilityDecl 5 ops, 5-case match, 4-apply, construct")
+  io.println(
+    "    Inference helpers: substitute App, normalize App, list_all_match heterogeneous",
+  )
+  io.println(
+    "    Compile: TypeDef 3 ctors, AbilityDecl 5 ops, 5-case match, 4-apply, construct",
+  )
   io.println("============================================================")
   io.println("Level 2269: OK")
 }

@@ -14,7 +14,11 @@ pub type CryptoError {
 fn ffi_hash(algo: String, data: BitArray) -> Result(BitArray, String)
 
 @external(erlang, "gleamunison_crypto", "hmac")
-fn ffi_hmac(algo: String, key: BitArray, data: BitArray) -> Result(BitArray, String)
+fn ffi_hmac(
+  algo: String,
+  key: BitArray,
+  data: BitArray,
+) -> Result(BitArray, String)
 
 @external(erlang, "gleamunison_crypto", "random_bytes")
 fn ffi_random_bytes(n: Int) -> BitArray
@@ -30,7 +34,10 @@ fn algo_to_string(algo: HashAlgorithm) -> String {
   }
 }
 
-pub fn hash(algo: HashAlgorithm, data: BitArray) -> Result(BitArray, CryptoError) {
+pub fn hash(
+  algo: HashAlgorithm,
+  data: BitArray,
+) -> Result(BitArray, CryptoError) {
   ffi_hash(algo_to_string(algo), data)
   |> result.map_error(fn(e) { InvalidInput(e) })
 }
@@ -48,7 +55,10 @@ pub fn random_bytes(n: Int) -> BitArray {
   ffi_random_bytes(n)
 }
 
-pub fn hash_hex(algo: HashAlgorithm, data: BitArray) -> Result(String, CryptoError) {
+pub fn hash_hex(
+  algo: HashAlgorithm,
+  data: BitArray,
+) -> Result(String, CryptoError) {
   case hash(algo, data) {
     Ok(digest) -> Ok(ffi_hash_to_hex(digest))
     Error(e) -> Error(e)

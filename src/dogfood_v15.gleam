@@ -1,36 +1,43 @@
 import gleam/bit_array
+import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/string
-import gleam/dict
-import gleamunison/identity.{type Hash, type DefinitionRef, type LocalVar, Local, Ref, hash_bytes, hash_to_short_string}
-import gleamunison/crypto.{type CryptoError, Sha256, Sha512, Md5, InvalidInput}
-import gleamunison/json
-import gleamunison/metrics
-import gleamunison/http_client
-import gleamunison/log
-import gleamunison/filepath.{from_string, to_string, join, file_name, extension, parent, has_extension}
-import gleamunison/datetime.{now, to_iso8601}
-import gleamunison/pipeline.{parse_only, elaborate_only, ref_for_name}
-import gleamunison/parser.{parse_string}
-import gleamunison/elaborate.{elaborate_unit}
-import gleamunison/lower.{lower_type_ref, type_ref_to_type}
-import gleamunison/elab_types.{
-  type SurfaceUnit, SurfaceTermDef, SurfaceAbilityDef, SurfaceTypeAlias, SurfacePubTypeAlias,
-  SurfaceUnit, TVar, TFun, TBuiltin, TInt, TFloat, TText, TList,
-  UnsupportedTypeRef,
-}
 import gleamunison/ast
-import gleamunison/types.{type TypeCache, CTAbility, CTTerm, CTType, TypeCache, empty_cache}
-import gleamunison/compile.{new as new_compiler, compile_definition}
-import gleamunison/loader.{new_loader, ensure_loaded, is_loaded}
-import gleamunison/inference.{
-  infer_term, check_linearity,
+import gleamunison/codebase.{
+  empty as empty_codebase, hash_of_definition, insert as cb_insert,
+}
+import gleamunison/compile.{compile_definition, new as new_compiler}
+import gleamunison/crypto.{type CryptoError, InvalidInput, Md5, Sha256, Sha512}
+import gleamunison/datetime.{now, to_iso8601}
+import gleamunison/elab_types.{
+  type SurfaceUnit, SurfaceAbilityDef, SurfacePubTypeAlias, SurfaceTermDef,
+  SurfaceTypeAlias, SurfaceUnit, TBuiltin, TFloat, TFun, TInt, TList, TText,
+  TVar, UnsupportedTypeRef,
+}
+import gleamunison/elaborate.{elaborate_unit}
+import gleamunison/filepath.{
+  extension, file_name, from_string, has_extension, join, parent, to_string,
+}
+import gleamunison/http_client
+import gleamunison/identity.{
+  type DefinitionRef, type Hash, type LocalVar, Local, Ref, hash_bytes,
+  hash_to_short_string,
 }
 import gleamunison/infer_helper.{list_all_match}
-import gleamunison/storage.{inmemory}
-import gleamunison/codebase.{insert as cb_insert, hash_of_definition, empty as empty_codebase}
+import gleamunison/inference.{check_linearity, infer_term}
+import gleamunison/json
+import gleamunison/loader.{ensure_loaded, is_loaded, new_loader}
+import gleamunison/log
+import gleamunison/lower.{lower_type_ref, type_ref_to_type}
+import gleamunison/metrics
+import gleamunison/parser.{parse_string}
+import gleamunison/pipeline.{elaborate_only, parse_only, ref_for_name}
 import gleamunison/repl.{eval_string}
+import gleamunison/storage.{inmemory}
+import gleamunison/types.{
+  type TypeCache, CTAbility, CTTerm, CTType, TypeCache, empty_cache,
+}
 
 fn range(_start: Int, _end: Int) -> List(Int) {
   []
@@ -174,8 +181,8 @@ pub fn level1660() -> Nil {
 pub fn level1661() -> Nil {
   io.println("--- Level 1661: metrics.histogram ---")
   metrics.histogram("dogfood_v15_hist_latency", 0.001)
-  metrics.histogram("dogfood_v15_hist_latency", 0.050)
-  metrics.histogram("dogfood_v15_hist_latency", 1.200)
+  metrics.histogram("dogfood_v15_hist_latency", 0.05)
+  metrics.histogram("dogfood_v15_hist_latency", 1.2)
   metrics.histogram("dogfood_v15_hist_latency", 0.003)
   io.println("Histogram observations recorded")
   io.println("Level 1661: OK")
@@ -185,7 +192,12 @@ pub fn level1661() -> Nil {
 
 pub fn level1662() -> Nil {
   io.println("--- Level 1662: http_client.post ---")
-  let _ = case http_client.post("http://localhost:8080/nonexistent", bit_array.from_string("{\"key\":\"val\"}")) {
+  let _ = case
+    http_client.post(
+      "http://localhost:8080/nonexistent",
+      bit_array.from_string("{\"key\":\"val\"}"),
+    )
+  {
     Ok(_resp) -> io.println("POST got response")
     Error(e) -> io.println("POST error (expected): " <> string.inspect(e))
   }
@@ -194,7 +206,12 @@ pub fn level1662() -> Nil {
 
 pub fn level1663() -> Nil {
   io.println("--- Level 1663: http_client.put ---")
-  let _ = case http_client.put("http://localhost:8080/nonexistent", bit_array.from_string("{\"updated\":true}")) {
+  let _ = case
+    http_client.put(
+      "http://localhost:8080/nonexistent",
+      bit_array.from_string("{\"updated\":true}"),
+    )
+  {
     Ok(_resp) -> io.println("PUT got response")
     Error(e) -> io.println("PUT error (expected): " <> string.inspect(e))
   }
@@ -214,28 +231,37 @@ pub fn level1664() -> Nil {
 
 pub fn level1665() -> Nil {
   io.println("--- Level 1665: log.debug_context ---")
-  log.debug_context("debug message from v15", dict.from_list([
-    #("file", "dogfood_v15.gleam"),
-    #("level", "1665"),
-  ]))
+  log.debug_context(
+    "debug message from v15",
+    dict.from_list([
+      #("file", "dogfood_v15.gleam"),
+      #("level", "1665"),
+    ]),
+  )
   io.println("Level 1665: OK")
 }
 
 pub fn level1666() -> Nil {
   io.println("--- Level 1666: log.warn_context ---")
-  log.warn_context("deprecation warning", dict.from_list([
-    #("old_api", "deprecated_fn"),
-    #("new_api", "replacement_fn"),
-  ]))
+  log.warn_context(
+    "deprecation warning",
+    dict.from_list([
+      #("old_api", "deprecated_fn"),
+      #("new_api", "replacement_fn"),
+    ]),
+  )
   io.println("Level 1666: OK")
 }
 
 pub fn level1667() -> Nil {
   io.println("--- Level 1667: log.error_context ---")
-  log.error_context("critical failure", dict.from_list([
-    #("component", "compiler"),
-    #("phase", "codegen"),
-  ]))
+  log.error_context(
+    "critical failure",
+    dict.from_list([
+      #("component", "compiler"),
+      #("phase", "codegen"),
+    ]),
+  )
   io.println("Level 1667: OK")
 }
 
@@ -323,9 +349,10 @@ pub fn level1674() -> Nil {
 
 pub fn level1675() -> Nil {
   io.println("--- Level 1675: elaborate SurfaceTypeAlias ---")
-  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("alias_root_v15"))), [
-    #("MyAlias", SurfaceTypeAlias("MyAlias", TBuiltin(TText))),
-  ])
+  let su =
+    SurfaceUnit(Ref(hash_bytes(bit_array.from_string("alias_root_v15"))), [
+      #("MyAlias", SurfaceTypeAlias("MyAlias", TBuiltin(TText))),
+    ])
   let cache = empty_cache()
   let _ = case elaborate_unit(su, cache) {
     Ok(#(_, _next_cache, _)) -> {
@@ -338,9 +365,10 @@ pub fn level1675() -> Nil {
 
 pub fn level1676() -> Nil {
   io.println("--- Level 1676: elaborate SurfacePubTypeAlias ---")
-  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("pubalias_root_v15"))), [
-    #("ExportedAlias", SurfacePubTypeAlias("ExportedAlias", TBuiltin(TFloat))),
-  ])
+  let su =
+    SurfaceUnit(Ref(hash_bytes(bit_array.from_string("pubalias_root_v15"))), [
+      #("ExportedAlias", SurfacePubTypeAlias("ExportedAlias", TBuiltin(TFloat))),
+    ])
   let cache = empty_cache()
   let _ = case elaborate_unit(su, cache) {
     Ok(#(_, _next_cache, _)) -> {
@@ -371,7 +399,8 @@ pub fn level1678() -> Nil {
   io.println("--- Level 1678: eval_string unbound variable ---")
   let _ = case eval_string("undefined_var_x") {
     Ok(res) -> io.println("eval_string unexpected success: " <> res)
-    Error(e) -> io.println("eval_string error (expected): " <> string.inspect(e))
+    Error(e) ->
+      io.println("eval_string error (expected): " <> string.inspect(e))
   }
   io.println("Level 1678: OK")
 }
@@ -417,9 +446,12 @@ pub fn level1681() -> Nil {
 pub fn level1682() -> Nil {
   io.println("--- Level 1682: Do with CTTerm cache entry ---")
   let ab_ref = hash_bytes(bit_array.from_string("ab_ctterm_miss_v15"))
-  let cache = TypeCache(entries: dict.from_list([
-    #(Ref(ab_ref), CTTerm(ast.Builtin(ast.IntType))),
-  ]))
+  let cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(Ref(ab_ref), CTTerm(ast.Builtin(ast.IntType))),
+      ]),
+    )
   let do_term = ast.Do(Ref(ab_ref), Local(0), [ast.Int(42)])
   let _ = case infer_term(do_term, cache) {
     Ok(_) -> io.println("Do with CTTerm cache entry: OK")
@@ -443,7 +475,8 @@ pub fn level1684() -> Nil {
   io.println("--- Level 1684: lexer unterminated string ---")
   let _ = case parse_string("\"hello") {
     Ok(_) -> io.println("Unterminated string parsed: OK")
-    Error(e) -> io.println("Unterminated string error (expected): " <> string.inspect(e))
+    Error(e) ->
+      io.println("Unterminated string error (expected): " <> string.inspect(e))
   }
   io.println("Level 1684: OK")
 }
@@ -501,10 +534,13 @@ pub fn level1688() -> Nil {
 pub fn level1689() -> Nil {
   io.println("--- Level 1689: metrics+log integration ---")
   metrics.counter("integration_counter", 1)
-  log.info_context("metrics+log chain", dict.from_list([
-    #("counter", "integration_counter"),
-    #("delta", "1"),
-  ]))
+  log.info_context(
+    "metrics+log chain",
+    dict.from_list([
+      #("counter", "integration_counter"),
+      #("delta", "1"),
+    ]),
+  )
   io.println("Level 1689: OK")
 }
 
@@ -606,7 +642,9 @@ pub fn level1695() -> Nil {
   let _ = case ensure_loaded(ldr, Ref(h), def) {
     Ok(ldr2) -> {
       let loaded = is_loaded(ldr2, Ref(h))
-      io.println("Loader cache + codebase roundtrip: " <> string.inspect(loaded))
+      io.println(
+        "Loader cache + codebase roundtrip: " <> string.inspect(loaded),
+      )
     }
     Error(#(_, e)) -> io.println("Loader error: " <> string.inspect(e))
   }
@@ -656,7 +694,8 @@ pub fn level1699() -> Nil {
   io.println("--- Level 1699: list_all_match cross ---")
   let cache = empty_cache()
   let terms = [ast.Int(1), ast.Int(2)]
-  let result = list_all_match(terms, ast.Builtin(ast.IntType), cache, infer_term)
+  let result =
+    list_all_match(terms, ast.Builtin(ast.IntType), cache, infer_term)
   io.println("list_all_match same type: " <> string.inspect(result))
   io.println("Level 1699: OK")
 }
@@ -670,7 +709,9 @@ pub fn level1700() -> Nil {
   io.println("")
   io.println("  721 dogfood levels + 52 unit tests = 773 verifications")
   io.println("")
-  io.println("  CRITICAL: crypto hash(Sha256/Sha512/Md5), hmac, random_bytes, hash_hex")
+  io.println(
+    "  CRITICAL: crypto hash(Sha256/Sha512/Md5), hmac, random_bytes, hash_hex",
+  )
   io.println("  CRITICAL: json encode + decode roundtrip")
   io.println("  CRITICAL: metrics counter, gauge, histogram")
   io.println("")
@@ -685,7 +726,9 @@ pub fn level1700() -> Nil {
   io.println("  LOW: lower TFun error path")
   io.println("  LOW: elaborate SurfaceTypeAlias, SurfacePubTypeAlias")
   io.println("  LOW: compile Hole emission")
-  io.println("  LOW: inference Construct cache miss, Match empty, check_linearity")
+  io.println(
+    "  LOW: inference Construct cache miss, Match empty, check_linearity",
+  )
   io.println("  LOW: types validate_handler CTTerm miss")
   io.println("  LOW: lexer empty, unterminated, complex escapes")
   io.println("  LOW: parser extra tokens, SPConstructor 3-args")

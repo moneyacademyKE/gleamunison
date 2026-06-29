@@ -1,24 +1,26 @@
 import gleam/bit_array
 import gleam/dict
 import gleam/io
+import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
-import gleam/list
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/identity.{Local, Ref, hash_equal, hash_to_debug_string}
-import gleamunison/types.{empty_cache, validate_handler}
-import gleamunison/jets.{get_jet}
-import gleamunison/loader.{is_loaded, new_loader, new_loader_with_limit, ensure_loaded}
-import gleamunison/storage
+import gleamunison/config
 import gleamunison/datetime
 import gleamunison/filepath
-import gleamunison/log
-import gleamunison/config
 import gleamunison/health
+import gleamunison/identity.{Local, Ref, hash_equal, hash_to_debug_string}
+import gleamunison/jets.{get_jet}
+import gleamunison/loader.{
+  ensure_loaded, is_loaded, new_loader, new_loader_with_limit,
+}
+import gleamunison/log
 import gleamunison/parser
+import gleamunison/storage
 import gleamunison/sync.{new_sync_state}
 import gleamunison/sync_types.{PeerId}
+import gleamunison/types.{empty_cache, validate_handler}
 
 @external(erlang, "gleamunison_json", "encode")
 fn ffi_encode(term: a) -> Result(BitArray, BitArray)
@@ -42,7 +44,11 @@ fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(List(a), b)
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_trace", "list_traces")
 fn ffi_trace_list() -> List(a)
@@ -57,13 +63,21 @@ fn ffi_storage_new() -> BitArray
 fn ffi_storage_lookup(tab: BitArray, ref: BitArray) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_storage", "insert")
-fn ffi_storage_insert(tab: BitArray, ref: BitArray, bytes: BitArray) -> Result(Nil, a)
+fn ffi_storage_insert(
+  tab: BitArray,
+  ref: BitArray,
+  bytes: BitArray,
+) -> Result(Nil, a)
 
 @external(erlang, "gleamunison_storage", "dets_new")
 fn ffi_dets_new(path: String) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_storage", "dets_insert")
-fn ffi_dets_insert(tab: BitArray, ref: BitArray, bytes: BitArray) -> Result(Nil, a)
+fn ffi_dets_insert(
+  tab: BitArray,
+  ref: BitArray,
+  bytes: BitArray,
+) -> Result(Nil, a)
 
 @external(erlang, "gleamunison_storage", "dets_lookup")
 fn ffi_dets_lookup(tab: BitArray, ref: BitArray) -> Result(BitArray, a)
@@ -192,7 +206,8 @@ fn inmem_bulk_insert(tab: BitArray, n: Int, offset: Int) -> Nil {
   case n {
     0 -> Nil
     _ -> {
-      let key = bit_array.from_string("inmem_key_" <> string.inspect(offset + n))
+      let key =
+        bit_array.from_string("inmem_key_" <> string.inspect(offset + n))
       let val = bit_array.from_string("val_" <> string.inspect(offset + n))
       let _ = ffi_storage_insert(tab, key, val)
       inmem_bulk_insert(tab, n - 1, offset)
@@ -218,10 +233,13 @@ pub fn level1159() -> Nil {
   io.println("--- Level 1159: Storage missing batch ---")
   let tab = ffi_storage_new()
   let ref = bit_array.from_string("present")
-  let assert Ok(Nil) = ffi_storage_insert(tab, ref, bit_array.from_string("here"))
+  let assert Ok(Nil) =
+    ffi_storage_insert(tab, ref, bit_array.from_string("here"))
   let missing1 = ffi_storage_lookup(tab, bit_array.from_string("absent1"))
   let missing2 = ffi_storage_lookup(tab, bit_array.from_string("absent2"))
-  io.println("Missing: " <> string.inspect(missing1) <> ", " <> string.inspect(missing2))
+  io.println(
+    "Missing: " <> string.inspect(missing1) <> ", " <> string.inspect(missing2),
+  )
   io.println("Level 1159: OK")
 }
 
@@ -231,7 +249,8 @@ pub fn level1160() -> Nil {
   let _ = ffi_dets_delete(path)
   let assert Ok(tab) = ffi_dets_new(path)
   let ref = bit_array.from_string("persist_key")
-  let assert Ok(Nil) = ffi_dets_insert(tab, ref, bit_array.from_string("persistent"))
+  let assert Ok(Nil) =
+    ffi_dets_insert(tab, ref, bit_array.from_string("persistent"))
   let _ = ffi_dets_close(tab)
   let assert Ok(tab2) = ffi_dets_new(path)
   let _ = case ffi_dets_lookup(tab2, ref) {
@@ -248,9 +267,45 @@ pub fn level1160() -> Nil {
 
 pub fn level1161() -> Nil {
   io.println("--- Level 1161: Jet registry lookup ---")
-  let known_jet = get_jet(Ref(identity.hash_from_bytes(
-    <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,123:256>>
-  )))
+  let known_jet =
+    get_jet(
+      Ref(
+        identity.hash_from_bytes(<<
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          123:256,
+        >>),
+      ),
+    )
   io.println("Jet lookup: " <> string.inspect(known_jet))
   io.println("Level 1161: OK")
 }
@@ -264,12 +319,84 @@ pub fn level1162() -> Nil {
 
 pub fn level1163() -> Nil {
   io.println("--- Level 1163: Jet hash stability ---")
-  let j1 = get_jet(Ref(identity.hash_from_bytes(
-    <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,123:256>>
-  )))
-  let j2 = get_jet(Ref(identity.hash_from_bytes(
-    <<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,123:256>>
-  )))
+  let j1 =
+    get_jet(
+      Ref(
+        identity.hash_from_bytes(<<
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          123:256,
+        >>),
+      ),
+    )
+  let j2 =
+    get_jet(
+      Ref(
+        identity.hash_from_bytes(<<
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          123:256,
+        >>),
+      ),
+    )
   let assert True = j1 == j2
   io.println("Jet determinism: OK")
   io.println("Level 1163: OK")
@@ -297,10 +424,7 @@ pub fn level1166() -> Nil {
   io.println("--- Level 1166: Multi-ref codebase for sync ---")
   let cb = new_codebase()
   let int_type = ast.Builtin(ast.IntType)
-  let defs =
-    list.map(range(1, 20), fn(n) {
-      ast.TermDef(ast.Int(n), int_type)
-    })
+  let defs = list.map(range(1, 20), fn(n) { ast.TermDef(ast.Int(n), int_type) })
   case insert_many_defs(cb, defs, int_type) {
     Ok(cb2) -> {
       io.println("20 defs inserted: OK")
@@ -364,7 +488,9 @@ pub fn level1169() -> Nil {
   io.println("--- Level 1169: High frequency counter ---")
   let start = ffi_time()
   counter_storm(<<"storm.v5">>, 5000)
-  io.println("5000 counter ops: " <> string.inspect(ffi_time() - start) <> " ns")
+  io.println(
+    "5000 counter ops: " <> string.inspect(ffi_time() - start) <> " ns",
+  )
   io.println("Level 1169: OK")
 }
 
@@ -556,17 +682,20 @@ pub fn level1182() -> Nil {
   let term = ast.RefTo(ref)
   let def = ast.TermDef(term, ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
-  io.println("RefTo hash: " <> string.slice(hash_to_debug_string(h), 0, 12) <> "...")
+  io.println(
+    "RefTo hash: " <> string.slice(hash_to_debug_string(h), 0, 12) <> "...",
+  )
   io.println("Level 1182: OK")
 }
 
 pub fn level1183() -> Nil {
   io.println("--- Level 1183: Construct pattern match ---")
   let cons = ast.Construct(identity.builtin_pair(), [ast.Int(1), ast.Int(2)])
-  let pat = ast.PatConstructor(identity.builtin_pair(), [
-    ast.PatVar(Local(0)),
-    ast.PatVar(Local(1)),
-  ])
+  let pat =
+    ast.PatConstructor(identity.builtin_pair(), [
+      ast.PatVar(Local(0)),
+      ast.PatVar(Local(1)),
+    ])
   let c = ast.Case(pat, None, ast.Int(42))
   let match_term = ast.Match(cons, [c])
   let def = ast.TermDef(match_term, ast.Builtin(ast.IntType))
@@ -596,9 +725,10 @@ pub fn level1184() -> Nil {
     ast.Hole,
     ast.Use(Local(0), ast.Int(1), ast.Int(2)),
   ]
-  let hashes = list.map(variants, fn(v) {
-    hash_of_definition(ast.TermDef(v, ast.Builtin(ast.IntType)))
-  })
+  let hashes =
+    list.map(variants, fn(v) {
+      hash_of_definition(ast.TermDef(v, ast.Builtin(ast.IntType)))
+    })
   let assert 15 = list.length(hashes)
   io.println("15 variant hashes: OK")
   io.println("Level 1184: OK")
@@ -633,10 +763,7 @@ pub fn level1188() -> Nil {
   io.println("--- Level 1188: Distributed codebase ---")
   let cb = new_codebase()
   let int_type = ast.Builtin(ast.IntType)
-  let defs =
-    list.map(range(1, 5), fn(n) {
-      ast.TermDef(ast.Int(n), int_type)
-    })
+  let defs = list.map(range(1, 5), fn(n) { ast.TermDef(ast.Int(n), int_type) })
   case insert_many_defs(cb, defs, int_type) {
     Ok(_) -> io.println("5-def distributed-ready codebase: OK")
     Error(_) -> io.println("Insert failed")
@@ -658,7 +785,8 @@ pub fn level1190() -> Nil {
   io.println("--- Level 1190: Loader + storage integration ---")
   let tab = ffi_storage_new()
   let ref = bit_array.from_string("loaded_ref")
-  let assert Ok(Nil) = ffi_storage_insert(tab, ref, bit_array.from_string("hello"))
+  let assert Ok(Nil) =
+    ffi_storage_insert(tab, ref, bit_array.from_string("hello"))
   let ld = new_loader_with_limit(10)
   let def = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
   let lref = Ref(hash_of_definition(def))
@@ -685,7 +813,8 @@ pub fn level1192() -> Nil {
   io.println("--- Level 1192: Sync + storage integration ---")
   let tab = ffi_storage_new()
   let sref = bit_array.from_string("sync_storage_key")
-  let assert Ok(Nil) = ffi_storage_insert(tab, sref, bit_array.from_string("sync_data"))
+  let assert Ok(Nil) =
+    ffi_storage_insert(tab, sref, bit_array.from_string("sync_data"))
   let _state = new_sync_state()
   let _pid = PeerId("integration-node")
   io.println("Sync+storage: OK")
@@ -712,10 +841,7 @@ pub fn level1194() -> Nil {
   io.println("--- Level 1194: Pipeline full cycle ---")
   case parser.parse_string("42") {
     Ok(term) -> {
-      let def = ast.TermDef(
-        ast.Int(42),
-        ast.Builtin(ast.IntType),
-      )
+      let def = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
       let ref = Ref(hash_of_definition(def))
       let unit = ast.Unit(ref, [#(ref, def)])
       let assert Ok(_) = insert(new_codebase(), unit)
@@ -794,16 +920,34 @@ pub fn level1198() -> Nil {
 pub fn level1199() -> Nil {
   io.println("--- Level 1199: Batch 5 completeness ---")
   io.println("v5 levels 1151-1199")
-  io.println("  Loader lifecycle (1151-1155): creation, limit, ensure_loaded, idempotent, LRU eviction")
-  io.println("  Storage endurance (1156-1160): DETS lifecycle, bulk insert, overwrite, missing, reopen")
+  io.println(
+    "  Loader lifecycle (1151-1155): creation, limit, ensure_loaded, idempotent, LRU eviction",
+  )
+  io.println(
+    "  Storage endurance (1156-1160): DETS lifecycle, bulk insert, overwrite, missing, reopen",
+  )
   io.println("  Jets (1161-1163): registry lookup, miss, stability")
-  io.println("  Sync protocol (1164-1168): state, PeerId, multi-ref, pull-ready, hex exchange")
-  io.println("  Concurrency stress (1169-1174): counters, gauges, prop batch, traces, hash/log storms")
-  io.println("  Error stress (1175-1179): parse recovery, nested match, extreme floats, unicode, zero text")
-  io.println("  Effects + constructs (1180-1184): Do+Handle, chained, RefTo, Construct-match, all variants")
-  io.println("  Distributed (1185-1189): spawn/send, timers, Mnesia, distributed codebase, self/recv")
-  io.println("  Integration (1190-1195): loader+storage, jet+codebase, sync+storage, full cycle, endurance")
-  io.println("  Certification (1196-1200): all builtins, all adapters, cross-module, completeness, full")
+  io.println(
+    "  Sync protocol (1164-1168): state, PeerId, multi-ref, pull-ready, hex exchange",
+  )
+  io.println(
+    "  Concurrency stress (1169-1174): counters, gauges, prop batch, traces, hash/log storms",
+  )
+  io.println(
+    "  Error stress (1175-1179): parse recovery, nested match, extreme floats, unicode, zero text",
+  )
+  io.println(
+    "  Effects + constructs (1180-1184): Do+Handle, chained, RefTo, Construct-match, all variants",
+  )
+  io.println(
+    "  Distributed (1185-1189): spawn/send, timers, Mnesia, distributed codebase, self/recv",
+  )
+  io.println(
+    "  Integration (1190-1195): loader+storage, jet+codebase, sync+storage, full cycle, endurance",
+  )
+  io.println(
+    "  Certification (1196-1200): all builtins, all adapters, cross-module, completeness, full",
+  )
   io.println("Level 1199: OK")
 }
 
@@ -813,7 +957,9 @@ pub fn level1200() -> Nil {
   io.println("  v2 (1001-1048): Language features + stdlib basics")
   io.println("  v3 (1049-1100): HTTP, JSON, DateTime, Filepath, Crypto")
   io.println("  v4 (1101-1150): Pipeline, Storage, Sync, REPL, Abilities")
-  io.println("  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed")
+  io.println(
+    "  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed",
+  )
   io.println("Total real dogfood levels: 221")
   io.println("  + 51 unit tests")
   io.println("  = 272 total conformance verifications")

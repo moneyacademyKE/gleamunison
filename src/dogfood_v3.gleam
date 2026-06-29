@@ -5,15 +5,15 @@ import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/identity.{Local, Ref, hash_to_debug_string}
-import gleamunison/types.{empty_cache}
+import gleamunison/config
 import gleamunison/datetime
 import gleamunison/filepath
-import gleamunison/template
-import gleamunison/log
-import gleamunison/config
 import gleamunison/health
+import gleamunison/identity.{Local, Ref, hash_to_debug_string}
+import gleamunison/log
 import gleamunison/parser
+import gleamunison/template
+import gleamunison/types.{empty_cache}
 
 @external(erlang, "gleamunison_http_client", "get")
 fn ffi_hc_get(url: BitArray) -> Result(a, b)
@@ -28,7 +28,11 @@ fn ffi_decode(bin: BitArray) -> Result(a, BitArray)
 fn ffi_hash(algo: BitArray, data: BitArray) -> Result(BitArray, BitArray)
 
 @external(erlang, "gleamunison_crypto", "hmac")
-fn ffi_hmac(algo: BitArray, key: BitArray, data: BitArray) -> Result(BitArray, BitArray)
+fn ffi_hmac(
+  algo: BitArray,
+  key: BitArray,
+  data: BitArray,
+) -> Result(BitArray, BitArray)
 
 @external(erlang, "gleamunison_crypto", "random_bytes")
 fn ffi_random(n: Int) -> BitArray
@@ -49,7 +53,11 @@ fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(List(a), b)
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_trace", "list_traces")
 fn ffi_trace_list() -> List(a)
@@ -415,12 +423,23 @@ pub fn level1088() -> Nil {
 pub fn level1089() -> Nil {
   io.println("--- Level 1089: Deeply nested let ---")
   let term =
-    ast.Let(Local(0), ast.Int(1),
-    ast.Let(Local(1), ast.Int(2),
-    ast.Let(Local(2), ast.Int(3),
-    ast.Let(Local(3), ast.Int(4),
-    ast.Let(Local(4), ast.Int(5),
-    ast.LocalVarRef(Local(4)))))))
+    ast.Let(
+      Local(0),
+      ast.Int(1),
+      ast.Let(
+        Local(1),
+        ast.Int(2),
+        ast.Let(
+          Local(2),
+          ast.Int(3),
+          ast.Let(
+            Local(3),
+            ast.Int(4),
+            ast.Let(Local(4), ast.Int(5), ast.LocalVarRef(Local(4))),
+          ),
+        ),
+      ),
+    )
   let def = ast.TermDef(term, ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
@@ -437,8 +456,12 @@ pub fn level1090() -> Nil {
   let d2 = ast.TermDef(m2, ast.Builtin(ast.IntType))
   let h1 = hash_of_definition(d1)
   let h2 = hash_of_definition(d2)
-  io.println("Hash 1: " <> string.slice(hash_to_debug_string(h1), 0, 16) <> "...")
-  io.println("Hash 2: " <> string.slice(hash_to_debug_string(h2), 0, 16) <> "...")
+  io.println(
+    "Hash 1: " <> string.slice(hash_to_debug_string(h1), 0, 16) <> "...",
+  )
+  io.println(
+    "Hash 2: " <> string.slice(hash_to_debug_string(h2), 0, 16) <> "...",
+  )
   io.println("Level 1090: OK")
 }
 
@@ -477,8 +500,8 @@ pub fn level1091() -> Nil {
 pub fn level1092() -> Nil {
   io.println("--- Level 1092: Lambda compilation benchmark ---")
   let start = ffi_time()
-  let lam = ast.Lambda(Local(0), ast.Apply(
-    ast.LocalVarRef(Local(0)), ast.Int(1)))
+  let lam =
+    ast.Lambda(Local(0), ast.Apply(ast.LocalVarRef(Local(0)), ast.Int(1)))
   let def = ast.TermDef(lam, ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
@@ -509,11 +532,12 @@ pub fn level1093() -> Nil {
 pub fn level1094() -> Nil {
   io.println("--- Level 1094: Effect chain benchmark ---")
   let start = ffi_time()
-  let handle_term = ast.Handle(
-    ast.Int(42),
-    ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
-    identity.builtin_state_get(),
-  )
+  let handle_term =
+    ast.Handle(
+      ast.Int(42),
+      ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
+      identity.builtin_state_get(),
+    )
   let def = ast.TermDef(handle_term, ast.TypeVar(-1))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
@@ -551,13 +575,15 @@ pub fn level1096() -> Nil {
 
 pub fn level1097() -> Nil {
   io.println("--- Level 1097: Full pipeline integration ---")
-  let handle_term = ast.Handle(
-    ast.Int(42),
-    ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
-    identity.builtin_state_get(),
-  )
+  let handle_term =
+    ast.Handle(
+      ast.Int(42),
+      ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
+      identity.builtin_state_get(),
+    )
   let use_term = ast.Use(Local(0), handle_term, ast.LocalVarRef(Local(0)))
-  let guard_case = ast.Case(ast.PatInt(1), Some(ast.GuardTerm(ast.Int(1))), ast.Hole)
+  let guard_case =
+    ast.Case(ast.PatInt(1), Some(ast.GuardTerm(ast.Int(1))), ast.Hole)
   let match_term = ast.Match(ast.Int(1), [guard_case])
   let full_term = ast.Let(Local(0), match_term, use_term)
   let def = ast.TermDef(full_term, ast.TypeVar(-1))

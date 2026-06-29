@@ -6,14 +6,6 @@ import gleam/string
 
 import dogfood_bench as bench
 import dogfood_core as core
-import dogfood_v2 as v2
-import dogfood_v3 as v3
-import dogfood_v4 as v4
-import dogfood_v5 as v5
-import dogfood_v6 as v6
-import dogfood_v7 as v7
-import dogfood_v8 as v8
-import dogfood_v9 as v9
 import dogfood_v10 as v10
 import dogfood_v11 as v11
 import dogfood_v12 as v12
@@ -24,18 +16,28 @@ import dogfood_v16 as v16
 import dogfood_v17 as v17
 import dogfood_v18 as v18
 import dogfood_v19 as v19
+import dogfood_v2 as v2
 import dogfood_v20 as v20
 import dogfood_v21 as v21
 import dogfood_v22 as v22
+import dogfood_v3 as v3
+import dogfood_v4 as v4
+import dogfood_v5 as v5
+import dogfood_v6 as v6
+import dogfood_v7 as v7
+import dogfood_v8 as v8
+import dogfood_v9 as v9
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
 import gleamunison/identity.{Local, Ref, hash_bytes, hash_to_debug_string}
-import gleamunison/parser.{parse_string}
 import gleamunison/inference.{infer_term}
-import gleamunison/types.{empty_cache}
-import gleamunison/compile.{compile_definition, module_name_for, new as new_compiler}
 import gleamunison/loader.{ensure_loaded, new_loader}
+import gleamunison/parser.{parse_string}
 import gleamunison/pipeline.{load_and_eval}
+import gleamunison/types.{empty_cache}
 
 // Meta-test runner — executes all real levels in sequence.
 // Stub levels are tracked separately via all_levels() Dict.
@@ -79,14 +81,21 @@ pub fn generic_hash_level(n: Int) -> Nil {
   let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
   let hex = hash_to_debug_string(h)
-  io.println("Level " <> int.to_string(n) <> ": hash " <> string.slice(hex, 0, 12) <> "... OK")
+  io.println(
+    "Level "
+    <> int.to_string(n)
+    <> ": hash "
+    <> string.slice(hex, 0, 12)
+    <> "... OK",
+  )
 }
 
 pub fn generic_parse_level(n: Int) -> Nil {
   let expr = "(* " <> int.to_string(n) <> " 1)"
   case parse_string(expr) {
     Ok(_) -> io.println("Level " <> int.to_string(n) <> ": parse OK")
-    Error(e) -> io.println("Level " <> int.to_string(n) <> ": parse err " <> e.message)
+    Error(e) ->
+      io.println("Level " <> int.to_string(n) <> ": parse err " <> e.message)
   }
 }
 
@@ -96,15 +105,24 @@ pub fn generic_insert_level(n: Int) -> Nil {
   let unit = ast.Unit(ref, [#(ref, def)])
   case insert(new_codebase(), unit) {
     Ok(_) -> io.println("Level " <> int.to_string(n) <> ": insert OK")
-    Error(e) -> io.println("Level " <> int.to_string(n) <> ": insert err " <> string.inspect(e))
+    Error(e) ->
+      io.println(
+        "Level " <> int.to_string(n) <> ": insert err " <> string.inspect(e),
+      )
   }
 }
 
 pub fn generic_infer_level(n: Int) -> Nil {
   let term = ast.List([ast.Int(n), ast.Int(n + 1), ast.Int(n + 2)])
   case infer_term(term, empty_cache()) {
-    Ok(t) -> io.println("Level " <> int.to_string(n) <> ": infer " <> string.inspect(t) <> " OK")
-    Error(e) -> io.println("Level " <> int.to_string(n) <> ": infer err " <> string.inspect(e))
+    Ok(t) ->
+      io.println(
+        "Level " <> int.to_string(n) <> ": infer " <> string.inspect(t) <> " OK",
+      )
+    Error(e) ->
+      io.println(
+        "Level " <> int.to_string(n) <> ": infer err " <> string.inspect(e),
+      )
   }
 }
 
@@ -117,9 +135,13 @@ pub fn generic_eval_level(n: Int) -> Nil {
     Ok(beam) ->
       case load_and_eval(mod_name, beam) {
         Ok(_) -> io.println("Level " <> int.to_string(n) <> ": compile+load OK")
-        Error(err) -> io.println("Level " <> int.to_string(n) <> ": load err " <> err)
+        Error(err) ->
+          io.println("Level " <> int.to_string(n) <> ": load err " <> err)
       }
-    Error(e) -> io.println("Level " <> int.to_string(n) <> ": compile err " <> string.inspect(e))
+    Error(e) ->
+      io.println(
+        "Level " <> int.to_string(n) <> ": compile err " <> string.inspect(e),
+      )
   }
 }
 

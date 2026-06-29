@@ -1,42 +1,64 @@
 import gleam/bit_array
+import gleam/dict
 import gleam/int
 import gleam/io
-import gleam/string
-import gleam/dict
 import gleam/list
-import gleamunison/identity.{type DefinitionRef, type LocalVar, type Hash, Ref, Local, hash_bytes, hash_to_short_string, hash_to_debug_string}
-import gleamunison/crypto as crypto
-import gleamunison/json
-import gleamunison/metrics
-import gleamunison/http_client.{get, post}
-import gleamunison/http.{start_server, stop_server}
-import gleamunison/log
-import gleamunison/health.{type HealthStatus, type HealthCheck, HealthCheck, Healthy, Degraded, Unhealthy, run_checks, readiness}
-import gleamunison/datetime.{now, to_iso8601, from_iso8601, add_seconds, diff_seconds}
-import gleamunison/filepath.{from_string, to_string, join, parent, file_name, extension, has_extension, with_extension}
-import gleamunison/template.{render}
-import gleamunison/config.{StringVal, IntVal, BoolVal, load, with_cli, get_string, get_int, get_bool}
-import gleamunison/effects.{type HandlerFrame, type RuntimeConfig, HandlerFrame, RuntimeConfig, run}
-import gleamunison/ast
-import gleamunison/types.{type TypeCache, CTAbility, CTType, TypeCache, empty_cache, type OperationType, OperationType}
-import gleamunison/inference.{infer_term, check_linearity}
-import gleamunison/compile.{new as new_compiler, compile_definition}
-import gleamunison/loader.{new_loader, ensure_loaded, is_loaded}
-import gleamunison/storage.{inmemory, dets, type StorageAdapter}
-import gleamunison/codebase.{insert as cb_insert, hash_of_definition, empty as empty_codebase}
-import gleamunison/repl.{eval_string}
-import gleamunison/pipeline.{parse_only}
-import gleamunison/sync.{new_sync_state, pull_sync}
-import gleamunison/sync_types.{Connected, Disconnected, Syncing, Failed, PeerId}
-import gleamunison/jets.{get_jet}
 import gleam/option
+import gleam/string
+import gleamunison/ast
+import gleamunison/codebase.{
+  empty as empty_codebase, hash_of_definition, insert as cb_insert,
+}
+import gleamunison/compile.{compile_definition, new as new_compiler}
+import gleamunison/config.{
+  BoolVal, IntVal, StringVal, get_bool, get_int, get_string, load, with_cli,
+}
+import gleamunison/crypto
+import gleamunison/datetime.{
+  add_seconds, diff_seconds, from_iso8601, now, to_iso8601,
+}
+import gleamunison/effects.{
+  type HandlerFrame, type RuntimeConfig, HandlerFrame, RuntimeConfig, run,
+}
+import gleamunison/filepath.{
+  extension, file_name, from_string, has_extension, join, parent, to_string,
+  with_extension,
+}
+import gleamunison/health.{
+  type HealthCheck, type HealthStatus, Degraded, HealthCheck, Healthy, Unhealthy,
+  readiness, run_checks,
+}
+import gleamunison/http.{start_server, stop_server}
+import gleamunison/http_client.{get, post}
+import gleamunison/identity.{
+  type DefinitionRef, type Hash, type LocalVar, Local, Ref, hash_bytes,
+  hash_to_debug_string, hash_to_short_string,
+}
+import gleamunison/inference.{check_linearity, infer_term}
+import gleamunison/jets.{get_jet}
+import gleamunison/json
+import gleamunison/loader.{ensure_loaded, is_loaded, new_loader}
+import gleamunison/log
+import gleamunison/metrics
+import gleamunison/pipeline.{parse_only}
+import gleamunison/repl.{eval_string}
+import gleamunison/storage.{type StorageAdapter, dets, inmemory}
+import gleamunison/sync.{new_sync_state, pull_sync}
+import gleamunison/sync_types.{Connected, Disconnected, Failed, PeerId, Syncing}
+import gleamunison/template.{render}
+import gleamunison/types.{
+  type OperationType, type TypeCache, CTAbility, CTType, OperationType,
+  TypeCache, empty_cache,
+}
 
 fn ref_to_debug_string(ref: DefinitionRef) -> String {
   let Ref(h) = ref
   hash_to_debug_string(h)
 }
 
-fn range(_start: Int, _end: Int) -> List(Int) { [] }
+fn range(_start: Int, _end: Int) -> List(Int) {
+  []
+}
 
 // --- HTTP SERVER INTEGRATION (7 levels) ---
 
@@ -45,7 +67,8 @@ pub fn level1701() -> Nil {
   start_server(0)
   let _ = case get("http://localhost:8765/eval?expr=42") {
     Ok(_resp) -> io.println("GET /eval: OK")
-    Error(e) -> io.println("GET /eval error (port may differ): " <> string.inspect(e))
+    Error(e) ->
+      io.println("GET /eval error (port may differ): " <> string.inspect(e))
   }
   stop_server()
   io.println("Level 1701: OK")
@@ -54,7 +77,12 @@ pub fn level1701() -> Nil {
 pub fn level1702() -> Nil {
   io.println("--- Level 1702: Start server, POST /define, GET /browse ---")
   start_server(0)
-  let _ = case post("http://localhost:8765/define?name=myval&expr=99", bit_array.from_string("")) {
+  let _ = case
+    post(
+      "http://localhost:8765/define?name=myval&expr=99",
+      bit_array.from_string(""),
+    )
+  {
     Ok(_resp) -> io.println("POST /define: OK")
     Error(e) -> io.println("POST /define error: " <> string.inspect(e))
   }
@@ -120,7 +148,8 @@ pub fn level1706() -> Nil {
   }
   let _ = case get("http://localhost:8765/api/redefinitions") {
     Ok(_resp) -> io.println("GET /api/redefinitions: OK")
-    Error(e) -> io.println("GET /api/redefinitions error: " <> string.inspect(e))
+    Error(e) ->
+      io.println("GET /api/redefinitions error: " <> string.inspect(e))
   }
   stop_server()
   io.println("Level 1706: OK")
@@ -187,7 +216,9 @@ pub fn level1710() -> Nil {
 // --- EFFECTS (3 levels) ---
 
 pub fn level1711() -> Nil {
-  io.println("--- Level 1711: Effects RuntimeConfig construct + empty handlers ---")
+  io.println(
+    "--- Level 1711: Effects RuntimeConfig construct + empty handlers ---",
+  )
   let cfg = RuntimeConfig(ambient_handlers: [])
   io.println("Effects cfg with 0 handlers constructed: OK")
   io.println("Level 1711: OK")
@@ -203,21 +234,27 @@ pub fn level1712() -> Nil {
 }
 
 pub fn level1713() -> Nil {
-  io.println("--- Level 1713: Effects different refs produce different keys ---")
+  io.println(
+    "--- Level 1713: Effects different refs produce different keys ---",
+  )
   let ref1 = Ref(hash_bytes(bit_array.from_string("ab1_v16")))
   let ref2 = Ref(hash_bytes(bit_array.from_string("ab2_v16")))
   let full1 = ref_to_debug_string(ref1)
   let full2 = ref_to_debug_string(ref2)
   let k1 = "m_" <> string.slice(full1, string.length(full1) - 8, 8)
   let k2 = "m_" <> string.slice(full2, string.length(full2) - 8, 8)
-  io.println("Different refs produce different keys: " <> string.inspect(k1 != k2))
+  io.println(
+    "Different refs produce different keys: " <> string.inspect(k1 != k2),
+  )
   io.println("Level 1713: OK")
 }
 
 // --- DATETIME FULL PIPELINE (4 levels) ---
 
 pub fn level1714() -> Nil {
-  io.println("--- Level 1714: datetime now() -> to_iso8601 -> from_iso8601 roundtrip ---")
+  io.println(
+    "--- Level 1714: datetime now() -> to_iso8601 -> from_iso8601 roundtrip ---",
+  )
   let dt = now()
   let iso = to_iso8601(dt)
   let _ = case from_iso8601(iso) {
@@ -260,7 +297,8 @@ pub fn level1717() -> Nil {
 
 pub fn level1718() -> Nil {
   io.println("--- Level 1718: template.render with 5 variables ---")
-  let tmpl = "Hello {{greeting}} {{name}}! Today is {{day}} at {{time}}. Status: {{status}}."
+  let tmpl =
+    "Hello {{greeting}} {{name}}! Today is {{day}} at {{time}}. Status: {{status}}."
   let vars = [
     #("greeting", "Good morning"),
     #("name", "Gleamunison"),
@@ -310,10 +348,11 @@ pub fn level1720() -> Nil {
 pub fn level1721() -> Nil {
   io.println("--- Level 1721: config with_cli int + bool override ---")
   let cfg = load()
-  let overrides = dict.from_list([
-    #("port", IntVal(9090)),
-    #("debug", BoolVal(True)),
-  ])
+  let overrides =
+    dict.from_list([
+      #("port", IntVal(9090)),
+      #("debug", BoolVal(True)),
+    ])
   let cfg2 = with_cli(cfg, overrides)
   let _ = case get_int(cfg2, "port") {
     Ok(v) -> io.println("CLI int override port: " <> int.to_string(v))
@@ -343,7 +382,9 @@ pub fn level1722() -> Nil {
 pub fn level1723() -> Nil {
   io.println("--- Level 1723: sync pull with nonexistent peer ---")
   let state = new_sync_state()
-  let _ = case pull_sync(state, PeerId("nonexistent_peer_v16"), empty_codebase()) {
+  let _ = case
+    pull_sync(state, PeerId("nonexistent_peer_v16"), empty_codebase())
+  {
     Ok(_) -> io.println("Pull sync succeeded (unexpected)")
     Error(e) -> io.println("Pull sync error (expected): " <> string.inspect(e))
   }
@@ -356,7 +397,9 @@ pub fn level1724() -> Nil {
   let _p2 = Disconnected
   let _p3 = Syncing
   let _p4 = Failed("connection lost")
-  io.println("PeerStatus variants: Connected, Disconnected, Syncing, Failed(...)")
+  io.println(
+    "PeerStatus variants: Connected, Disconnected, Syncing, Failed(...)",
+  )
   io.println("Level 1724: OK")
 }
 
@@ -367,18 +410,27 @@ pub fn level1725() -> Nil {
   let _ = case dets("test_dets_500_v16") {
     Ok(adapter) -> {
       let adapter: StorageAdapter = adapter
-      let ok = list.fold(range(1, 500), True, fn(acc: Bool, n: Int) -> Bool {
-        case acc {
-          False -> False
-          True -> {
-            let ref = hash_bytes(bit_array.from_string("dets_ref_" <> int.to_string(n)))
-            case adapter.insert(Ref(ref), bit_array.from_string("data_" <> int.to_string(n))) {
-              Ok(_) -> True
-              Error(_) -> False
+      let ok =
+        list.fold(range(1, 500), True, fn(acc: Bool, n: Int) -> Bool {
+          case acc {
+            False -> False
+            True -> {
+              let ref =
+                hash_bytes(bit_array.from_string(
+                  "dets_ref_" <> int.to_string(n),
+                ))
+              case
+                adapter.insert(
+                  Ref(ref),
+                  bit_array.from_string("data_" <> int.to_string(n)),
+                )
+              {
+                Ok(_) -> True
+                Error(_) -> False
+              }
             }
           }
-        }
-      })
+        })
       let _ = case adapter.close() {
         Ok(_) -> io.println("DETS close: OK")
         Error(e) -> io.println("DETS close error: " <> string.inspect(e))
@@ -393,18 +445,25 @@ pub fn level1725() -> Nil {
 pub fn level1726() -> Nil {
   io.println("--- Level 1726: inmemory 5000-insert stress ---")
   let adapter: StorageAdapter = inmemory()
-  let ok = list.fold(range(1, 5000), True, fn(acc: Bool, n: Int) -> Bool {
-    case acc {
-      False -> False
-      True -> {
-        let ref = hash_bytes(bit_array.from_string("mem_ref_" <> int.to_string(n)))
-        case adapter.insert(Ref(ref), bit_array.from_string("data_" <> int.to_string(n))) {
-          Ok(_) -> True
-          Error(_) -> False
+  let ok =
+    list.fold(range(1, 5000), True, fn(acc: Bool, n: Int) -> Bool {
+      case acc {
+        False -> False
+        True -> {
+          let ref =
+            hash_bytes(bit_array.from_string("mem_ref_" <> int.to_string(n)))
+          case
+            adapter.insert(
+              Ref(ref),
+              bit_array.from_string("data_" <> int.to_string(n)),
+            )
+          {
+            Ok(_) -> True
+            Error(_) -> False
+          }
         }
       }
-    }
-  })
+    })
   io.println("Inmemory 5000-insert all ok: " <> string.inspect(ok))
   io.println("Level 1726: OK")
 }
@@ -414,19 +473,23 @@ pub fn level1726() -> Nil {
 pub fn level1727() -> Nil {
   io.println("--- Level 1727: Compile 100 simple defs ---")
   let compiler = new_compiler()
-  let all_ok = list.fold(range(1, 100), True, fn(acc: Bool, n: Int) {
-    case acc {
-      False -> False
-      True -> {
-        let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
-        let h = hash_bytes(bit_array.from_string("compile_stress_" <> int.to_string(n)))
-        case compile_definition(compiler, def, Ref(h)) {
-          Ok(_) -> True
-          Error(_) -> False
+  let all_ok =
+    list.fold(range(1, 100), True, fn(acc: Bool, n: Int) {
+      case acc {
+        False -> False
+        True -> {
+          let def = ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType))
+          let h =
+            hash_bytes(bit_array.from_string(
+              "compile_stress_" <> int.to_string(n),
+            ))
+          case compile_definition(compiler, def, Ref(h)) {
+            Ok(_) -> True
+            Error(_) -> False
+          }
         }
       }
-    }
-  })
+    })
   io.println("100 compiles all ok: " <> string.inspect(all_ok))
   io.println("Level 1727: OK")
 }
@@ -435,10 +498,7 @@ pub fn level1728() -> Nil {
   io.println("--- Level 1728: Loader compile-failed cache + retry ---")
   let ldr = new_loader()
   let bad_ref = Ref(hash_bytes(bit_array.from_string("bad_compile_v16")))
-  let bad_def = ast.AbilityDecl(ast.AbilityDeclaration(
-    Local(0),
-    [],
-  ))
+  let bad_def = ast.AbilityDecl(ast.AbilityDeclaration(Local(0), []))
   let _ = case ensure_loaded(ldr, bad_ref, bad_def) {
     Ok(_) -> io.println("Loader compiled empty ability: OK")
     Error(#(ldr2, err)) -> {
@@ -467,7 +527,8 @@ pub fn level1730() -> Nil {
   let ref = Ref(hash_bytes(bit_array.from_string("fib")))
   case get_jet(ref) {
     option.None -> io.println("No jet registered for 'fib'")
-    option.Some(body) -> io.println("Jet body length: " <> int.to_string(string.length(body)))
+    option.Some(body) ->
+      io.println("Jet body length: " <> int.to_string(string.length(body)))
   }
   io.println("Level 1730: OK")
 }
@@ -505,7 +566,12 @@ pub fn level1733() -> Nil {
 
 pub fn level1734() -> Nil {
   io.println("--- Level 1734: AST Hole + Handle combination ---")
-  let _hole_handle = ast.Handle(ast.Hole, ast.Int(0), Ref(hash_bytes(bit_array.from_string("h_v16"))))
+  let _hole_handle =
+    ast.Handle(
+      ast.Hole,
+      ast.Int(0),
+      Ref(hash_bytes(bit_array.from_string("h_v16"))),
+    )
   io.println("Hole+Handle constructed: OK")
   io.println("Level 1734: OK")
 }
@@ -616,11 +682,25 @@ pub fn level1740() -> Nil {
 pub fn level1741() -> Nil {
   io.println("--- Level 1741: Effects + TypeCache + Health cross ---")
   let ab_ref = hash_bytes(bit_array.from_string("effects_health_v16"))
-  let _cache = TypeCache(entries: dict.from_list([
-    #(Ref(ab_ref), CTAbility([OperationType(name: option.None, inputs: [], output: ast.Builtin(ast.IntType))])),
-  ]))
+  let _cache =
+    TypeCache(
+      entries: dict.from_list([
+        #(
+          Ref(ab_ref),
+          CTAbility([
+            OperationType(
+              name: option.None,
+              inputs: [],
+              output: ast.Builtin(ast.IntType),
+            ),
+          ]),
+        ),
+      ]),
+    )
   let healthy = readiness()
-  io.println("Effects+TypeCache+Health cross: readiness=" <> string.inspect(healthy))
+  io.println(
+    "Effects+TypeCache+Health cross: readiness=" <> string.inspect(healthy),
+  )
   io.println("Level 1741: OK")
 }
 
@@ -636,10 +716,11 @@ pub fn level1743() -> Nil {
   io.println("--- Level 1743: REPL + Pipeline + Compile cross ---")
   let _ = case parse_only("(lam x x)") {
     Ok(_) -> {
-      let def = ast.TermDef(
-        ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
-        ast.Fn([ast.TypeVar(0)], ast.TypeVar(0), ast.Required([])),
-      )
+      let def =
+        ast.TermDef(
+          ast.Lambda(Local(0), ast.LocalVarRef(Local(0))),
+          ast.Fn([ast.TypeVar(0)], ast.TypeVar(0), ast.Required([])),
+        )
       let h = hash_bytes(bit_array.from_string("pipeline_compile_v16"))
       let compiler = new_compiler()
       let _ = case compile_definition(compiler, def, Ref(h)) {

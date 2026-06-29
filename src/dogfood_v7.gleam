@@ -8,7 +8,9 @@ import gleam/set
 import gleam/string
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/compile.{compile_definition, module_name_for, new as new_compiler}
+import gleamunison/compile.{
+  compile_definition, module_name_for, new as new_compiler,
+}
 import gleamunison/config
 import gleamunison/effects.{HandlerFrame, RuntimeConfig, run as effects_run}
 import gleamunison/elab_ctx.{empty_elab_ctx}
@@ -24,8 +26,8 @@ import gleamunison/lexer.{tokenize}
 import gleamunison/log
 import gleamunison/metrics.{histogram}
 import gleamunison/parser.{parse_string}
-import gleamunison/pipeline.{load_and_eval, compile_only, elaborate_only}
-import gleamunison/storage.{inmemory, dets}
+import gleamunison/pipeline.{compile_only, elaborate_only, load_and_eval}
+import gleamunison/storage.{dets, inmemory}
 import gleamunison/sync.{new_sync_state, push_sync}
 import gleamunison/sync_types.{
   Connected, Disconnected, Failed, PeerId, PeerState, Syncing,
@@ -62,7 +64,11 @@ fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(List(a), b)
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_trace", "list_traces")
 fn ffi_trace_list() -> List(a)
@@ -74,14 +80,14 @@ fn ffi_to_dynamic(val: any) -> Dynamic
 
 pub fn level1251() -> Nil {
   io.println("--- Level 1251: HTTP server start ---")
-  start_server(18189)
+  start_server(18_189)
   io.println("Server started on 18189: OK")
   io.println("Level 1251: OK")
 }
 
 pub fn level1252() -> Nil {
   io.println("--- Level 1252: HTTP server health ---")
-  start_server(18190)
+  start_server(18_190)
   let ready = readiness()
   io.println("Readiness: " <> string.inspect(ready))
   stop_server()
@@ -91,9 +97,9 @@ pub fn level1252() -> Nil {
 
 pub fn level1253() -> Nil {
   io.println("--- Level 1253: HTTP server restart cycle ---")
-  start_server(18191)
+  start_server(18_191)
   stop_server()
-  start_server(18191)
+  start_server(18_191)
   stop_server()
   io.println("Start-stop-start-stop: OK")
   io.println("Level 1253: OK")
@@ -111,25 +117,47 @@ pub fn level1254() -> Nil {
 
 pub fn level1255() -> Nil {
   io.println("--- Level 1255: Effects HandlerFrame creation ---")
-  let _hf = HandlerFrame(identity.builtin_state_get(), dict.from_list([
-    #(0, fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-      cont(ffi_to_dynamic(1))
-    }),
-  ]))
+  let _hf =
+    HandlerFrame(
+      identity.builtin_state_get(),
+      dict.from_list([
+        #(0, fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
+          cont(ffi_to_dynamic(1))
+        }),
+      ]),
+    )
   io.println("HandlerFrame created: OK")
   io.println("Level 1255: OK")
 }
 
 pub fn level1256() -> Nil {
   io.println("--- Level 1256: Effects double handler chain ---")
-  let op1: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_args, cont) { cont(ffi_to_dynamic(10)) }
-  let op2: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_args, cont) { cont(ffi_to_dynamic(20)) }
-  let hf1 = HandlerFrame(identity.builtin_state_get(), dict.from_list([
-    #(0, op1),
-  ]))
-  let hf2 = HandlerFrame(identity.builtin_io_read_line(), dict.from_list([
-    #(0, op2),
-  ]))
+  let op1: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(
+    _args,
+    cont,
+  ) {
+    cont(ffi_to_dynamic(10))
+  }
+  let op2: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(
+    _args,
+    cont,
+  ) {
+    cont(ffi_to_dynamic(20))
+  }
+  let hf1 =
+    HandlerFrame(
+      identity.builtin_state_get(),
+      dict.from_list([
+        #(0, op1),
+      ]),
+    )
+  let hf2 =
+    HandlerFrame(
+      identity.builtin_io_read_line(),
+      dict.from_list([
+        #(0, op2),
+      ]),
+    )
   let cfg = RuntimeConfig([hf1, hf2])
   let result = effects_run(cfg, fn() { ffi_to_dynamic(99) })
   io.println("Double handler: " <> string.inspect(result))
@@ -138,20 +166,40 @@ pub fn level1256() -> Nil {
 
 pub fn level1257() -> Nil {
   io.println("--- Level 1257: Effects handler with multiple ops ---")
-  let _hf = HandlerFrame(identity.builtin_state_get(), dict.from_list([
-    #(0, fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic { cont(ffi_to_dynamic(0)) }),
-    #(1, fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic { cont(ffi_to_dynamic(1)) }),
-  ]))
+  let _hf =
+    HandlerFrame(
+      identity.builtin_state_get(),
+      dict.from_list([
+        #(0, fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
+          cont(ffi_to_dynamic(0))
+        }),
+        #(1, fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
+          cont(ffi_to_dynamic(1))
+        }),
+      ]),
+    )
   io.println("Multi-op handler: OK")
   io.println("Level 1257: OK")
 }
 
 pub fn level1258() -> Nil {
   io.println("--- Level 1258: Effects chained handlers different abilities ---")
-  let op_a: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_args, cont) { cont(ffi_to_dynamic(100)) }
-  let op_b: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_args, cont) { cont(ffi_to_dynamic(200)) }
-  let hf_state = HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, op_a)]))
-  let hf_io = HandlerFrame(identity.builtin_io_read_line(), dict.from_list([#(0, op_b)]))
+  let op_a: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(
+    _args,
+    cont,
+  ) {
+    cont(ffi_to_dynamic(100))
+  }
+  let op_b: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(
+    _args,
+    cont,
+  ) {
+    cont(ffi_to_dynamic(200))
+  }
+  let hf_state =
+    HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, op_a)]))
+  let hf_io =
+    HandlerFrame(identity.builtin_io_read_line(), dict.from_list([#(0, op_b)]))
   let cfg = RuntimeConfig([hf_state, hf_io])
   let result = effects_run(cfg, fn() { ffi_to_dynamic(999) })
   io.println("Chained abilities: " <> string.inspect(result))
@@ -160,15 +208,22 @@ pub fn level1258() -> Nil {
 
 pub fn level1259() -> Nil {
   io.println("--- Level 1259: Effects nested RuntimeConfig ---")
-  let inner_op: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(_args, cont) { cont(ffi_to_dynamic(42)) }
-  let inner_hf = HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, inner_op)]))
+  let inner_op: fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic = fn(
+    _args,
+    cont,
+  ) {
+    cont(ffi_to_dynamic(42))
+  }
+  let inner_hf =
+    HandlerFrame(identity.builtin_state_get(), dict.from_list([#(0, inner_op)]))
   let inner_cfg = RuntimeConfig([inner_hf])
   let outer_hf = HandlerFrame(identity.builtin_io_read_line(), dict.new())
   let outer_cfg = RuntimeConfig([outer_hf])
-  let result = effects_run(outer_cfg, fn() {
-    let _ = effects_run(inner_cfg, fn() { ffi_to_dynamic(777) })
-    ffi_to_dynamic(888)
-  })
+  let result =
+    effects_run(outer_cfg, fn() {
+      let _ = effects_run(inner_cfg, fn() { ffi_to_dynamic(777) })
+      ffi_to_dynamic(888)
+    })
   io.println("Nested run: " <> string.inspect(result))
   io.println("Level 1259: OK")
 }
@@ -182,8 +237,7 @@ pub fn level1260() -> Nil {
     Ok(#(ctx2, _pat)) -> {
       io.println("Cons elaborated: OK")
       case elaborate_pattern(elab_types.SPEmptyList, ctx2) {
-        Ok(#(_, _pat2)) ->
-          io.println("EmptyList elaborated: OK")
+        Ok(#(_, _pat2)) -> io.println("EmptyList elaborated: OK")
         Error(e) -> io.println("EmptyList error: " <> string.inspect(e))
       }
     }
@@ -214,7 +268,9 @@ pub fn level1261() -> Nil {
 pub fn level1262() -> Nil {
   io.println("--- Level 1262: Elaborate nested As+Cons pattern ---")
   let ctx = empty_elab_ctx()
-  case elaborate_pattern(elab_types.SPAs("xs", elab_types.SPCons("h", "t")), ctx) {
+  case
+    elaborate_pattern(elab_types.SPAs("xs", elab_types.SPCons("h", "t")), ctx)
+  {
     Ok(#(_, pat)) -> {
       io.println("Nested As+Cons: " <> string.inspect(pat))
     }
@@ -251,7 +307,9 @@ pub fn level1264() -> Nil {
   let mod_name = module_name_for(ref)
   case compile_definition(new_compiler(), def, ref) {
     Ok(beam) -> {
-      io.println("Compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes")
+      io.println(
+        "Compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes",
+      )
       case load_and_eval(mod_name, beam) {
         Ok(_result) -> io.println("Load and eval: OK")
         Error(err) -> io.println("Load error: " <> err)
@@ -290,7 +348,11 @@ pub fn level1266() -> Nil {
             [#(ref, def), ..] -> {
               case compile_only(def, ref) {
                 Ok(beam) ->
-                  io.println("Compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes")
+                  io.println(
+                    "Compiled: "
+                    <> string.inspect(bit_array.byte_size(beam))
+                    <> " bytes",
+                  )
                 Error(e) -> io.println("Compile error: " <> e)
               }
             }
@@ -309,9 +371,12 @@ pub fn level1266() -> Nil {
 
 pub fn level1267() -> Nil {
   io.println("--- Level 1267: Template multi-variable render ---")
-  case render("hello {{name}}, age {{age}}", [
-    #("name", "Alice"), #("age", "30"),
-  ]) {
+  case
+    render("hello {{name}}, age {{age}}", [
+      #("name", "Alice"),
+      #("age", "30"),
+    ])
+  {
     Ok(result) -> {
       io.println("Template: " <> result)
     }
@@ -347,11 +412,12 @@ pub fn level1270() -> Nil {
 
 pub fn level1271() -> Nil {
   io.println("--- Level 1271: Pretty print function type ---")
-  let fn_type = ast.Fn(
-    [ast.Builtin(ast.IntType), ast.Builtin(ast.TextType)],
-    ast.Builtin(ast.ListType),
-    ast.Required([]),
-  )
+  let fn_type =
+    ast.Fn(
+      [ast.Builtin(ast.IntType), ast.Builtin(ast.TextType)],
+      ast.Builtin(ast.ListType),
+      ast.Required([]),
+    )
   let s = pretty_print(fn_type)
   io.println("Fn type: " <> s)
   let assert True = string.contains(s, "Int")
@@ -431,7 +497,8 @@ pub fn level1277() -> Nil {
   case dets(path) {
     Ok(adapter) -> {
       let ref = Ref(hash_bytes(bit_array.from_string("dets_ref_v7")))
-      let assert Ok(Nil) = adapter.insert(ref, bit_array.from_string("dets_data"))
+      let assert Ok(Nil) =
+        adapter.insert(ref, bit_array.from_string("dets_data"))
       case adapter.list_refs() {
         Ok(refs) ->
           io.println("DETS refs: " <> string.inspect(list.length(refs)))
@@ -474,7 +541,8 @@ pub fn level1279() -> Nil {
   let ref = Ref(hash_bytes(bit_array.from_string("push_ref_v7")))
   let assert Ok(Nil) = adapter.insert(ref, bit_array.from_string("push_data"))
   case push_sync(state, PeerId("test-pusher"), [ref], adapter) {
-    Ok(#(_, count)) -> io.println("Push sync: " <> string.inspect(count) <> " defs pushed")
+    Ok(#(_, count)) ->
+      io.println("Push sync: " <> string.inspect(count) <> " defs pushed")
     Error(e) -> io.println("Push sync error (expected): " <> string.inspect(e))
   }
   io.println("Level 1279: OK")
@@ -508,7 +576,43 @@ pub fn level1281() -> Nil {
 pub fn level1282() -> Nil {
   io.println("--- Level 1282: Compile bad Erlang source ---")
   let def = ast.TermDef(ast.Hole, ast.Builtin(ast.IntType))
-  let ref = Ref(hash_from_bytes(<<0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,127:256>>))
+  let ref =
+    Ref(
+      hash_from_bytes(<<
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        127:256,
+      >>),
+    )
   case compile_definition(new_compiler(), def, ref) {
     Ok(_) -> io.println("Hole compiled (via runtime error): OK")
     Error(e) -> io.println("Expected compile path: " <> string.inspect(e))
@@ -519,7 +623,10 @@ pub fn level1282() -> Nil {
 pub fn level1283() -> Nil {
   io.println("--- Level 1283: Module name length stability ---")
   let ref1 = Ref(hash_bytes(bit_array.from_string("short")))
-  let ref2 = Ref(hash_bytes(bit_array.from_string("a_very_long_module_name_for_testing_v7")))
+  let ref2 =
+    Ref(
+      hash_bytes(bit_array.from_string("a_very_long_module_name_for_testing_v7")),
+    )
   let mn1 = module_name_for(ref1)
   let mn2 = module_name_for(ref2)
   let assert 10 = string.length(mn1)
@@ -534,7 +641,11 @@ pub fn level1284() -> Nil {
   let ref = Ref(hash_of_definition(def))
   case compile_definition(new_compiler(), def, ref) {
     Ok(beam) ->
-      io.println("TypeDef compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes")
+      io.println(
+        "TypeDef compiled: "
+        <> string.inspect(bit_array.byte_size(beam))
+        <> " bytes",
+      )
     Error(e) -> io.println("TypeDef compile error: " <> string.inspect(e))
   }
   io.println("Level 1284: OK")
@@ -544,15 +655,17 @@ pub fn level1284() -> Nil {
 
 pub fn level1285() -> Nil {
   io.println("--- Level 1285: SLabeledFn elaboration ---")
-  let sterm = elab_types.SLabeledFn(
-    [#("x", elab_types.SInt(10)), #("y", elab_types.SInt(20))],
-    elab_types.SVar("x"),
-  )
+  let sterm =
+    elab_types.SLabeledFn(
+      [#("x", elab_types.SInt(10)), #("y", elab_types.SInt(20))],
+      elab_types.SVar("x"),
+    )
   let surf_def = elab_types.SurfaceTermDef(sterm)
-  let unit = elab_types.SurfaceUnit(
-    Ref(hash_bytes(bit_array.from_string("labeled_fn_v7"))),
-    [#("labeled_fn", surf_def)],
-  )
+  let unit =
+    elab_types.SurfaceUnit(
+      Ref(hash_bytes(bit_array.from_string("labeled_fn_v7"))),
+      [#("labeled_fn", surf_def)],
+    )
   case elaborate_unit(unit, empty_cache()) {
     Ok(#(_, _, _)) -> {
       io.println("LabeledFn elaborated: OK")
@@ -566,23 +679,28 @@ pub fn level1286() -> Nil {
   io.println("--- Level 1286: SGuardGuard elaboration ---")
   let guard_standalone = elab_types.SGuardGuard(elab_types.SInt(1))
   let surf_def = elab_types.SurfaceTermDef(guard_standalone)
-  let unit = elab_types.SurfaceUnit(
-    Ref(hash_bytes(bit_array.from_string("guard_guard_v7"))),
-    [#("guard_standalone", surf_def)],
-  )
+  let unit =
+    elab_types.SurfaceUnit(
+      Ref(hash_bytes(bit_array.from_string("guard_guard_v7"))),
+      [#("guard_standalone", surf_def)],
+    )
   case elaborate_unit(unit, empty_cache()) {
     Ok(_) -> io.println("SGuardGuard: OK (unexpected success)")
-    Error(e) -> io.println("SGuardGuard error (expected): " <> string.inspect(e))
+    Error(e) ->
+      io.println("SGuardGuard error (expected): " <> string.inspect(e))
   }
   io.println("Level 1286: OK")
 }
 
 pub fn level1287() -> Nil {
   io.println("--- Level 1287: Complex match with guard ---")
-  let lam = ast.Lambda(Local(0), ast.Match(
-    ast.LocalVarRef(Local(0)),
-    [ast.Case(ast.PatInt(42), Some(ast.GuardTerm(ast.Int(1))), ast.Int(100))],
-  ))
+  let lam =
+    ast.Lambda(
+      Local(0),
+      ast.Match(ast.LocalVarRef(Local(0)), [
+        ast.Case(ast.PatInt(42), Some(ast.GuardTerm(ast.Int(1))), ast.Int(100)),
+      ]),
+    )
   let def = ast.TermDef(lam, ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
@@ -631,7 +749,8 @@ pub fn level1291() -> Nil {
 
 pub fn level1292() -> Nil {
   io.println("--- Level 1292: Construct with pair ---")
-  let pair_term = ast.Construct(identity.builtin_pair(), [ast.Int(1), ast.Int(2)])
+  let pair_term =
+    ast.Construct(identity.builtin_pair(), [ast.Int(1), ast.Int(2)])
   let def = ast.TermDef(pair_term, ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
@@ -642,11 +761,12 @@ pub fn level1292() -> Nil {
 
 pub fn level1293() -> Nil {
   io.println("--- Level 1293: Use syntactic sugar ---")
-  let use_term = ast.Use(
-    Local(0),
-    ast.RefTo(identity.builtin_int_add()),
-    ast.LocalVarRef(Local(0)),
-  )
+  let use_term =
+    ast.Use(
+      Local(0),
+      ast.RefTo(identity.builtin_int_add()),
+      ast.LocalVarRef(Local(0)),
+    )
   let def = ast.TermDef(use_term, ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
@@ -657,17 +777,28 @@ pub fn level1293() -> Nil {
 
 pub fn level1294() -> Nil {
   io.println("--- Level 1294: AbilityDecl compile ---")
-  let _ad = ast.AbilityDecl(ast.AbilityDeclaration(
-    Local(0),
-    [ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)), ast.Operation(Local(1), [], ast.TypeRefBuiltin(ast.IntType))],
-  ))
-  let def = ast.AbilityDecl(ast.AbilityDeclaration(Local(0), [
-    ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
-  ]))
-  let ref = Ref(hash_of_definition(ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))))
+  let _ad =
+    ast.AbilityDecl(
+      ast.AbilityDeclaration(Local(0), [
+        ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
+        ast.Operation(Local(1), [], ast.TypeRefBuiltin(ast.IntType)),
+      ]),
+    )
+  let def =
+    ast.AbilityDecl(
+      ast.AbilityDeclaration(Local(0), [
+        ast.Operation(Local(0), [], ast.TypeRefBuiltin(ast.IntType)),
+      ]),
+    )
+  let ref =
+    Ref(hash_of_definition(ast.TermDef(ast.Int(1), ast.Builtin(ast.IntType))))
   case compile_definition(new_compiler(), def, ref) {
     Ok(beam) ->
-      io.println("AbilityDecl compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes")
+      io.println(
+        "AbilityDecl compiled: "
+        <> string.inspect(bit_array.byte_size(beam))
+        <> " bytes",
+      )
     Error(e) -> io.println("Compile error: " <> string.inspect(e))
   }
   io.println("Level 1294: OK")
@@ -726,20 +857,38 @@ pub fn level1299() -> Nil {
   io.println("--- Level 1299: Batch 7 summary ---")
   io.println("v7 levels 1251-1300")
   io.println("  HTTP server (1251-1253): start, health, restart cycle")
-  io.println("  Effects runtime (1254-1259): RuntimeConfig, HandlerFrame, chained handlers, nested run")
-  io.println("  Pattern elaboration (1260-1263): Cons, EmptyList, As, Text patterns")
-  io.println("  Pipeline E2E (1264-1266): load_and_eval, parse+elaborate, full chain")
+  io.println(
+    "  Effects runtime (1254-1259): RuntimeConfig, HandlerFrame, chained handlers, nested run",
+  )
+  io.println(
+    "  Pattern elaboration (1260-1263): Cons, EmptyList, As, Text patterns",
+  )
+  io.println(
+    "  Pipeline E2E (1264-1266): load_and_eval, parse+elaborate, full chain",
+  )
   io.println("  Template (1267-1268): multi-variable, missing variable")
   io.println("  Type pretty (1269-1271): Int, Float, Fn types")
   io.println("  Metrics histogram (1272): histogram record")
-  io.println("  Config errors (1273-1275): missing keys, type mismatch, CLI override")
-  io.println("  Storage deeper (1276-1278): list_refs, DETS list_refs, zero-byte insert")
+  io.println(
+    "  Config errors (1273-1275): missing keys, type mismatch, CLI override",
+  )
+  io.println(
+    "  Storage deeper (1276-1278): list_refs, DETS list_refs, zero-byte insert",
+  )
   io.println("  Sync push (1279-1281): push_sync, PeerStatus, PeerId")
   io.println("  Compile errors (1282-1284): hole, module name, TypeDef")
-  io.println("  Labeled fn + guard (1285-1287): SLabeledFn, SGuardGuard, guarded match")
-  io.println("  Lexer escapes (1288-1291): empty string, escape seq, backslash, quote")
-  io.println("  Abilities + constructs (1292-1294): pair, use sugar, AbilityDecl compile")
-  io.println("  Integration (1295-1300): cross-module, ops+storage, prop+log, trace, summary, cert")
+  io.println(
+    "  Labeled fn + guard (1285-1287): SLabeledFn, SGuardGuard, guarded match",
+  )
+  io.println(
+    "  Lexer escapes (1288-1291): empty string, escape seq, backslash, quote",
+  )
+  io.println(
+    "  Abilities + constructs (1292-1294): pair, use sugar, AbilityDecl compile",
+  )
+  io.println(
+    "  Integration (1295-1300): cross-module, ops+storage, prop+log, trace, summary, cert",
+  )
   io.println("Level 1299: OK")
 }
 
@@ -749,9 +898,15 @@ pub fn level1300() -> Nil {
   io.println("  v2 (1001-1048): Language features + stdlib basics")
   io.println("  v3 (1049-1100): HTTP, JSON, DateTime, Filepath, Crypto")
   io.println("  v4 (1101-1150): Pipeline, Storage, Sync, REPL, Abilities")
-  io.println("  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed")
-  io.println("  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules")
-  io.println("  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs")
+  io.println(
+    "  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed",
+  )
+  io.println(
+    "  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules",
+  )
+  io.println(
+    "  v7 (1251-1300): HTTP server, Effects runtime, Pattern elaboration, Pipeline E2E, Template, Type pretty, Histogram, Config errors, Storage deeper, Sync push, Compile errors, Labeled fn, Lexer escapes, Abilities+constructs",
+  )
   io.println("Total real dogfood levels: 321")
   io.println("  + 51 unit tests")
   io.println("  = 372 total conformance verifications")

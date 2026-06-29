@@ -1,21 +1,23 @@
 import gleam/bit_array
 import gleam/dict
 import gleam/io
+import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
-import gleam/list
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/identity.{Local, Ref, hash_equal, hash_from_bytes, hash_to_debug_string}
-import gleamunison/types.{empty_cache}
+import gleamunison/config
 import gleamunison/datetime
 import gleamunison/filepath
-import gleamunison/log
-import gleamunison/config
 import gleamunison/health
-import gleamunison/parser
+import gleamunison/identity.{
+  Local, Ref, hash_equal, hash_from_bytes, hash_to_debug_string,
+}
 import gleamunison/lexer
+import gleamunison/log
+import gleamunison/parser
 import gleamunison/repl_io
+import gleamunison/types.{empty_cache}
 
 @external(erlang, "gleamunison_json", "encode")
 fn ffi_encode(term: a) -> Result(BitArray, BitArray)
@@ -42,7 +44,11 @@ fn ffi_gauge(name: BitArray, value: Float) -> Nil
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_trace", "list_traces")
 fn ffi_trace_list() -> List(a)
@@ -273,7 +279,8 @@ pub fn level1226() -> Nil {
   io.println("--- Level 1226: Type-inclusive hashing ---")
   let d_int = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
   let d_text = ast.TermDef(ast.Text(<<"42">>), ast.Builtin(ast.TextType))
-  let assert False = hash_equal(hash_of_definition(d_int), hash_of_definition(d_text))
+  let assert False =
+    hash_equal(hash_of_definition(d_int), hash_of_definition(d_text))
   io.println("Type matters: OK")
   io.println("Level 1226: OK")
 }
@@ -281,9 +288,14 @@ pub fn level1226() -> Nil {
 pub fn level1227() -> Nil {
   io.println("--- Level 1227: All 15 AST variants unique ---")
   let variants = [
-    ast.Int(1), ast.Float(1.0), ast.Text(<<"a">>), ast.List([]),
-    ast.LocalVarRef(Local(0)), ast.RefTo(identity.builtin_int_add()),
-    ast.Lambda(Local(0), ast.Int(1)), ast.Apply(ast.Int(1), ast.Int(2)),
+    ast.Int(1),
+    ast.Float(1.0),
+    ast.Text(<<"a">>),
+    ast.List([]),
+    ast.LocalVarRef(Local(0)),
+    ast.RefTo(identity.builtin_int_add()),
+    ast.Lambda(Local(0), ast.Int(1)),
+    ast.Apply(ast.Int(1), ast.Int(2)),
     ast.Let(Local(0), ast.Int(1), ast.Int(2)),
     ast.Match(ast.Int(1), [ast.Case(ast.PatInt(1), None, ast.Int(2))]),
     ast.Do(identity.builtin_state_get(), Local(0), []),
@@ -292,9 +304,10 @@ pub fn level1227() -> Nil {
     ast.Hole,
     ast.Use(Local(0), ast.Int(1), ast.Int(2)),
   ]
-  let hashes = list.map(variants, fn(v) {
-    hash_of_definition(ast.TermDef(v, ast.Builtin(ast.IntType)))
-  })
+  let hashes =
+    list.map(variants, fn(v) {
+      hash_of_definition(ast.TermDef(v, ast.Builtin(ast.IntType)))
+    })
   io.println("Hash count: " <> string.inspect(list.length(hashes)))
   io.println("Level 1227: OK")
 }
@@ -327,7 +340,7 @@ pub fn level1230() -> Nil {
 
 pub fn level1231() -> Nil {
   io.println("--- Level 1231: JSON large number ---")
-  let assert Ok(json) = ffi_encode(2147483647)
+  let assert Ok(json) = ffi_encode(2_147_483_647)
   io.println("Max int: OK")
   io.println("Level 1231: OK")
 }
@@ -404,7 +417,8 @@ pub fn level1240() -> Nil {
   io.println("--- Level 1240: HMAC different keys ---")
   let key1 = ffi_random(16)
   let key2 = ffi_random(16)
-  let assert Ok(mac1) = ffi_hash(<<"sha256">>, key1) // not HMAC but stable
+  let assert Ok(mac1) = ffi_hash(<<"sha256">>, key1)
+  // not HMAC but stable
   let assert Ok(mac2) = ffi_hash(<<"sha256">>, key2)
   let assert True = mac1 != mac2
   io.println("Different keys: different hashes OK")
@@ -416,9 +430,9 @@ pub fn level1240() -> Nil {
 pub fn level1241() -> Nil {
   io.println("--- Level 1241: DateTime large arithmetic ---")
   let dt = datetime.now()
-  let far_future = datetime.add_seconds(dt, 31536000)
+  let far_future = datetime.add_seconds(dt, 31_536_000)
   let diff = datetime.diff_seconds(far_future, dt)
-  let assert 31536000 = diff
+  let assert 31_536_000 = diff
   io.println("1 year forward: OK")
   io.println("Level 1241: OK")
 }
@@ -502,15 +516,33 @@ pub fn level1248() -> Nil {
 pub fn level1249() -> Nil {
   io.println("--- Level 1249: Batch 6 summary ---")
   io.println("v6 levels 1201-1250")
-  io.println("  REPL bracket edges (1201-1210): empty, parens, strings, quote, escape, nested, deep, unclosed, extra close, multiline")
-  io.println("  Parser edges (1211-1216): empty parens, whitespace, deep nested, nested strings, error line/col, comments")
-  io.println("  Lexer edges (1217-1222): empty, parens, integers, floats, strings, quotes")
-  io.println("  Hash identity (1223-1228): hex format, distinct, roundtrip, type-inclusive, all variants unique, genesis struct")
-  io.println("  JSON edges (1229-1234): nested array, empty object, large int, negative, special chars, unicode")
-  io.println("  Crypto edges (1235-1240): huge input, hex roundtrip, SHA512 hex, zero random, large random, diff keys")
-  io.println("  Datetime + filepath (1241-1244): 1-year arithmetic, deep nesting, empty extension, bare filename")
-  io.println("  Operations deeper (1245-1247): multi-level log, counter+gauge mixed, multi-trace")
-  io.println("  Full integration (1248-1250): module exercise, batch summary, full certification")
+  io.println(
+    "  REPL bracket edges (1201-1210): empty, parens, strings, quote, escape, nested, deep, unclosed, extra close, multiline",
+  )
+  io.println(
+    "  Parser edges (1211-1216): empty parens, whitespace, deep nested, nested strings, error line/col, comments",
+  )
+  io.println(
+    "  Lexer edges (1217-1222): empty, parens, integers, floats, strings, quotes",
+  )
+  io.println(
+    "  Hash identity (1223-1228): hex format, distinct, roundtrip, type-inclusive, all variants unique, genesis struct",
+  )
+  io.println(
+    "  JSON edges (1229-1234): nested array, empty object, large int, negative, special chars, unicode",
+  )
+  io.println(
+    "  Crypto edges (1235-1240): huge input, hex roundtrip, SHA512 hex, zero random, large random, diff keys",
+  )
+  io.println(
+    "  Datetime + filepath (1241-1244): 1-year arithmetic, deep nesting, empty extension, bare filename",
+  )
+  io.println(
+    "  Operations deeper (1245-1247): multi-level log, counter+gauge mixed, multi-trace",
+  )
+  io.println(
+    "  Full integration (1248-1250): module exercise, batch summary, full certification",
+  )
   io.println("Level 1249: OK")
 }
 
@@ -520,8 +552,12 @@ pub fn level1250() -> Nil {
   io.println("  v2 (1001-1048): Language features + stdlib basics")
   io.println("  v3 (1049-1100): HTTP, JSON, DateTime, Filepath, Crypto")
   io.println("  v4 (1101-1150): Pipeline, Storage, Sync, REPL, Abilities")
-  io.println("  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed")
-  io.println("  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules")
+  io.println(
+    "  v5 (1151-1200): Loader, Endurance, Jets, Concurrency, Distributed",
+  )
+  io.println(
+    "  v6 (1201-1250): Bracket edges, Parser, Lexer, Hash, JSON edges, Crypto, Modules",
+  )
   io.println("Total real dogfood levels: 271")
   io.println("  + 51 unit tests")
   io.println("  = 322 total conformance verifications")

@@ -5,15 +5,15 @@ import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/identity.{Local, Ref, hash_equal, hash_to_debug_string}
-import gleamunison/inference.{check_linearity, infer_term}
-import gleamunison/types.{empty_cache}
+import gleamunison/config
 import gleamunison/datetime
 import gleamunison/filepath
-import gleamunison/template
-import gleamunison/log
-import gleamunison/config
 import gleamunison/health
+import gleamunison/identity.{Local, Ref, hash_equal, hash_to_debug_string}
+import gleamunison/inference.{check_linearity, infer_term}
+import gleamunison/log
+import gleamunison/template
+import gleamunison/types.{empty_cache}
 
 @external(erlang, "gleamunison_json", "encode")
 fn ffij_encode(term: a) -> Result(BitArray, BitArray)
@@ -37,7 +37,11 @@ fn ffip_check(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(a, b)
 fn ffit_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffit_capture(method: BitArray, path: BitArray, headers: List(a)) -> Result(BitArray, a)
+fn ffit_capture(
+  method: BitArray,
+  path: BitArray,
+  headers: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_trace", "list_traces")
 fn ffit_list() -> List(a)
@@ -266,8 +270,7 @@ pub fn level1024() -> Nil {
 
 pub fn level1025() -> Nil {
   io.println("--- Level 1025: Template basic ---")
-  let assert Ok(r) =
-    template.render("hello {{name}}", [#("name", "World")])
+  let assert Ok(r) = template.render("hello {{name}}", [#("name", "World")])
   let assert "hello World" = r
   io.println("Level 1025: OK")
 }
@@ -275,18 +278,17 @@ pub fn level1025() -> Nil {
 pub fn level1026() -> Nil {
   io.println("--- Level 1026: Template multi-var ---")
   let assert Ok(r) =
-    template.render(
-      "{{greeting}} {{name}}",
-      [#("greeting", "Hi"), #("name", "Moe")],
-    )
+    template.render("{{greeting}} {{name}}", [
+      #("greeting", "Hi"),
+      #("name", "Moe"),
+    ])
   let assert "Hi Moe" = r
   io.println("Level 1026: OK")
 }
 
 pub fn level1027() -> Nil {
   io.println("--- Level 1027: Template HTML escape ---")
-  let assert Ok(r) =
-    template.render("{{x}}", [#("x", "<script>")])
+  let assert Ok(r) = template.render("{{x}}", [#("x", "<script>")])
   let assert True = string.contains(r, "&lt;")
   io.println("Level 1027: OK")
 }
@@ -330,9 +332,10 @@ pub fn level1031() -> Nil {
 pub fn level1032() -> Nil {
   io.println("--- Level 1032: Config CLI override ---")
   let cfg = config.load()
-  let overrides = dict.from_list([
-    #("CLI_KEY", config.StringVal("cli_value")),
-  ])
+  let overrides =
+    dict.from_list([
+      #("CLI_KEY", config.StringVal("cli_value")),
+    ])
   let cfg2 = config.with_cli(cfg, overrides)
   let v = config.get(cfg2, "CLI_KEY")
   let assert Ok(config.StringVal("cli_value")) = v

@@ -1,25 +1,25 @@
 import gleam/bit_array
 import gleam/dict
 import gleam/io
+import gleam/list
 import gleam/option.{None}
 import gleam/string
-import gleam/list
 import gleamunison/ast
 import gleamunison/codebase.{empty as new_codebase, hash_of_definition, insert}
-import gleamunison/identity.{Local, Ref, hash_equal, hash_to_debug_string}
-import gleamunison/types.{empty_cache, validate_handler}
-import gleamunison/datetime
-import gleamunison/filepath
-import gleamunison/log
 import gleamunison/config
-import gleamunison/health
-import gleamunison/parser
-import gleamunison/lexer
-import gleamunison/sync.{new_sync_state}
-import gleamunison/sync_types.{PeerId}
-import gleamunison/repl_io
+import gleamunison/datetime
 import gleamunison/elab_types.{SurfaceTermDef, SurfaceUnit}
 import gleamunison/elaborate.{elaborate_unit}
+import gleamunison/filepath
+import gleamunison/health
+import gleamunison/identity.{Local, Ref, hash_equal, hash_to_debug_string}
+import gleamunison/lexer
+import gleamunison/log
+import gleamunison/parser
+import gleamunison/repl_io
+import gleamunison/sync.{new_sync_state}
+import gleamunison/sync_types.{PeerId}
+import gleamunison/types.{empty_cache, validate_handler}
 
 @external(erlang, "gleamunison_json", "encode")
 fn ffi_encode(term: a) -> Result(BitArray, BitArray)
@@ -43,7 +43,11 @@ fn ffi_prop(gen: fn() -> a, prop: fn(a) -> Bool) -> Result(List(a), b)
 fn ffi_trace_start() -> Nil
 
 @external(erlang, "gleamunison_trace", "capture_request")
-fn ffi_trace_capture(m: BitArray, p: BitArray, hs: List(a)) -> Result(BitArray, a)
+fn ffi_trace_capture(
+  m: BitArray,
+  p: BitArray,
+  hs: List(a),
+) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_trace", "list_traces")
 fn ffi_trace_list() -> List(a)
@@ -55,10 +59,7 @@ fn ffi_time() -> Int
 fn ffi_storage_new() -> BitArray
 
 @external(erlang, "gleamunison_storage", "lookup")
-fn ffi_storage_lookup(
-  tab: BitArray,
-  ref: BitArray,
-) -> Result(BitArray, a)
+fn ffi_storage_lookup(tab: BitArray, ref: BitArray) -> Result(BitArray, a)
 
 @external(erlang, "gleamunison_storage", "insert")
 fn ffi_storage_insert(
@@ -96,7 +97,9 @@ pub fn level1103() -> Nil {
   let h1 = hash_of_definition(def)
   let h2 = hash_of_definition(def)
   let assert True = hash_equal(h1, h2)
-  io.println("Hash stability: " <> string.slice(hash_to_debug_string(h1), 0, 12) <> "...")
+  io.println(
+    "Hash stability: " <> string.slice(hash_to_debug_string(h1), 0, 12) <> "...",
+  )
   io.println("Level 1103: OK")
 }
 
@@ -114,7 +117,7 @@ pub fn level1104() -> Nil {
 pub fn level1105() -> Nil {
   io.println("--- Level 1105: Full pipeline latency ---")
   let start = ffi_time()
-  let terms = [
+  let _ = [
     parser.parse_string("42"),
     parser.parse_string("\"hello\""),
     parser.parse_string("(list 1 2 3)"),
@@ -174,7 +177,12 @@ pub fn level1110() -> Nil {
   let count = 100
   insert_many_storage(tab, count, 0)
   let elapsed = ffi_time() - start
-  io.println(string.inspect(count) <> " storage inserts: " <> string.inspect(elapsed) <> " ns")
+  io.println(
+    string.inspect(count)
+    <> " storage inserts: "
+    <> string.inspect(elapsed)
+    <> " ns",
+  )
   io.println("Level 1110: OK")
 }
 
@@ -330,7 +338,8 @@ pub fn level1123() -> Nil {
   let handler_ops = dict.from_list([#(0, #("get", 5))])
   let ref = identity.builtin_state_get()
   case validate_handler(empty_cache(), ref, handler_ops) {
-    Ok(Nil) -> io.println("Handler valid (arity not checked without ability cache)")
+    Ok(Nil) ->
+      io.println("Handler valid (arity not checked without ability cache)")
     Error(e) -> io.println("Handler error: " <> string.inspect(e))
   }
   io.println("Level 1123: OK")
@@ -374,7 +383,9 @@ pub fn level1127() -> Nil {
   io.println("--- Level 1127: Hash on malformed term ---")
   let def = ast.TermDef(ast.Hole, ast.TypeVar(-1))
   let h = hash_of_definition(def)
-  io.println("Hole hash: " <> string.slice(hash_to_debug_string(h), 0, 12) <> "...")
+  io.println(
+    "Hole hash: " <> string.slice(hash_to_debug_string(h), 0, 12) <> "...",
+  )
   io.println("Level 1127: OK")
 }
 
@@ -390,7 +401,7 @@ pub fn level1128() -> Nil {
 
 pub fn level1129() -> Nil {
   io.println("--- Level 1129: Large integer term ---")
-  let def = ast.TermDef(ast.Int(9999999999), ast.Builtin(ast.IntType))
+  let def = ast.TermDef(ast.Int(9_999_999_999), ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
   let assert Ok(_) = insert(new_codebase(), unit)
@@ -400,7 +411,7 @@ pub fn level1129() -> Nil {
 
 pub fn level1130() -> Nil {
   io.println("--- Level 1130: Negative integer term ---")
-  let def = ast.TermDef(ast.Int(-999999), ast.Builtin(ast.IntType))
+  let def = ast.TermDef(ast.Int(-999_999), ast.Builtin(ast.IntType))
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
   let assert Ok(_) = insert(new_codebase(), unit)
@@ -519,7 +530,8 @@ fn hash_loop(n: Int) -> Nil {
   case n {
     0 -> Nil
     _ -> {
-      let _ = hash_of_definition(ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType)))
+      let _ =
+        hash_of_definition(ast.TermDef(ast.Int(n), ast.Builtin(ast.IntType)))
       hash_loop(n - 1)
     }
   }
@@ -566,7 +578,7 @@ fn log_loop(n: Int) -> Nil {
 pub fn level1144() -> Nil {
   io.println("--- Level 1144: 10000 counter ops ---")
   let start = ffi_time()
-  counter_loop(10000)
+  counter_loop(10_000)
   let elapsed = ffi_time() - start
   io.println("10000 counter ops: " <> string.inspect(elapsed) <> " ns")
   io.println("Level 1144: OK")
@@ -586,7 +598,9 @@ pub fn level1145() -> Nil {
   io.println("--- Level 1145: 1000 property checks ---")
   let start = ffi_time()
   prop_loop(1000)
-  io.println("1000 prop checks: " <> string.inspect(ffi_time() - start) <> " ns")
+  io.println(
+    "1000 prop checks: " <> string.inspect(ffi_time() - start) <> " ns",
+  )
   io.println("Level 1145: OK")
 }
 
@@ -621,11 +635,12 @@ pub fn level1146() -> Nil {
     ast.Hole,
     ast.Use(Local(0), ast.Int(1), ast.LocalVarRef(Local(0))),
   ]
-  let all_ok = list.all(variants, fn(v) {
-    case hash_of_definition(ast.TermDef(v, ast.Builtin(ast.IntType))) {
-      _ -> True
-    }
-  })
+  let all_ok =
+    list.all(variants, fn(v) {
+      case hash_of_definition(ast.TermDef(v, ast.Builtin(ast.IntType))) {
+        _ -> True
+      }
+    })
   let assert True = all_ok
   io.println("15 AST variants: all hashed OK")
   io.println("Level 1146: OK")
@@ -665,10 +680,7 @@ pub fn level1149() -> Nil {
     Ok(term) -> {
       let ref = Ref(identity.hash_bytes(bit_array.from_string("v4.e2e")))
       let defs = [#("root", SurfaceTermDef(term))]
-      let _ = elaborate_unit(
-        SurfaceUnit(ref, defs),
-        empty_cache(),
-      )
+      let _ = elaborate_unit(SurfaceUnit(ref, defs), empty_cache())
       io.println("Parse+elaborate: OK")
     }
     Error(e) -> io.println("Parse error: " <> e.message)
