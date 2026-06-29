@@ -75,10 +75,12 @@ load_binary(Mod, Binary) ->
         false when is_list(Mod) -> erlang:list_to_atom(Mod);
         false -> erlang:binary_to_atom(erlang:iolist_to_binary(Mod), utf8)
     end,
-    case catch code:load_binary(ModuleAtom, atom_to_list(ModuleAtom) ++ ".beam", Binary) of
+    try code:load_binary(ModuleAtom, atom_to_list(ModuleAtom) ++ ".beam", Binary) of
         {module, ModuleAtom} -> {ok, nil};
-        {'EXIT', Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))};
         {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
+    catch
+        exit:Reason -> {error, list_to_binary(io_lib:format("~p", [Reason]))};
+        _:Reason -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
     end.
 
 hex_to_bytes(Hex) when is_binary(Hex) ->

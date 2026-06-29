@@ -155,9 +155,11 @@ ensure_table(Name) ->
 
 compute_diff(Peer) ->
     ensure_table(gleamunison_peer_refs),
-    PeerRefs = case catch ets:lookup(gleamunison_peer_refs, Peer) of
+    PeerRefs = try ets:lookup(gleamunison_peer_refs, Peer) of
         [{Peer, R}] -> R;
         _ -> []
+    catch
+        _:_ -> []
     end,
     PeerRefsSet = sets:from_list(PeerRefs),
     LocalRefs = get_local_refs_hex(),
