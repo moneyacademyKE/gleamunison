@@ -512,3 +512,11 @@ Hosting on Cloudflare Workers replaces DevOps cluster operations with global edg
 ## 106. Zero-Deploy Code Syncing and Trace-Replay Debugging
 
 By separating the static runtime (the V8 Worker engine) from the dynamic application logic (stored as content-addressed AST definitions in KV), Cloudflare-hosted `gleamunison` apps achieve a zero-deploy, compile-free lifecycle. Deploying code changes does not require a bundler build or Worker update, eliminating compilation latency and cold starts. Debugging is also simplified through deterministic trace replay: since all I/O is managed as algebraic effects, complete execution history can be captured and replayed locally with mock handlers, bypassing complex browser reactivity charts or source map step-debugging.
+
+## 107. Dynamic S-expression Environment Interpreter to avoid Elaboration Overhead
+
+When evaluating S-expressions directly inside a lightweight edge serverless isolate, running the full five-module compilation and typechecker elaborator adds significant latency. We can instead implement a tree-walking interpreter directly on the parsed `SurfaceTerm` using a simple name-based `Env` mapping string identifiers to evaluated `Val`s. Builtin operators (like `+`, `-`) are resolved dynamically during variable lookup, bypassing the need for de Bruijn indexing and elaboration in hot path execution.
+
+## 108. Dependency Pre-fetching at the Edge for Serverless Workers
+
+Since Cloudflare Workers block synchronous KV lookup operations, executing a tree-walking interpreter where lookups occur on-demand requires making the entire interpreter asynchronous. We can avoid this and keep all parser, typecheck, and interpreter execution logic fully synchronous by performing **dependency pre-fetching** at the boundaries: the incoming request handler asynchronously fetches the target term and all its transitives in parallel from KV, populates a synchronous in-memory store in Gleam, and then starts the synchronous evaluation loop.

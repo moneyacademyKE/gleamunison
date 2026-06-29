@@ -677,3 +677,15 @@ For applications deployed in environments with strict update policies:
 1. Bundle the parsing, typechecking, and execution interpreter as a static **Host Engine** that is deployed once and rarely updated.
 2. Store the application logic (the actual functions, handlers, and types) strictly as **data** (content-addressed AST values) in a distributed database or key-value store (e.g. Cloudflare KV).
 3. Synchronize new code via Merkle differential sync directly to database storage. This enables immediate hot upgrades without modifying the host, restarting instances, or incurring cold starts.
+
+---
+
+## 73. Dependency Pre-fetching at Isolate Boundaries
+
+When executing a synchronous interpreter over network-bound storage (such as Cloudflare KV), lookups inside the evaluation loop are blocked due to lacking synchronous APIs. We solve this by pre-fetching dependencies at the isolate boundaries: before evaluation starts, the request handler recursively resolves the target term's dependency graph, fetches all definitions asynchronously in parallel from KV, populates an in-memory cache, and then executes the interpreter synchronously.
+
+---
+
+## 74. Dynamic Builtin Operator Resolution in Interpreters
+
+To avoid the overhead of full variable elaboration and de Bruijn indexing at the serverless edge, variables are matched dynamically by name. When the interpreter encounters a variable name that is not bound in the lexical scope, it resolves it against a static table of builtin operators (like `+` or `-`), translating them directly to their native FFI function implementations on the fly.
