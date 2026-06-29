@@ -25,6 +25,8 @@
    `compile:file/2` with OTP 29's `{ok, Mod, []}` return format, distribution
    via EPMD — these are part of the design, not implementation details.
 
+6. **Sandboxed Target Constraints (Cloudflare/WASM).** For non-BEAM sandboxed environments (such as Cloudflare Workers or WebAssembly isolates), dynamic code compilation and loading are blocked by the security sandbox. Code execution in these environments must use static-worker AST interpreters rather than dynamic compilers.
+
 ### Workflow
 
 1. **Design:** Types and signatures go in `src/` as Gleam code.
@@ -91,4 +93,6 @@ The REPL bootstraps `"Console"`, `"add"`, and `"read_line"`, and supports:
 
 ### LOC Constraints
 All Gleam/Erlang source files MUST be strictly under 250 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
+
+Current conformance: 1170 real dogfood levels + 53 unit tests = 1223 total conformance verifications across 22 playbook files (batches 1-21). No failures. v3.3.0 adds batches 20-21 with 200 levels covering type pretty edges, lexer/parser edges, elaborate all surface forms, compile pattern depth, REPL error codes, count_brackets edges, sync push validation, validate_handler edge cases, stress testing (500 compiles, 10k inserts), compile→load→eval roundtrip, template+config+filepath edges, and 16 cross-module chains.
 

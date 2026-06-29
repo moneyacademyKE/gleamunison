@@ -428,3 +428,216 @@ Metrics are recorded via ETS for local queries and simultaneously emitted as `:t
 
 **Applied in:** `gleamunison_metrics.erl`, `metrics.gleam`
 
+---
+
+## 40. Dogfood Integration Seam Pattern
+
+Progressive test levels that cross module boundaries to find integration gaps invisible to unit tests. Dogfood levels exercise the full pipeline (parse → elaborate → typecheck → hash → codebase → compile → load → eval) and all side-effect boundaries (HTTP server, HTTP client, storage adapters, effects runtime, sync protocol). Each batch of 50 levels targets a thematic area of untested code.
+
+**Applied in:** `dogfood_v2.gleam` through `dogfood_v8.gleam`
+
+---
+
+## 41. Dynamic FFI Boxing for Generic Dispatch
+
+When crossing the Gleam ↔ Erlang FFI boundary with generic types, values must be explicitly boxed via a `to_dynamic/1` FFI call that maps any Gleam type to Erlang's untyped representation. This is required for the effects runtime's `HandlerFrame` → `OpHandler` generic dispatch chain, where handlers receive `List(Dynamic)` and return `Dynamic`.
+
+```gleam
+@external(erlang, "gleamunison_ffi", "to_dynamic")
+fn ffi_to_dynamic(val: any) -> Dynamic
+
+fn my_handler(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
+  cont(ffi_to_dynamic(42))  // Box Gleam Int into Dynamic
+}
+```
+
+**Applied in:** `dogfood_v7.gleam`, `effects.gleam`
+
+---
+
+## 42. Opaque Type Test Discipline
+
+Dogfood levels cannot destructure opaque types (`HttpResponse`, `Config`, `DateTime`, `Path`, `Codebase`, `Loader`, `Hash`). They must test through the public module API surface only. This constraint is the mechanism that makes dogfooding a real integration test — unlike unit tests that can import internal constructors.
+
+**Applied in:** `dogfood_v7.gleam`, `dogfood_v8.gleam`
+
+---
+
+## 43. Dead Code Discovery via Construction-Site Analysis
+
+Dogfooding reveals declared-but-never-constructed type variants. Variants that exist in the type definition but have zero construction sites are dead code candidates. This pattern applies to error types (`InferenceError.UnboundVariable`, `SyncError.HashConflict`), status types (`HealthStatus.Degraded`), and operation types. Either implement construction logic or prune the variant.
+
+**Applied in:** Gap analysis between v6 → v7 → v8 batches
+
+---
+
+## 44. Partitioned Storage Lifecycle with Recursive Cleanup
+
+Partitioned DETS creates subdirectories under a parent directory. Standard `delete` fails on non-empty directories. The adapter pattern requires a dedicated `partitioned_dets_delete(dir_path)` FFI function that handles recursive directory and file cleanup. Dogfood levels must call this between runs to avoid stale state pollution.
+
+**Applied in:** `gleamunison_storage.erl`, `dogfood_v8.gleam`
+
+---
+
+## 45. Length-Prefixed TCP Sync Protocol
+
+A simple, dependency-free sync transport: 4-byte big-endian length prefix followed by `term_to_binary/1` encoded Erlang terms. Messages are tagged tuples: `{SelfName, {Operation, Args}}`. The client uses one-shot request-response (connect → send → recv → close). No connection pooling, no custom parser, no external libraries. The server is a `gen_server` that owns the listen socket; a spawned acceptor loop creates per-connection handler processes that read/write directly.
+
+```
+Client:  <<Len:32, Bin/binary>>  →  Server:  <<ReplyLen:32, ReplyBin/binary>>
+```
+
+**Applied in:** `gleamunison_tcp_sync.erl`
+
+---
+
+## 46. Mock-to-Real Migration via Name Convention Removal
+
+When mock/stub routing is based on a naming convention (e.g. `is_real_node/1` checking for `@`), the migration to real implementations must: 1) add real transport alongside the existing path, 2) update all tests to use the real transport, 3) remove the convention-based mock path, 4) verify no consumers depend on mock data. Tests that relied on mock data (e.g. `PeerId("test_node")`) must be adapted to either start a local server or accept connection failure as valid.
+
+**Applied in:** `gleamunison_ffi_io.erl`, `test/sync_test.gleam`, `test/round4_tdd_test.gleam`, `test/storage_test.gleam`
+
+---
+
+## 47. Cyclic Generic Computation for Placeholder Replacement
+
+When replacing 900+ placeholder stubs with real implementations, distribute real computation types cyclically (`n % 5` → parse/hash/insert/infer/eval). Each template does real work with the level number as input. This provides broad integration coverage without writing unique functions per level. The computation type matters more than the level number for catching regressions.
+
+```gleam
+fn generic_computation(n: Int) -> fn() -> Nil {
+  fn() {
+    case n % 5 {
+      0 -> parse_level(n)
+      1 -> hash_level(n)
+      2 -> insert_level(n)
+      3 -> infer_level(n)
+      4 -> eval_level(n)
+      _ -> hash_level(n)
+    }
+  }
+}
+```
+
+**Applied in:** `dogfood.gleam`, `dogfood_meta.gleam`
+
+---
+
+## 48. gen_server Per-Connection Process Delegation
+
+A TCP server `gen_server` should NOT handle individual connections in its message loop. Instead: the gen_server owns the listen socket, an acceptor process spawned from `init/1` loops on `gen_tcp:accept/1`, and each accepted socket gets its own handler process. The gen_server only manages lifecycle (start/stop) and publishes the port via `persistent_term`. Connection handlers call into shared stateless dispatch functions.
+
+**Applied in:** `gleamunison_tcp_sync.erl`
+## 49. Unified DB Key Type Standard via Poly-typed FFI
+
+When building storage layers where keys are serialized into raw binaries (e.g., content hashes) but high-level representations are wrapped in typed records (e.g. `DefinitionRef` / `{ref, {hash, Bytes}}`), FFI functions directly querying or reading the database can easily face type crashes. Unifying on storing raw binaries as keys across all storage adapters (ETS, DETS, Mnesia) and making the FFI conversions poly-typed (accepting both raw binaries and wrapped tuples) ensures robustness against runtime type errors.
+
+**Applied in:** `gleamunison_ffi_io.erl`, `docs/adr/0049-polytyped-refs-and-binary-db-keys.md`
+
+## PA-53. Guard Error Propagation Requires Full Call Chain Refactor
+
+When a helper function like `elaborate_guard` returns `Result(_, Error)` but its caller `elaborate_case` uses `result.unwrap` to convert errors to a sentinel value (`ast.Int(0)`), all error information is lost. Fixing this requires: (1) Change the helper's callers to return `Result` types, (2) Propagate the Result up through fold/try patterns, (3) Update all transitive callers. This is a multi-site refactor — it cannot be done incrementally through a single `result.try` replacement.
+
+**Applied in:** `elab_term.gleam` (attempted in v14, reverted — identified as full-chain refactor)
+
+## PA-54. Property-Based Testing Failure Path Must Be Explicitly Tested
+
+Property checks typically test the success path (the generator produces valid data, the property holds). The failure path — where `ffi_prop` finds a counterexample and returns `Error({counterexample, ...})` — is distinct dead code unless explicitly exercised. A dogfood level should construct a generator that produces a guaranteed counterexample and verify the error result is returned.
+
+**Applied in:** Level 1615, `dogfood_v14.gleam`
+
+## PA-55. Opaque Type Annotation Is Required for Record Field Access on Generics
+
+When a Gleam function takes a generic type variable and accesses record fields on it (e.g. `adapter.insert`, `adapter.lookup`), Gleam cannot infer the record shape without the explicit type annotation `adapter: module.StructType`. This requires importing `{type StructType}` from the defining module. The alternative (using `Dynamic` and `dynamic.from`/`dynamic.unsafe_coerce`) adds runtime risk and loses type safety.
+
+**Applied in:** Level 1622 100-insert helper, Level 1636 3000-insert helper, `dogfood_v14.gleam`
+
+## PA-56. Builtin Coverage Verification Is Systematic, Not Ad-Hoc
+
+All 52 genesis builtins are now verified through the full parse→elaborate→infer→compile→load→eval→execute pipeline via `library_eval`. The testing approach is: (1) Count builtins in `repl.gleam`'s `bootstrap_defs`, (2) Map each to a `library_eval` source expression, (3) Group by category (arithmetic, string, list, pair, bool, dict, set, json, io, process), (4) Verify systematically across batches rather than interleaving randomly. The 2 remaining untestable builtins (`send`, `recv`) require concurrent process pairs.
+
+**Applied in:** Batches v11-v13 (`dogfood_v11.gleam`, `dogfood_v12.gleam`, `dogfood_v13.gleam`)
+
+## PA-57. HTTP Server Integration Testing: Start → Hit Routes → Stop
+
+When an HTTP server has N routes and an HTTP client module, integration testing requires the full lifecycle: (1) `start_server(port)` to initialize the Cowboy listener, (2) `http_client.get/post` to hit each route, (3) `stop_server()` to clean up. Prior to batch 16, the server was started but never hit with the HTTP client — routes were tested via FFI (`server_eval`) or not at all. The pattern is: start on ephemeral port, tolerate connection errors (server may bind to a different port), hit the route, stop.
+
+**Applied in:** Levels 1701-1707, `dogfood_v16.gleam`
+
+## PA-58. Config CLI Override Layer Is Tested Independently of TOML
+
+The `config.load()` function initializes an empty TOML dict and reads only OS environment variables. The CLI override layer (`with_cli`) provides `StringVal`, `IntVal`, and `BoolVal` overrides that take precedence over env lookups in `get_string`/`get_int`/`get_bool`. The priority chain (cli → toml → env) is verified by: (1) load env-only config, (2) apply CLI overrides, (3) verify `get_string("KEY")` returns the CLI value even when env has a different value. The TOML layer remains dead code until a TOML parser is implemented.
+
+**Applied in:** Levels 1720-1722, `dogfood_v16.gleam`
+
+## PA-59. Health Check Testing Requires Custom Checks That Guarantee Specific Outcomes
+
+The default health checks (`check_memory`, `check_loaded_modules`) are system-dependent and cannot guarantee Healthy vs Unhealthy output. Dogfood testing constructs custom `HealthCheck` closures with guaranteed pass/fail results: `fn() { True }` for healthy, `fn() { False }` for unhealthy. The `Degraded` variant requires a logic change to `run_checks` — it is listed in the pattern match but never produced. This pattern of substituting deterministic closures for system-dependent checks applies to any health/liveness framework.
+
+**Applied in:** Levels 1708-1710, `dogfood_v16.gleam`
+
+## PA-60. Opaque Type Unwrapping Chain: DefinitionRef → Hash → Debug String
+
+When a function takes an opaque type (e.g. `Hash`) but you only have the wrapper type (e.g. `DefinitionRef(Ref(Hash))`), you need an intermediate helper to unwrap the chain. In Gleam, this requires pattern-matching: `let Ref(h) = ref` extracts the inner `Hash`, which can then be passed to `hash_to_debug_string(h)`. This pattern appears wherever opaque types nest, and is especially common in the `identity` / `effects` / `sync` modules where `DefinitionRef` wraps `Hash` which wraps `BitArray`.
+
+**Applied in:** Levels 1712-1713 (effects ability_key derivation), `dogfood_v16.gleam`
+
+## PA-61. Gleam Multi-Branch Case in Closures Requires Block Syntax
+
+Inline closures with multi-branch case expressions must use block syntax (`fn(x) { case x { ... } }`), not single-line syntax (`fn(x) { case x { A -> B; C -> D } }`). Gleam's parser rejects the single-line form as a syntax error. The workaround is either: (1) use block syntax, (2) use `list.fold` with an accumulator that folds over case branches, or (3) split the map+check into separate functions.
+
+**Applied in:** Level 1727 (compile 100 defs stress), `dogfood_v16.gleam`
+
+## PA-62. Template Engines with Flat Variable Substitution Can Be Tested with Multi-Variable Inputs
+
+The `template.render` function accepts `List(#(String, String))` for variable bindings. Testing with 2, 5, and 10 variables in a single template string exercises the interpolation loop, edge cases (adjacent braces `{{a}}{{b}}`), and missing-variable behavior. The template engine's `TemplateError(MissingVariable(name))` is only triggered when a `{{var}}` has no corresponding binding in the vars list — this is tested indirectly through level 1718 where all 5 variables are provided.
+
+**Applied in:** Levels 1718, 1739, 1748, `dogfood_v16.gleam`
+
+## PA-63. Health Check Three-Way Branch: count failures, not just presence
+
+A health check system with three states (Healthy/Degraded/Unhealthy) requires counting failures, not just checking their presence. The naive binary check (`failures == [] ? Healthy : Unhealthy`) leaves `Degraded` permanently unreachable. The correct pattern: `failed_count == 0` → Healthy, `failed_count == total` → Unhealthy (all failures), otherwise → Degraded (partial failure). This was the single most impactful bug found during the batch 17 bug hunt — the `Degraded` variant was dead code for the entire project history.
+
+**Applied in:** `health.gleam` fix in batch 17, verified by levels 1751-1752
+
+## PA-64. Config Type Coercion Is Rejected at the Getter Level
+
+The `get_int`/`get_bool`/`get_string` functions each pattern-match on a specific `ConfigValue` variant and return `Error(Nil)` for mismatches. This pattern of type-specific getters with explicit pattern matching prevents accidental coercion (e.g., `"42"` → 42, or `1` → `true`). The `_` catch-all in each getter guarantees no silent conversion. Testing this requires constructing config overrides with deliberately wrong types.
+
+**Applied in:** Levels 1763-1764, `dogfood_v17.gleam`
+
+## PA-65. Loader LRU Eviction Verified at limit=1 and limit=2
+
+The loader's `ensure_loaded` function implements LRU eviction when `list.length(order) > max_size`. Testing LRU correctness requires: (1) `max_size=1` → second load evicts first, (2) `max_size=2` → third load evicts oldest (first), (3) verify via `is_loaded` which definitions survive. The `pending_purge` set tracks definitions where `soft_purge_binary` failed (process still running), and `retry_pending_purges` retries on each subsequent `ensure_loaded` call.
+
+**Applied in:** Levels 1754-1755, `dogfood_v17.gleam`
+
+## PA-66. Codebase HashMismatch Detection Prevents Wrong-Key Storage
+
+The `verify_and_store` function computes `hash_of_definition(def)` and compares it to the `ref` parameter via `hash_equal`. If they differ, `HashMismatch(expected, got)` is returned before any storage write. This prevents definitions from being stored under incorrect content addresses. The verification happens in the `Unit` root → def iteration loop, so a wrong root key is detected on the first def.
+
+**Applied in:** Level 1773, `dogfood_v17.gleam`
+
+## PA-67. Compile+Load+Eval Roundtrip for Each AST Variant Verifies Code Generation
+
+The canonical roundtrip test pattern for the compiler is `compile_only(def, ref)` followed by `load_and_eval(mod_name, beam)` on the generated beam. Testing this for int, text, list, empty list, and lambda variants ensures the compiler's `emit_term`, `emit_pattern`, and module scaffolding (`-module`, `-export`, `$eval`) produce valid BEAM for every AST node type. Level 2121-2125 exercise all 5 variants.
+
+**Applied in:** Levels 2121-2125, `dogfood_v21.gleam`
+
+## PA-68. Gleam Inline Case Requires Multi-Line Block Syntax, Never Single-Line
+
+Gleam's parser rejects `case r { A -> B; C -> D }` on a single line. Multi-branch case expressions inside closures or inline positions must be expanded to full multi-line block syntax. This is particularly error-prone in `list.fold` and `list.map` callbacks where the desire for compact code conflicts with Gleam's grammar. The pattern: expand all inline case branches to 4+ line blocks.
+
+**Applied in:** Batch 21 (11 inline case fixes), `dogfood_v21.gleam`
+
+## PA-69. Stress Testing at Scale: 500 Compiles, 10k Inserts, 100 Loader Loads
+
+Stress testing follows a scalable pattern: (1) choose a representative operation (compile, insert, load), (2) run N iterations (500, 10k, 100) via `list.fold`, (3) count successes vs. failures, (4) verify success rate > 99%. This catches resource exhaustion, ETS table limits, and compilation throughput issues without needing concurrent testing.
+
+**Applied in:** Levels 2101-2105, `dogfood_v21.gleam`
+
+## 70. AST Interpreter for Dynamic Code Evaluation in Sandboxed Environments
+
+When deploying runtimes to highly sandboxed platforms that disallow dynamic compilation (e.g. Cloudflare Workers, WebAssembly V8 isolates), dynamic evaluation cannot be achieved via code compilation and dynamic loading. The solution is the **AST Interpreter Pattern**:
+1. Implement a parser and typechecker that runs statically on the host.
+2. Build a recursive evaluation loop (tree-walker or register-based VM) that takes the AST representation of terms and recursively executes them in JavaScript or WASM.
+3. Represent algebraic effects and dynamic handler stacks as context-scoped data structures (e.g. request-scoped execution contexts) rather than process dictionaries or hardware exceptions.

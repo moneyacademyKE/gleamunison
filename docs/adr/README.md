@@ -51,8 +51,10 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0045](0045-linearity-enforced-single-shot-continuations.md) | Linearity-Enforced Single-Shot Continuations | Proposed |
 | [ADR-0046](0046-first-class-typed-holes-and-dynamic-closures.md) | First-Class Typed Holes and Dynamic Closures | Proposed |
 | [ADR-0047](0047-trace-driven-request-interception-and-analysis.md) | Trace-Driven Request Interception and Analysis | Proposed |
-
-
-
-
-
+| [ADR-0048](0048-cas-type-adapters.md) | Lazy CAS Type Adapters | Accepted |
+| [ADR-0049](0049-polytyped-refs-and-binary-db-keys.md) | Poly-typed References and Binary DB Keys | Accepted |
+| [ADR-0050](0050-comprehensive-unit-test-coverage-expansion.md) | Comprehensive FFI Unit Test Coverage Expansion | Accepted |
+| [ADR-0051](0051-strict-unterminated-string-literal-validation.md) | Strict Unterminated String Literal Validation | Accepted |
+| [ADR-0052](0052-propagate-guard-elaboration-errors.md) | Propagate Case Guard Elaboration Errors | Accepted |
+| [ADR-0053](0053-standardize-property-failure-path-and-types.md) | Standardize Property Failure Path and FFI Signatures | Accepted |
+| [ADR-0054](0054-cloudflare-wasm-compatibility-analysis.md) | Cloudflare Workers and WebAssembly Compatibility Analysis | Accepted |

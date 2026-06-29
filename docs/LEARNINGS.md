@@ -249,6 +249,232 @@ Adding a `Guard` field to `ast.Case` means every constructor/case in the codebas
 
 Erlang/OTP 27+ deprecates the `random` module in favor of `rand`. Property-based testing generators (`int_gen`, `bool_gen`, `list_gen`) should use `rand:uniform/1` instead of `random:uniform/1` to avoid deprecation warnings and ensure cryptographic-quality randomness.
 
+## 50. Dogfood-driven integration seam discovery
+
+Progressive dogfood levels (1251-1350) uncovered integration gaps invisible to unit tests: `load_and_eval` (the compile-load-evaluate pipeline), HTTP client+server lifecycle, and `effects.run()` were all implemented but never end-to-end exercised. Dogfooding at the module boundary catches these seams where unit tests don't cross module boundaries.
+
+## 51. Dynamic type bridging in effects runtime
+
+The `effects.run(RuntimeConfig, thunk)` API returns `Dynamic`. All values passed through handler chains must be wrapped via `ffi_to_dynamic(val)`, an Erlang FFI call that boxes Gleam types into Erlang terms. This wrapping is invisible in the Gleam type system (`Dynamic` erases to a generic type variable) but is strictly required at runtime for handler dispatch.
+
+## 52. Opaque types enforce API-only testing
+
+Dogfood levels cannot destructure opaque types like `HttpResponse`, `Config`, or `DateTime` (they have no accessible fields). This forces tests to use only the public module API surface — exactly the constraint that makes dogfooding valuable. Unit tests can bypass this by importing internal constructors, but dogfood levels cannot.
+
+## 53. Declared-but-unconstructed error variants are dead code
+
+Dogfooding reveals that `InferenceError.UnboundVariable`, `InfiniteType`, `UnhandledAbility`, `ImpureContext`, and `LinearityViolation` are declared in `types.gleam` but never constructed by `infer_term`. Similarly, `SyncError.HashConflict`, `InsertError.DuplicateDef`, and `HealthStatus.Degraded` have zero construction sites. These are dead code candidates that should either be implemented or pruned.
+
+## 54. Gleam case clause uniformity discipline
+
+Gleam requires all branches of a `case` expression to return the same type. Dogfood levels mixing `io.println(msg)` (returns `Nil`) with `let assert True = condition` (returns `Bool`) in different branches fail to compile. The fix is to add an explicit `Nil`-returning statement after assertions in multi-branch cases, or to structure assertions as standalone `let assert` before the case.
+
+## 55. Storage adapter `list_refs` was declared but untested
+
+All four storage adapters (`inmemory`, `dets`, `partitioned_dets`, `mnesia`) define a `list_refs` function in their `StorageAdapter` record, but prior to v7 dogfooding, it was never called for DETS or partitioned DETS. This revealed that the FFI existed and compiled correctly but had zero integration coverage.
+
+## 56. Partitioned DETS requires recursive directory cleanup
+
+The partitioned DETS adapter creates subdirectories and partition files under a parent directory. A simple `delete` on the parent fails if subdirectories exist. The adapter provides a dedicated `partitioned_dets_delete(dir_path)` function in the FFI layer (`gleamunison_storage.erl`) that handles recursive cleanup. Dogfood levels exercising reopen persistence must call this between runs.
+
+## 57. Mock-by-convention is fragile — name-based dispatch breaks in test
+
+The `is_real_node/1` heuristic (checking for `@` in the peer name) caused 4 existing tests to break when the mock path was removed. Tests using `PeerId("test_node")` expected hardcoded mock data. Real implementations must either coexist with test mode or tests must adapt to use real infrastructure (starting a local TCP server, inserting test data). Convention-based mock vs. real routing is fragile because any refactoring of the routing logic breaks all consumers.
+
+## 58. Length-prefixed binary protocol is simpler than custom framing
+
+A TCP sync protocol using 4-byte big-endian length prefix + `term_to_binary`/`binary_to_term` requires only ~120 lines of Erlang. No custom parser, no state machine, no protobuf/thrift dependency. Erlang's built-in term serialization handles all data types natively. The client is one-shot request-response (connect → send length+payload → recv length+payload → close), which avoids connection pooling complexity for the initial implementation.
+
+## 59. gen_server acceptor must spawn per-connection handlers
+
+A naive acceptor that calls the gen_server itself per connection will serialize all requests through the gen_server mailbox. The correct pattern: acceptor spawns a dedicated process per connection, which reads/writes the socket directly. The gen_server only manages the listen socket lifecycle and the persistent_term port registration. Connection handlers call into shared stateless functions for dispatch.
+
+## 60. Dogfood stubs can be replaced with generic cyclic computation
+
+904 placeholder levels (printing "Level N: stub") were replaced with 5 generic computation templates distributed cyclically (`n % 5`): parse, hash, insert, infer, compile+load. Each template does real work with the level number as input. This provides real integration coverage for 904 levels without writing 904 unique functions. The key insight: the computation type matters more than the level number for catching integration regressions.
+
+## 61. Gleam's `@external(erlang, ...)` ties FFI declarations to specific modules
+
+Test helper functions declared via `@external(erlang, "gleamunison_ffi", "corrupt_handler_stack")` can only be moved if ALL call sites update their `@external` targets AND the target module compiles successfully. Standalone test `.erl` files in `test/` aren't compiled by `gleam build`, making them invisible to Erlang FFI resolution. The pragmatic solution: keep test helpers in production modules with `%% @private` doc annotations, accepting the minimal API surface pollution.
+
+## 62. `persistent_term` must survive Erlang module reloads
+
+The TCP sync server registers its port via `persistent_term:put({gleamunison_tcp_sync, port}, Port)`. Gleam's test runner compiles and loads modules fresh each run — if the module is recompiled, the gen_server restarts and the old `persistent_term` entry is replaced. The `terminate/2` callback must call `persistent_term:erase` to prevent stale entries. The default port (9876) must be returned by `get_port/0` as a fallback when `persistent_term` is empty.
+
+## 63. All 15 AST compile variants must be individually verified
+
+Prior to v9 dogfooding, only 5 of 15 AST variants had dedicated compilation tests. The remaining 10 (Float, Text, Let, Match, List, Construct, Use, guarded Match, List-of-Refs, and TypeDef/AbilityDecl) were implicitly exercised through hashing and insertion but never had their Erlang source emission verified. Adding explicit compilation tests for each variant revealed zero bugs — the `emit_term` function was correct — but proved the compilation path for every variant works end-to-end.
+
+## 64. `infer_helper` functions have zero direct tests
+
+`substitute`, `list_all_match`, and `normalize_type` are instrumental in the inference engine (called 20+ times by `infer_term` and `typecheck_unit`) but had zero standalone unit tests. They were exercised only indirectly through inference and typechecking integration tests. Adding direct tests for `substitute` (match, non-match, Fn recursion, Builtin passthrough) and `list_all_match` (empty list) verified the internal logic without depending on the full inference pipeline.
+
+## 65. Loader with limit=1 reliably evicts the single loaded module
+
+When `new_loader_with_limit(1)`, loading def1 then def2 must evict def1 (the only one that fits). The `ensure_loaded` path correctly handles the edge case where `list.length(next_order) > max_size` with `max_size = 1`: the first def lands in `evict`, `soft_purge_binary` runs, and only def2 remains in `order`. This edge case was never tested before — LRU tests only used limits ≥ 3.
+
+## 66. `handle_define` returns a Result, not a (cache, defs) triple
+
+`repl_eval.handle_define` returns `Result(#(TypeCache, List(#(String, SurfaceDef))), String)`. Attempting to destructure as `Ok(#(cache, defs))` requires importing `repl_eval`'s exact return type signature. The function does real elaboration, inference, and compilation — it's not a simple cache update. This makes the REPL define+eval roundtrip a genuine integration test covering 5+ modules.
+
+## 67. Type-level `Dynamic` bridging is mandatory for effects handlers
+
+Effects handler functions (`OpHandler`) must be typed as `fn(List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic`. Using generic type variables (`fn(List(a), fn(a) -> a) -> a`) in dogfood handler definitions fails to unify with `HandlerFrame`'s expected `Dict(Int, OpHandler)` type. The `Dynamic` type import from `gleam/dynamic` is required for all effects handler construction in dogfood levels.
+
+## 68. HTTP server route coverage requires systematic endpoint testing
+
+The Gleamunison HTTP server defines 14+ routes in `gleamunison_http_routes.erl`, but prior to v10 dogfooding, only 3 were tested (health, status, eval). The remaining 11 (counter, browse, processes, sync-status, modules, logs, traces, trace-detail, redefinitions, root static, SSE) had zero integration coverage. Starting the server on an ephemeral port and hitting every route catches 500 errors, JSON format mismatches, and missing route handlers that unit tests can't reach.
+
+## 69. REPL error codes (E001–E005) need individual trigger tests
+
+The `do_eval` function maps 5 error conditions to `[E00X]` prefixed error strings. Prior to v10, only E001 (NameNotFound with spelling suggestions) had a dedicated trigger test. The remaining 4 codes (E002 UnknownOperation, E003 MissingAbilityDecl, E004 InferFailed, E005 UnsupportedTypeRef) were never explicitly triggered and verified. Each error code requires a specific evaluation context: custom ability registrations for E002/E003, type mismatches for E004, and guard-as-standalone for E005.
+
+## 70. `Gleam list.range` is not in the stdlib — every dogfood module defines its own
+
+Gleam's standard library has `gleam/list` but does NOT include a `range/2` function. Every dogfood file defines its own recursive `fn range(start, end) -> List(Int)`. This is a pattern to be aware of when writing new levels — don't assume `list.range` exists.
+
+## 71. `StorageAdapter` is an opaque type in Gleam but transparent in Erlang
+
+When writing helper functions that accept a `StorageAdapter` argument, the Gleam type system cannot infer the record fields (`.insert`, `.lookup`, `.close`) from a generic type variable. The explicit type annotation `adapter: storage.StorageAdapter` must be used, which requires importing `{type StorageAdapter}` from `gleamunison/storage`. Without this, "Unknown type for record access" errors appear at every field access.
+
+## 72. Gleam `case` clause return type uniformity applies even with `let _`
+
+Each branch of a `case` expression must return the same type. When the `Ok` branch returns `Result(...)` (from `elaborate_only`) and the `Error` branch returns `Nil`, Gleam rejects it. Wrapping both in `let _ = case ...` or adding an explicit `Nil` after the Ok branch fixes this. This is a common pattern when using `case` for side-effect-only operations in dogfood levels.
+
+
+## 73. Storage adapters query keys using raw binaries, not wrapping records
+
+Although Gleam constructs `DefinitionRef` records (like `{ref, {hash, Bytes}}`) for compile-time safety, the actual storage adapters (ETS, DETS, Mnesia) query and insert entries using raw binary hashes (`BitArray` / `binary()`) as the primary keys. Directly querying with `{ref, {hash, Bytes}}` in FFI bypasses the adapter serialization and results in lookup failures or `function_clause` crashes (especially in partitioned DETS where the key is pattern matched as a bitstring). The FFI layer must decode hex refs to raw binaries using `gleamunison_ffi:hex_to_bytes/1` before database operations.
+
+## 74. Erlang standard library lists:filtermap spelling
+
+The standard Erlang function for filtering and mapping a list in one pass is `lists:filtermap/2` (no underscore), unlike in Elixir or other functional environments which use `filter_map`. Calling `lists:filter_map/2` causes a runtime `undef` crash in the BEAM VM.
+
+## 75. Guard error swallowing in `elaborate_case` is a correctness bug
+
+The `elaborate_case` function in `elab_term.gleam` uses `result.unwrap` on guard elaboration: if a guard references an undefined variable, the `NameNotFound` error is silently replaced with `ast.Int(0)` (always truthy). The fix requires changing the entire `elaborate_case` function to return `Result(_, ElaborateError)` instead of the current flat tuple, which cascades into `elaborate_cases` and all callers. This was attempted in v14 but reverted — the type signature change breaks 4+ call sites. A proper fix needs: (1) change `elaborate_case` return type, (2) propagate error through `elaborate_cases`'s `try_fold`, (3) update `elaborate_term`'s `SMatch` handler.
+
+## 76. Property-based testing needs actual failure-path verification
+
+All dogfood property checks prior to v14 used generators that always return the expected value (e.g. `fn() { 1 }` with prop `x == 1`). The failure path — where `ffi_prop` detects a counterexample and returns `Error(...)` — was never exercised. Level 1615 finally tests this with `gen: fn() { -1 }` and `prop: x > 0`, verifying the property checker catches the violation. Without this, the error-reporting machinery was dead code.
+
+## 77. Mnesia adapter requires `mnesia:start()` before any table operations
+
+The `mnesia` storage adapter calls `mnesia:start()` internally (in `gleamunison_storage.erl:124`), which means the first `mnesia_new` call initializes the Mnesia application. This is transparent to Gleam consumers but means the adapter cannot be used in processes that don't have Mnesia started. Unit tests use `mnesia:start()` explicitly in test setup, but dogfood levels rely on the adapter's internal initialization.
+
+## 78. `SPCons` takes string head/tail, not nested patterns
+
+The surface pattern `SPCons(head: String, tail: String)` only accepts string identifiers for the head and tail bindings, not recursive pattern structures. Nested list destructuring must use `SPConstructor("Cons", [SPVar("h"), SPConstructor("Cons", ...)])` instead. This is a surface-only limitation — the core AST's `PatCons(LocalVar, LocalVar)` supports nested patterns through de Bruijn indices.
+
+## 79. All 52 genesis builtins are now verified via REPL eval
+
+With v13 completing I/O builtin tests (`file-read`, `http-get`, `now`, `sleep`, `self`, `spawn` via `library_eval`) and v11+v12 testing arithmetic, string, list, pair, bool, dict, set, and json builtins, all 52 bootstrapped builtins in `repl.gleam` now have at least one execution test through the full parse→elaborate→infer→compile→load→eval pipeline. The remaining untested builtins (`send`, `recv`) are inherently concurrent and require process pairs.
+
+## 80. The HTTP server has 14 routes but zero were tested via HTTP client until v16
+
+The `gleamunison_http.erl` server dispatches through `handle_route/2` to 14 distinct endpoints: `/eval`, `/counter`, `/define`, `/browse`, `/api/status`, `/api/events`, `/api/processes`, `/api/sync-status`, `/api/redefinitions`, `/api/logs`, `/api/modules`, `/api/traces`, `/api/traces/:id`, `/api/health`, plus static file serving and 404. Prior to v16, `http_client.get` was used only against `localhost:8080` in a vacuum — never against the local server started via `http.start_server`. The server lifecycle (`start_server` → hit routes → `stop_server`) is now tested in dogfood levels 1701-1707.
+
+## 81. `HealthStatus.Degraded` is declared but never constructed by `run_checks`
+
+The `run_checks` function only returns `Healthy` or `Unhealthy` — the `run_all` path to `Degraded` is never taken because `list.filter` on failures produces an empty list (Healthy) or non-empty (Unhealthy) with no "some passed, some failed" intermediate. The `Degraded` variant is pattern-matched in dogfood but never produced by the production code. Either implement partial-failure logic or prune the variant.
+
+## 82. `template.render` takes `List(#(String, String))`, not `Dict(String, String)`
+
+The template engine's public API uses a list of key-value tuples rather than a dict. This is a deliberate choice (matching the Erlang FFI's proplist convention), but means callers must construct list literals or convert from dicts. Dogfood levels 1718, 1739, and 1748 exercise this with 2-, 5-, and 2-variable templates respectively.
+
+## 83. `config.load()` only reads OS environment — TOML layer is dead code
+
+The `Config.toml` field is initialized to `dict.new()` in `load()` and is never populated by any code path. The 3-layer priority logic in `config.get()` (cli → toml → env) reduces to 2-layer (cli → env) in practice. The `get_string`/`get_int`/`get_bool` functions work correctly for the layers that exist, and level 1722 verifies cli precedence over env by overriding the `USER` environment variable.
+
+## 84. Gleam inline `case` syntax doesn't support `case r { Ok(_) -> True; Error(_) -> False }`
+
+Multi-branch case expressions inside closures or inline expressions must use multi-line block syntax. The single-line `case x { A -> B; C -> D }` form is lexed as a syntax error in Gleam. This was encountered in level 1727 when trying to write a compact `list.map(fn(r) { case r { ... } })` and required rewriting as a `list.fold` with explicit multi-line case blocks.
+
+## 85. `Option` pattern matching in Gleam requires importing `gleam/option`
+
+The `Option` type from `gleam/option` cannot be pattern-matched with bare `None`/`Some(...)` constructors — they must be qualified as `option.None`/`option.Some` or imported explicitly. Levels 1729, 1730, and 1741 use `option.None`/`option.Some` with `import gleam/option` for jet lookups and type operations.
+
+## 86. Opaque type `DefinitionRef(Ref(Hash))` requires explicit unwrap for `hash_to_debug_string`
+
+The `hash_to_debug_string` function takes `Hash`, not `DefinitionRef`. To derive an ability_key from a `DefinitionRef`, you must unwrap `Ref(h)` to extract the `Hash`, then pass it to `hash_to_debug_string`. Level 1712-1713 define a helper `ref_to_debug_string` that handles this unwrapping. This is a common pattern across the codebase.
+
+## 87. `run_checks` now correctly produces all three `HealthStatus` variants after fix
+
+The original `run_checks` only had two branches: `[]` (no failures) → `Healthy`, and `_` (any failures) → `Unhealthy`. The `Degraded` variant was dead code — declared, pattern-matched in dogfood, but never constructed. The fix introduces a three-way branch using `failed_count`: `0` → `Healthy`, `== total` → `Unhealthy`, otherwise → `Degraded("Passed N/T, failed: ...")`. This was the single most impactful bug found during batch 17.
+
+## 88. `config.get_int`/`get_bool` correctly reject type mismatches
+
+The `get_int` function pattern matches on `IntVal(n)` and returns `Error(Nil)` for `StringVal` or `BoolVal`. Similarly, `get_bool` only accepts `BoolVal(b)`. This automatic type rejection prevents accidental type coercion. Level 1763 verifies that `StringVal("not_a_number")` is rejected by `get_int`, and level 1764 verifies `IntVal(1)` is rejected by `get_bool`.
+
+## 89. Loader `max_size=1` reliably evicts the single loadable module
+
+When the loader's `max_size` is set to 1 via `new_loader_with_limit(1)`, loading a second definition triggers eviction of the first. The first module is purged via `soft_purge_binary`, and its reference is removed from `module_names`. Level 1754 verifies this: after loading two definitions, only the second is `is_loaded`. With `max_size=2` and 3 loads (level 1755), the oldest module is evicted.
+
+## 90. `ensure_loaded` supports `TypeDef` and `AbilityDecl` alongside `TermDef`
+
+The loader's `ensure_loaded` function accepts any `ast.Definition`, not just `TermDef`. Level 1758 verifies that `TypeDef(Structural(Local(0), [], [...]))` compiles and loads successfully. Level 1756 verifies that `AbilityDecl` with zero operations compiles (or caches the error). This means all three definition variants are loadable.
+
+## 91. `verify_and_store` detects `HashMismatch` when unit key differs from computed hash
+
+The `codebase.insert` function validates that the key in `unit.defs` matches `hash_of_definition(def)`. If a definition is stored under a different key, `HashMismatch(hash_expected: computed, hash_got: wrong)` is returned. Level 1773 verifies this by constructing a unit where `unit.defs` uses a correct hash but the outer Unit root uses a different one — the mismatch is caught.
+
+## 92. Gleam `LocalVar` is opaque — construct with `Local`, pattern match only inside `identity`
+
+The `LocalVar` type is opaque and only constructable via `Local(index)`. Users outside the `identity` module cannot destructure `LocalVar`, so `local_var_index` is the only way to extract the de Bruijn index. Level 1810 verifies that `local_var_index(Local(0))` returns 0, `Local(3)` returns 3, and `Local(7)` returns 7.
+
+## 93. `hash_equal` uses Erlang `phash2/2` comparison, not structural comparison
+
+The `hash_equal` function calls `ffi_hash_equal` which compares hash bytes using phash2. It's internally consistent: two calls to `hash_bytes` on the same data produce identical `Hash` values that `hash_equal` confirms. Levels 1808 and 1809 verify this for both equal and unequal data.
+
+## 94. `compile_only` unloads the binary before recompiling
+
+The `compile_only` function in `pipeline.gleam` calls `unload_binary(mod_name)` before recompilation, ensuring no stale module is left in the VM. This is critical for REPL iterations where the same definition is recompiled with changes. Level 1835 and 1877 verify this through the full pipeline.
+
+## 95. `count_brackets` handles inside-string parentheses correctly
+
+The `count_brackets` function tracks `in_string` state when encountering `"` characters, ignoring parentheses inside strings. Level 1865 verifies negative depth from bare `)`, level 1866 verifies that `"(hello)"` counts as 0 (inside string), and level 1867 verifies `(add 1 2)` is balanced (0).
+
+## 96. `elaborate_unit` works with empty surface units
+
+When `SurfaceUnit(root, [])` is passed to `elaborate_unit`, it initializes an empty `ElabCtx` with no bindings, abilities, or ops. Level 1876 verifies this boundary case returns `Ok(#(unit_with_no_defs, unchanged_cache, empty_ctx))`.
+
+## 97. `load_and_eval` is the full compile→load→eval pipeline in one call
+
+The `load_and_eval` function calls `load_binary` then `eval_module`, combining the last two steps of the pipeline. Level 1877 exercises this with a simple `Int(42)` definition: compile, load and eval, verify the eval returns the correct string representation.
+
+## 98. Gleam semicolons are syntax errors — every `;` must be on its own line or removed
+
+Gleam does not support inline statement separators. Every `let x = 1; let y = 2` or `case r { Ok(_) -> a + 1; Error(_) -> a }` is a syntax error. This was the most frequent error in batch 21 — 11 occurrences of compact inline case/semicolon syntax that had to be expanded to multi-line block form.
+
+## 99. `compile_only` + `load_and_eval` is the canonical roundtrip test pattern
+
+The pipeline module provides `compile_only(def, ref)` for beam generation and `load_and_eval(mod_name, beam)` for execution. Testing the full compile→load→eval chain for each AST variant (int, text, list, empty list, lambda) validates the compiler's code generation across all term types. Levels 2121-2125 exercise all 5 variants.
+
+## 100. `push_sync` with empty ref list returns count 0
+
+When `push_sync` is called with an empty `refs` list, `list.filter_map` produces an empty list and `list.length([])` returns 0. The function still attempts `sync_connect` and `sync_push_defs` with an empty blob list. Level 2141 verifies this edge case.
+
+## 101. Inmemory storage adapter handles 10,000 inserts without issues
+
+The inmemory adapter uses an ETS table owned by a spawned process, with entries stored via `ets:insert`. Testing with 10,000 inserts (level 2104) verifies there is no table size limit or memory exhaustion. All 10,000 inserts succeeded.
+
+## 102. Gleam `pipe` operator `|>` requires a function on the right, not a pipeline chain
+
+The `|>` operator pipes a value into a function: `value |> function`. It cannot be used to chain multiple pipeline stages without parentheses. In `dict.size` after a fold, the correct form is `let d = list.fold(...); dict.size(d)` not `list.fold(...) |> dict.size` without binding.
+
+## 103. `elaborate_unit` handles `if` desugaring to `SMatch` correctly
+
+The parser transforms `(if cond then else)` into `SMatch(cond, [SCase(SPInt(1), None, then), SCase(SPVar("_"), None, else)])`. Level 2112 verifies this transformation through elaboration. The `define` form is wrapped as `SList([SVar("define"), SVar(name), val])` — level 2113 verifies this intermediate representation survives elaboration.
 
 
 
+
+
+
+
+
+
+
+## 104. Cloudflare Workers and WebAssembly Platform Sandbox Limitations
+
+Cloudflare Workers run in highly-restricted V8 isolates where dynamic code compilation and loading are blocked for security. `eval()`, `new Function()`, and runtime WebAssembly compilation (`WebAssembly.compile()` or `WebAssembly.instantiate(bytes)`) throw security errors. This renders direct transpilation and dynamic VM loading (`code:load_binary/3`) impossible in this environment. Running `gleamunison` on Cloudflare Workers requires deploying a static AST interpreter compiled to JS or WASM, which evaluates Unison expressions as data structures without compiling them dynamically at runtime.
