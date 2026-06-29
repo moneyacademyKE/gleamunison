@@ -478,3 +478,7 @@ The parser transforms `(if cond then else)` into `SMatch(cond, [SCase(SPInt(1), 
 ## 104. Cloudflare Workers and WebAssembly Platform Sandbox Limitations
 
 Cloudflare Workers run in highly-restricted V8 isolates where dynamic code compilation and loading are blocked for security. `eval()`, `new Function()`, and runtime WebAssembly compilation (`WebAssembly.compile()` or `WebAssembly.instantiate(bytes)`) throw security errors. This renders direct transpilation and dynamic VM loading (`code:load_binary/3`) impossible in this environment. Running `gleamunison` on Cloudflare Workers requires deploying a static AST interpreter compiled to JS or WASM, which evaluates Unison expressions as data structures without compiling them dynamically at runtime.
+
+## 105. Cloudflare Workers Serverless Edge Hosting Tradeoffs
+
+Hosting on Cloudflare Workers replaces DevOps cluster operations with global edge routing, near-zero cold starts, and cost efficiency. However, the trade-off is the loss of BEAM-native stateful execution properties (ETS, Mnesia, and hot code reloading). For a compiler-driven language platform like Unison, running an AST interpreter in a 128MB memory-limited, network-bound serverless isolate limits throughput and increases execution latency compared to running on native VM instances.

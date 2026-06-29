@@ -58,3 +58,4 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0052](0052-propagate-guard-elaboration-errors.md) | Propagate Case Guard Elaboration Errors | Accepted |
 | [ADR-0053](0053-standardize-property-failure-path-and-types.md) | Standardize Property Failure Path and FFI Signatures | Accepted |
 | [ADR-0054](0054-cloudflare-wasm-compatibility-analysis.md) | Cloudflare Workers and WebAssembly Compatibility Analysis | Accepted |
+| [ADR-0055](0055-cloudflare-workers-hosting-topology.md) | Cloudflare Workers Hosting Topology Decisions | Accepted |

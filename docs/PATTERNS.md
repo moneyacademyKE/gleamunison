@@ -641,3 +641,10 @@ When deploying runtimes to highly sandboxed platforms that disallow dynamic comp
 1. Implement a parser and typechecker that runs statically on the host.
 2. Build a recursive evaluation loop (tree-walker or register-based VM) that takes the AST representation of terms and recursively executes them in JavaScript or WASM.
 3. Represent algebraic effects and dynamic handler stacks as context-scoped data structures (e.g. request-scoped execution contexts) rather than process dictionaries or hardware exceptions.
+
+## 71. Hybrid Topology Execution Strategy
+
+To balance operational costs, global distribution, and VM capabilities:
+1. Deploy a heavy, stateful, always-on VM cluster (e.g. Erlang/OTP BEAM) in a central region to act as the primary compilation, REPL, and actor migration coordinate node.
+2. Deploy lightweight, serverless edge workers (e.g. Cloudflare Workers running an AST interpreter) globally to handle read-heavy request routing, static caching, edge middleware, and lightweight sandboxed user actions.
+3. Node synchronizations (Merkle sync) route edge definition requests to the central cluster.
