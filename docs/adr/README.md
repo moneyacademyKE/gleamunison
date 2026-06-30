@@ -60,3 +60,5 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0054](0054-cloudflare-wasm-compatibility-analysis.md) | Cloudflare Workers and WebAssembly Compatibility Analysis | Accepted |
 | [ADR-0055](0055-cloudflare-workers-hosting-topology.md) | Cloudflare Workers Hosting Topology Decisions | Accepted |
 | [ADR-0056](0056-gleamunison-cloudflare-application-architecture.md) | Gleamunison Cloudflare Application Architecture Decisions | Accepted |
+| [ADR-0057](0057-v3.4.0-gap-analysis.md) | v3.4.0 Rich Hickey Gap Analysis and Evolution Path | Accepted |
+

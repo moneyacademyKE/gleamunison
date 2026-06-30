@@ -94,5 +94,6 @@ The REPL bootstraps `"Console"`, `"add"`, and `"read_line"`, and supports:
 ### LOC Constraints
 All Gleam/Erlang source files MUST be strictly under 250 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
 
-Current conformance: 1170 real dogfood levels + 53 unit tests = 1223 total conformance verifications across 22 playbook files (batches 1-21). No failures. v3.3.0 adds batches 20-21 with 200 levels covering type pretty edges, lexer/parser edges, elaborate all surface forms, compile pattern depth, REPL error codes, count_brackets edges, sync push validation, validate_handler edge cases, stress testing (500 compiles, 10k inserts), compile→load→eval roundtrip, template+config+filepath edges, and 16 cross-module chains.
+Current conformance: 2270 playbook conformance levels (1240 real implementations, 53 unit tests, 1293 verifications, 0 failures). v3.4.0 adds compile→load→eval roundtrip (Apply, text, float, let), 7 deep cross-module chains (4-8 modules), template no-vars+adjacent, config env-only, count_brackets 500-level, elaborate 2-op ability+ability-term refs, inference+linearity deep (Hole, Use, Apply chain, Let+Apply), DETS list_refs, REPL pair+dict+bool ops, TypeDef 3 ctors, AbilityDecl 5 ops, 5-case match, and construct roundtrip.
+
 

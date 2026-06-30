@@ -520,3 +520,12 @@ When evaluating S-expressions directly inside a lightweight edge serverless isol
 ## 108. Dependency Pre-fetching at the Edge for Serverless Workers
 
 Since Cloudflare Workers block synchronous KV lookup operations, executing a tree-walking interpreter where lookups occur on-demand requires making the entire interpreter asynchronous. We can avoid this and keep all parser, typecheck, and interpreter execution logic fully synchronous by performing **dependency pre-fetching** at the boundaries: the incoming request handler asynchronously fetches the target term and all its transitives in parallel from KV, populates a synchronous in-memory store in Gleam, and then starts the synchronous evaluation loop.
+
+## 109. Rich Hickey Gap Analysis as a continuous correctness/evolution feedback loop
+
+Using Rich Hickey Gap Analysis to compare custom downscoped runtimes against full specifications of mainstream languages helps identify which features are essential for developer productivity (such as MCP tools and dependency propagation) vs which features are over-engineered or out-of-scope for the target environment (such as native escript export or unique types).
+
+## 110. AI Model Context Protocol (MCP) as the modern compilation interface
+
+Exposing AST information and compilation environment details via an MCP endpoint is highly valuable because it transforms the runtime from a black box to a transparent, AI-agent-friendly system, enabling LLMs to verify, debug, and trace types with 100% precision.
+

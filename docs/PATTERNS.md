@@ -689,3 +689,20 @@ When executing a synchronous interpreter over network-bound storage (such as Clo
 ## 74. Dynamic Builtin Operator Resolution in Interpreters
 
 To avoid the overhead of full variable elaboration and de Bruijn indexing at the serverless edge, variables are matched dynamically by name. When the interpreter encounters a variable name that is not bound in the lexical scope, it resolves it against a static table of builtin operators (like `+` or `-`), translating them directly to their native FFI function implementations on the fly.
+
+---
+
+## 75. Code Graph Query and Reference Indexing
+
+Tracing Merkle tree references transitively in content-addressed databases using DETS key lookups to dynamically build dependent and dependency trees. This enables immediate feedback on the impact of definition updates.
+
+**Applied in:** `storage.gleam` and CLI query functions.
+
+---
+
+## 76. Model Context Protocol for Compiler Observability
+
+Exposing structural compilation environments, type checkers, and AST node caches to AI coding assistants via standard Model Context Protocol (MCP) endpoints over JSON-RPC. This turns a language compiler into an agent-native cooperative tool.
+
+**Applied in:** `/api/mcp` endpoints on HTTP dashboard servers.
+
