@@ -529,3 +529,8 @@ Using Rich Hickey Gap Analysis to compare custom downscoped runtimes against ful
 
 Exposing AST information and compilation environment details via an MCP endpoint is highly valuable because it transforms the runtime from a black box to a transparent, AI-agent-friendly system, enabling LLMs to verify, debug, and trace types with 100% precision.
 
+## 111. Static AST Interpreter as a Serverless Sandbox Bypass
+
+Compiling dynamic self-evaluating languages (like Gleamunison) to run inside sandboxed serverless environments (like Cloudflare Workers) is blocked by the inability to compile and load bytecode dynamically. The resolution is deploying a static runtime engine compiled to WASM/JS that evaluates the content-addressed AST structures as data, achieving hot code execution changes purely via data store synchronization.
+
+

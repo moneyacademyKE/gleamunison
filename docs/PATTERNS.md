@@ -706,3 +706,12 @@ Exposing structural compilation environments, type checkers, and AST node caches
 
 **Applied in:** `/api/mcp` endpoints on HTTP dashboard servers.
 
+---
+
+## 77. Dual-variant WASM Compilation
+
+Compiling applications to run both as self-contained WASM modules (with zero JS imports for clean sandbox portability) and host-bound WASM modules (with real JS FFI bindings to leverage browser/Workers services like console logging and Web Crypto).
+
+**Applied in:** `gleamunison-cf` adapter build configurations.
+
+
