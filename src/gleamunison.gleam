@@ -62,7 +62,7 @@ fn range(start: Int, end: Int) -> List(Int) {
 }
 
 fn run_all_levels(levels: dict.Dict(String, fn() -> Nil)) -> Nil {
-  let r = range(1, 5626)
+  let r = range(1, 6697)
   list.each(r, fn(n) {
     let key = "level" <> int.to_string(n)
     case dict.get(levels, key) {

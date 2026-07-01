@@ -88,15 +88,17 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - `scripts/generate_levels.clj` — 21 template patterns cycled across 49 levels + 1 cert per batch
 - All scripts are pure Clojure/Babashka — no Python dependencies
 
-### Improvements (Roadmap v2 — Completed Dec 2026)
+### Improvements (Roadmap v3.7.0 — 15/15 Complete)
 1. **Generator uses all 24 templates** — `pick-templates` distributes N levels evenly, no template is dropped
-2. **Per-level imports** — each template declares its own imports; writer unions only what's needed (~1 warning per file vs ~13)
+2. **Per-level imports** — each template declares its own imports; writer unions only what's needed (1061 warnings vs 1244)
 3. **Zombie process cleanup** — loop kills stale `cmd -p` processes before spawning
 4. **Retry detection** — same batch 3x = failure log + exit 1
-5. **3 new templates** — bool compile, type_pretty, infer_term (24 total)
-6. **`--count N` flag** — variable batch sizes (default 50)
+5. **3 new templates** — Construct compile, type_pretty, infer_term (24 total)
+6. **`--count N` and `--suite N` flags** — variable batch sizes, sequential multi-batch mode
 7. **Shortened prompt** — 3 imperative commands, no analysis trigger words
 8. **Orphaned scripts removed** — `check_next.clj`, `next_batch.sh`, `auto_dogfood.clj` deleted
+9. **Numeric batch sorting** — fixed `v9 > v85` alphabetical sort bug in batch detection
+10. **Assertion helpers** — `dogfood_assert.gleam` with `assert_eq`, `assert_prefix`, `assert_all_ok`
 
 ### Known Remaining Issues
 1. **Generator template #21 unused**: `(take 49 templates)` drops `gen-loader-limit`. Should cycle 50 templates evenly or redistribute to use all 21.
@@ -107,11 +109,11 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 6. **No `next_batch.sh`**: The prompt references `bb scripts/next_batch.sh` which was deleted. The infinite loop generates its own batch numbers.
 7. **Reduce generated file size**: Each v*.gleam is ~25KB with 50 levels. Could deduplicate common imports/patterns.
 
-### Dogfood Coverage (82 batches, 4235 levels)
+### Dogfood Coverage (109 batches, 5674 levels)
 
 - **Unit tests**: 53 Erlang/Gleam unit tests covering hashing, codebase, inference, elaboration, typechecking, compilation, storage, sync, effects, and jets.
-- **Dogfood levels**: 4399 integration levels (1-5421) organized in 84 batches (v2-v85).
-- **Total conformance verifications**: 4452 (4399 dogfood + 53 unit tests) across 84 batch files.
+- **Dogfood levels**: 5674 integration levels (1-6696) organized in 109 batches (v2-v109).
+- **Total conformance verifications**: 5727 (5674 dogfood + 53 unit tests) across 109 batch files.
 - **Bug fixes**: Health `Degraded` dead code activated (v2.9.0), Guard error swallowing documented (v14).
 
 ## Invariants
