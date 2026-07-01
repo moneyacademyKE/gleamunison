@@ -110,8 +110,8 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 ### Dogfood Coverage (82 batches, 4235 levels)
 
 - **Unit tests**: 53 Erlang/Gleam unit tests covering hashing, codebase, inference, elaboration, typechecking, compilation, storage, sync, effects, and jets.
-- **Dogfood levels**: 4235 integration levels (1-5320) organized in 82 batches (v2-v83).
-- **Total conformance verifications**: 4288 (4235 dogfood + 53 unit tests) across 82 batch files.
+- **Dogfood levels**: 4399 integration levels (1-5421) organized in 84 batches (v2-v85).
+- **Total conformance verifications**: 4452 (4399 dogfood + 53 unit tests) across 84 batch files.
 - **Bug fixes**: Health `Degraded` dead code activated (v2.9.0), Guard error swallowing documented (v14).
 
 ## Invariants

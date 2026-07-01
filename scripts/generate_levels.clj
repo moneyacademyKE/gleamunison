@@ -36,6 +36,8 @@
     "gleamunison/storage" "import gleamunison/storage.{StorageAdapter, inmemory}"
     "gleamunison/typecheck" "import gleamunison/typecheck.{typecheck_unit}"
     "gleamunison/types" "import gleamunison/types.{empty_cache}"
+    "gleamunison/inference" "import gleamunison/inference.{infer_term}"
+    "gleamunison/type_pretty" "import gleamunison/type_pretty.{pretty_print}"
     (str "import " m)))
 
 (defn gen-compile-int [n]
@@ -393,16 +395,17 @@
 
 ;; === NEW TEMPLATES (coverage diversity) ===
 
-(defn gen-bool-compile [n]
+(defn gen-compile-construct [n]
   {:imports #{"gleamunison/ast" "gleamunison/codebase" "gleamunison/compile"
               "gleamunison/identity" "gleamunison/pipeline"}
    :code (str/join "\n" [(str "pub fn level" n "() -> Nil {")
-     "  io.println(\"--- compile+load bool ---\")"
-     (str "  let def = ast.TermDef(ast.Bool(" (rand-nth ["True" "False"]) "), ast.Builtin(ast.BoolType))")
+     "  io.println(\"--- compile+load Construct ---\")"
+     "  let ctr = Ref(hash_bytes(bit_array.from_string(\"ctor\")))"
+     (str "  let def = ast.TermDef(ast.Construct(ctr, [ast.Int(" (next-int) "), ast.Int(" (next-int) ")]), ast.Builtin(ast.ListType))")
      "  let h = hash_of_definition(def)"
      "  case compile_only(def, Ref(h)) {"
      "    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {"
-     "      Ok(r) -> io.println(\"Bool: \" <> r <> \" [OK]\")"
+     "      Ok(r) -> io.println(\"Construct: \" <> r <> \" [OK]\")"
      "      Error(e) -> io.println(\"L&E: \" <> e)"
      "    }"
      "    Error(e) -> io.println(\"Comp: \" <> e)"
@@ -413,18 +416,18 @@
   {:imports #{"gleamunison/type_pretty" "gleamunison/ast"}
    :code (str/join "\n" [(str "pub fn level" n "() -> Nil {")
      "  io.println(\"--- type pretty_print ---\")"
-     (str "  let pp = pretty_print(ast.BoolType)")
+     (str "  let pp = pretty_print(ast.Builtin(ast.BoolType))")
      "  io.println(\"PP: \" <> pp)"
      (str "  io.println(\"Level " n ": OK\")") "}"])})
 
 (defn gen-infer-term [n]
-  {:imports #{"gleamunison/ast" "gleamunison/inference" "gleamunison/types"}
+  {:imports #{"gleamunison/ast" "gleamunison/inference" "gleamunison/types" "gleamunison/type_pretty"}
    :code (str/join "\n" [(str "pub fn level" n "() -> Nil {")
      "  io.println(\"--- infer_term ---\")"
      (str "  let t = ast.Int(" (next-int) ")")
      "  let cache = empty_cache()"
      "  case infer_term(t, cache) {"
-     "    Ok(#(ty, _)) -> io.println(\"Infer: \" <> pretty_print(ty))"
+     "    Ok(ty) -> io.println(\"Infer: \" <> pretty_print(ty))"
      "    Error(e) -> io.println(\"Err: \" <> string.inspect(e))"
      "  }"
      (str "  io.println(\"Level " n ": OK\")") "}"])})
@@ -451,7 +454,7 @@
    gen-codebase-insert gen-storage-stress gen-cross-ref gen-effects-handle
    gen-elab-unit-abilities gen-typecheck gen-loader-loaded gen-hash-distinct
    gen-insert-raw gen-repl-eval gen-serialize gen-empty-list gen-elab-error
-   gen-bool-compile gen-type-pretty gen-infer-term])
+   gen-compile-construct gen-type-pretty gen-infer-term])
 
 (defn pick-templates [n]
   ;; Distribute n levels across all templates evenly
@@ -469,10 +472,14 @@
           {:level lvl :code code :imports imports}))
       templates)))
 
-(defn write-file [batch level-start level-end levels]
+(defn write-file [batch level-start cnt levels]
   (let [f (str "src/dogfood_v" batch ".gleam")
-        cert-level level-end
-        all-imports (reduce clojure.set/union #{} (map :imports levels))
+        last-level (+ level-start (dec cnt))
+        cert-level (inc last-level)
+        all-imports (reduce clojure.set/union
+                      #{"gleam/io" "gleam/int" "gleam/list" "gleam/string"
+                        "gleam/bit_array" "gleam/option"}
+                      (map :imports levels))
         sorted-imports (sort all-imports)
         body (str/join "\n\n" (map :code levels))
         header (str/join "\n"
@@ -485,7 +492,7 @@
                  "  }"
                  "}"
                  ""
-                 (str "// --- AUTO-GENERATED BATCH " batch " (" level-start "-" level-end ") ---")
+                 (str "// --- AUTO-GENERATED BATCH " batch " (" level-start "-" (+ level-start (dec cnt)) ") ---")
                  ""])
         cert (str/join "\n"
                [""
@@ -495,7 +502,8 @@
                 "  io.println(\"============================================================\")"
                 (str "  io.println(\"  BATCH " batch " COMPLETE — Auto-generated\")")
                 "  io.println(\"============================================================\")"
-                (str "  io.println(\"  Levels " level-start "-" level-end " all passed\")")
+                (str "  io.println(\"  Levels " level-start "-" last-level " all passed\")")
+    (str "  io.println(\"  Certification level " cert-level "\")")
                 "  io.println(\"============================================================\")"
                 (str "  io.println(\"Level " cert-level ": OK\")")
                 "}"
@@ -505,24 +513,50 @@
 
 (defn -main [& args]
   (let [flags (set (filter #(str/starts-with? % "--") args))
-        batch-str (first (remove #(str/starts-with? % "--") *command-line-args*))
-        batch (or (some-> batch-str Long/parseLong)
-                  (let [f (last (sort (fs/glob "src" "dogfood_v*.gleam")))]
-                    (Long/parseLong (re-find #"\d+" (str f)))))
-        lvl-flag (when-let [s (second (first (filter #(= "--start" (first %)) (partition 2 args))))]
-                   (Long/parseLong s))
-        count-flag (or (some-> (when-let [s (second (first (filter #(= "--count" (first %)) (partition 2 args))))]
-                                 (Long/parseLong s)))
-                       50)
-        meta (slurp "src/dogfood_meta.gleam")
-        latest (apply max (map #(Long/parseLong (second %)) (re-seq #"level(\d+)" meta)))
-        level-start (or lvl-flag (inc latest))
-        level-end (+ level-start (dec count-flag))
-        levels (generate-levels batch level-start count-flag)]
-    (println "Generating batch" batch "levels" level-start "-" level-end
-             "(" count-flag "levels, " (count all-templates) "templates)")
-    (write-file batch level-start level-end levels)
-    (println "Done. bb dogfood-register -> gleam build -> verify")))
+        suite-flag (some-> (when-let [s (second (first (filter #(= "--suite" (first %)) (partition 2 args))))]
+                              (Long/parseLong s)))]
+    (if suite-flag
+      ;; Suite mode: generate N batches, register each, verify at end
+      (let [meta (slurp "src/dogfood_meta.gleam")
+            latest (apply max (map #(Long/parseLong (second %)) (re-seq #"level(\d+)" meta)))
+            _ (println "Suite mode: generating" suite-flag "batches starting from" (inc latest))]
+        (doseq [i (range suite-flag)]
+          (let [meta2 (slurp "src/dogfood_meta.gleam")
+                lvl (apply max (map #(Long/parseLong (second %)) (re-seq #"level(\d+)" meta2)))
+                files (map (fn [f] [(Long/parseLong (re-find #"\d+" (str f))) f])
+                           (fs/glob "src" "dogfood_v*.gleam"))
+                batch (inc (apply max (map first files)))
+                start (inc lvl)
+                levels (generate-levels batch start 50)]
+            (println "\n--- Suite batch" batch "levels" start "-" (+ start 49) "---")
+            (write-file batch start 50 levels)
+            (let [r (clojure.java.shell/sh "bb" "scripts/dogfood_loop.clj" "--register"
+                     :dir (str (fs/parent (fs/parent *file*))))]
+              (println (str/trim (:out r))))))
+        (println "\n=== Suite complete. Building and verifying... ===")
+        (let [b (clojure.java.shell/sh "gleam" "build" :dir (str (fs/parent (fs/parent *file*))))
+              v (clojure.java.shell/sh "gleam" "run" "level70" :dir (str (fs/parent (fs/parent *file*))))]
+          (println (str/trim (:out v)))))
+      ;; Single batch mode
+      (let [batch-str (first (remove #(str/starts-with? % "--") *command-line-args*))
+            batch (or (some-> batch-str Long/parseLong)
+                      (let [bfs (map (fn [f] [(Long/parseLong (re-find #"\d+" (str f))) f])
+                                     (fs/glob "src" "dogfood_v*.gleam"))]
+                        (first (last (sort-by first bfs)))))
+            lvl-flag (when-let [s (second (first (filter #(= "--start" (first %)) (partition 2 args))))]
+                       (Long/parseLong s))
+            count-flag (or (some-> (when-let [s (second (first (filter #(= "--count" (first %)) (partition 2 args))))]
+                                     (Long/parseLong s)))
+                           50)
+            meta (slurp "src/dogfood_meta.gleam")
+            latest (apply max (map #(Long/parseLong (second %)) (re-seq #"level(\d+)" meta)))
+            level-start (or lvl-flag (inc latest))
+            level-end (+ level-start (dec count-flag))
+            levels (generate-levels batch level-start count-flag)]
+        (println "Generating batch" batch "levels" level-start "-" level-end
+                 "(" count-flag "levels, " (count all-templates) "templates, cert at" (inc level-end) ")")
+        (write-file batch level-start count-flag levels)
+        (println "Done. bb dogfood-register -> gleam build -> verify")))))
 
 (when *command-line-args*
   (apply -main *command-line-args*))

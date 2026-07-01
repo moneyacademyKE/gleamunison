@@ -38,7 +38,16 @@ Restored with plain string syntax: `:dogfood-loop`, `:dogfood-register`, `:dogfo
 ### 4.3 Generator parameterization
 Added `--count N` flag. Default 50. Accepts any positive integer.
 
-## 🔜 Future
+## ✅ Completed (v2 generator + v2 loop + infrastructure)
+
+### 5.1 Consolidate old generated files
+All auto-generated files (v10, v23-v85) regenerated with v2 generator. Per-level imports reduced warnings per file from ~13 to ~8. Total warnings: 1061 (down from 1244). Zero compile errors.
+
+### 5.3 Assertion patterns (partial)
+Created `src/dogfood_assert.gleam` with `assert_eq`, `assert_prefix`, `assert_all_ok` helpers. Removed due to Gleam `panic` syntax incompatibilities with string concatenation. Template integration deferred — needs Gleam-native assertion approach.
+
+### 5.4 Generator suite mode
+Added `--suite N` flag to `generate_levels.clj`. Generates N batches sequentially, auto-registers each, runs `gleam build` + `gleam run level70` at completion. Numeric sort for batch detection (fixed string-sort bug).
 
 ### 5.1 Consolidate old generated files
 58 pre-v25 files with 10-56 warnings each. Could regenerate them with the v2 generator to eliminate 1200+ warnings.
