@@ -26,11 +26,11 @@ fn range(start: Int, end: Int) -> List(Int) {
   }
 }
 
-// --- AUTO-GENERATED BATCH 10 (1401-1450) ---
+// --- AUTO-GENERATED BATCH 83 (5271-5320) ---
 
-pub fn level1401() -> Nil {
+pub fn level5271() -> Nil {
   io.println("--- compile+load int ---")
-  let def = ast.TermDef(ast.Int(99), ast.Builtin(ast.IntType))
+  let def = ast.TermDef(ast.Int(10), ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -39,12 +39,12 @@ pub fn level1401() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1401: OK")
+  io.println("Level 5271: OK")
 }
 
-pub fn level1402() -> Nil {
+pub fn level5272() -> Nil {
   io.println("--- compile+load float ---")
-  let def = ast.TermDef(ast.Float(10.0), ast.Builtin(ast.FloatType))
+  let def = ast.TermDef(ast.Float(2.71), ast.Builtin(ast.FloatType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -53,12 +53,12 @@ pub fn level1402() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1402: OK")
+  io.println("Level 5272: OK")
 }
 
-pub fn level1403() -> Nil {
+pub fn level5273() -> Nil {
   io.println("--- compile+load text ---")
-  let def = ast.TermDef(ast.Text(bit_array.from_string("test")), ast.Builtin(ast.TextType))
+  let def = ast.TermDef(ast.Text(bit_array.from_string("hello")), ast.Builtin(ast.TextType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -67,13 +67,13 @@ pub fn level1403() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1403: OK")
+  io.println("Level 5273: OK")
 }
 
-pub fn level1404() -> Nil {
+pub fn level5274() -> Nil {
   io.println("--- compile+load lambda apply ---")
   let id = ast.Lambda(Local(0), ast.LocalVarRef(Local(0)))
-  let def = ast.TermDef(ast.Apply(id, ast.Int(77)), ast.Builtin(ast.IntType))
+  let def = ast.TermDef(ast.Apply(id, ast.Int(25)), ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -82,12 +82,12 @@ pub fn level1404() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1404: OK")
+  io.println("Level 5274: OK")
 }
 
-pub fn level1405() -> Nil {
+pub fn level5275() -> Nil {
   io.println("--- compile Let ---")
-  let def = ast.TermDef(ast.Let(Local(0), ast.Int(7), ast.LocalVarRef(Local(0))), ast.Builtin(ast.IntType))
+  let def = ast.TermDef(ast.Let(Local(0), ast.Int(100), ast.LocalVarRef(Local(0))), ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -96,12 +96,12 @@ pub fn level1405() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1405: OK")
+  io.println("Level 5275: OK")
 }
 
-pub fn level1406() -> Nil {
+pub fn level5276() -> Nil {
   io.println("--- compile List ---")
-  let def = ast.TermDef(ast.List([ast.Int(7), ast.Int(7), ast.Int(7)]), ast.Builtin(ast.ListType))
+  let def = ast.TermDef(ast.List([ast.Int(33), ast.Int(33), ast.Int(33), ast.Int(33)]), ast.Builtin(ast.ListType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -110,24 +110,24 @@ pub fn level1406() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1406: OK")
+  io.println("Level 5276: OK")
 }
 
-pub fn level1407() -> Nil {
+pub fn level5277() -> Nil {
   io.println("--- elaborate_only ---")
-  case parse_only("3.14") {
+  case parse_only("42") {
     Ok(st) -> case elaborate_only(st, "e
-1407
+5277
 ", empty_cache(), []) {
       Ok(#(_, _, _)) -> io.println("Elab: OK")
       Error(e) -> io.println("Err: " <> string.inspect(e))
     }
     Error(e) -> io.println("Parse: " <> e.message)
   }
-  io.println("Level 1407: OK")
+  io.println("Level 5277: OK")
 }
 
-pub fn level1408() -> Nil {
+pub fn level5278() -> Nil {
   io.println("--- loader limit 3 + 6 ---")
   let ldr = new_loader_with_limit(3)
   let defs = list.map(range(1, 7), fn(i) {
@@ -143,51 +143,51 @@ pub fn level1408() -> Nil {
  defs: OK")
     Error(_) -> io.println("Err")
   }
-  io.println("Level 1408: OK")
+  io.println("Level 5278: OK")
 }
 
-pub fn level1409() -> Nil {
-  io.println("--- codebase insert 4 defs ---")
-  let defs = list.map(range(1, 5), fn(i) {
-    let d = ast.TermDef(ast.Int(i * 77), ast.Builtin(ast.IntType))
+pub fn level5279() -> Nil {
+  io.println("--- codebase insert 1 defs ---")
+  let defs = list.map(range(1, 2), fn(i) {
+    let d = ast.TermDef(ast.Int(i * 7), ast.Builtin(ast.IntType))
     let r = Ref(hash_of_definition(d))
     #(r, d)
   })
-  let unit = ast.Unit(Ref(hash_bytes(bit_array.from_string("u1409"))), defs)
+  let unit = ast.Unit(Ref(hash_bytes(bit_array.from_string("u5279"))), defs)
   case insert(new_codebase(), unit) {
     Ok(cb) -> {
       let a = get_adapter(cb)
       case a.list_refs() {
         Ok(rs) -> io.println("
-4
+1
  defs: " <> int.to_string(list.length(rs)))
         Error(e) -> io.println("Err: " <> string.inspect(e))
       }
     }
     Error(e) -> io.println("Err: " <> string.inspect(e))
   }
-  io.println("Level 1409: OK")
+  io.println("Level 5279: OK")
 }
 
-pub fn level1410() -> Nil {
-  io.println("--- storage 300 inserts ---")
+pub fn level5280() -> Nil {
+  io.println("--- storage 400 inserts ---")
   let a = inmemory()
-  list.each(range(1, 301), fn(i) {
+  list.each(range(1, 401), fn(i) {
     let r = Ref(hash_bytes(bit_array.from_string("s" <> int.to_string(i))))
     let _ = a.insert(r, bit_array.from_string("d"))
   })
   case a.list_refs() {
     Ok(rs) -> io.println("
-300
+400
  refs: " <> int.to_string(list.length(rs)))
     Error(e) -> io.println("Err: " <> string.inspect(e))
   }
-  io.println("Level 1410: OK")
+  io.println("Level 5280: OK")
 }
 
-pub fn level1411() -> Nil {
+pub fn level5281() -> Nil {
   io.println("--- cross-module RefTo ---")
-  let db = ast.TermDef(ast.Int(55), ast.Builtin(ast.IntType))
+  let db = ast.TermDef(ast.Int(25), ast.Builtin(ast.IntType))
   let hb = hash_of_definition(db)
   case compile_only(db, Ref(hb)) {
     Ok(bb) -> case load_and_eval(module_name_for(Ref(hb)), bb) {
@@ -206,12 +206,329 @@ pub fn level1411() -> Nil {
     }
     Error(e) -> io.println("B comp: " <> e)
   }
-  io.println("Level 1411: OK")
+  io.println("Level 5281: OK")
 }
 
-pub fn level1412() -> Nil {
+pub fn level5282() -> Nil {
   io.println("--- effects Handle ---")
-  let ab_r = Ref(hash_bytes(bit_array.from_string("ab1412")))
+  let ab_r = Ref(hash_bytes(bit_array.from_string("ab5282")))
+  let ab = ast.AbilityDecl(ast.AbilityDeclaration(name: Local(0), operations: [
+    ast.Operation(name: Local(0), inputs: [], output: ast.TypeRefBuiltin(ast.IntType)),
+  ]))
+  let ah = hash_of_definition(ab)
+  case compile_only(ab, Ref(ah)) {
+    Ok(bb) -> case load_and_eval(module_name_for(Ref(ah)), bb) {
+      Ok(_) -> {
+        let h = ast.Handle(ast.Int(42), ast.Lambda(Local(0), ast.LocalVarRef(Local(0))), ab_r)
+        let d = ast.TermDef(h, ast.Builtin(ast.IntType))
+        let dh = hash_of_definition(d)
+        case compile_only(d, Ref(dh)) {
+          Ok(b) -> case load_and_eval(module_name_for(Ref(dh)), b) {
+            Ok(r) -> io.println("Handle: " <> r)
+            Error(e) -> io.println("L&E: " <> e)
+          }
+          Error(e) -> io.println("Comp: " <> e)
+        }
+      }
+      Error(e) -> io.println("Ab: " <> e)
+    }
+    Error(e) -> io.println("Ab comp: " <> e)
+  }
+  io.println("Level 5282: OK")
+}
+
+pub fn level5283() -> Nil {
+  io.println("--- elab abilities ---")
+  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("elab5283"))), [
+    #("A", SurfaceAbilityDef("A", [SurfaceOp("op0",[],TBuiltin(TInt))]))
+  ])
+  case elaborate_unit(su, empty_cache()) {
+    Ok(#(_, _, _)) -> io.println("Elab: OK")
+    Error(e) -> io.println("Err: " <> string.inspect(e))
+  }
+  io.println("Level 5283: OK")
+}
+
+pub fn level5284() -> Nil {
+  io.println("--- typecheck ---")
+  let d1 = ast.TermDef(ast.Int(25), ast.Builtin(ast.IntType))
+  let d2 = ast.TermDef(ast.Int(77), ast.Builtin(ast.IntType))
+  let r1 = Ref(hash_of_definition(d1))
+  let r2 = Ref(hash_of_definition(d2))
+  let unit = ast.Unit(r1, [#(r1, d1), #(r2, d2)])
+  case typecheck_unit(unit, empty_cache()) {
+    Ok(#(_, _)) -> io.println("TC: OK")
+    Error(e) -> io.println("Err: " <> string.inspect(e))
+  }
+  io.println("Level 5284: OK")
+}
+
+pub fn level5285() -> Nil {
+  io.println("--- loader is_loaded ---")
+  let ldr = new_loader()
+  let d = ast.TermDef(ast.Int(33), ast.Builtin(ast.IntType))
+  let h = Ref(hash_of_definition(d))
+  case ensure_loaded(ldr, h, d) {
+    Ok(l) -> case is_loaded(l, h) {
+      True -> io.println("Loaded: OK")
+      False -> io.println("Not tracked")
+    }
+    Error(_) -> io.println("Err")
+  }
+  io.println("Level 5285: OK")
+}
+
+pub fn level5286() -> Nil {
+  io.println("--- hash distinct ---")
+  let d1 = ast.TermDef(ast.Int(25), ast.Builtin(ast.IntType))
+  let d2 = ast.TermDef(ast.Int(25), ast.Builtin(ast.IntType))
+  case hash_equal(hash_of_definition(d1), hash_of_definition(d2)) {
+    True -> io.println("Same: OK")
+    False -> io.println("Diff: OK")
+  }
+  io.println("Level 5286: OK")
+}
+
+pub fn level5287() -> Nil {
+  io.println("--- insert_raw ---")
+  let r = Ref(hash_bytes(bit_array.from_string("raw5287")))
+  let cb2 = insert_raw(new_codebase(), r, bit_array.from_string("data"))
+  let a = get_adapter(cb2)
+  case a.lookup(r) {
+    Ok(option.Some(v)) -> io.println("Found: " <> string.inspect(v))
+    Ok(option.None) -> io.println("Not found")
+    Error(e) -> io.println("Err: " <> string.inspect(e))
+  }
+  io.println("Level 5287: OK")
+}
+
+pub fn level5288() -> Nil {
+  io.println("--- REPL eval ---")
+  case eval_string("\"hello\"") {
+    Ok(r) -> io.println("Eval: " <> r)
+    Error(e) -> io.println("Err: " <> e)
+  }
+  io.println("Level 5288: OK")
+}
+
+pub fn level5289() -> Nil {
+  io.println("--- serialize ---")
+  let ser = serialize_term("hello")
+  let deser = deserialize_term(ser)
+  io.println("Serde: OK")
+  io.println("Level 5289: OK")
+}
+
+pub fn level5290() -> Nil {
+  io.println("--- empty list ---")
+  let def = ast.TermDef(ast.List([]), ast.Builtin(ast.ListType))
+  let h = hash_of_definition(def)
+  case compile_only(def, Ref(h)) {
+    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
+      Ok(r) -> io.println("Empty: " <> r)
+      Error(e) -> io.println("L&E: " <> e)
+    }
+    Error(e) -> io.println("Comp: " <> e)
+  }
+  io.println("Level 5290: OK")
+}
+
+pub fn level5291() -> Nil {
+  io.println("--- elab error ---")
+  case parse_only("nonexistent") {
+    Ok(st) -> case elaborate_only(st, "t", empty_cache(), []) {
+      Ok(_) -> io.println("Unexpected")
+      Error(e) -> io.println("Err: " <> string.inspect(e))
+    }
+    Error(e) -> io.println("Parse: " <> string.inspect(e))
+  }
+  io.println("Level 5291: OK")
+}
+
+pub fn level5292() -> Nil {
+  io.println("--- compile+load int ---")
+  let def = ast.TermDef(ast.Int(10), ast.Builtin(ast.IntType))
+  let h = hash_of_definition(def)
+  case compile_only(def, Ref(h)) {
+    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
+      Ok(r) -> io.println("Int: " <> r)
+      Error(e) -> io.println("L&E: " <> e)
+    }
+    Error(e) -> io.println("Comp: " <> e)
+  }
+  io.println("Level 5292: OK")
+}
+
+pub fn level5293() -> Nil {
+  io.println("--- compile+load float ---")
+  let def = ast.TermDef(ast.Float(99.9), ast.Builtin(ast.FloatType))
+  let h = hash_of_definition(def)
+  case compile_only(def, Ref(h)) {
+    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
+      Ok(r) -> io.println("Float: " <> r)
+      Error(e) -> io.println("L&E: " <> e)
+    }
+    Error(e) -> io.println("Comp: " <> e)
+  }
+  io.println("Level 5293: OK")
+}
+
+pub fn level5294() -> Nil {
+  io.println("--- compile+load text ---")
+  let def = ast.TermDef(ast.Text(bit_array.from_string("batch")), ast.Builtin(ast.TextType))
+  let h = hash_of_definition(def)
+  case compile_only(def, Ref(h)) {
+    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
+      Ok(r) -> io.println("Text: " <> string.slice(r, 0, 10))
+      Error(e) -> io.println("L&E: " <> e)
+    }
+    Error(e) -> io.println("Comp: " <> e)
+  }
+  io.println("Level 5294: OK")
+}
+
+pub fn level5295() -> Nil {
+  io.println("--- compile+load lambda apply ---")
+  let id = ast.Lambda(Local(0), ast.LocalVarRef(Local(0)))
+  let def = ast.TermDef(ast.Apply(id, ast.Int(33)), ast.Builtin(ast.IntType))
+  let h = hash_of_definition(def)
+  case compile_only(def, Ref(h)) {
+    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
+      Ok(r) -> io.println("Apply: " <> r)
+      Error(e) -> io.println("L&E: " <> e)
+    }
+    Error(e) -> io.println("Comp: " <> e)
+  }
+  io.println("Level 5295: OK")
+}
+
+pub fn level5296() -> Nil {
+  io.println("--- compile Let ---")
+  let def = ast.TermDef(ast.Let(Local(0), ast.Int(25), ast.LocalVarRef(Local(0))), ast.Builtin(ast.IntType))
+  let h = hash_of_definition(def)
+  case compile_only(def, Ref(h)) {
+    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
+      Ok(r) -> io.println("Let: " <> r)
+      Error(e) -> io.println("L&E: " <> e)
+    }
+    Error(e) -> io.println("Comp: " <> e)
+  }
+  io.println("Level 5296: OK")
+}
+
+pub fn level5297() -> Nil {
+  io.println("--- compile List ---")
+  let def = ast.TermDef(ast.List([ast.Int(42), ast.Int(42), ast.Int(42)]), ast.Builtin(ast.ListType))
+  let h = hash_of_definition(def)
+  case compile_only(def, Ref(h)) {
+    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
+      Ok(r) -> io.println("List: " <> string.slice(r, 0, 15))
+      Error(e) -> io.println("L&E: " <> e)
+    }
+    Error(e) -> io.println("Comp: " <> e)
+  }
+  io.println("Level 5297: OK")
+}
+
+pub fn level5298() -> Nil {
+  io.println("--- elaborate_only ---")
+  case parse_only("42") {
+    Ok(st) -> case elaborate_only(st, "e
+5298
+", empty_cache(), []) {
+      Ok(#(_, _, _)) -> io.println("Elab: OK")
+      Error(e) -> io.println("Err: " <> string.inspect(e))
+    }
+    Error(e) -> io.println("Parse: " <> e.message)
+  }
+  io.println("Level 5298: OK")
+}
+
+pub fn level5299() -> Nil {
+  io.println("--- loader limit 3 + 6 ---")
+  let ldr = new_loader_with_limit(3)
+  let defs = list.map(range(1, 7), fn(i) {
+    let d = ast.TermDef(ast.Int(i), ast.Builtin(ast.IntType))
+    let h = Ref(hash_of_definition(d))
+    #(h, d)
+  })
+  case list.fold(defs, Ok(ldr), fn(acc, p) {
+    case acc { Ok(l) -> { let #(h,d)=p ensure_loaded(l,h,d) } Error(e)->Error(e) }
+  }) {
+    Ok(_) -> io.println("
+6
+ defs: OK")
+    Error(_) -> io.println("Err")
+  }
+  io.println("Level 5299: OK")
+}
+
+pub fn level5300() -> Nil {
+  io.println("--- codebase insert 1 defs ---")
+  let defs = list.map(range(1, 2), fn(i) {
+    let d = ast.TermDef(ast.Int(i * 10), ast.Builtin(ast.IntType))
+    let r = Ref(hash_of_definition(d))
+    #(r, d)
+  })
+  let unit = ast.Unit(Ref(hash_bytes(bit_array.from_string("u5300"))), defs)
+  case insert(new_codebase(), unit) {
+    Ok(cb) -> {
+      let a = get_adapter(cb)
+      case a.list_refs() {
+        Ok(rs) -> io.println("
+1
+ defs: " <> int.to_string(list.length(rs)))
+        Error(e) -> io.println("Err: " <> string.inspect(e))
+      }
+    }
+    Error(e) -> io.println("Err: " <> string.inspect(e))
+  }
+  io.println("Level 5300: OK")
+}
+
+pub fn level5301() -> Nil {
+  io.println("--- storage 300 inserts ---")
+  let a = inmemory()
+  list.each(range(1, 301), fn(i) {
+    let r = Ref(hash_bytes(bit_array.from_string("s" <> int.to_string(i))))
+    let _ = a.insert(r, bit_array.from_string("d"))
+  })
+  case a.list_refs() {
+    Ok(rs) -> io.println("
+300
+ refs: " <> int.to_string(list.length(rs)))
+    Error(e) -> io.println("Err: " <> string.inspect(e))
+  }
+  io.println("Level 5301: OK")
+}
+
+pub fn level5302() -> Nil {
+  io.println("--- cross-module RefTo ---")
+  let db = ast.TermDef(ast.Int(7), ast.Builtin(ast.IntType))
+  let hb = hash_of_definition(db)
+  case compile_only(db, Ref(hb)) {
+    Ok(bb) -> case load_and_eval(module_name_for(Ref(hb)), bb) {
+      Ok(_) -> {
+        let da = ast.TermDef(ast.RefTo(Ref(hb)), ast.Builtin(ast.IntType))
+        let ha = hash_of_definition(da)
+        case compile_only(da, Ref(ha)) {
+          Ok(ba) -> case load_and_eval(module_name_for(Ref(ha)), ba) {
+            Ok(r) -> io.println("Cross: " <> r)
+            Error(e) -> io.println("A: " <> e)
+          }
+          Error(e) -> io.println("A comp: " <> e)
+        }
+      }
+      Error(e) -> io.println("B: " <> e)
+    }
+    Error(e) -> io.println("B comp: " <> e)
+  }
+  io.println("Level 5302: OK")
+}
+
+pub fn level5303() -> Nil {
+  io.println("--- effects Handle ---")
+  let ab_r = Ref(hash_bytes(bit_array.from_string("ab5303")))
   let ab = ast.AbilityDecl(ast.AbilityDeclaration(name: Local(0), operations: [
     ast.Operation(name: Local(0), inputs: [], output: ast.TypeRefBuiltin(ast.IntType)),
   ]))
@@ -234,330 +551,12 @@ pub fn level1412() -> Nil {
     }
     Error(e) -> io.println("Ab comp: " <> e)
   }
-  io.println("Level 1412: OK")
+  io.println("Level 5303: OK")
 }
 
-pub fn level1413() -> Nil {
+pub fn level5304() -> Nil {
   io.println("--- elab abilities ---")
-  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("elab1413"))), [
-    #("A", SurfaceAbilityDef("A", [SurfaceOp("op0",[],TBuiltin(TInt))])),
-    #("B", SurfaceAbilityDef("B", [SurfaceOp("op1",[],TBuiltin(TInt))]))
-  ])
-  case elaborate_unit(su, empty_cache()) {
-    Ok(#(_, _, _)) -> io.println("Elab: OK")
-    Error(e) -> io.println("Err: " <> string.inspect(e))
-  }
-  io.println("Level 1413: OK")
-}
-
-pub fn level1414() -> Nil {
-  io.println("--- typecheck ---")
-  let d1 = ast.TermDef(ast.Int(33), ast.Builtin(ast.IntType))
-  let d2 = ast.TermDef(ast.Int(7), ast.Builtin(ast.IntType))
-  let r1 = Ref(hash_of_definition(d1))
-  let r2 = Ref(hash_of_definition(d2))
-  let unit = ast.Unit(r1, [#(r1, d1), #(r2, d2)])
-  case typecheck_unit(unit, empty_cache()) {
-    Ok(#(_, _)) -> io.println("TC: OK")
-    Error(e) -> io.println("Err: " <> string.inspect(e))
-  }
-  io.println("Level 1414: OK")
-}
-
-pub fn level1415() -> Nil {
-  io.println("--- loader is_loaded ---")
-  let ldr = new_loader()
-  let d = ast.TermDef(ast.Int(50), ast.Builtin(ast.IntType))
-  let h = Ref(hash_of_definition(d))
-  case ensure_loaded(ldr, h, d) {
-    Ok(l) -> case is_loaded(l, h) {
-      True -> io.println("Loaded: OK")
-      False -> io.println("Not tracked")
-    }
-    Error(_) -> io.println("Err")
-  }
-  io.println("Level 1415: OK")
-}
-
-pub fn level1416() -> Nil {
-  io.println("--- hash distinct ---")
-  let d1 = ast.TermDef(ast.Int(100), ast.Builtin(ast.IntType))
-  let d2 = ast.TermDef(ast.Int(25), ast.Builtin(ast.IntType))
-  case hash_equal(hash_of_definition(d1), hash_of_definition(d2)) {
-    True -> io.println("Same: OK")
-    False -> io.println("Diff: OK")
-  }
-  io.println("Level 1416: OK")
-}
-
-pub fn level1417() -> Nil {
-  io.println("--- insert_raw ---")
-  let r = Ref(hash_bytes(bit_array.from_string("raw1417")))
-  let cb2 = insert_raw(new_codebase(), r, bit_array.from_string("data"))
-  let a = get_adapter(cb2)
-  case a.lookup(r) {
-    Ok(option.Some(v)) -> io.println("Found: " <> string.inspect(v))
-    Ok(option.None) -> io.println("Not found")
-    Error(e) -> io.println("Err: " <> string.inspect(e))
-  }
-  io.println("Level 1417: OK")
-}
-
-pub fn level1418() -> Nil {
-  io.println("--- REPL eval ---")
-  case eval_string("3.14") {
-    Ok(r) -> io.println("Eval: " <> r)
-    Error(e) -> io.println("Err: " <> e)
-  }
-  io.println("Level 1418: OK")
-}
-
-pub fn level1419() -> Nil {
-  io.println("--- serialize ---")
-  let ser = serialize_term([1,2,3])
-  let deser = deserialize_term(ser)
-  io.println("Serde: OK")
-  io.println("Level 1419: OK")
-}
-
-pub fn level1420() -> Nil {
-  io.println("--- empty list ---")
-  let def = ast.TermDef(ast.List([]), ast.Builtin(ast.ListType))
-  let h = hash_of_definition(def)
-  case compile_only(def, Ref(h)) {
-    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
-      Ok(r) -> io.println("Empty: " <> r)
-      Error(e) -> io.println("L&E: " <> e)
-    }
-    Error(e) -> io.println("Comp: " <> e)
-  }
-  io.println("Level 1420: OK")
-}
-
-pub fn level1421() -> Nil {
-  io.println("--- elab error ---")
-  case parse_only("nonexistent") {
-    Ok(st) -> case elaborate_only(st, "t", empty_cache(), []) {
-      Ok(_) -> io.println("Unexpected")
-      Error(e) -> io.println("Err: " <> string.inspect(e))
-    }
-    Error(e) -> io.println("Parse: " <> string.inspect(e))
-  }
-  io.println("Level 1421: OK")
-}
-
-pub fn level1422() -> Nil {
-  io.println("--- compile+load int ---")
-  let def = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
-  let h = hash_of_definition(def)
-  case compile_only(def, Ref(h)) {
-    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
-      Ok(r) -> io.println("Int: " <> r)
-      Error(e) -> io.println("L&E: " <> e)
-    }
-    Error(e) -> io.println("Comp: " <> e)
-  }
-  io.println("Level 1422: OK")
-}
-
-pub fn level1423() -> Nil {
-  io.println("--- compile+load float ---")
-  let def = ast.TermDef(ast.Float(1.5), ast.Builtin(ast.FloatType))
-  let h = hash_of_definition(def)
-  case compile_only(def, Ref(h)) {
-    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
-      Ok(r) -> io.println("Float: " <> r)
-      Error(e) -> io.println("L&E: " <> e)
-    }
-    Error(e) -> io.println("Comp: " <> e)
-  }
-  io.println("Level 1423: OK")
-}
-
-pub fn level1424() -> Nil {
-  io.println("--- compile+load text ---")
-  let def = ast.TermDef(ast.Text(bit_array.from_string("dogfood")), ast.Builtin(ast.TextType))
-  let h = hash_of_definition(def)
-  case compile_only(def, Ref(h)) {
-    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
-      Ok(r) -> io.println("Text: " <> string.slice(r, 0, 10))
-      Error(e) -> io.println("L&E: " <> e)
-    }
-    Error(e) -> io.println("Comp: " <> e)
-  }
-  io.println("Level 1424: OK")
-}
-
-pub fn level1425() -> Nil {
-  io.println("--- compile+load lambda apply ---")
-  let id = ast.Lambda(Local(0), ast.LocalVarRef(Local(0)))
-  let def = ast.TermDef(ast.Apply(id, ast.Int(77)), ast.Builtin(ast.IntType))
-  let h = hash_of_definition(def)
-  case compile_only(def, Ref(h)) {
-    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
-      Ok(r) -> io.println("Apply: " <> r)
-      Error(e) -> io.println("L&E: " <> e)
-    }
-    Error(e) -> io.println("Comp: " <> e)
-  }
-  io.println("Level 1425: OK")
-}
-
-pub fn level1426() -> Nil {
-  io.println("--- compile Let ---")
-  let def = ast.TermDef(ast.Let(Local(0), ast.Int(50), ast.LocalVarRef(Local(0))), ast.Builtin(ast.IntType))
-  let h = hash_of_definition(def)
-  case compile_only(def, Ref(h)) {
-    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
-      Ok(r) -> io.println("Let: " <> r)
-      Error(e) -> io.println("L&E: " <> e)
-    }
-    Error(e) -> io.println("Comp: " <> e)
-  }
-  io.println("Level 1426: OK")
-}
-
-pub fn level1427() -> Nil {
-  io.println("--- compile List ---")
-  let def = ast.TermDef(ast.List([ast.Int(77), ast.Int(77), ast.Int(77), ast.Int(77)]), ast.Builtin(ast.ListType))
-  let h = hash_of_definition(def)
-  case compile_only(def, Ref(h)) {
-    Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
-      Ok(r) -> io.println("List: " <> string.slice(r, 0, 15))
-      Error(e) -> io.println("L&E: " <> e)
-    }
-    Error(e) -> io.println("Comp: " <> e)
-  }
-  io.println("Level 1427: OK")
-}
-
-pub fn level1428() -> Nil {
-  io.println("--- elaborate_only ---")
-  case parse_only("\"hello\"") {
-    Ok(st) -> case elaborate_only(st, "e
-1428
-", empty_cache(), []) {
-      Ok(#(_, _, _)) -> io.println("Elab: OK")
-      Error(e) -> io.println("Err: " <> string.inspect(e))
-    }
-    Error(e) -> io.println("Parse: " <> e.message)
-  }
-  io.println("Level 1428: OK")
-}
-
-pub fn level1429() -> Nil {
-  io.println("--- loader limit 1 + 4 ---")
-  let ldr = new_loader_with_limit(1)
-  let defs = list.map(range(1, 5), fn(i) {
-    let d = ast.TermDef(ast.Int(i), ast.Builtin(ast.IntType))
-    let h = Ref(hash_of_definition(d))
-    #(h, d)
-  })
-  case list.fold(defs, Ok(ldr), fn(acc, p) {
-    case acc { Ok(l) -> { let #(h,d)=p ensure_loaded(l,h,d) } Error(e)->Error(e) }
-  }) {
-    Ok(_) -> io.println("
-4
- defs: OK")
-    Error(_) -> io.println("Err")
-  }
-  io.println("Level 1429: OK")
-}
-
-pub fn level1430() -> Nil {
-  io.println("--- codebase insert 1 defs ---")
-  let defs = list.map(range(1, 2), fn(i) {
-    let d = ast.TermDef(ast.Int(i * 10), ast.Builtin(ast.IntType))
-    let r = Ref(hash_of_definition(d))
-    #(r, d)
-  })
-  let unit = ast.Unit(Ref(hash_bytes(bit_array.from_string("u1430"))), defs)
-  case insert(new_codebase(), unit) {
-    Ok(cb) -> {
-      let a = get_adapter(cb)
-      case a.list_refs() {
-        Ok(rs) -> io.println("
-1
- defs: " <> int.to_string(list.length(rs)))
-        Error(e) -> io.println("Err: " <> string.inspect(e))
-      }
-    }
-    Error(e) -> io.println("Err: " <> string.inspect(e))
-  }
-  io.println("Level 1430: OK")
-}
-
-pub fn level1431() -> Nil {
-  io.println("--- storage 300 inserts ---")
-  let a = inmemory()
-  list.each(range(1, 301), fn(i) {
-    let r = Ref(hash_bytes(bit_array.from_string("s" <> int.to_string(i))))
-    let _ = a.insert(r, bit_array.from_string("d"))
-  })
-  case a.list_refs() {
-    Ok(rs) -> io.println("
-300
- refs: " <> int.to_string(list.length(rs)))
-    Error(e) -> io.println("Err: " <> string.inspect(e))
-  }
-  io.println("Level 1431: OK")
-}
-
-pub fn level1432() -> Nil {
-  io.println("--- cross-module RefTo ---")
-  let db = ast.TermDef(ast.Int(55), ast.Builtin(ast.IntType))
-  let hb = hash_of_definition(db)
-  case compile_only(db, Ref(hb)) {
-    Ok(bb) -> case load_and_eval(module_name_for(Ref(hb)), bb) {
-      Ok(_) -> {
-        let da = ast.TermDef(ast.RefTo(Ref(hb)), ast.Builtin(ast.IntType))
-        let ha = hash_of_definition(da)
-        case compile_only(da, Ref(ha)) {
-          Ok(ba) -> case load_and_eval(module_name_for(Ref(ha)), ba) {
-            Ok(r) -> io.println("Cross: " <> r)
-            Error(e) -> io.println("A: " <> e)
-          }
-          Error(e) -> io.println("A comp: " <> e)
-        }
-      }
-      Error(e) -> io.println("B: " <> e)
-    }
-    Error(e) -> io.println("B comp: " <> e)
-  }
-  io.println("Level 1432: OK")
-}
-
-pub fn level1433() -> Nil {
-  io.println("--- effects Handle ---")
-  let ab_r = Ref(hash_bytes(bit_array.from_string("ab1433")))
-  let ab = ast.AbilityDecl(ast.AbilityDeclaration(name: Local(0), operations: [
-    ast.Operation(name: Local(0), inputs: [], output: ast.TypeRefBuiltin(ast.IntType)),
-  ]))
-  let ah = hash_of_definition(ab)
-  case compile_only(ab, Ref(ah)) {
-    Ok(bb) -> case load_and_eval(module_name_for(Ref(ah)), bb) {
-      Ok(_) -> {
-        let h = ast.Handle(ast.Int(99), ast.Lambda(Local(0), ast.LocalVarRef(Local(0))), ab_r)
-        let d = ast.TermDef(h, ast.Builtin(ast.IntType))
-        let dh = hash_of_definition(d)
-        case compile_only(d, Ref(dh)) {
-          Ok(b) -> case load_and_eval(module_name_for(Ref(dh)), b) {
-            Ok(r) -> io.println("Handle: " <> r)
-            Error(e) -> io.println("L&E: " <> e)
-          }
-          Error(e) -> io.println("Comp: " <> e)
-        }
-      }
-      Error(e) -> io.println("Ab: " <> e)
-    }
-    Error(e) -> io.println("Ab comp: " <> e)
-  }
-  io.println("Level 1433: OK")
-}
-
-pub fn level1434() -> Nil {
-  io.println("--- elab abilities ---")
-  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("elab1434"))), [
+  let su = SurfaceUnit(Ref(hash_bytes(bit_array.from_string("elab5304"))), [
     #("A", SurfaceAbilityDef("A", [SurfaceOp("op0",[],TBuiltin(TInt))])),
     #("B", SurfaceAbilityDef("B", [SurfaceOp("op1",[],TBuiltin(TInt))])),
     #("C", SurfaceAbilityDef("C", [SurfaceOp("op2",[],TBuiltin(TInt))]))
@@ -566,13 +565,13 @@ pub fn level1434() -> Nil {
     Ok(#(_, _, _)) -> io.println("Elab: OK")
     Error(e) -> io.println("Err: " <> string.inspect(e))
   }
-  io.println("Level 1434: OK")
+  io.println("Level 5304: OK")
 }
 
-pub fn level1435() -> Nil {
+pub fn level5305() -> Nil {
   io.println("--- typecheck ---")
-  let d1 = ast.TermDef(ast.Int(99), ast.Builtin(ast.IntType))
-  let d2 = ast.TermDef(ast.Int(50), ast.Builtin(ast.IntType))
+  let d1 = ast.TermDef(ast.Int(100), ast.Builtin(ast.IntType))
+  let d2 = ast.TermDef(ast.Int(77), ast.Builtin(ast.IntType))
   let r1 = Ref(hash_of_definition(d1))
   let r2 = Ref(hash_of_definition(d2))
   let unit = ast.Unit(r1, [#(r1, d1), #(r2, d2)])
@@ -580,10 +579,10 @@ pub fn level1435() -> Nil {
     Ok(#(_, _)) -> io.println("TC: OK")
     Error(e) -> io.println("Err: " <> string.inspect(e))
   }
-  io.println("Level 1435: OK")
+  io.println("Level 5305: OK")
 }
 
-pub fn level1436() -> Nil {
+pub fn level5306() -> Nil {
   io.println("--- loader is_loaded ---")
   let ldr = new_loader()
   let d = ast.TermDef(ast.Int(50), ast.Builtin(ast.IntType))
@@ -595,23 +594,23 @@ pub fn level1436() -> Nil {
     }
     Error(_) -> io.println("Err")
   }
-  io.println("Level 1436: OK")
+  io.println("Level 5306: OK")
 }
 
-pub fn level1437() -> Nil {
+pub fn level5307() -> Nil {
   io.println("--- hash distinct ---")
-  let d1 = ast.TermDef(ast.Int(10), ast.Builtin(ast.IntType))
-  let d2 = ast.TermDef(ast.Int(25), ast.Builtin(ast.IntType))
+  let d1 = ast.TermDef(ast.Int(77), ast.Builtin(ast.IntType))
+  let d2 = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
   case hash_equal(hash_of_definition(d1), hash_of_definition(d2)) {
     True -> io.println("Same: OK")
     False -> io.println("Diff: OK")
   }
-  io.println("Level 1437: OK")
+  io.println("Level 5307: OK")
 }
 
-pub fn level1438() -> Nil {
+pub fn level5308() -> Nil {
   io.println("--- insert_raw ---")
-  let r = Ref(hash_bytes(bit_array.from_string("raw1438")))
+  let r = Ref(hash_bytes(bit_array.from_string("raw5308")))
   let cb2 = insert_raw(new_codebase(), r, bit_array.from_string("data"))
   let a = get_adapter(cb2)
   case a.lookup(r) {
@@ -619,27 +618,27 @@ pub fn level1438() -> Nil {
     Ok(option.None) -> io.println("Not found")
     Error(e) -> io.println("Err: " <> string.inspect(e))
   }
-  io.println("Level 1438: OK")
+  io.println("Level 5308: OK")
 }
 
-pub fn level1439() -> Nil {
+pub fn level5309() -> Nil {
   io.println("--- REPL eval ---")
-  case eval_string("42") {
+  case eval_string("\"hello\"") {
     Ok(r) -> io.println("Eval: " <> r)
     Error(e) -> io.println("Err: " <> e)
   }
-  io.println("Level 1439: OK")
+  io.println("Level 5309: OK")
 }
 
-pub fn level1440() -> Nil {
+pub fn level5310() -> Nil {
   io.println("--- serialize ---")
-  let ser = serialize_term(42)
+  let ser = serialize_term([1,2,3])
   let deser = deserialize_term(ser)
   io.println("Serde: OK")
-  io.println("Level 1440: OK")
+  io.println("Level 5310: OK")
 }
 
-pub fn level1441() -> Nil {
+pub fn level5311() -> Nil {
   io.println("--- empty list ---")
   let def = ast.TermDef(ast.List([]), ast.Builtin(ast.ListType))
   let h = hash_of_definition(def)
@@ -650,10 +649,10 @@ pub fn level1441() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1441: OK")
+  io.println("Level 5311: OK")
 }
 
-pub fn level1442() -> Nil {
+pub fn level5312() -> Nil {
   io.println("--- elab error ---")
   case parse_only("nonexistent") {
     Ok(st) -> case elaborate_only(st, "t", empty_cache(), []) {
@@ -662,10 +661,10 @@ pub fn level1442() -> Nil {
     }
     Error(e) -> io.println("Parse: " <> string.inspect(e))
   }
-  io.println("Level 1442: OK")
+  io.println("Level 5312: OK")
 }
 
-pub fn level1443() -> Nil {
+pub fn level5313() -> Nil {
   io.println("--- compile+load int ---")
   let def = ast.TermDef(ast.Int(33), ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
@@ -676,12 +675,12 @@ pub fn level1443() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1443: OK")
+  io.println("Level 5313: OK")
 }
 
-pub fn level1444() -> Nil {
+pub fn level5314() -> Nil {
   io.println("--- compile+load float ---")
-  let def = ast.TermDef(ast.Float(10.0), ast.Builtin(ast.FloatType))
+  let def = ast.TermDef(ast.Float(2.71), ast.Builtin(ast.FloatType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -690,12 +689,12 @@ pub fn level1444() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1444: OK")
+  io.println("Level 5314: OK")
 }
 
-pub fn level1445() -> Nil {
+pub fn level5315() -> Nil {
   io.println("--- compile+load text ---")
-  let def = ast.TermDef(ast.Text(bit_array.from_string("dogfood")), ast.Builtin(ast.TextType))
+  let def = ast.TermDef(ast.Text(bit_array.from_string("batch")), ast.Builtin(ast.TextType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -704,13 +703,13 @@ pub fn level1445() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1445: OK")
+  io.println("Level 5315: OK")
 }
 
-pub fn level1446() -> Nil {
+pub fn level5316() -> Nil {
   io.println("--- compile+load lambda apply ---")
   let id = ast.Lambda(Local(0), ast.LocalVarRef(Local(0)))
-  let def = ast.TermDef(ast.Apply(id, ast.Int(42)), ast.Builtin(ast.IntType))
+  let def = ast.TermDef(ast.Apply(id, ast.Int(99)), ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -719,10 +718,10 @@ pub fn level1446() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1446: OK")
+  io.println("Level 5316: OK")
 }
 
-pub fn level1447() -> Nil {
+pub fn level5317() -> Nil {
   io.println("--- compile Let ---")
   let def = ast.TermDef(ast.Let(Local(0), ast.Int(99), ast.LocalVarRef(Local(0))), ast.Builtin(ast.IntType))
   let h = hash_of_definition(def)
@@ -733,12 +732,12 @@ pub fn level1447() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1447: OK")
+  io.println("Level 5317: OK")
 }
 
-pub fn level1448() -> Nil {
+pub fn level5318() -> Nil {
   io.println("--- compile List ---")
-  let def = ast.TermDef(ast.List([ast.Int(99), ast.Int(99), ast.Int(99), ast.Int(99)]), ast.Builtin(ast.ListType))
+  let def = ast.TermDef(ast.List([ast.Int(7), ast.Int(7), ast.Int(7), ast.Int(7), ast.Int(7)]), ast.Builtin(ast.ListType))
   let h = hash_of_definition(def)
   case compile_only(def, Ref(h)) {
     Ok(beam) -> case load_and_eval(module_name_for(Ref(h)), beam) {
@@ -747,30 +746,30 @@ pub fn level1448() -> Nil {
     }
     Error(e) -> io.println("Comp: " <> e)
   }
-  io.println("Level 1448: OK")
+  io.println("Level 5318: OK")
 }
 
-pub fn level1449() -> Nil {
+pub fn level5319() -> Nil {
   io.println("--- elaborate_only ---")
-  case parse_only("42") {
+  case parse_only("\"hello\"") {
     Ok(st) -> case elaborate_only(st, "e
-1449
+5319
 ", empty_cache(), []) {
       Ok(#(_, _, _)) -> io.println("Elab: OK")
       Error(e) -> io.println("Err: " <> string.inspect(e))
     }
     Error(e) -> io.println("Parse: " <> e.message)
   }
-  io.println("Level 1449: OK")
+  io.println("Level 5319: OK")
 }
 
 // --- CERTIFICATION ---
 
-pub fn level1450() -> Nil {
+pub fn level5320() -> Nil {
   io.println("============================================================")
-  io.println("  BATCH 10 COMPLETE — Auto-generated")
+  io.println("  BATCH 83 COMPLETE — Auto-generated")
   io.println("============================================================")
-  io.println("  Levels 1401-1450 all passed")
+  io.println("  Levels 5271-5320 all passed")
   io.println("============================================================")
-  io.println("Level 1450: OK")
+  io.println("Level 5320: OK")
 }

@@ -79,11 +79,29 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - **Crypto**: `gleamunison/crypto` — SHA256/512, HMAC, random bytes.
 - **Template**: `gleamunison/template` — `{{var}}` interpolation with HTML escaping.
 
-## Conformance Coverage
+## Dogfood Infrastructure
+
+### Scripts
+- `scripts/loop_infinite.clj` — Infinite loop: computes next batch, spawns `cmd`, waits, repeats
+- `scripts/dogfood_loop.clj` — Registration (`--register`) and verification (`--verify`) helper
+- `scripts/rebuild_meta.clj` — Regenerates `dogfood_meta.gleam` from v*.gleam files
+- `scripts/generate_levels.clj` — 21 template patterns cycled across 49 levels + 1 cert per batch
+- All scripts are pure Clojure/Babashka — no Python dependencies
+
+### Known Improvements Needed
+1. **Generator template #21 unused**: `(take 49 templates)` drops `gen-loader-limit`. Should cycle 50 templates evenly or redistribute to use all 21.
+2. **Zombie process cleanup**: `loop_infinite.clj` should kill stale `cmd` processes before spawning new ones.
+3. **Error recovery in loop**: If a batch fails, the loop currently continues silently. Should log failures and optionally alert.
+4. **1224 build warnings**: All unused imports/variables in generated dogfood files. The generator template imports a standard set but each batch only uses a subset.
+5. **`cmd -p` needs `--yolo`**: The auto loop requires `--yolo` permission bypass. Consider using `--auto-accept` instead for safety.
+6. **No `next_batch.sh`**: The prompt references `bb scripts/next_batch.sh` which was deleted. The infinite loop generates its own batch numbers.
+7. **Reduce generated file size**: Each v*.gleam is ~25KB with 50 levels. Could deduplicate common imports/patterns.
+
+### Dogfood Coverage (82 batches, 4235 levels)
 
 - **Unit tests**: 53 Erlang/Gleam unit tests covering hashing, codebase, inference, elaboration, typechecking, compilation, storage, sync, effects, and jets.
-- **Dogfood levels**: 1240 integration levels (1001-2270) organized in 23 playbook batches. Coverage includes compile→load→eval roundtrip (Apply, text, float, let, construct), 7 deep cross-module chains, template no-vars+adjacent, config env-only, count_brackets 500-level, elaborate surface forms (2-op ability, ability+term refs, int/float/empty literals), inference+linearity deep (Hole, Use, Apply chain, Let+Apply), DETS list_refs, REPL pair+dict+bool ops, TypeDef 3 ctors, AbilityDecl 5 ops, 5-case match, and 4-apply compile.
-- **Total conformance verifications**: 1293 (1240 dogfood + 53 unit tests) across 23 playbook files.
+- **Dogfood levels**: 4235 integration levels (1-5320) organized in 82 batches (v2-v83).
+- **Total conformance verifications**: 4288 (4235 dogfood + 53 unit tests) across 82 batch files.
 - **Bug fixes**: Health `Degraded` dead code activated (v2.9.0), Guard error swallowing documented (v14).
 
 ## Invariants

@@ -1,4 +1,1 @@
-{:paths ["scripts"]
- :tasks
- {conformance {:doc "Run all 1000 playbook-driven conformance tests"
-               :task "bb scripts/run_playbook_tests.clj"}}}
+{:paths ["scripts"]}

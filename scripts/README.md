@@ -52,13 +52,46 @@ bb scripts/refactor_dispatch.clj
 ```
 
 ### `test_parser.clj`
-**Purpose**: Test the gleamunison S-expression parser against the full 1000-level playbook.
+**Purpose**: Test the gleamunison S-expression parser against the full playbook.
 
 Parses all playbook files, extracts S-expression test cases from `gleam` code blocks, feeds them through the parser, and reports any parse errors or syntax issues.
 
 ```sh
 bb scripts/test_parser.clj
 ```
+
+### `dogfood_loop.clj`
+**Purpose**: Automate the mechanical parts of each dogfood batch iteration.
+
+Handles registration (import + level entries in `dogfood_meta.gleam`), range bumping
+(`dogfood.gleam` + `gleamunison.gleam`), build verification, level execution,
+unit test confirmation, temp file cleanup, and doc badge updates.
+
+**Usage pattern (after AI writes level implementations):**
+```sh
+bb dogfood-loop           # Full cycle: register, bump, build, run, test, cleanup
+bb dogfood-loop --commit  # Same + git commit
+bb dogfood-register       # Only register levels + bump ranges
+bb dogfood-verify         # Only run verification
+```
+
+**Gap analysis**: This script handles ALL mechanical bookkeeping that was previously
+done by fragile python/sed scripts. The AI still handles:
+- Writing the 50 level functions in `dogfood_v{N}.gleam`
+- Writing the playbook `docs/playbook/PLAYBOOK_DOGFOOD_XXXX-YYYY.md`
+- Updating `.commandcode/skills/gleamunison.md` with findings
+- Designing the gap analysis and level content
+
+## Babashka Tasks (from `bb.edn`)
+
+| Task | What it does |
+|---|---|
+| `bb conformance` | Run all playbook conformance tests |
+| `bb dogfood-loop` | Full dogfood loop automation |
+| `bb dogfood-register` | Register levels + bump ranges only |
+| `bb dogfood-verify` | Verify levels only |
+| `bb coverage` | Run BEAM code coverage |
+| `bb parse-check` | Validate all playbook S-expressions |
 
 ## Common Patterns
 

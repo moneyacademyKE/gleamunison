@@ -1,4 +1,5 @@
 import dogfood
+import dogfood_meta as meta
 import gleam/dict
 import gleam/int
 import gleam/io
@@ -39,6 +40,7 @@ fn dispatch(
     "demo" -> print_help()
     "repl" -> repl.start_repl()
     "all" -> run_all_levels(levels)
+    "level70" -> meta.level70()
     _ ->
       case dict.get(levels, cmd) {
         Ok(f) -> f()
@@ -60,7 +62,7 @@ fn range(start: Int, end: Int) -> List(Int) {
 }
 
 fn run_all_levels(levels: dict.Dict(String, fn() -> Nil)) -> Nil {
-  let r = range(1, 2270)
+  let r = range(1, 5321)
   list.each(r, fn(n) {
     let key = "level" <> int.to_string(n)
     case dict.get(levels, key) {
