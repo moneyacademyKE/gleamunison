@@ -88,7 +88,17 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - `scripts/generate_levels.clj` — 21 template patterns cycled across 49 levels + 1 cert per batch
 - All scripts are pure Clojure/Babashka — no Python dependencies
 
-### Known Improvements Needed
+### Improvements (Roadmap v2 — Completed Dec 2026)
+1. **Generator uses all 24 templates** — `pick-templates` distributes N levels evenly, no template is dropped
+2. **Per-level imports** — each template declares its own imports; writer unions only what's needed (~1 warning per file vs ~13)
+3. **Zombie process cleanup** — loop kills stale `cmd -p` processes before spawning
+4. **Retry detection** — same batch 3x = failure log + exit 1
+5. **3 new templates** — bool compile, type_pretty, infer_term (24 total)
+6. **`--count N` flag** — variable batch sizes (default 50)
+7. **Shortened prompt** — 3 imperative commands, no analysis trigger words
+8. **Orphaned scripts removed** — `check_next.clj`, `next_batch.sh`, `auto_dogfood.clj` deleted
+
+### Known Remaining Issues
 1. **Generator template #21 unused**: `(take 49 templates)` drops `gen-loader-limit`. Should cycle 50 templates evenly or redistribute to use all 21.
 2. **Zombie process cleanup**: `loop_infinite.clj` should kill stale `cmd` processes before spawning new ones.
 3. **Error recovery in loop**: If a batch fails, the loop currently continues silently. Should log failures and optionally alert.

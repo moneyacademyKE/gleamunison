@@ -1,1 +1,4 @@
-{:paths ["scripts"]}
+{:paths ["scripts"]
+ :tasks {:dogfood-loop "bb scripts/loop_infinite.clj"
+         :dogfood-register "bb scripts/dogfood_loop.clj --register"
+         :dogfood-verify "bb scripts/dogfood_loop.clj --verify"}}

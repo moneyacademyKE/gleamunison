@@ -1,47 +1,53 @@
-# Dogfood Loop — Improvements Roadmap
+# Dogfood Loop — Improvements Roadmap (Status: Dec 2026)
 
-## Priority 1 (Immediate Impact)
+## ✅ Completed (v2 generator + v2 loop)
 
 ### 1.1 Fix generator template gap
-Template #21 (`gen-loader-limit`) is never consumed because `(take 49 templates)` drops the 21st pattern after 2 full cycles. Fix: distribute 50 across 21 templates evenly — 8 patterns get 2x, 13 patterns get 3x = 50.
+`(take 49 templates)` → `(take 50 templates)` via `pick-templates` which distributes N levels evenly across all 24 templates. No template is ever dropped.
 
 ### 1.2 Reduce build warnings
-1224 warnings across all generated v*.gleam files. The generator imports a standard set of 15+ modules but each batch only uses a subset. Fix: make generator emit per-level imports instead of file-level blanket imports, or use `import gleam/*.{}` syntax to silence.
+Generator v2 uses per-template import sets. Each template returns `{:code ... :imports #{...}}`. The writer unions all imports and emits only what's needed. New generated files: ~1 warning (down from ~13). Remaining 1224 warnings are all from pre-existing v2-v83 files.
 
 ### 1.3 Add error notification to loop
-If a batch fails (build error, test failure, timeout), the loop currently logs and continues. Should exit non-zero or write a failure log.
-
-## Priority 2 (Stability)
+`loop_infinite.clj` v2: if a batch fails 3 times, writes `batch_N_failure.log` and exits with code 1.
 
 ### 2.1 Zombie process management
-`loop_infinite.clj` should kill any existing `cmd` processes before spawning new ones. Currently each spawned cmd accumulates until manual cleanup.
+`loop_infinite.clj` v2 runs `pkill -f "cmd -p"` before spawning each new cmd, preventing zombie accumulation.
 
 ### 2.2 Prompt improvement
-The AI prompt for each batch needs to be even more concise to avoid exploration deadlocks. Current prompt is 6 imperative commands — could be shortened to 3.
+Shortened from 6 commands to 3: generate (with `--count 50`), register, build+verify+test, update docs. No analysis/exploration trigger words.
 
 ### 2.3 Session state management
-If the AI gets stuck on a batch, the loop retries indefinitely (same batch, same prompt). Should detect retries and escalate (different prompt, skip batch, etc).
-
-## Priority 3 (Quality)
+Loop tracks `last-batch` and `same-batch-count`. If the same batch number is attempted 3+ times (cmd keeps failing), loop exits with error and writes a failure log.
 
 ### 3.1 Generate batch coverage diversity
-All generated batches (v25-v83) use the same 21 template patterns with varied values. Coverage is broad but shallow. Should introduce new template types for deeper coverage.
+3 new template types: `gen-bool-compile` (Bool literal through pipeline), `gen-type-pretty` (exercise pretty_print), `gen-infer-term` (exercise infer_term). Total: 24 templates.
 
 ### 3.2 Reduce generated file size
-Each v*.gleam is ~25KB. With 60+ generated files, that's ~1.5MB of highly repetitive code. Could consolidate into fewer files or use a data-driven approach.
+Per-level imports cut ~10 import lines per file. New files: ~6 imports (from needed modules) vs ~16 (blanket). Also reduces compilation overhead.
 
-### 3.3 Generate real tests
-The generated levels test that things compile and don't crash. No generated levels verify correctness of results. Could add assertion patterns to templates.
+### 3.3 Generate real tests (deferred)
+Gleam assertion syntax (`let assert` + `panic`) doesn't produce clean error messages. Deferred — would need `gleeunit` integration or custom assertion helpers.
 
-## Priority 4 (Infrastructure)
+### 4.1 Remove orphaned scripts
+Removed: `check_next.clj`, `next_batch.sh`, `auto_dogfood.clj`. All functionality subsumed by `loop_infinite.clj` + `generate_levels.clj` + `dogfood_loop.clj`.
 
-### 4.1 Rename/remove unused scripts
-- `next_batch.sh` — deleted, reference removed from prompts
-- `auto_dogfood.clj` — deleted, replaced by `loop_infinite.clj`
-- `check_next.clj` — orphaned, no callers
-
-### 4.2 bb.edn task aliases
-The `:task` map syntax doesn't work in Babashka 1.12. Tasks defined as maps with `{:task "..."}` silently fail. Either fix or remove.
+### 4.2 Fix bb.edn task aliases
+Restored with plain string syntax: `:dogfood-loop`, `:dogfood-register`, `:dogfood-verify`.
 
 ### 4.3 Generator parameterization
-`generate_levels.clj --batch N --start S` currently hardcodes 49 levels + 1 cert. Could accept `--count` and `--templates` for variable batch sizes.
+Added `--count N` flag. Default 50. Accepts any positive integer.
+
+## 🔜 Future
+
+### 5.1 Consolidate old generated files
+58 pre-v25 files with 10-56 warnings each. Could regenerate them with the v2 generator to eliminate 1200+ warnings.
+
+### 5.2 Speed up verification
+`gleam run level70` runs 82 cert levels sequentially (~2 min). Could parallelize or run `gleam build` only (cert levels run inside build).
+
+### 5.3 Assertion patterns
+Custom Gleam assertion helper that prints clean pass/fail messages without `panic`.
+
+### 5.4 Generator suite mode
+`--suite` flag that generates and verifies multiple batches in one command.

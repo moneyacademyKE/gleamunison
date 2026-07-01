@@ -15,6 +15,14 @@ gleamunison is a content-addressed language runtime with algebraic effects runni
 ## Codebase Structure
 
 ```
+scripts/
+  loop_infinite.clj     # v2 — zombie cleanup, retry detection, error alert
+  dogfood_loop.clj      # Registration + verification helper
+  rebuild_meta.clj      # Generates meta from v*.gleam files
+  generate_levels.clj   # v2 — 24 templates, per-level imports, --count flag
+src/
+
+```
 src/
   gleamunison/           # 40 Gleam modules — core runtime + stdlib
     ast.gleam            # Core AST: Term (15 variants), Type, Definition, Unit
