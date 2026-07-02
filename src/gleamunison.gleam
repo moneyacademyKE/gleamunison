@@ -6,6 +6,7 @@ import gleam/io
 import gleam/list
 import gleamunison/http
 import gleamunison/repl
+import gleamunison/verify
 
 pub fn main() -> Nil {
   run(get_plain_args())
@@ -41,6 +42,12 @@ fn dispatch(
     "repl" -> repl.start_repl()
     "all" -> run_all_levels(levels)
     "level70" -> meta.level70()
+    "verify" -> {
+      case verify.verify_file(param) {
+        Ok(msg) -> io.println("OK: " <> msg)
+        Error(err) -> io.println("ERROR: " <> err)
+      }
+    }
     _ ->
       case dict.get(levels, cmd) {
         Ok(f) -> f()
@@ -48,7 +55,7 @@ fn dispatch(
           io.println(
             "Unknown command: '"
             <> cmd
-            <> "'. Try: server, repl, all, level1..level1000",
+            <> "'. Try: server, repl, all, verify, level1..level1000",
           )
       }
   }
@@ -78,6 +85,7 @@ fn print_help() -> Nil {
   io.println("Usage: gleam run -- <command>")
   io.println("  server [port]   — start web server (default port 8080)")
   io.println("  repl            — interactive REPL")
+  io.println("  verify [file]   — verify a scratch.lisp file")
   io.println("  all             — run all levels (1-1250)")
   io.println("  levelN          — run level N (1-1250)")
 }
