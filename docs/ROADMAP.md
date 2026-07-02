@@ -52,6 +52,7 @@ From architectural specification to production-grade content-addressed runtime.
 | 7.4 | `use` expression (monadic sugar) | ✓ DONE (v1.1.0) | `(use x <- call body)` — desugars to `call(fn(x) { body })` at AST level. |
 | 7.5 | `pub opaque type` | ✓ DONE (v1.1.0) | `SurfacePubTypeAlias` variant in elaborator. Constructor visibility controlled at definition level. |
 | 7.6 | Type alias export control | ✓ DONE (v1.1.0) | `SurfaceTypeAlias` and `SurfacePubTypeAlias` in surface defs. Full elaboration pipeline support. |
+| 7.7 | Monadic syntax bindings | PENDING | S | Monadic S-expression sequencing (`let*` or `do` block bindings) desugaring to nested lambdas during elaboration. |
 
 ---
 
