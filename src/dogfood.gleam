@@ -4,6 +4,7 @@ import dogfood_meta as meta
 import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
+import gleamunison/util.{range}
 
 fn generic_computation(n: Int) -> fn() -> Nil {
   fn() {
@@ -18,12 +19,6 @@ fn generic_computation(n: Int) -> fn() -> Nil {
   }
 }
 
-fn range(start: Int, end: Int) -> List(Int) {
-  case start > end {
-    True -> []
-    False -> [start, ..range(start + 1, end)]
-  }
-}
 
 pub fn all_levels() -> Dict(String, fn() -> Nil) {
   let hand_crafted = [

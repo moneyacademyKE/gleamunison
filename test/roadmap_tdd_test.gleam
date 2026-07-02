@@ -9,6 +9,7 @@ import gleamunison/lexer
 import gleamunison/loader
 import gleamunison/parser
 import gleamunison/storage
+import gleamunison/util.{range}
 
 pub fn sha256_hash_length_test() {
   let def = ast.TermDef(term: ast.Int(42), typ: ast.Builtin(ast.IntType))
@@ -141,12 +142,6 @@ pub fn dets_fd_pool_test() {
   let assert Ok(Nil) = storage.partitioned_dets_delete(path)
 }
 
-fn range(start: Int, end: Int) -> List(Int) {
-  case start > end {
-    True -> []
-    False -> [start, ..range(start + 1, end)]
-  }
-}
 
 @external(erlang, "gleamunison_ffi", "test_soft_purge_scenario")
 fn test_soft_purge_scenario() -> Result(#(Bool, Bool), String)

@@ -541,4 +541,14 @@ A gap analysis comparing the BEAM-native `gleamunison` runtime with the theorem 
 
 The feedback loop is one of the most critical aspects of developer experience (DX). In traditional compiler systems, the editor is complected with the build tool via synchronous execution blockages. By leveraging a non-blocking background scratch-file watcher daemon (`bb watch-scratch`) and exposing lightweight validation endpoints (`/api/verify`) on the running compiler runtime, we de-couple code editing from compilation blockages. The compiler processes the file asynchronously on each write, updating the local development codebase instantly without interrupting the developer's editing state, mirroring the scratch-file feedback ergonomics of Unison's `ucm`.
 
+## 114. Port-based socket monitoring on Ranch/Cowboy
 
+Process monitors are not suitable for Ranch/Cowboy socket monitoring because the socket process and the physical socket port have different lifecycles. Swapping to `erlang:monitor(port, Socket)` ensures connection closes are accurately tracked.
+
+## 115. Data-driven JSON test configurations vs compilation scaling limit
+
+Generating separate source modules for thousands of test levels causes severe compilation overhead due to module tracking. Consolidating the test specs in a single JSON file and executing them via a generic VM runner eliminates build time overhead entirely and preserves strict compliance with the 250 LOC constraint.
+
+## 116. FFI Safe deserialization limits VM crash vectors
+
+Using `binary_to_term` without `[safe]` is a significant security vector as malicious binaries can trigger atom leakage or code loading. Forcing `[safe]` on all FFI and sync boundaries guarantees the runtime is resilient against denial-of-service and code injection.

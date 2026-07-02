@@ -3,22 +3,7 @@ import gleam/io
 import gleam/list
 import gleam/string
 import gleamunison/elab_types.{SurfaceTermDef}
-import gleamunison/identity.{
-  builtin_and, builtin_dict_get, builtin_dict_new, builtin_dict_set, builtin_div,
-  builtin_eq, builtin_file_read, builtin_fst, builtin_gt, builtin_http_get,
-  builtin_int_add, builtin_io_read_line, builtin_json_parse, builtin_left,
-  builtin_list_append, builtin_list_filter, builtin_list_flatten,
-  builtin_list_fold, builtin_list_length, builtin_list_map, builtin_list_member,
-  builtin_list_range, builtin_list_reverse, builtin_list_sort, builtin_lt,
-  builtin_mod, builtin_mul, builtin_not, builtin_or, builtin_pair,
-  builtin_process_recv, builtin_process_self, builtin_process_send,
-  builtin_process_spawn, builtin_right, builtin_set_insert, builtin_set_new,
-  builtin_snd, builtin_string_concat, builtin_string_contains,
-  builtin_string_downcase, builtin_string_length, builtin_string_replace,
-  builtin_string_slice, builtin_string_split, builtin_string_to_int,
-  builtin_string_trim, builtin_string_upcase, builtin_sub, builtin_timer_now,
-  builtin_timer_sleep,
-}
+import gleamunison/bootstraps
 import gleamunison/lexer
 import gleamunison/parser
 import gleamunison/repl_eval
@@ -95,152 +80,7 @@ pub fn start_repl() -> Nil {
   io.println(
     "=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit. Type 'help' for builtins.",
   )
-  let init_defs = [
-    #(
-      "Console",
-      elab_types.SurfaceAbilityDef("Console", [
-        elab_types.SurfaceOp(
-          "print",
-          [elab_types.TBuiltin(elab_types.TText)],
-          elab_types.TBuiltin(elab_types.TInt),
-        ),
-      ]),
-    ),
-    #(
-      "State",
-      elab_types.SurfaceAbilityDef("State", [
-        elab_types.SurfaceOp(
-          "get",
-          [elab_types.TBuiltin(elab_types.TText)],
-          elab_types.TBuiltin(elab_types.TText),
-        ),
-        elab_types.SurfaceOp(
-          "set",
-          [
-            elab_types.TBuiltin(elab_types.TText),
-            elab_types.TBuiltin(elab_types.TText),
-          ],
-          elab_types.TBuiltin(elab_types.TText),
-        ),
-      ]),
-    ),
-    #(
-      "Math",
-      elab_types.SurfaceAbilityDef("Math", [
-        elab_types.SurfaceOp(
-          "add",
-          [
-            elab_types.TBuiltin(elab_types.TInt),
-            elab_types.TBuiltin(elab_types.TInt),
-          ],
-          elab_types.TBuiltin(elab_types.TInt),
-        ),
-        elab_types.SurfaceOp(
-          "sub",
-          [
-            elab_types.TBuiltin(elab_types.TInt),
-            elab_types.TBuiltin(elab_types.TInt),
-          ],
-          elab_types.TBuiltin(elab_types.TInt),
-        ),
-        elab_types.SurfaceOp(
-          "mul",
-          [
-            elab_types.TBuiltin(elab_types.TInt),
-            elab_types.TBuiltin(elab_types.TInt),
-          ],
-          elab_types.TBuiltin(elab_types.TInt),
-        ),
-      ]),
-    ),
-    #(
-      "Show",
-      elab_types.SurfaceAbilityDef("Show", [
-        elab_types.SurfaceOp(
-          "show",
-          [elab_types.TVar("a")],
-          elab_types.TBuiltin(elab_types.TText),
-        ),
-      ]),
-    ),
-    #(
-      "Remote",
-      elab_types.SurfaceAbilityDef("Remote", [
-        elab_types.SurfaceOp(
-          "forkAt",
-          [elab_types.TVar("location"), elab_types.TVar("a")],
-          elab_types.TVar("task"),
-        ),
-        elab_types.SurfaceOp(
-          "await",
-          [elab_types.TVar("task")],
-          elab_types.TVar("a"),
-        ),
-        elab_types.SurfaceOp("here", [], elab_types.TVar("location")),
-      ]),
-    ),
-    #("add", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
-    #("+", SurfaceTermDef(elab_types.SRef(builtin_int_add()))),
-    #("read_line", SurfaceTermDef(elab_types.SRef(builtin_io_read_line()))),
-    #("spawn", SurfaceTermDef(elab_types.SRef(builtin_process_spawn()))),
-    #("self", SurfaceTermDef(elab_types.SRef(builtin_process_self()))),
-    #("send", SurfaceTermDef(elab_types.SRef(builtin_process_send()))),
-    #("recv", SurfaceTermDef(elab_types.SRef(builtin_process_recv()))),
-    #("sleep", SurfaceTermDef(elab_types.SRef(builtin_timer_sleep()))),
-    #("now", SurfaceTermDef(elab_types.SRef(builtin_timer_now()))),
-    #("sub", SurfaceTermDef(elab_types.SRef(builtin_sub()))),
-    #("mul", SurfaceTermDef(elab_types.SRef(builtin_mul()))),
-    #("div", SurfaceTermDef(elab_types.SRef(builtin_div()))),
-    #("mod", SurfaceTermDef(elab_types.SRef(builtin_mod()))),
-    #("eq?", SurfaceTermDef(elab_types.SRef(builtin_eq()))),
-    #("lt?", SurfaceTermDef(elab_types.SRef(builtin_lt()))),
-    #("gt?", SurfaceTermDef(elab_types.SRef(builtin_gt()))),
-    #("and", SurfaceTermDef(elab_types.SRef(builtin_and()))),
-    #("or", SurfaceTermDef(elab_types.SRef(builtin_or()))),
-    #("not", SurfaceTermDef(elab_types.SRef(builtin_not()))),
-    #("string-concat", SurfaceTermDef(elab_types.SRef(builtin_string_concat()))),
-    #("string-length", SurfaceTermDef(elab_types.SRef(builtin_string_length()))),
-    #(
-      "string-contains?",
-      SurfaceTermDef(elab_types.SRef(builtin_string_contains())),
-    ),
-    #("string-slice", SurfaceTermDef(elab_types.SRef(builtin_string_slice()))),
-    #("string-upcase", SurfaceTermDef(elab_types.SRef(builtin_string_upcase()))),
-    #(
-      "string-downcase",
-      SurfaceTermDef(elab_types.SRef(builtin_string_downcase())),
-    ),
-    #(
-      "string-replace",
-      SurfaceTermDef(elab_types.SRef(builtin_string_replace())),
-    ),
-    #("string-split", SurfaceTermDef(elab_types.SRef(builtin_string_split()))),
-    #("string-trim", SurfaceTermDef(elab_types.SRef(builtin_string_trim()))),
-    #("string->int", SurfaceTermDef(elab_types.SRef(builtin_string_to_int()))),
-    #("list-length", SurfaceTermDef(elab_types.SRef(builtin_list_length()))),
-    #("list-reverse", SurfaceTermDef(elab_types.SRef(builtin_list_reverse()))),
-    #("list-map", SurfaceTermDef(elab_types.SRef(builtin_list_map()))),
-    #("list-filter", SurfaceTermDef(elab_types.SRef(builtin_list_filter()))),
-    #("list-fold", SurfaceTermDef(elab_types.SRef(builtin_list_fold()))),
-    #("list-append", SurfaceTermDef(elab_types.SRef(builtin_list_append()))),
-    #("list-flatten", SurfaceTermDef(elab_types.SRef(builtin_list_flatten()))),
-    #("list-member?", SurfaceTermDef(elab_types.SRef(builtin_list_member()))),
-    #("range", SurfaceTermDef(elab_types.SRef(builtin_list_range()))),
-    #("list-sort", SurfaceTermDef(elab_types.SRef(builtin_list_sort()))),
-    #("pair", SurfaceTermDef(elab_types.SRef(builtin_pair()))),
-    #("fst", SurfaceTermDef(elab_types.SRef(builtin_fst()))),
-    #("snd", SurfaceTermDef(elab_types.SRef(builtin_snd()))),
-    #("left", SurfaceTermDef(elab_types.SRef(builtin_left()))),
-    #("right", SurfaceTermDef(elab_types.SRef(builtin_right()))),
-    #("dict-new", SurfaceTermDef(elab_types.SRef(builtin_dict_new()))),
-    #("dict-get", SurfaceTermDef(elab_types.SRef(builtin_dict_get()))),
-    #("dict-set", SurfaceTermDef(elab_types.SRef(builtin_dict_set()))),
-    #("set-new", SurfaceTermDef(elab_types.SRef(builtin_set_new()))),
-    #("set-insert", SurfaceTermDef(elab_types.SRef(builtin_set_insert()))),
-    #("json-parse", SurfaceTermDef(elab_types.SRef(builtin_json_parse()))),
-    #("http-get", SurfaceTermDef(elab_types.SRef(builtin_http_get()))),
-    #("file-read", SurfaceTermDef(elab_types.SRef(builtin_file_read()))),
-  ]
+  let init_defs = list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
   let assert Ok(compare_term) =
     parser.parse_string("(lam a (lam b (if (eq? a b) 0 (if (lt? a b) -1 1))))")
   let init_defs =
@@ -248,6 +88,41 @@ pub fn start_repl() -> Nil {
   let #(cache, bootstrap_list) =
     repl_eval.bootstrap_defs(init_defs, empty_cache())
   repl_loop(cache, bootstrap_list)
+}
+
+fn convert_bootstrap_def(
+  b: bootstraps.BootstrapDef,
+) -> #(String, elab_types.SurfaceDef) {
+  case b {
+    bootstraps.BAbility(name, ops) -> {
+      #(
+        name,
+        elab_types.SurfaceAbilityDef(
+          name,
+          list.map(ops, fn(op) {
+            elab_types.SurfaceOp(
+              op.name,
+              list.map(op.inputs, convert_bootstrap_type),
+              convert_bootstrap_type(op.output),
+            )
+          }),
+        ),
+      )
+    }
+    bootstraps.BTerm(name, ref) -> {
+      #(name, elab_types.SurfaceTermDef(elab_types.SRef(ref)))
+    }
+  }
+}
+
+fn convert_bootstrap_type(t: bootstraps.BootstrapType) -> elab_types.Typ {
+  case t {
+    bootstraps.BTInt -> elab_types.TBuiltin(elab_types.TInt)
+    bootstraps.BTFloat -> elab_types.TBuiltin(elab_types.TFloat)
+    bootstraps.BTText -> elab_types.TBuiltin(elab_types.TText)
+    bootstraps.BTList -> elab_types.TBuiltin(elab_types.TList)
+    bootstraps.BTVar(name) -> elab_types.TVar(name)
+  }
 }
 
 fn help_text() -> String {

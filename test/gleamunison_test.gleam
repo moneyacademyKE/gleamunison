@@ -4,7 +4,10 @@ import gleamunison/ast.{Apply, Int, Lambda, LocalVarRef, TermDef, TypeVar}
 import gleamunison/codebase.{hash_of_definition}
 import gleamunison/compile.{module_name_for}
 import gleamunison/identity.{
-  Local, Ref, builtin_int_add, builtin_io_read_line, hash_bytes, hash_equal,
+  Local, Ref, hash_bytes, hash_equal,
+}
+import gleamunison/genesis.{
+  builtin_int_add, builtin_io_read_line,
 }
 import gleamunison/inference.{infer_term}
 import gleamunison/repl_eval

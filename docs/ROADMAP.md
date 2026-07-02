@@ -148,4 +148,18 @@ Phase 5 (Distributed) ──┐
 
 Effort key: **S** = Small (days), **M** = Medium (weeks), **L** = Large (month+).
 
+---
 
+## Phase 13: Security Hardening & Codebase Refactoring
+
+**Goal:** Secure the FFI boundaries, resolve socket leak bugs, and refactor the massive code-gen footprint into simple, maintainable data-driven structures.
+
+| # | Feature | Status | Effort | Description |
+|---|---|---|---|---|
+| 13.1 | **Harden FFI Serialization (P0)** | PENDING | S | Modify `binary_to_term` in `gleamunison_ffi_io.erl` and `gleamunison_tcp_sync.erl` to use `binary_to_term(Bin, [safe])` to prevent remote code execution and atom table exhaustion. |
+| 13.2 | **Fix SSE Socket Monitor (P0)** | PENDING | S | Resolve process-monitor crash in static routing where socket port references are monitored as process IDs. |
+| 13.3 | **Fix Undef eval_expression FFI (P0)** | PENDING | S | Implement and export `eval_expression` in `gleamunison_ffi.erl` to fix HTTP route invocation crash. |
+| 13.4 | **Secure HTTP Endpoints (P0)** | PENDING | S | Bind HTTP listener default to `127.0.0.1` and restrict the `/eval` and `/define` routes to prevent open-network remote execution. |
+| 13.5 | **Extract range and builtins (P1)** | PENDING | S | Move duplicated `range` function from all 112+ modules into `gleamunison/util.gleam`. Consolidate `init_defs` from `repl.gleam` and `verify.gleam` to `gleamunison/identity.gleam`. |
+| 13.6 | **Data-Driven Dogfooding (P1)** | PENDING | M | Refactor the `generate_levels.clj` pipeline to emit a single database/data-structure representation of levels, removing 90k lines of generated boilerplate. |
+| 13.7 | **Fix Metric/Docs Inconsistencies (P2)**| PENDING | S | Align all level and module metrics across README, Architecture, and Playbook docs. Correct duplicate numbering in `LEARNINGS.md`. |

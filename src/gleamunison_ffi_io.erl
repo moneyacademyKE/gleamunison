@@ -234,4 +234,4 @@ serialize_term(Term) ->
     erlang:term_to_binary(Term).
 
 deserialize_term(Bytes) when is_binary(Bytes) ->
-    erlang:binary_to_term(Bytes).
+    erlang:binary_to_term(Bytes, [safe]).

@@ -29,7 +29,7 @@ server_loop(Port) ->
     register(gleamunison_http_server, self()),
     {ok, ListenSocket} = gen_tcp:listen(Port, [
         binary, {active, false}, {reuseaddr, true},
-        {packet, http_bin}, {backlog, 100}
+        {packet, http_bin}, {backlog, 100}, {ip, {127, 0, 0, 1}}
     ]),
     accept_loop(ListenSocket).
 

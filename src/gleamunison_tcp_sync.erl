@@ -30,7 +30,7 @@ send_message({Host, Port}, Message) when is_list(Host); is_binary(Host) ->
             Result = case gen_tcp:recv(Sock, 4, 5000) of
                 {ok, <<Len:32>>} ->
                     case gen_tcp:recv(Sock, Len, 5000) of
-                        {ok, ReplyBin} -> {ok, binary_to_term(ReplyBin)};
+                        {ok, ReplyBin} -> {ok, binary_to_term(ReplyBin, [safe])};
                         {error, Reason} -> {error, {recv_body, Reason}}
                     end;
                 {error, Reason} -> {error, {recv_length, Reason}}
@@ -89,7 +89,7 @@ handle_connection(Sock) ->
         {ok, <<Len:32>>} ->
             case gen_tcp:recv(Sock, Len, 30000) of
                 {ok, Bin} ->
-                    Request = binary_to_term(Bin),
+                    Request = binary_to_term(Bin, [safe]),
                     Reply = dispatch(Request),
                     ReplyBin = term_to_binary(Reply),
                     gen_tcp:send(Sock, <<(byte_size(ReplyBin)):32, ReplyBin/binary>>);

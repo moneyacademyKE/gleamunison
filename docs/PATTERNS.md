@@ -732,4 +732,24 @@ Decoupling editor modifications from compile-run-verify execution steps by utili
 
 ---
 
+## 80. Cycle-Free Bootstrapping Registry Pattern
 
+Structuring bootstrap declarations into intermediate data definitions (`bootstraps.gleam`) that compile without external imports, and mapping them dynamically to surface syntax definitions at compiler and REPL caller boundaries. This resolves circular module import blockages.
+
+**Applied in:** `bootstraps.gleam`, `repl.gleam`, `verify.gleam`
+
+---
+
+## 81. Data-Driven Dynamic VM Test Runner
+
+Consolidating massive test specs into a portable external database (JSON/EDN) instead of source-code modules, and executing them dynamically at runtime via FFI loading and a generic VM runner. This scales test execution limits without hitting compiler bottlenecks.
+
+**Applied in:** `dogfood_runner.gleam`, `dogfood_data.gleam`, `dogfood_data.json`
+
+---
+
+## 82. Port-Based Ranch Socket Monitoring
+
+Monitoring Ranch/Cowboy network sockets by tracking the underlying Erlang port (`erlang:monitor(port, Socket)`) instead of process identifiers, avoiding lifecycle synchronization errors when Cowboy recycles handler processes.
+
+**Applied in:** `gleamunison_http_routes.erl`

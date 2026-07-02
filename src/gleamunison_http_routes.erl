@@ -6,18 +6,30 @@
          handle_logs_route/1, handle_enhanced_modules_route/1,
          handle_traces_route/1, handle_trace_detail_route/2]).
 
+is_localhost(Socket) ->
+    case inet:peername(Socket) of
+        {ok, {{127, 0, 0, 1}, _}} -> true;
+        {ok, {{0, 0, 0, 0, 0, 0, 0, 1}, _}} -> true;
+        _ -> false
+    end.
+
 handle_eval_route(Socket, <<"?expr=", Expr/binary>>) ->
     handle_eval_route(Socket, Expr);
 handle_eval_route(Socket, Expr) when is_binary(Expr) ->
-    Decoded = gleamunison_http_util:url_decode(Expr),
-    case gleamunison_ffi:eval_expression(Decoded) of
-        {ok, Result} ->
-            gleamunison_http_util:notify_sse_eval(Expr, Result),
-            Json = <<"{\"result\":", (gleamunison_http_util:escape_json(Result))/binary, "}">>,
-            gleamunison_http_util:send_json(Socket, 200, Json);
-        {error, Error} ->
-            Json = <<"{\"error\":", (gleamunison_http_util:escape_json(Error))/binary, "}">>,
-            gleamunison_http_util:send_json(Socket, 400, Json)
+    case is_localhost(Socket) of
+        true ->
+            Decoded = gleamunison_http_util:url_decode(Expr),
+            case gleamunison_ffi:eval_expression(Decoded) of
+                {ok, Result} ->
+                    gleamunison_http_util:notify_sse_eval(Expr, Result),
+                    Json = <<"{\"result\":", (gleamunison_http_util:escape_json(Result))/binary, "}">>,
+                    gleamunison_http_util:send_json(Socket, 200, Json);
+                {error, Error} ->
+                    Json = <<"{\"error\":", (gleamunison_http_util:escape_json(Error))/binary, "}">>,
+                    gleamunison_http_util:send_json(Socket, 400, Json)
+            end;
+        false ->
+            gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
     end;
 handle_eval_route(Socket, _) ->
     gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing expr parameter\"}">>).
@@ -28,33 +40,38 @@ handle_counter_route(Socket) ->
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_define_route(Socket, <<"?name=", Rest/binary>>) ->
-    case binary:split(Rest, <<"&expr=">>) of
-        [Name, Expr] ->
-            DecodedName = gleamunison_http_util:url_decode(Name),
-            DecodedExpr = gleamunison_http_util:url_decode(Expr),
-            case gleamunison_ffi:eval_expression(DecodedExpr) of
-                {ok, Result} ->
-                    persistent_term:put({gleamunison_notebook, DecodedName}, DecodedExpr),
-                    Keys = case persistent_term:get({gleamunison_notebook_keys}, []) of
-                        undefined -> [DecodedName];
-                        Ks -> lists:usort([DecodedName | Ks])
-                    end,
-                    persistent_term:put({gleamunison_notebook_keys}, Keys),
-                    gleamunison_http_util:notify_sse_def(DecodedName),
-                    Json = iolist_to_binary(io_lib:format(
-                        "{\"status\":\"defined\",\"name\":~ts,\"result\":~ts}",
-                        [gleamunison_http_util:escape_json(DecodedName),
-                         gleamunison_http_util:escape_json(Result)]
-                    )),
-                    gleamunison_http_util:send_json(Socket, 200, Json);
-                {error, Error} ->
-                    Json = iolist_to_binary(io_lib:format(
-                        "{\"error\":~ts}", [gleamunison_http_util:escape_json(Error)]
-                    )),
-                    gleamunison_http_util:send_json(Socket, 400, Json)
+    case is_localhost(Socket) of
+        true ->
+            case binary:split(Rest, <<"&expr=">>) of
+                [Name, Expr] ->
+                    DecodedName = gleamunison_http_util:url_decode(Name),
+                    DecodedExpr = gleamunison_http_util:url_decode(Expr),
+                    case gleamunison_ffi:eval_expression(DecodedExpr) of
+                        {ok, Result} ->
+                            persistent_term:put({gleamunison_notebook, DecodedName}, DecodedExpr),
+                            Keys = case persistent_term:get({gleamunison_notebook_keys}, []) of
+                                undefined -> [DecodedName];
+                                Ks -> lists:usort([DecodedName | Ks])
+                            end,
+                            persistent_term:put({gleamunison_notebook_keys}, Keys),
+                            gleamunison_http_util:notify_sse_def(DecodedName),
+                            Json = iolist_to_binary(io_lib:format(
+                                "{\"status\":\"defined\",\"name\":~ts,\"result\":~ts}",
+                                [gleamunison_http_util:escape_json(DecodedName),
+                                 gleamunison_http_util:escape_json(Result)]
+                            )),
+                            gleamunison_http_util:send_json(Socket, 200, Json);
+                        {error, Error} ->
+                            Json = iolist_to_binary(io_lib:format(
+                                "{\"error\":~ts}", [gleamunison_http_util:escape_json(Error)]
+                            )),
+                            gleamunison_http_util:send_json(Socket, 400, Json)
+                    end;
+                _ ->
+                    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>)
             end;
-        _ ->
-            gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>)
+        false ->
+            gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
     end;
 handle_define_route(Socket, _) ->
     gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>).
@@ -132,12 +149,12 @@ handle_sse_route(Socket) ->
             ets:new(gleamunison_sse_clients, [set, public, named_table])
     catch _:_ -> ok end,
     ets:insert(gleamunison_sse_clients, {Pid, true}),
-    Ref = erlang:monitor(process, Socket),
+    Ref = erlang:monitor(port, Socket),
     sse_keepalive_loop(Socket, Pid, Ref).
 
 sse_keepalive_loop(Socket, Pid, Ref) ->
     receive
-        {'DOWN', Ref, process, _Socket, _Reason} ->
+        {'DOWN', Ref, port, _Socket, _Reason} ->
             ets:delete(gleamunison_sse_clients, Pid),
             ok;
         {sse_event, EventType, Data} ->

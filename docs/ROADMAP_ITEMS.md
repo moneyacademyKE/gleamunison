@@ -49,14 +49,17 @@ Created `src/dogfood_assert.gleam` with `assert_eq`, `assert_prefix`, `assert_al
 ### 5.4 Generator suite mode
 Added `--suite N` flag to `generate_levels.clj`. Generates N batches sequentially, auto-registers each, runs `gleam build` + `gleam run level70` at completion. Numeric sort for batch detection (fixed string-sort bug).
 
-### 5.1 Consolidate old generated files
-58 pre-v25 files with 10-56 warnings each. Could regenerate them with the v2 generator to eliminate 1200+ warnings.
+## 🔴 Planned Refactoring & Security Hardening (Recommendations)
 
-### 5.2 Speed up verification
-`gleam run level70` runs 82 cert levels sequentially (~2 min). Could parallelize or run `gleam build` only (cert levels run inside build).
+### 6.1 Data-Driven Dogfood Generator (P1)
+Refactor `generate_levels.clj` to stop emitting 110 large `dogfood_v*.gleam` files. Instead, generate a single data module containing level definitions (declarative AST records) to compile, resolve, and execute using a single parameterized test engine. This removes ~90,000 LOC of accidental complexity.
 
-### 5.3 Assertion patterns
-Custom Gleam assertion helper that prints clean pass/fail messages without `panic`.
+### 6.2 Standardize Assertion Harness (P1)
+Replace the current silent-success harness (which prints "OK" even on failed cases unless a panic is triggered) with a standardized assertion module. Ensure level failures return error codes or non-zero exits to fail the CLI runner.
 
-### 5.4 Generator suite mode
-`--suite` flag that generates and verifies multiple batches in one command.
+### 6.3 Cleanup Babashka Tooling (P2)
+- Replace all imperative `atom`/`swap!` constructs in scripts with functional `reduce`/`map`/`filter` pipelines.
+- Extract common helper functions (`sorted-batches`, `latest-level`, playbook parsing) into a shared `scripts/lib/common.clj` module.
+- Eliminate hardcoded paths in scripts (`regenerate_batches.clj`) and use relative project-root paths.
+- Add error recovery, try/catch handlers, and file backup routines in scripts that perform direct file refactoring/mutations.
+

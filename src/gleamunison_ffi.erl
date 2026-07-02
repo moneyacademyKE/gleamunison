@@ -8,7 +8,9 @@
     get_plain_args/0,
     to_dynamic/1,
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
-    test_soft_purge_scenario/0
+    test_soft_purge_scenario/0,
+    eval_expression/1,
+    load_dogfood_levels/1
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -140,3 +142,57 @@ get_plain_args() ->
     [list_to_binary(A) || A <- init:get_plain_arguments()].
 
 to_dynamic(X) -> X.
+
+eval_expression(Expr) ->
+    gleamunison_ffi_io:eval_expression(Expr).
+
+load_dogfood_levels(Path) ->
+    case file:read_file(Path) of
+        {ok, Bin} ->
+            try json:decode(Bin) of
+                List -> {ok, [map_to_level(M) || M <- List]}
+            catch
+                Class:Reason ->
+                    {error, list_to_binary(io_lib:format("JSON error: ~p:~p", [Class, Reason]))}
+            end;
+        {error, Reason} -> {error, list_to_binary(io_lib:format("File error: ~p", [Reason]))}
+    end.
+
+map_to_level(#{<<"n">> := N, <<"t">> := T, <<"args">> := Args}) ->
+    case T of
+        <<"CompileInt">> -> {compile_int, N, to_integer(lists:nth(1, Args))};
+        <<"CompileFloat">> -> {compile_float, N, to_float(lists:nth(1, Args))};
+        <<"CompileText">> -> {compile_text, N, lists:nth(1, Args)};
+        <<"LambdaApply">> -> {lambda_apply, N, to_integer(lists:nth(1, Args))};
+        <<"CompileLet">> -> {compile_let, N, to_integer(lists:nth(1, Args))};
+        <<"CompileList">> -> {compile_list, N, [to_integer(X) || X <- Args]};
+        <<"Elaborate">> -> {elaborate, N, lists:nth(1, Args)};
+        <<"LoaderLimit">> -> {loader_limit, N, to_integer(lists:nth(1, Args)), to_integer(lists:nth(2, Args))};
+        <<"CodebaseInsert">> -> {codebase_insert, N, to_integer(lists:nth(1, Args)), to_integer(lists:nth(2, Args))};
+        <<"StorageStress">> -> {storage_stress, N, to_integer(lists:nth(1, Args))};
+        <<"CrossRef">> -> {cross_ref, N, to_integer(lists:nth(1, Args))};
+        <<"EffectsHandle">> -> {effects_handle, N, to_integer(lists:nth(1, Args))};
+        <<"ElabUnitAbilities">> -> {elab_unit_abilities, N, to_integer(lists:nth(1, Args))};
+        <<"Typecheck">> -> {typecheck, N, to_integer(lists:nth(1, Args)), to_integer(lists:nth(2, Args))};
+        <<"LoaderLoaded">> -> {loader_loaded, N, to_integer(lists:nth(1, Args))};
+        <<"HashDistinct">> -> {hash_distinct, N, to_integer(lists:nth(1, Args)), to_integer(lists:nth(2, Args))};
+        <<"InsertRaw">> -> {insert_raw, N};
+        <<"ReplEval">> -> {repl_eval, N, lists:nth(1, Args)};
+        <<"Serialize">> -> {serialize, N, to_integer(lists:nth(1, Args))};
+        <<"EmptyList">> -> {empty_list, N};
+        <<"ElabError">> -> {elab_error, N, lists:nth(1, Args)};
+        <<"CompileConstruct">> -> {compile_construct, N};
+        <<"TypePretty">> -> {type_pretty, N, lists:nth(1, Args), lists:nth(2, Args)};
+        <<"InferTerm">> -> {infer_term, N, lists:nth(1, Args), lists:nth(2, Args)}
+    end.
+
+to_integer(Val) when is_integer(Val) -> Val;
+to_integer(Val) when is_binary(Val) -> binary_to_integer(Val).
+
+to_float(Val) when is_float(Val) -> Val;
+to_float(Val) when is_integer(Val) -> erlang:float(Val);
+to_float(Val) when is_binary(Val) ->
+    case binary:match(Val, <<".">>) of
+        nomatch -> erlang:float(binary_to_integer(Val));
+        _ -> binary_to_float(Val)
+    end.

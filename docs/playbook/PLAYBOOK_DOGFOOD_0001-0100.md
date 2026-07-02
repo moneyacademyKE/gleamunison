@@ -3590,53 +3590,24 @@ curl "http://localhost:8081/sync?peer=localhost:9876"
 
 ```gleam
 //
-// Level 70: Meta-test runner
+// Level 70: Meta-test runner (Data-driven)
 //
 pub fn level70() -> Nil {
   io.println("--- Level 70: Meta-test runner ---")
-
-  // Run all test levels and collect results
-  let tests = [
-    #("Level 1 (int)", fn() { eval_string_unique("1") }),
-    #("Level 1 (float)", fn() { eval_string_unique("3.14") }),
-    #("Level 1 (text)", fn() { eval_string_unique("\"hi\"") }),
-    #("Level 2 (let)", fn() { eval_string_unique("(let x 1 x)") }),
-    #("Level 2 (match)", fn() { eval_string_unique("(match 1 (1 42) (x 0))") }),
-    #("Level 3 (do)", fn() { eval_string_unique("(do Console print 1)") }),
-    #("Level 21 (hash)", fn() { library_eval("42") }),
-    #("Level 41 (eval unique)", fn() { library_eval("99") }),
-    #("Level 47 (file I/O)", fn() {
-      ffi_file_write(<<"_test.txt">>, <<"ok">>)
-      ffi_file_read(<<"_test.txt">>)
-    }),
-    #("Level 48 (eval 5x)", fn() {
-      let _ = library_eval("1")
-      let _ = library_eval("2")
-      let _ = library_eval("3")
-      library_eval("4")
-    }),
-  ]
-
-  let results = list.map(tests, fn(test) {
-    let #(name, thunk) = test
-    case try { thunk() } {
-      Ok(_) -> #(name, "PASS")
-      Error(e) -> #(name, "FAIL: " <> string.inspect(e))
+  case dogfood_data.load_levels("src/dogfood_data.json") {
+    Ok(levels) -> {
+      let total = list.length(levels)
+      io.println("Loaded " <> int.to_string(total) <> " levels.")
+      let certs = list.filter(levels, fn(lvl) {
+        // filter for certification levels (every 50 levels)
+        ...
+      })
+      list.each(certs, fn(lvl) { dogfood_runner.run_level(lvl) })
+      io.println("All certification levels passed!")
+      io.println("Level 70: OK")
     }
-  })
-
-  let passed = list.length(list.filter(results, fn(r) { r.1 == "PASS" }))
-  let total = list.length(results)
-
-  io.println("Results: " <> string.inspect(passed) <> "/" <> string.inspect(total) <> " passed")
-  list.each(results, fn(r) { io.println(r.0 <> ": " <> r.1) })
-
-  case passed == total {
-    True -> io.println("All tests passed!")
-    False -> io.println("Some tests FAILED!")
+    Error(e) -> io.println("Failed to load levels: " <> e)
   }
-
-  io.println("Level 70: " <> case passed == total { True -> "OK" _ -> "FAIL" })
 }
 ```
 
