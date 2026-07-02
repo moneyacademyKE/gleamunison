@@ -2,6 +2,17 @@
 
 ---
 
+## What's New in v3.9.0 (2026-07-02)
+
+Release v3.9.0 introduces architectural comparisons and actionable developer experience (DX) tooling:
+
+- **Lean 4 & DX Gap Analyses**: Completed comprehensive gap analyses comparing `gleamunison` with Lean 4 and identifying critical developer workflow bottlenecks. Documented in ADR-0059 and ADR-0060.
+- **Verification Engine (`verify.gleam`)**: Implemented a file-based parser and compilation checker that runs multiple S-expressions sequentially in a clean, bootstrapped sandbox environment, catching syntax, parsing, type-checking, and runtime execution errors.
+- **Scratch Watcher Daemon (`bb watch-scratch`)**: Added a background file monitoring task in Babashka that monitors a `scratch.lisp` file in the project root, automatically verifying edits on save.
+- **Roadmap Sync**: Registered monadic sequencing bindings (Phase 7) and watch loops / REPL queries (Phase 9) in the project roadmap.
+
+---
+
 ## What's New in v3.3.0 (2026-06-28)
 
 Release v3.3.0 adds 100 stress-testing and edge-case dogfood levels across 3 batches:
