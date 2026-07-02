@@ -724,4 +724,12 @@ Ergonomically sequencing multiple effectful computations in S-expressions withou
 
 ---
 
+## 79. Scratch-File Watcher Loop Pattern
+
+Decoupling editor modifications from compile-run-verify execution steps by utilizing a background watcher process that monitors local text drafts (scratch files) and pushes them to a running development host API endpoint for non-blocking validation and feedback.
+
+**Applied in:** `docs/gap-analysis-dx-improvements.md`
+
+---
+
 

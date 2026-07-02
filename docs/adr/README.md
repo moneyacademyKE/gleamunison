@@ -63,5 +63,6 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0057](0057-v3.4.0-gap-analysis.md) | v3.4.0 Rich Hickey Gap Analysis and Evolution Path | Accepted |
 | [ADR-0058](0058-gleamunison-beam-vs-wasm.md) | Gleamunison BEAM vs. Cloudflare Workers WASM Decisions | Accepted |
 | [ADR-0059](0059-gleamunison-vs-lean-lang-analysis.md) | gleamunison vs. Lean Lang Architectural Gap Analysis | Accepted |
+| [ADR-0060](0060-developer-experience-improvements.md) | Developer Experience (DX) Improvements | Accepted |
 
 

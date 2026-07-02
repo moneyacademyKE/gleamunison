@@ -84,6 +84,8 @@ From architectural specification to production-grade content-addressed runtime.
 | 9.4 | Property-based testing | ✓ DONE (v1.1.0) | `gleamunison_property.erl` — `check/2`, `int_gen/0`, `bool_gen/0`, `list_gen/1`, `tuple_gen/2`. |
 | 9.5 | `gleam watch` | ✓ DONE (v1.1.0) | `scripts/watch.sh` — file watcher, auto-rebuild on change, optional `--test` mode. |
 | 9.6 | Error message improvement | ✓ DONE (v1.1.0) | Elm/Rust-style: `[P001]`–`[P004]` parse errors, `[E001]`–`[E005]` type errors with suggested fixes. |
+| 9.7 | Scratch-file watcher loop | PENDING | S | background file watcher (`watch-scratch`) for non-blocking local verification. |
+| 9.8 | REPL Code Graph Queries | PENDING | S | `view`, `dependents`, and `dependencies` commands in REPL console. |
 
 ---
 
