@@ -533,4 +533,8 @@ Exposing AST information and compilation environment details via an MCP endpoint
 
 Compiling dynamic self-evaluating languages (like Gleamunison) to run inside sandboxed serverless environments (like Cloudflare Workers) is blocked by the inability to compile and load bytecode dynamically. The resolution is deploying a static runtime engine compiled to WASM/JS that evaluates the content-addressed AST structures as data, achieving hot code execution changes purely via data store synchronization.
 
+## 112. gleamunison vs. Lean Lang: Verifiability vs. Upgradability
+
+A gap analysis comparing the BEAM-native `gleamunison` runtime with the theorem prover and systems language Lean 4 highlights a fundamental trade-off: mathematical soundness vs. operational adaptability. Lean 4 complects program execution with mathematical proofs using the Calculus of Inductive Constructions (CIC) to guarantee absolute correctness and uses Reference Counting with Functional But In-Place (FBIP) updates for maximum bare-metal speed. In contrast, `gleamunison` complects identity with content-addressed Merkle DAG hashes, prioritizing zero-dependency distributed execution, dynamic sandboxing via stack-based algebraic effects, and zero-downtime hot-upgrades on the BEAM. Attempting to add dependent types or FBIP optimizations to `gleamunison` is rejected as it over-complects the prototype without adding utility to its distributed-concurrency mission. However, adapting monadic block syntax bindings (inspired by Lean 4's `do` sugar) in S-expressions is accepted to improve algebraic effects sequencing readability.
+
 

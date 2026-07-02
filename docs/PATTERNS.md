@@ -714,4 +714,14 @@ Compiling applications to run both as self-contained WASM modules (with zero JS 
 
 **Applied in:** `gleamunison-cf` adapter build configurations.
 
+---
+
+## 78. Monadic S-Expression Sequencing Pattern
+
+Ergonomically sequencing multiple effectful computations in S-expressions without nesting deep closures. This desugars sequential let-bindings (like `let*` or `do` block bindings) into nested lambdas during elaboration, similar to monadic auto-lifting in Lean 4.
+
+**Applied in:** `docs/gap-analysis-gleamunison-vs-lean.md`
+
+---
+
 
