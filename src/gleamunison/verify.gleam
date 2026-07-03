@@ -1,7 +1,7 @@
 import gleam/list
 import gleam/string
-import gleamunison/elab_types.{type SurfaceDef, type SurfaceTerm, SurfaceTermDef}
 import gleamunison/bootstraps
+import gleamunison/elab_types.{type SurfaceDef, type SurfaceTerm, SurfaceTermDef}
 import gleamunison/lexer
 import gleamunison/parser.{type SExpr, parse_sexpr, sexpr_to_term}
 import gleamunison/repl_eval
@@ -47,11 +47,7 @@ fn verify_terms(
     [] -> Ok(#(cache, prev_defs))
     [term, ..rest] -> {
       case term {
-        elab_types.SList([
-          elab_types.SVar("define"),
-          elab_types.SVar(name),
-          val,
-        ]) -> {
+        elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), val]) -> {
           case repl_eval.handle_define(name, val, cache, prev_defs) {
             Ok(#(next_cache, next_defs)) ->
               verify_terms(rest, next_cache, next_defs)
@@ -70,7 +66,8 @@ fn verify_terms(
 }
 
 fn get_init_defs() -> List(#(String, SurfaceDef)) {
-  let init_defs = list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
+  let init_defs =
+    list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
   let assert Ok(compare_term) =
     parser.parse_string("(lam a (lam b (if (eq? a b) 0 (if (lt? a b) -1 1))))")
   list.append(init_defs, [#("compare", SurfaceTermDef(compare_term))])

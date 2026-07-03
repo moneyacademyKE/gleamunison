@@ -1,8 +1,8 @@
+import dogfood_data
+import dogfood_runner
 import gleam/int
 import gleam/io
 import gleam/list
-import dogfood_data
-import dogfood_runner
 
 pub fn generic_hash_level(_n: Int) -> Nil {
   io.println("stub: hash")

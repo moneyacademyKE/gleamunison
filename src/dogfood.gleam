@@ -19,7 +19,6 @@ fn generic_computation(n: Int) -> fn() -> Nil {
   }
 }
 
-
 pub fn all_levels() -> Dict(String, fn() -> Nil) {
   let hand_crafted = [
     #("level21", core.level21),

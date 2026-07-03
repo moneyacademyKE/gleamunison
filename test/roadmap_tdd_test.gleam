@@ -142,7 +142,6 @@ pub fn dets_fd_pool_test() {
   let assert Ok(Nil) = storage.partitioned_dets_delete(path)
 }
 
-
 @external(erlang, "gleamunison_ffi", "test_soft_purge_scenario")
 fn test_soft_purge_scenario() -> Result(#(Bool, Bool), String)
 

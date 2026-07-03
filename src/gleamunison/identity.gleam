@@ -67,5 +67,3 @@ pub fn hash_to_short_string(h: Hash) -> String {
   let s = hash_to_debug_string(h)
   string.slice(s, 0, 12)
 }
-
-

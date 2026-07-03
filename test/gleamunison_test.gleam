@@ -3,12 +3,8 @@ import gleam/option
 import gleamunison/ast.{Apply, Int, Lambda, LocalVarRef, TermDef, TypeVar}
 import gleamunison/codebase.{hash_of_definition}
 import gleamunison/compile.{module_name_for}
-import gleamunison/identity.{
-  Local, Ref, hash_bytes, hash_equal,
-}
-import gleamunison/genesis.{
-  builtin_int_add, builtin_io_read_line,
-}
+import gleamunison/genesis.{builtin_int_add, builtin_io_read_line}
+import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal}
 import gleamunison/inference.{infer_term}
 import gleamunison/repl_eval
 import gleamunison/types.{empty_cache}

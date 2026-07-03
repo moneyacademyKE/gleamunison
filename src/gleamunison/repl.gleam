@@ -2,8 +2,8 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleam/string
-import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/bootstraps
+import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/lexer
 import gleamunison/parser
 import gleamunison/repl_eval
@@ -80,7 +80,8 @@ pub fn start_repl() -> Nil {
   io.println(
     "=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit. Type 'help' for builtins.",
   )
-  let init_defs = list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
+  let init_defs =
+    list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
   let assert Ok(compare_term) =
     parser.parse_string("(lam a (lam b (if (eq? a b) 0 (if (lt? a b) -1 1))))")
   let init_defs =
