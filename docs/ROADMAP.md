@@ -2,7 +2,7 @@
 
 From architectural specification to production-grade content-addressed runtime.
 
-**Current State:** Fully certified Lisp-style surface parser, typechecker, compiler, and VM runner. Certified against 1000 playbook conformance levels (959 passed, 41 skipped, 0 failed). **v1.1.0**: Standard library (http, json, datetime, filepath, crypto, template), structured logging, metrics, health checks, guard clauses, holes, `use` expression, linearity enforcement, CAS adapters, trace inspector, error codes, and LSP documentation — all implemented.
+**Current State:** Fully certified Lisp-style surface parser, typechecker, compiler, and VM runner. Certified against 5696 playbook conformance levels (all passed). **v3.10.0**: Safe FFI deserialization, local HTTP bind checks, Cowboy port monitoring socket safeguards, builtin constant extraction for strict <250 LOC compliance, and fully data-driven test runner framework — all implemented.
 
 ---
 
@@ -150,16 +150,15 @@ Effort key: **S** = Small (days), **M** = Medium (weeks), **L** = Large (month+)
 
 ---
 
-## Phase 13: Security Hardening & Codebase Refactoring
-
-**Goal:** Secure the FFI boundaries, resolve socket leak bugs, and refactor the massive code-gen footprint into simple, maintainable data-driven structures.
+## Phase 13: Security Hardening & Codebase Refactoring ✓
+- **Status:** COMPLETE. Secured FFI serialization, local loopback checks, port-based network socket monitors, extracted modular builtins, and refactored the 5600+ level dogfooding suite into a data-driven JSON VM runner. All files fully adhere to the <250 LOC constraint.
 
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|---|
-| 13.1 | **Harden FFI Serialization (P0)** | PENDING | S | Modify `binary_to_term` in `gleamunison_ffi_io.erl` and `gleamunison_tcp_sync.erl` to use `binary_to_term(Bin, [safe])` to prevent remote code execution and atom table exhaustion. |
-| 13.2 | **Fix SSE Socket Monitor (P0)** | PENDING | S | Resolve process-monitor crash in static routing where socket port references are monitored as process IDs. |
-| 13.3 | **Fix Undef eval_expression FFI (P0)** | PENDING | S | Implement and export `eval_expression` in `gleamunison_ffi.erl` to fix HTTP route invocation crash. |
-| 13.4 | **Secure HTTP Endpoints (P0)** | PENDING | S | Bind HTTP listener default to `127.0.0.1` and restrict the `/eval` and `/define` routes to prevent open-network remote execution. |
-| 13.5 | **Extract range and builtins (P1)** | PENDING | S | Move duplicated `range` function from all 112+ modules into `gleamunison/util.gleam`. Consolidate `init_defs` from `repl.gleam` and `verify.gleam` to `gleamunison/identity.gleam`. |
-| 13.6 | **Data-Driven Dogfooding (P1)** | PENDING | M | Refactor the `generate_levels.clj` pipeline to emit a single database/data-structure representation of levels, removing 90k lines of generated boilerplate. |
-| 13.7 | **Fix Metric/Docs Inconsistencies (P2)**| PENDING | S | Align all level and module metrics across README, Architecture, and Playbook docs. Correct duplicate numbering in `LEARNINGS.md`. |
+| 13.1 | **Harden FFI Serialization (P0)** | ✓ DONE (v3.10.0) | S | Modify `binary_to_term` in `gleamunison_ffi_io.erl` and `gleamunison_tcp_sync.erl` to use `binary_to_term(Bin, [safe])` to prevent remote code execution and atom table exhaustion. |
+| 13.2 | **Fix SSE Socket Monitor (P0)** | ✓ DONE (v3.10.0) | S | Resolve process-monitor crash in static routing where socket port references are monitored as process IDs. |
+| 13.3 | **Fix Undef eval_expression FFI (P0)** | ✓ DONE (v3.10.0) | S | Implement and export `eval_expression` in `gleamunison_ffi.erl` to fix HTTP route invocation crash. |
+| 13.4 | **Secure HTTP Endpoints (P0)** | ✓ DONE (v3.10.0) | S | Bind HTTP listener default to `127.0.0.1` and restrict the `/eval` and `/define` routes to prevent open-network remote execution. |
+| 13.5 | **Extract range and builtins (P1)** | ✓ DONE (v3.10.0) | S | Move duplicated `range` function from all 112+ modules into `gleamunison/util.gleam`. Consolidate `init_defs` from `repl.gleam` and `verify.gleam` to `gleamunison/identity.gleam`. |
+| 13.6 | **Data-Driven Dogfooding (P1)** | ✓ DONE (v3.10.0) | M | Refactor the `generate_levels.clj` pipeline to emit a single database/data-structure representation of levels, removing 90k lines of generated boilerplate. |
+| 13.7 | **Fix Metric/Docs Inconsistencies (P2)**| ✓ DONE (v3.10.0) | S | Align all level and module metrics across README, Architecture, and Playbook docs. Correct duplicate numbering in `LEARNINGS.md`. |

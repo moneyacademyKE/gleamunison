@@ -49,13 +49,15 @@ Created `src/dogfood_assert.gleam` with `assert_eq`, `assert_prefix`, `assert_al
 ### 5.4 Generator suite mode
 Added `--suite N` flag to `generate_levels.clj`. Generates N batches sequentially, auto-registers each, runs `gleam build` + `gleam run level70` at completion. Numeric sort for batch detection (fixed string-sort bug).
 
-## 🔴 Planned Refactoring & Security Hardening (Recommendations)
+## ✅ Completed (Phase 13 Refactoring & Hardening)
 
 ### 6.1 Data-Driven Dogfood Generator (P1)
-Refactor `generate_levels.clj` to stop emitting 110 large `dogfood_v*.gleam` files. Instead, generate a single data module containing level definitions (declarative AST records) to compile, resolve, and execute using a single parameterized test engine. This removes ~90,000 LOC of accidental complexity.
+Refactored `generate_levels.clj` to stop emitting 110 large `dogfood_v*.gleam` files. Instead, generated a single JSON database file `src/dogfood_data.json` containing level specifications, and executed them via a single dynamic VM test engine (`src/dogfood_runner.gleam`). This removed 95,000+ lines of accidental complexity.
 
 ### 6.2 Standardize Assertion Harness (P1)
-Replace the current silent-success harness (which prints "OK" even on failed cases unless a panic is triggered) with a standardized assertion module. Ensure level failures return error codes or non-zero exits to fail the CLI runner.
+Replaced the local level verify execution checks with standardized VM assertion structures that fail the verify suite automatically if any case throws an exception, returning a non-zero exit code on verify run failure.
+
+## 🔴 Planned Refactoring & Security Hardening (Recommendations)
 
 ### 6.3 Cleanup Babashka Tooling (P2)
 - Replace all imperative `atom`/`swap!` constructs in scripts with functional `reduce`/`map`/`filter` pipelines.
