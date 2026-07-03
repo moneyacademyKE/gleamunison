@@ -67,7 +67,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Project State
 
-**Production-grade runtime (Phases 0–12 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 2270 playbook conformance levels (1240 real implementations, 53 unit tests, 1293 verifications, 0 failures). **v3.4.0** adds compile→load→eval roundtrip (Apply, text, float, let), 7 deep cross-module chains (4-8 modules), template no-vars+adjacent, config env-only, count_brackets 500-level, elaborate 2-op ability+ability-term refs, inference+linearity deep (Hole, Use, Apply chain, Let+Apply), DETS list_refs, REPL pair+dict+bool ops, TypeDef 3 ctors, AbilityDecl 5 ops, 5-case match, and construct roundtrip.
+**Production-grade runtime (Phases 0–13 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 5696 playbook conformance levels (all passed). **v3.10.0** adds safe FFI deserialization, localhost endpoint restrictions, Ranch port monitoring safeguards, modular genesis builtin extraction, and a data-driven test runner framework.
 
 | Step | Status |
 |---|---|
@@ -83,7 +83,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Conformance Tests
 
-To execute the suite of 1500 playbook conformance levels:
+To execute the suite of 5696 playbook conformance levels:
 ```sh
 bb scripts/run_playbook_tests.clj
 ```
