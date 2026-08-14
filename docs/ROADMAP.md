@@ -162,3 +162,19 @@ Effort key: **S** = Small (days), **M** = Medium (weeks), **L** = Large (month+)
 | 13.5 | **Extract range and builtins (P1)** | ✓ DONE (v3.10.0) | S | Move duplicated `range` function from all 112+ modules into `gleamunison/util.gleam`. Consolidate `init_defs` from `repl.gleam` and `verify.gleam` to `gleamunison/identity.gleam`. |
 | 13.6 | **Data-Driven Dogfooding (P1)** | ✓ DONE (v3.10.0) | M | Refactor the `generate_levels.clj` pipeline to emit a single database/data-structure representation of levels, removing 90k lines of generated boilerplate. |
 | 13.7 | **Fix Metric/Docs Inconsistencies (P2)**| ✓ DONE (v3.10.0) | S | Align all level and module metrics across README, Architecture, and Playbook docs. Correct duplicate numbering in `LEARNINGS.md`. |
+
+---
+
+## Phase 14: Native Content-Addressed Datalog Database Engine ✓
+- **Status:** COMPLETE. Pure S-expression immutable database engine running entirely in GleamUnison user-space, documented in ADR-0062 and verified via `datalog_test.gleam`.
+
+| # | Feature | Status | Effort | Description |
+|---|---|---|---|---|
+| 14.1 | **EAVT / AVET Dual Indexing** | ✓ DONE (v3.11.0) | S | Pure dictionary-backed immutable index store supporting instant attribute lookups and entity queries. |
+| 14.2 | **Pattern Unification Solver** | ✓ DONE (v3.11.0) | M | Datalog triple clause conjunction solver with recursive variable binding and substitution. |
+| 14.3 | **Temporal & History Indexing** | ✓ DONE (v3.11.0) | S | `db-history`, `db-as-of`, `db-since`, and `db-diff` replaying transaction datoms across historic markers. |
+| 14.4 | **Stratified Deductive Rules** | ✓ DONE (v3.11.0) | M | Fixpoint recursive logic rules engine for graph reachability and transitive relation resolution. |
+| 14.5 | **Graph Algorithms & PageRank** | ✓ DONE (v3.11.0) | S | Graph BFS, DFS, shortest path finding, and Power-Iteration PageRank over datom relationships. |
+| 14.6 | **Vector Similarity & BM25 Search** | ✓ DONE (v3.11.0) | S | Cosine similarity k-NN search and BM25 term frequency / inverse document frequency ranking. |
+| 14.7 | **Actor Transactor Process** | ✓ DONE (v3.11.0) | S | Stateful actor loop managing transactional serializability via Erlang message passing (`spawn`/`send`/`recv`). |
+

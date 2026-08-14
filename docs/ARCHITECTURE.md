@@ -79,47 +79,39 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - **Crypto**: `gleamunison/crypto` — SHA256/512, HMAC, random bytes.
 - **Template**: `gleamunison/template` — `{{var}}` interpolation with HTML escaping.
 
+### 9. Native Datalog Database Engine (`gleamunison_datalog/`)
+Pure S-expression immutable database engine running entirely in GleamUnison user-space (ADR-0062):
+- **EAVT / AVET Indexing**: Dual persistent map indexes mapping `[Entity -> Attr -> Values]` and `[Attr -> Value -> Entities]`.
+- **Transaction Engine**: Pure immutable state transitions (`db-assert`, `db-retract`, `db-cas`, `db-assert-many`).
+- **Query Solver**: Pattern unification over Datalog triple clauses `(?e ?a ?v)` with variable bindings.
+- **Temporal Queries**: `db-history`, `db-as-of`, `db-since`, `db-diff` replaying transaction logs.
+- **Recursive Rules**: Stratified fixpoint evaluation for transitive and deductive relations.
+- **Graph & Search**: BFS, DFS, shortest path, PageRank, k-NN cosine vector similarity, and BM25 document ranking.
+- **Transactor Actor**: Concurrent process loop (`spawn`/`send`/`recv`) serializing atomic database updates.
+
+### 10. Security & FFI Boundaries (v3.11.0)
+- **Safe Deserialization**: All incoming Erlang binaries decoded with `binary_to_term(Bin, [safe])` in TCP sync and FFI channels, preventing atom table exhaustion and code injection.
+- **Network Boundaries**: HTTP server and TCP sync server bind strictly to loopback (`127.0.0.1`) with a 1MB payload length guard.
+- **Deterministic Storage Atoms**: Storage table names derived via SHA256 hashing (`stable_name`) to eliminate dynamic atom generation during runtime.
+
 ## Dogfood Infrastructure
 
 ### Scripts
-- `scripts/loop_infinite.clj` — Infinite loop: computes next batch, spawns `cmd`, waits, repeats
-- `scripts/dogfood_loop.clj` — Registration (`--register`) and verification (`--verify`) helper
-- `scripts/rebuild_meta.clj` — Regenerates `dogfood_meta.gleam` from v*.gleam files
-- `scripts/generate_levels.clj` — 21 template patterns cycled across 49 levels + 1 cert per batch
-- All scripts are pure Clojure/Babashka — no Python dependencies
+- `scripts/run_playbook_tests.clj` — Executes all conformance levels against the runtime.
+- `scripts/demo.clj` & `scripts/test_runner.clj` — Automated execution of the native Datalog engine.
+- All scripts are pure Clojure/Babashka (`bb`) — zero Python or npm dependencies.
 
-### Improvements (Roadmap v3.7.0 — 15/15 Complete)
-1. **Generator uses all 24 templates** — `pick-templates` distributes N levels evenly, no template is dropped
-2. **Per-level imports** — each template declares its own imports; writer unions only what's needed (1061 warnings vs 1244)
-3. **Zombie process cleanup** — loop kills stale `cmd -p` processes before spawning
-4. **Retry detection** — same batch 3x = failure log + exit 1
-5. **3 new templates** — Construct compile, type_pretty, infer_term (24 total)
-6. **`--count N` and `--suite N` flags** — variable batch sizes, sequential multi-batch mode
-7. **Shortened prompt** — 3 imperative commands, no analysis trigger words
-8. **Orphaned scripts removed** — `check_next.clj`, `next_batch.sh`, `auto_dogfood.clj` deleted
-9. **Numeric batch sorting** — fixed `v9 > v85` alphabetical sort bug in batch detection
-10. **Assertion helpers** — `dogfood_assert.gleam` with `assert_eq`, `assert_prefix`, `assert_all_ok`
+### Conformance Coverage
 
-### Known Remaining Issues
-1. **Generator template #21 unused**: `(take 49 templates)` drops `gen-loader-limit`. Should cycle 50 templates evenly or redistribute to use all 21.
-2. **Zombie process cleanup**: `loop_infinite.clj` should kill stale `cmd` processes before spawning new ones.
-3. **Error recovery in loop**: If a batch fails, the loop currently continues silently. Should log failures and optionally alert.
-4. **1224 build warnings**: All unused imports/variables in generated dogfood files. The generator template imports a standard set but each batch only uses a subset.
-5. **`cmd -p` needs `--yolo`**: The auto loop requires `--yolo` permission bypass. Consider using `--auto-accept` instead for safety.
-6. **No `next_batch.sh`**: The prompt references `bb scripts/next_batch.sh` which was deleted. The infinite loop generates its own batch numbers.
-7. **Reduce generated file size**: Each v*.gleam is ~25KB with 50 levels. Could deduplicate common imports/patterns.
-
-### Dogfood Coverage (109 batches, 5674 levels)
-
-- **Unit tests**: 53 Erlang/Gleam unit tests covering hashing, codebase, inference, elaboration, typechecking, compilation, storage, sync, effects, and jets.
-- **Dogfood levels**: 5674 integration levels (1-6696) organized in 109 batches (v2-v109).
-- **Total conformance verifications**: 5727 (5674 dogfood + 53 unit tests) across 109 batch files.
-- **Bug fixes**: Health `Degraded` dead code activated (v2.9.0), Guard error swallowing documented (v14).
+- **Unit tests**: 54 Erlang/Gleam unit test suites covering hashing, codebase, inference, elaboration, typechecking, compilation, storage, sync, effects, jets, and native Datalog.
+- **Playbook conformance levels**: 5696 conformance levels executed via the dynamic JSON VM test runner (`dogfood_runner.gleam` + `dogfood_data.json`).
+- **File constraints**: All files strictly conform to the `<500 LOC` constraint (all Gleam core files $< 250$ LOC).
 
 ## Invariants
 - **Type-Inclusive Hash**: The AST term and its inferred type compile to the hash.
 - **Append-only Codebase**: Once inserted, definitions never change.
 - **Process Isolation**: Ability stack bound to processes.
-- **Standalone escript**: zero-dependency ~1.1 MB binary.
+- **Standalone escript**: zero-dependency ~1.2 MB binary.
 - **Content-Addressed Continuations**: Identical hashes guarantee identical module versions across nodes, enabling native Erlang closure serialization.
 - **Supervisor Link Isolation**: Supervisor trees spawned in dedicated workers to prevent cascading termination signals.
+

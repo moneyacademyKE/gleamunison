@@ -104,7 +104,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Project State
 
-**Production-grade runtime (Phases 0–13 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 5696 playbook conformance levels (all passed). **v3.10.0** adds safe FFI deserialization, localhost endpoint restrictions, Ranch port monitoring safeguards, modular genesis builtin extraction, and a data-driven test runner framework.
+**Production-grade runtime (Phases 0–14 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 5696 playbook conformance levels and 54 unit test suites (all passed). **v3.11.0** includes native content-addressed Datalog database engine with temporal indexing, graph algorithms, BM25, and vector search, alongside safe FFI deserialization, localhost endpoint restrictions, Ranch port monitoring safeguards, modular genesis builtin extraction, and a data-driven test runner framework.
 
 | Step | Status |
 |---|---|
@@ -115,19 +115,21 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 | Type inference (Int/Float/Text/List) | ✓ Hindley-Milner style |
 | Elaboration (Surface → Core) | ✓ Two-phase with name resolution |
 | Effects runtime (process dict stack) | ✓ do_/handle_/push_frame/pop_frame |
-| Sync protocol (pull-based) | ✓ Types + Erlang distribution FFI stubs |
+| Sync protocol (pull-based) | ✓ Types + Erlang distribution FFI + TCP sync |
+| Native Datalog Engine | ✓ Pure S-expression EAVT/AVET, temporal, rules, BM25, vector |
 | escript standalone binary | ✓ ~1.2 MB, no Gleam dependency at runtime |
 
 ## Conformance Tests
 
-To execute the playbook conformance suite:
+To execute the unit and integration test suites:
 ```sh
-bb scripts/run_playbook_tests.clj
+gleam test                          # Runs all 54 unit test suites including native Datalog
+bb scripts/run_playbook_tests.clj   # Runs playbook conformance suite
 ```
 
 ## Why the escript is only 1.2 MB
 
-The standalone binary (`gleamunison_escript`) contains the full content-addressed runtime — parser, elaborator, typechecker, compiler, loader, codebase, effects system, web server, REPL, 50 genesis modules, and all stdlib dependencies. At ~1.2 MB, it's compact because:
+The standalone binary (`gleamunison_escript`) contains the full content-addressed runtime — parser, elaborator, typechecker, compiler, loader, codebase, effects system, web server, REPL, 52 genesis modules, and all stdlib dependencies. At ~1.2 MB, it's compact because:
 
 **BEAM bytecode is dense.** The compiled `.beam` files are ~2.4 MB uncompressed; zip compression brings that to ~1.2 MB.
 
@@ -142,12 +144,12 @@ The standalone binary (`gleamunison_escript`) contains the full content-addresse
 
 If you already have Erlang installed, this is as close to a zero-install language runtime as it gets.
 
-## Modules (44 Gleam source modules, 70+ Erlang FFI files, 52 genesis modules, 471 real dogfood levels)
+## Modules (44 Gleam source modules, Erlang FFI, 52 genesis modules, 13 Datalog engine modules)
 
 | Module | Concern | Status |
 |---|---|---|
 | `gleamunison/identity` | Opaque Hash, DefinitionRef, LocalVar | Real |
-| `gleamunison/ast` | Core AST: Term (12 variants), Type, Definition, Unit | Real |
+| `gleamunison/ast` | Core AST: Term (15 variants), Type, Definition, Unit | Real |
 | `gleamunison/types` | Core type definitions | Real |
 | `gleamunison/typecheck` | Type checker | Real |
 | `gleamunison/inference` | Type inference engine (Hindley-Milner) | Real |
@@ -184,9 +186,17 @@ If you already have Erlang installed, this is as close to a zero-install languag
 | `gleamunison/health` | Health checks and readiness probes | Real |
 | `gleamunison/metrics` | Counter/gauge/histogram with telemetry | Real |
 | `gleamunison/pipeline` | Factored pipeline phases (parse_only, elaborate_only, compile_only, load_and_eval) | Real |
+| `gleamunison/jets` | FFI Jet compiler interception registry | Real |
+| `gleamunison/bootstraps` | Cycle-free genesis bootstrap definitions | Real |
+| `gleamunison/genesis` | Genesis block constants and hashes | Real |
+| `gleamunison/util` | Shared utilities (e.g. range helper) | Real |
+| `gleamunison/verify` | Interactive and file-based verification runner | Real |
+| `gleamunison/dogfood_runner` | Data-driven dynamic VM test runner | Real |
+| `gleamunison_datalog/src/` | 13-module S-expression Datalog database engine | Real |
 | `gleamunison_ffi.erl` | FFI: hashing, compilation, loading, process dict | Real |
 | `gleamunison_effets.erl` | Effects runtime: push/pop/find_frame, do_op/handle_comp | Real |
-| `gleamunison_storage.erl` | ETS/DETS/Mnesia storage backend | Real |
+| `gleamunison_storage.erl` | ETS/DETS/Mnesia storage backend with SHA256 atom safety | Real |
+| `gleamunison_tcp_sync.erl` | TCP sync server with safe deserialization & length limit | Real |
 | `gleamunison_http.erl` | HTTP server with trace capture, SSE, and health routes | Real |
 | `gleamunison_http_routes.erl` | Route handlers: eval, define, browse, traces, logs, modules | Real |
 | `gleamunison_http_util.erl` | HTTP utilities: JSON, MIME, URL decode, SSE broadcast | Real |
@@ -206,13 +216,12 @@ If you already have Erlang installed, this is as close to a zero-install languag
 | `gleamunison_property.erl` | Property-based testing framework | Real |
 | `m_*.erl` (52 files) | Content-addressed genesis modules | Real |
 
-
 ## Quick start
 
 ```sh
 cd ~/Desktop/gleamunison_dogfood/gleamunison_repo
-gleam run -- all             # Run all 1000 dogfooding levels
-gleam test                  # Run unit tests
+gleam run -- all             # Run all dogfooding levels via dynamic VM runner
+gleam test                  # Run unit tests (54 test suites)
 ./gleamunison_escript repl   # Start interactive REPL via standalone escript (after ./build_escript.sh)
 ```
 
@@ -220,12 +229,12 @@ gleam test                  # Run unit tests
 
 - [Playbook](docs/PLAYBOOK.md) — how to work on this project
 - [Architecture](docs/ARCHITECTURE.md) — deep dive into the design
-- [Roadmap](docs/ROADMAP.md) — 12-phase plan from spec to production
+- [Roadmap](docs/ROADMAP.md) — 14-phase plan from spec to production
 - [Operations Runbook](docs/OPERATIONS.md) — deploy, configure, monitor, upgrade, troubleshoot
 - [Learnings](docs/LEARNINGS.md) — architectural insights discovered
 - [Patterns](docs/PATTERNS.md) — design patterns used
 - [Reference Manual](docs/MANUAL.md) — complete reference user guide
-- [ADRs](docs/adr/) — Architecture Decision Records (48+)
+- [ADRs](docs/adr/) — Architecture Decision Records (62 records)
 - [Standard Library](docs/stdlib/index.html) — module reference
 
 ## Runtime output

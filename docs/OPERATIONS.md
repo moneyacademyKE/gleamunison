@@ -4,18 +4,18 @@
 
 ### Prerequisites
 - Erlang/OTP 26+ installed on target machine
-- The `gleamunison` escript binary (~1.2 MB)
+- The `gleamunison_escript` binary (~1.2 MB)
 
 ### Deploy Steps
 ```sh
 # 1. Copy escript to target
-scp gleamunison user@host:/opt/gleamunison/bin/gleamunison
+scp gleamunison_escript user@host:/opt/gleamunison/bin/gleamunison_escript
 
 # 2. Make executable
-chmod +x /opt/gleamunison/bin/gleamunison
+chmod +x /opt/gleamunison/bin/gleamunison_escript
 
-# 3. Start server
-/opt/gleamunison/bin/gleamunison server 8080
+# 3. Start server (binds to 127.0.0.1 by default)
+/opt/gleamunison/bin/gleamunison_escript server 8080
 ```
 
 ### Systemd Service (optional)
@@ -26,7 +26,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/opt/gleamunison/bin/gleamunison server 8080
+ExecStart=/opt/gleamunison/bin/gleamunison_escript server 8080
 Restart=always
 RestartSec=10
 Environment=GLEAM_LOG_LEVEL=info
@@ -48,8 +48,8 @@ WantedBy=multi-user.target
 ### Runtime Config
 Use the CLI to override config at startup:
 ```sh
-./gleamunison server 9090
-./gleamunison --port 9090 --log-level debug
+./gleamunison_escript server 9090
+./gleamunison_escript --port 9090 --log-level debug
 ```
 
 ## Monitor
@@ -93,8 +93,8 @@ Gleamunison emits typed telemetry events via `:telemetry`. Attach reporters:
 
 ### REPL hangs
 ```sh
-# Kill and restart REPl
-./gleamunison repl
+# Kill and restart REPL
+./gleamunison_escript repl
 ```
 
 ### Server not responding
@@ -112,7 +112,7 @@ curl http://localhost:8080/api/processes
 ### Module load failures
 ```sh
 # List loaded modules
-./gleamunison repl
+./gleamunison_escript repl
 > (list-loaded-modules)
 
 # Purge and reload

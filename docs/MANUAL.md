@@ -4,119 +4,6 @@ Gleamunison is a content-addressed runtime with algebraic effects running on the
 
 ---
 
-## 10. Standard Library (v1.1.0)
-
-### 10.1 HTTP Client
-```gleam
-import gleamunison/http_client
-
-let assert Ok(HttpResponse(status: 200, body: b)) =
-  http_client.get("https://api.example.com/data")
-```
-
-### 10.2 JSON
-```gleam
-import gleamunison/json
-
-let encoded = json.encode(term)
-let decoded = json.decode(binary)
-```
-
-### 10.3 DateTime
-```gleam
-import gleamunison/datetime
-
-let now = datetime.now()
-let iso = datetime.to_iso8601(now)
-```
-
-### 10.4 Filepath
-```gleam
-import gleamunison/filepath
-
-let p = filepath.from_string("/home/user/file.txt")
-let ext = filepath.extension(p)  // "txt"
-```
-
-### 10.5 Crypto
-```gleam
-import gleamunison/crypto
-
-let digest = crypto.hash(crypto.Sha256, data)
-let key = crypto.random_bytes(32)
-```
-
-### 10.6 Template
-```gleam
-import gleamunison/template
-
-let html = template.render("Hello {{name}}!", [#("name", "World")])
-```
-
-### 10.7 Structured Logging
-```gleam
-import gleamunison/log
-
-log.info("Server started")
-log.error_context("Connection failed", dict.from_list([#("port", "8080")]))
-```
-
-### 10.8 Configuration
-```gleam
-import gleamunison/config
-
-let cfg = config.load()
-let port = config.get_int(cfg, "PORT") |> result.unwrap(8080)
-```
-
-### 10.9 Health Checks
-```gleam
-import gleamunison/health
-
-case health.run_all() {
-  Healthy(msg) -> log.info(msg)
-  Unhealthy(err) -> log.error(err)
-}
-```
-
-### 10.10 Metrics
-```gleam
-import gleamunison/metrics
-
-metrics.counter("requests", 1)
-metrics.gauge("memory_mb", 256.0)
-```
-
----
-
-## 11. Property-Based Testing (v1.1.0)
-```erlang
-% From Erlang FFI:
-gleamunison_property:check(Generator, Property).
-
-% Example: all reversed lists have same length as original
-IntListGen = gleamunison_property:list_gen(gleamunison_property:int_gen()),
-gleamunison_property:check(IntListGen, fun(L) ->
-    length(L) =:= length(lists:reverse(L))
-end).
-```
-
----
-
-## 12. Error Code Reference (v1.1.0)
-
-| Code | Description |
-|---|---|
-| `[P001]` | Unexpected end of input — missing closing parenthesis |
-| `[P002]` | Empty expression — type an S-expression |
-| `[P003]` | Unclosed parentheses — every `(` needs `)` |
-| `[P004]` | General parse error with line/column |
-| `[E001]` | Undefined variable — with spelling suggestions |
-| `[E002]` | Unknown operation in ability |
-| `[E003]` | Undefined ability declaration |
-| `[E004]` | Type error — could not type-check |
-| `[E005]` | Unsupported type reference |
-
 ## 1. Core Philosophy & Concepts
 
 ### 1.1 Content-Addressability
@@ -135,7 +22,7 @@ Side effects and environment operations are declared as **Abilities**.
 ## 2. Command Line Interface (CLI) & S-Expression Parser
 The standalone binary runs with zero dependencies on any Erlang/OTP environment.
 ```sh
-./build_escript.sh && ./gleamunison
+./build_escript.sh && ./gleamunison_escript
 ```
 
 ### 2.1 S-Expression Syntax
@@ -145,6 +32,8 @@ Gleamunison supports text input via a recursive-descent S-expression parser:
 - Lists: `(1 2 3)`
 - Scoped variables: `(let x 42 (add x 1))`
 - Lambdas: `(lam x (add x 1))`
+
+---
 
 ## 3. Language AST & Definition Model
 Definitions exist in three forms, represented in `ast.gleam`:
@@ -201,8 +90,8 @@ Named type references with visibility control:
 ### 4.1 Verification on Insert
 Insertions verify that `hash_of_definition(def)` matches the target `DefinitionRef`.
 
-### 4.2 Storage Backends (DETS)
-Persistence is managed via the `StorageAdapter` record, which supports disk-based DETS:
+### 4.2 Storage Backends (DETS, ETS, Mnesia)
+Persistence is managed via the `StorageAdapter` record, which supports disk-based DETS, in-memory ETS, and distributed Mnesia:
 ```gleam
 pub type StorageAdapter {
   StorageAdapter(
@@ -216,10 +105,11 @@ pub type StorageAdapter {
 
 ---
 
-## 5. Pull-based Node Syncing
+## 5. Pull-based Node Syncing & Network Transport
 1. **Advertise**: Exchange lists of local hashes (`sync_send_refs`).
 2. **Calculate Diff**: Peer computes missing hashes (`sync_receive_diff`).
 3. **Request & Persist**: Request missing definition binaries (`sync_request_defs`) and insert them into local storage (`codebase.insert_raw`).
+4. **Transport**: Supported via native Erlang Distribution (for `@` cluster peers) or framed TCP protocol (`gleamunison_tcp_sync.erl` with 1MB payload limits and safe decoding).
 
 ---
 
@@ -240,49 +130,177 @@ Gleamunison exposes Erlang's native process model through typed abilities:
 - **Code shipping**: Uses the pull-based sync protocol to verify and transfer content-addressed BEAM modules to remote nodes.
 - **Serializable continuations**: Erlang's `term_to_binary/1` serializes closures; identical module hashes across nodes guarantee correct deserialization.
 
-### 6.3 Mnesia Storage
-- **Replicated codebase**: The Mnesia storage adapter provides ACID transactions and automatic replication across clustered nodes.
-- **No external database**: Pure Erlang/OTP, no PostgreSQL or SQLite dependency.
-
-### 6.4 Supervision Trees
+### 6.3 Supervision Trees
 - **OTP integration**: `gleamunison_sup` manages worker process lifecycles with standard Erlang supervisor behavior.
 - **Link isolation**: Supervisor processes are spawned in dedicated workers to prevent cascading termination during testing.
 
 ---
 
-## 7. Web Dashboard
+## 7. Standard Library (v1.1.0)
+
+### 7.1 HTTP Client
+```gleam
+import gleamunison/http_client
+
+let assert Ok(HttpResponse(status: 200, body: b)) =
+  http_client.get("https://api.example.com/data")
+```
+
+### 7.2 JSON
+```gleam
+import gleamunison/json
+
+let encoded = json.encode(term)
+let decoded = json.decode(binary)
+```
+
+### 7.3 DateTime
+```gleam
+import gleamunison/datetime
+
+let now = datetime.now()
+let iso = datetime.to_iso8601(now)
+```
+
+### 7.4 Filepath
+```gleam
+import gleamunison/filepath
+
+let p = filepath.from_string("/home/user/file.txt")
+let ext = filepath.extension(p)
+```
+
+### 7.5 Crypto
+```gleam
+import gleamunison/crypto
+
+let digest = crypto.hash(crypto.Sha256, data)
+let key = crypto.random_bytes(32)
+```
+
+### 7.6 Template
+```gleam
+import gleamunison/template
+
+let html = template.render("Hello {{name}}!", [#("name", "World")])
+```
+
+### 7.7 Structured Logging
+```gleam
+import gleamunison/log
+
+log.info("Server started")
+log.error_context("Connection failed", dict.from_list([#("port", "8080")]))
+```
+
+### 7.8 Configuration
+```gleam
+import gleamunison/config
+
+let cfg = config.load()
+let port = config.get_int(cfg, "PORT") |> result.unwrap(8080)
+```
+
+### 7.9 Health Checks
+```gleam
+import gleamunison/health
+
+case health.run_all() {
+  Healthy(msg) -> log.info(msg)
+  Unhealthy(err) -> log.error(err)
+}
+```
+
+### 7.10 Metrics
+```gleam
+import gleamunison/metrics
+
+metrics.counter("requests", 1)
+metrics.gauge("memory_mb", 256.0)
+```
+
+---
+
+## 8. Native Content-Addressed Datalog Engine (`gleamunison_datalog/`)
+
+Pure S-expression immutable database engine running entirely in GleamUnison user-space (ADR-0062):
+- **EAVT / AVET Indexing**: Dual persistent map indexes mapping `[Entity -> Attr -> Values]` and `[Attr -> Value -> Entities]`.
+- **Pure Transactions**: Functional assertions, retractions, and Compare-and-Swap:
+```lisp
+(let db1 (db-assert db-empty 1 "name" "Alice")
+  (let db2 (db-assert db1 1 "age" 30)
+    (db-query db2 (list (pair (q-var "?e") (pair "name" (q-val "Alice")))))))
+```
+- **Temporal & Historical Queries**: `db-history`, `db-as-of`, `db-since`, `db-diff`.
+- **Deductive Logic Rules**: Fixpoint recursive rule solver for graph reachability and transitive relationships.
+- **Graph & Search**: BFS, DFS, shortest path finding, PageRank, k-NN cosine vector similarity, and BM25 document ranking.
+- **Actor Model Transactor**: Concurrency and serializability via Erlang actors (`spawn`, `send`, `recv`).
+
+---
+
+## 9. Web Dashboard & Tracing
 
 ```sh
-./gleamunison_escript server   # Starts on http://localhost:8080
+./gleamunison_escript server   # Starts on http://127.0.0.1:8080
 ```
 
 The embedded HTTP dashboard provides:
 - **Node status**: Running processes, loaded module count, synced hashes.
+- **Trace Inspector**: DETS-backed HTTP request capture, SSE push, `/api/traces` endpoint.
 - **Mnesia table keys**: Browse all stored content-addressed definitions.
-- **Real-time updates**: ETS-backed counters with zero garbage collection overhead.
 
 ---
 
-## 8. REPL Features
+## 10. REPL Features
 
-### 8.1 Multi-line Input
-The REPL supports multi-line expressions. It tracks bracket depth and accumulates lines until parentheses balance:
+### 10.1 Multi-line Input
+The REPL supports multi-line expressions, accumulating lines until parentheses balance:
 ```
 > (define factorial
 |   (lam n
-|     (if (eq n 0) 1
-|       (multiply n (factorial (subtract n 1))))))
+|     (if (eq? n 0) 1
+|       (mul n (factorial (sub n 1))))))
 ```
 
-### 8.2 Spelling Suggestions
-On name resolution errors, the REPL provides spelling suggestions using depth-limited Levenshtein distance against all active environment definitions.
+### 10.2 Spelling Suggestions
+On name resolution errors, the REPL provides spelling suggestions using depth-limited Levenshtein distance.
 
-### 8.3 Module Purging
-Redefining a name in the REPL automatically purges the old BEAM module (`code:delete/1` + `code:purge/1`) before loading the new compilation, preventing code server conflicts.
+### 10.3 Module Purging
+Redefining a name in the REPL automatically purges old BEAM modules (`code:delete/1` + `code:purge/1`) before loading new compilations.
 
 ---
 
-## 9. Library Integration Guide
+## 11. Property-Based Testing (v1.1.0)
+```erlang
+% From Erlang FFI:
+gleamunison_property:check(Generator, Property).
+
+% Example: all reversed lists have same length as original
+IntListGen = gleamunison_property:list_gen(gleamunison_property:int_gen()),
+gleamunison_property:check(IntListGen, fun(L) ->
+    length(L) =:= length(lists:reverse(L))
+end).
+```
+
+---
+
+## 12. Error Code Reference (v1.1.0)
+
+| Code | Description |
+|---|---|
+| `[P001]` | Unexpected end of input — missing closing parenthesis |
+| `[P002]` | Empty expression — type an S-expression |
+| `[P003]` | Unclosed parentheses — every `(` needs `)` |
+| `[P004]` | General parse error with line/column |
+| `[E001]` | Undefined variable — with spelling suggestions |
+| `[E002]` | Unknown operation in ability |
+| `[E003]` | Undefined ability declaration |
+| `[E004]` | Type error — could not type-check |
+| `[E005]` | Unsupported type reference |
+
+---
+
+## 13. Library Integration Guide
 Host applications must target Erlang (`--target erlang`) and use OTP 29+.
 ```gleam
 import gleamunison/ast

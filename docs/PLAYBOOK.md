@@ -61,15 +61,17 @@ Text (S-Expr) → AST (Gleam types) → Hash (SHA256) → Codebase (DETS / in-me
 ### Building standalone binary
 
 ```sh
-./build_escript.sh    # Produces ./gleamunison (281KB escript)
-./gleamunison         # Run without Gleam, just Erlang/OTP
+./build_escript.sh             # Produces ./gleamunison_escript (~1.2 MB escript)
+./gleamunison_escript          # Run without Gleam, just Erlang/OTP
+./gleamunison_escript repl     # Start interactive REPL
+./gleamunison_escript server   # Start HTTP dashboard
 ```
 
 ### Decision records
 
 Every significant design decision is recorded as an ADR in `docs/adr/`.
 Before making a change, read the relevant ADRs. After making a change,
-write a new ADR or update an existing one.
+write a new ADR or update an existing one. Currently 62 ADRs are cataloged.
 
 ### Deployment and Synchronization
 
@@ -82,18 +84,17 @@ Always pre-verify all remote transfers:
 
 Start the interactive loop to dogfood the codebase:
 ```sh
-./gleamunison
+./gleamunison_escript repl
 ```
 The REPL bootstraps `"Console"`, `"add"`, and `"read_line"`, and supports:
 - `(define name expr)` to define names
 - expressions (like `(add 1 2)`) to evaluate them
 - `(do Console print "hello")` to trigger algebraic effects.
 
-
-
 ### LOC Constraints
-All Gleam/Erlang source files MUST be strictly under 250 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
+All Gleam/Erlang source files MUST be strictly under 250 LOC, and all Lisp/script files strictly under 500 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
 
-Current conformance: 2770 playbook conformance levels (1740 real implementations, 53 unit tests, 1793 verifications, 0 failures). v3.14.0 adds auto-generated batch 32, cross-module 6-chain, loader deeper, codebase deeper chains, cross-module 5-chain, loader deeper, codebase deeper, cross-module chains, parser edges, elaborate edges, loader deeper, type_pretty+lower, error format variants, parser deeper, type+inference deeper, elaborate depth, cross-module runtime, cross-module runtime, codebase depth (eval_string, eval_string_unique, handle_define+do_eval chain, parse_only+elaborate_only, compile_only+load_and_eval), effects runtime nesting (multi-ability, Handle+Do dispatch, nested Handles, effects+cross-module combined), error recovery at every pipeline stage, loader stress (eviction, memoization, limits), serialize_term/deserialize_term roundtrip, bootstrap_defs smoke tests, and complex elaborate_only patterns.
+Current conformance: 5696 playbook conformance levels and 54 unit test suites (all passing green). Includes the native content-addressed Datalog database engine with temporal querying, graph algorithms, and BM25/vector search.
+
 
 
