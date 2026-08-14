@@ -2,6 +2,34 @@
 
 ---
 
+## What's New in v3.11.0 (2026-08-14)
+
+Release v3.11.0 introduces the **Native Content-Addressed Datalog Database Engine**, complete security hardening across all FFI boundaries, and automated Hex package publishing:
+
+### 1. Native Content-Addressed Datalog Engine (`gleamunison_datalog/`)
+- **Dual Persistent Indexing**: Immutable `EAVT` (entity-attribute-value-tx) and `AVET` (attribute-value-entity-tx) index stores (`02_index.lisp`).
+- **Pure Functional Transactions**: Atomic assertions (`db-assert`, `db-assert-many`), retractions (`db-retract`, `db-retract-attr`, `db-retract-entity`), and Compare-And-Swap (`db-cas`) maintaining an immutable transaction log (`03_transact.lisp`).
+- **Pattern Unification Query Solver**: Datalog pattern matching over triple clauses `(?e ?a ?v)` with recursive variable binding and substitution (`05_query.lisp`).
+- **Analytics & Aggregations**: Relational aggregations (`db-count`, `db-sum`, `db-min`, `db-max`, `db-avg`, `db-count-distinct`) over query binding sets (`06_aggregate.lisp`).
+- **Entity Pull Expressions**: EDN-style recursive entity tree pulling (`db-pull`, `db-pull-many`, `db-pull-except`) (`07_pull.lisp`).
+- **Temporal & Historical Queries**: Bi-temporal time travel (`db-history`, `db-as-of`, `db-since`, `db-diff`) replaying transaction datoms across historic markers (`08_temporal.lisp`).
+- **Stratified Deductive Rules Engine**: Fixpoint evaluation for recursive queries and transitive relation resolution (`09_rules.lisp`).
+- **Graph Algorithms & PageRank**: BFS, DFS, shortest path finding, and Power-Iteration PageRank over datom relationships (`10_graph.lisp`).
+- **Vector & Full-Text Search**: Dot product, cosine similarity, k-NN search, and BM25 term frequency / inverse document frequency ranking (`11_vector.lisp`, `12_bm25.lisp`).
+- **Transactor Actor Process**: Concurrency and serializability via Erlang actors (`spawn`, `send`, `recv`) (`13_actor.lisp`).
+
+### 2. Security & FFI Boundary Hardening
+- **Safe Binary Deserialization**: Replaced raw `binary_to_term` with `binary_to_term(Bin, [safe])` in TCP sync and FFI channels to prevent atom leakage and code injection.
+- **Payload Guard & Port Binding**: Enforced a 1MB payload length framing limit and `127.0.0.1` localhost binding by default.
+- **Deterministic Storage Atoms**: Derived storage table names via SHA256 hashing (`stable_name`) to eliminate dynamic atom generation during runtime.
+
+### 3. Documentation & Verification
+- Cataloged **ADR-0061** (Phase 13 Hardening) and **ADR-0062** (Native Datalog Engine).
+- All **54 unit test suites** pass cleanly (`gleam test`).
+- Added automated Hex.pm release publishing workflow (`.github/workflows/publish.yml`).
+
+---
+
 ## What's New in v3.9.0 (2026-07-02)
 
 Release v3.9.0 introduces architectural comparisons and actionable developer experience (DX) tooling:

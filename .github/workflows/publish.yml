@@ -1,0 +1,21 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "26.2"
+          gleam-version: "1.17.0"
+      - run: gleam deps download
+      - name: Publish to Hex.pm
+        env:
+          HEXPM_API_KEY: ${{ secrets.HEXPM_API_KEY }}
+        run: gleam publish --yes
