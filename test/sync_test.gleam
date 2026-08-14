@@ -8,7 +8,7 @@ import gleamunison/elab_types.{
   MissingAbilityDecl, SHandle, SInt, SurfaceTermDef, SurfaceUnit,
 }
 import gleamunison/elaborate as elab
-import gleamunison/identity.{Ref, hash_bytes}
+import gleamunison/identity.{Ref}
 import gleamunison/sync.{new_sync_state, pull_sync}
 import gleamunison/sync_types.{PeerId}
 import gleamunison/types.{empty_cache}

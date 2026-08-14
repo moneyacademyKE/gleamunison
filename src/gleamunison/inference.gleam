@@ -119,6 +119,7 @@ pub fn check_linearity(
   term: ast.Term,
   cache: TypeCache,
 ) -> Result(Nil, InferenceError) {
+  let _ = cache
   case term {
     ast.Lambda(..) -> {
       let ast.Lambda(binder: _, body: b) = term

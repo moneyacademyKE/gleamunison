@@ -45,7 +45,7 @@ pub fn hash_equal(a: Hash, b: Hash) -> Bool {
   ffi_hash_equal(hash_to_bytes(a), hash_to_bytes(b))
 }
 
-/// Compute a hash from arbitrary bytes. Uses phash2 (fast, non-crypto).
+/// Compute a SHA-256 hash from arbitrary bytes.
 pub fn hash_bytes(contents: BitArray) -> Hash {
   Hash(ffi_hash_bytes(contents))
 }

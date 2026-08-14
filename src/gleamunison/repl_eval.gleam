@@ -1,4 +1,5 @@
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/string
 import gleamunison/ast
@@ -219,7 +220,10 @@ pub fn bootstrap_defs(
       SurfaceTermDef(val) -> {
         case handle_define(name, val, curr_cache, curr_defs) {
           Ok(#(next_cache, next_defs)) -> #(next_cache, next_defs)
-          Error(_) -> acc
+          Error(err) -> {
+            io.println("Bootstrap error for " <> name <> ": " <> err)
+            acc
+          }
         }
       }
       elab_types.SurfaceAbilityDef(_, _) -> {

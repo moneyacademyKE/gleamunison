@@ -32,7 +32,7 @@ list_refs(Tab) -> {ok, [R || {R, _} <- ets:tab2list(Tab)]}.
 err(R) -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}.
 
 dets_new(Path) ->
-    N = erlang:binary_to_atom(<<"gleamunison_dets_", Path/binary>>, utf8),
+    N = stable_name(<<"gleamunison_dets_", Path/binary>>),
     case dets:open_file(N, [{file, binary_to_list(Path)}, {type, set}]) of
         {ok, N} ->
             persistent_term:put({gleamunison, active_storage}, {dets, N}),
@@ -68,14 +68,14 @@ partitioned_dets_new(DP) ->
 ensure_dets_open(Dir, P) ->
     Key = {gleamunison_open_dets, Dir},
     Open = case erlang:get(Key) of undefined -> []; L -> L end,
-    Tab = erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, P>>, utf8),
+    Tab = stable_name(<<"gleamunison_dets_", Dir/binary, P>>),
     case lists:member(P, Open) of
         true -> erlang:put(Key, [P | lists:delete(P, Open)]), Tab;
         false ->
             NewOpen = case length(Open) >= 4 of
                 true ->
                     LRU = lists:last(Open),
-                    dets:close(erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, LRU>>, utf8)),
+                    dets:close(stable_name(<<"gleamunison_dets_", Dir/binary, LRU>>)),
                     [P | lists:droplast(Open)];
                 false -> [P | Open]
             end,
@@ -105,7 +105,7 @@ partitioned_dets_close(Dir) ->
     case erlang:get(K) of
         undefined -> ok;
         L ->
-            [dets:close(erlang:binary_to_atom(<<"gleamunison_dets_", Dir/binary, P>>, utf8)) || P <- L],
+            [dets:close(stable_name(<<"gleamunison_dets_", Dir/binary, P>>)) || P <- L],
             erlang:erase(K)
     end,
     {ok, nil}.
@@ -127,7 +127,7 @@ hex(N) -> case N < 10 of true -> $0 + N; false -> $a + N - 10 end.
 mnesia_new(TabName) ->
     case mnesia:start() of
         ok ->
-            N = erlang:binary_to_atom(<<"gleamunison_mnesia_", TabName/binary>>, utf8),
+            N = stable_name(<<"gleamunison_mnesia_", TabName/binary>>),
             case mnesia:create_table(N, [{attributes, [key, val]}, {type, set}]) of
                 {atomic, ok} ->
                     ok = mnesia:wait_for_tables([N], 5000),
@@ -166,3 +166,6 @@ mnesia_list_refs(Tab) ->
 
 mnesia_close(_Tab) -> {ok, nil}.
 
+stable_name(Bin) when is_binary(Bin) ->
+    Hex = iolist_to_binary(gleamunison_ffi:hash_to_hex(crypto:hash(sha256, Bin))),
+    erlang:binary_to_atom(<<"gleamunison_", Hex/binary>>, utf8).

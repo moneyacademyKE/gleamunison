@@ -329,3 +329,10 @@ pub fn insert_raw(
 pub fn get_adapter(codebase: Codebase) -> StorageAdapter {
   codebase.adapter
 }
+
+pub fn list_refs(codebase: Codebase) -> List(DefinitionRef) {
+  case codebase.adapter.list_refs() {
+    Ok(refs) -> refs
+    Error(_) -> []
+  }
+}

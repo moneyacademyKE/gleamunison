@@ -29,6 +29,43 @@ Gleamunison combines the type-safe concurrency of the BEAM (via Gleam) with Unis
 | Unique Type GUIDs | Low | Medium | **Adopted**: Prevents structural hash collisions. |
 | Remote Ability | High | Low | **Out-of-Scope**: Rely on BEAM distribution instead. |
 
+## How Hashes Act as Executables
+
+In `gleamunison`, a program is not a monolithic binary file. It is a **Merkle Directed Acyclic Graph (Merkle DAG)** of content-addressed AST definitions stored in a database.
+
+### The Merkle DAG Code Structure
+Each function definition is parsed into an AST and hashed based on its structure, stripping variable names to ensure α-equivalence. If a function references other functions, it references them strictly by their hashes (`RefTo` AST node).
+
+```
+                  ┌───────────────────────┐
+                  │   start-server Hash   │  ◄─── This single Root Hash IS the executable
+                  │       [#ff45e8]       │
+                  └───────────┬───────────┘
+                              │
+             ┌────────────────┴────────────────┐
+             ▼                                 ▼
+ ┌───────────────────────┐         ┌───────────────────────┐
+ │  page-template Hash   │         │    query-db Hash      │
+ │       [#ac88b2]       │         │       [#3b12ef]       │
+ └───────────────────────┘         └───────────┬───────────┘
+                                               │
+                                               ▼
+                                   ┌───────────────────────┐
+                                   │  Datalog-Transact Jet │
+                                   │  [#00000064] (Builtin)│
+                                   └───────────────────────┘
+```
+
+The entire application (CMS, database, or GUI) is represented by a single **root hash** (e.g. `#ff45e8`).
+
+### Step-by-Step Execution
+When running a program by its hash:
+1. **DAG Resolution**: The runtime looks up the root hash in its database, transitively walks the dependency graph, and fetches any missing dependency hashes from peers via the **Pull Sync Protocol**.
+2. **On-the-Fly Compilation**: The compiler translates the resolved AST nodes into Erlang BEAM bytecode binary arrays named after their hashes (e.g. `m_ff45e8.beam`).
+3. **Dynamic Loading & Run**: The VM dynamically loads the bytecode (`code:load_binary/3`) and calls the module's entrypoint function `'m_ff45e8':'$eval'()`.
+
+This enables zero-downtime hot upgrades (running new logic by swapping to a new root hash) and conflict-free dependency resolution.
+
 ## Unique Usecases (Impossible on Gleam or Unison Alone)
 
 Gleamunison combines the scheduling, distribution, and runtime efficiency of the BEAM with the content-addressing and algebraic effects constraints of Unison:
@@ -83,7 +120,7 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Conformance Tests
 
-To execute the suite of 5696 playbook conformance levels:
+To execute the playbook conformance suite:
 ```sh
 bb scripts/run_playbook_tests.clj
 ```

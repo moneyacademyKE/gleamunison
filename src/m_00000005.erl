@@ -3,5 +3,9 @@
 
 '$eval'() ->
     fun(Fun) when is_function(Fun) ->
-        erlang:spawn(Fun)
+        case erlang:fun_info(Fun, arity) of
+            {arity, 0} -> erlang:spawn(Fun);
+            {arity, 1} -> erlang:spawn(fun() -> Fun(0) end);
+            _ -> erlang:spawn(Fun)
+        end
     end.

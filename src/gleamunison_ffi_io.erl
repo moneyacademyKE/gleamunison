@@ -54,7 +54,25 @@ spawn_concurrent_evals() ->
 %% --- Sync protocol (peer networking) ---
 
 node_atom(NodeBin) ->
-    list_to_atom(binary_to_list(NodeBin)).
+    case valid_node_name(NodeBin) of
+        true -> list_to_atom(binary_to_list(NodeBin));
+        false -> error({invalid_node_name, NodeBin})
+    end.
+
+valid_node_name(NodeBin) when is_binary(NodeBin), byte_size(NodeBin) =< 255 ->
+    has_node_at(NodeBin) andalso valid_node_chars(NodeBin);
+valid_node_name(_) -> false.
+
+valid_node_chars(<<>>) -> true;
+valid_node_chars(<<C, Rest/binary>>) when C >= $a, C =< $z -> valid_node_chars(Rest);
+valid_node_chars(<<C, Rest/binary>>) when C >= $A, C =< $Z -> valid_node_chars(Rest);
+valid_node_chars(<<C, Rest/binary>>) when C >= $0, C =< $9 -> valid_node_chars(Rest);
+valid_node_chars(<<$., Rest/binary>>) -> valid_node_chars(Rest);
+valid_node_chars(<<$-, Rest/binary>>) -> valid_node_chars(Rest);
+valid_node_chars(<<$_, Rest/binary>>) -> valid_node_chars(Rest);
+valid_node_chars(<<$@, Rest/binary>>) -> valid_node_chars(Rest);
+valid_node_chars(<<$:, Rest/binary>>) -> valid_node_chars(Rest);
+valid_node_chars(_) -> false.
 
 has_node_at(Name) ->
     binary:match(Name, <<"@">>) =/= nomatch.
@@ -85,10 +103,13 @@ self_name() ->
 sync_connect(NodeBin) ->
     case has_node_at(NodeBin) of
         true ->
-            NodeAtom = node_atom(NodeBin),
-            case net_adm:ping(NodeAtom) of
-                pong -> {ok, nil};
-                pang -> {error, <<"Connection failed (pang)">>}
+            case safe_node_atom(NodeBin) of
+                {ok, NodeAtom} ->
+                    case net_adm:ping(NodeAtom) of
+                        pong -> {ok, nil};
+                        pang -> {error, <<"Connection failed (pang)">>}
+                    end;
+                {error, Reason} -> {error, Reason}
             end;
         false ->
             tcp_call(NodeBin, {connect, node()})
@@ -97,10 +118,13 @@ sync_connect(NodeBin) ->
 sync_send_refs(NodeBin, Refs) ->
     case has_node_at(NodeBin) of
         true ->
-            NodeAtom = node_atom(NodeBin),
-            case rpc:call(NodeAtom, gleamunison_ffi_io, register_peer_refs, [node(), Refs]) of
-                {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
-                Res -> {ok, Res}
+            case safe_node_atom(NodeBin) of
+                {ok, NodeAtom} ->
+                    case rpc:call(NodeAtom, gleamunison_ffi_io, register_peer_refs, [node(), Refs]) of
+                        {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
+                        Res -> {ok, Res}
+                    end;
+                {error, Reason} -> {error, Reason}
             end;
         false ->
             tcp_call(NodeBin, {send_refs, Refs})
@@ -109,10 +133,13 @@ sync_send_refs(NodeBin, Refs) ->
 sync_receive_diff(NodeBin) ->
     case has_node_at(NodeBin) of
         true ->
-            NodeAtom = node_atom(NodeBin),
-            case rpc:call(NodeAtom, gleamunison_ffi_io, compute_diff, [node()]) of
-                {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
-                Res -> {ok, Res}
+            case safe_node_atom(NodeBin) of
+                {ok, NodeAtom} ->
+                    case rpc:call(NodeAtom, gleamunison_ffi_io, compute_diff, [node()]) of
+                        {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
+                        Res -> {ok, Res}
+                    end;
+                {error, Reason} -> {error, Reason}
             end;
         false ->
             tcp_call(NodeBin, {receive_diff, []})
@@ -121,10 +148,13 @@ sync_receive_diff(NodeBin) ->
 sync_request_defs(NodeBin, Refs) ->
     case has_node_at(NodeBin) of
         true ->
-            NodeAtom = node_atom(NodeBin),
-            case rpc:call(NodeAtom, gleamunison_ffi_io, fetch_defs_binary, [Refs]) of
-                {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
-                Res -> {ok, Res}
+            case safe_node_atom(NodeBin) of
+                {ok, NodeAtom} ->
+                    case rpc:call(NodeAtom, gleamunison_ffi_io, fetch_defs_binary, [Refs]) of
+                        {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
+                        Res -> {ok, Res}
+                    end;
+                {error, Reason} -> {error, Reason}
             end;
         false ->
             tcp_call(NodeBin, {request_defs, Refs})
@@ -133,10 +163,13 @@ sync_request_defs(NodeBin, Refs) ->
 sync_push_defs(NodeBin, Defs) ->
     case has_node_at(NodeBin) of
         true ->
-            NodeAtom = node_atom(NodeBin),
-            case rpc:call(NodeAtom, gleamunison_ffi_io, receive_pushed_defs, [Defs]) of
-                {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
-                Res -> {ok, Res}
+            case safe_node_atom(NodeBin) of
+                {ok, NodeAtom} ->
+                    case rpc:call(NodeAtom, gleamunison_ffi_io, receive_pushed_defs, [Defs]) of
+                        {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
+                        Res -> {ok, Res}
+                    end;
+                {error, Reason} -> {error, Reason}
             end;
         false ->
             tcp_call(NodeBin, {push_defs, Defs})
@@ -235,3 +268,8 @@ serialize_term(Term) ->
 
 deserialize_term(Bytes) when is_binary(Bytes) ->
     erlang:binary_to_term(Bytes, [safe]).
+
+safe_node_atom(NodeBin) ->
+    try {ok, node_atom(NodeBin)}
+    catch _:_ -> {error, <<"Invalid node name">>}
+    end.

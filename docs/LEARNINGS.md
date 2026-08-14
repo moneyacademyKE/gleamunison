@@ -552,3 +552,17 @@ Generating separate source modules for thousands of test levels causes severe co
 ## 116. FFI Safe deserialization limits VM crash vectors
 
 Using `binary_to_term` without `[safe]` is a significant security vector as malicious binaries can trigger atom leakage or code loading. Forcing `[safe]` on all FFI and sync boundaries guarantees the runtime is resilient against denial-of-service and code injection.
+
+## 117. S-expression native implementation of databases avoids host complection
+
+Implementing a Datalog database natively inside the S-expression runtime (rather than as a compiled Gleam/Erlang module) completely decouples the database engine from the host platform lifecycle. The entire database system — EAVT indexes, transaction log, query solver, pull parser, and graph algorithms — runs as pure data, stored and synchronized by cryptographic content hashes. This makes the database itself immediately portable across BEAM nodes, serverless edge workers, and browser sandboxes without requiring code changes, binary compilation, or host restarts.
+
+## 118. Wrapping Gleam/Erlang libraries as Genesis Builtins (FFI Jets)
+
+FFI Jets bypass the dynamic S-expression compiler by intercepting specific content-addressed hashes at compile time. This allows performance-critical modules (such as database engines or cryptographic protocols) to execute pre-compiled native BEAM modules directly. By sharing the same hash identity as the guest-space definitions, the runtime achieves a zero-downtime, fully transparent optimization transition from interpreted logic to native compilation.
+
+## 119. S-Expression Parsing and Pure Nested Let / List Representation Invariants
+
+1. **Pure Nested Let**: The S-expression parser maps `(let var val body)` strictly as a 4-element AST form `SLet(var, val, body)`. Sequential declarations `(let a 1) (let b 2) body` must be explicitly nested as `(let a 1 (let b 2 body))` to avoid treating subsequent declarations as stray top-level expressions or argument overflows.
+2. **Product Pairs vs List Cons**: In GleamUnison, `(pair a b)` produces a 2-tuple `{pair, a, b}` (a product type), whereas list operations (`list-filter`, `list-map`, `list-reverse`, `list-fold`) operate on Erlang lists `[H | T]`. List prepending must be handled via `(cons x xs)` (aliased to `(list-append (list x) xs)`), with list element access mediated by `list-head` and `list-tail` rather than `fst` and `snd`.
+3. **Map Safety and Null Sentinel Handling**: Missing keys in `dict-get` return the Erlang atom `null` from `maps:get/3`. Calling `dict-get` on `null` or uninitialized integer sentinel `0` triggers Erlang `{badmap, ...}`. Implementing `dict-safe-get` to guard against both `null` and `0` ensures robust nil-safe tree traversal across dynamic dictionary stores.

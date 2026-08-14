@@ -161,11 +161,24 @@ url_decode(Bin) when is_binary(Bin) ->
     url_decode_hex(NoPlus, <<>>).
 
 url_decode_hex(<<$%, Hi, Lo, Rest/binary>>, Acc) ->
-    Hex = binary_to_integer(<<Hi, Lo>>, 16),
-    url_decode_hex(Rest, <<Acc/binary, Hex>>);
+    case hex_byte(Hi, Lo) of
+        {ok, Hex} -> url_decode_hex(Rest, <<Acc/binary, Hex>>);
+        error -> url_decode_hex(Rest, <<Acc/binary, $%, Hi, Lo>>)
+    end;
 url_decode_hex(<<C, Rest/binary>>, Acc) ->
     url_decode_hex(Rest, <<Acc/binary, C>>);
 url_decode_hex(<<>>, Acc) -> Acc.
+
+hex_byte(Hi, Lo) ->
+    case {hex_digit(Hi), hex_digit(Lo)} of
+        {{ok, H}, {ok, L}} -> {ok, H * 16 + L};
+        _ -> error
+    end.
+
+hex_digit(C) when C >= $0, C =< $9 -> {ok, C - $0};
+hex_digit(C) when C >= $A, C =< $F -> {ok, C - $A + 10};
+hex_digit(C) when C >= $a, C =< $f -> {ok, C - $a + 10};
+hex_digit(_) -> error.
 
 escape_json(Bin) when is_binary(Bin) ->
     B1 = binary:replace(Bin, <<"\\">>, <<"\\\\">>, [global]),
@@ -190,6 +203,7 @@ send_response(Socket, StatusCode, Body) ->
     gen_tcp:close(Socket).
 
 status_text(200) -> <<"OK">>;
+status_text(400) -> <<"Bad Request">>;
 status_text(404) -> <<"Not Found">>;
 status_text(403) -> <<"Forbidden">>;
 status_text(501) -> <<"Not Implemented">>;

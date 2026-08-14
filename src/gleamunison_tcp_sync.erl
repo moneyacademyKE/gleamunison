@@ -28,11 +28,12 @@ send_message({Host, Port}, Message) when is_list(Host); is_binary(Host) ->
             Bin = term_to_binary(Message),
             ok = gen_tcp:send(Sock, <<(byte_size(Bin)):32, Bin/binary>>),
             Result = case gen_tcp:recv(Sock, 4, 5000) of
-                {ok, <<Len:32>>} ->
+                {ok, <<Len:32>>} when Len =< 1048576 ->
                     case gen_tcp:recv(Sock, Len, 5000) of
-                        {ok, ReplyBin} -> {ok, binary_to_term(ReplyBin, [safe])};
+                        {ok, ReplyBin} -> safe_decode(ReplyBin);
                         {error, Reason} -> {error, {recv_body, Reason}}
                     end;
+                {ok, <<_Len:32>>} -> {error, message_too_large};
                 {error, Reason} -> {error, {recv_length, Reason}}
             end,
             gen_tcp:close(Sock),
@@ -45,7 +46,8 @@ send_message({Host, Port}, Message) when is_list(Host); is_binary(Host) ->
 
 init([]) ->
     {ok, LSock} = gen_tcp:listen(0, [binary, {packet, 0}, {active, false},
-                                      {reuseaddr, true}, {backlog, 32}]),
+                                      {reuseaddr, true}, {backlog, 32},
+                                      {ip, {127, 0, 0, 1}}]),
     {ok, Port} = inet:port(LSock),
     persistent_term:put({?MODULE, port}, Port),
     spawn_link(fun() -> acceptor(LSock) end),
@@ -86,16 +88,21 @@ acceptor(LSock) ->
 
 handle_connection(Sock) ->
     case gen_tcp:recv(Sock, 4, 30000) of
-        {ok, <<Len:32>>} ->
+        {ok, <<Len:32>>} when Len =< 1048576 ->
             case gen_tcp:recv(Sock, Len, 30000) of
                 {ok, Bin} ->
-                    Request = binary_to_term(Bin, [safe]),
-                    Reply = dispatch(Request),
+                    Reply = case safe_decode(Bin) of
+                        {ok, Request} -> dispatch(Request);
+                        {error, Reason} -> {error, Reason}
+                    end,
                     ReplyBin = term_to_binary(Reply),
                     gen_tcp:send(Sock, <<(byte_size(ReplyBin)):32, ReplyBin/binary>>);
                 {error, _} ->
                     ok
             end;
+        {ok, <<_Len:32>>} ->
+            ReplyBin = term_to_binary({error, <<"message too large">>}),
+            gen_tcp:send(Sock, <<(byte_size(ReplyBin)):32, ReplyBin/binary>>);
         {error, _} ->
             ok
     end,
@@ -103,25 +110,30 @@ handle_connection(Sock) ->
 
 %% --- Dispatch ---
 
-dispatch({SelfName, {connect, _Name}}) ->
+dispatch({SelfName, {connect, _Name}}) when is_binary(SelfName) ->
     gleamunison_ffi_io:register_peer_refs(SelfName, []),
     ok;
 
-dispatch({SelfName, {send_refs, Refs}}) ->
+dispatch({SelfName, {send_refs, Refs}}) when is_binary(SelfName), is_list(Refs) ->
     gleamunison_ffi_io:register_peer_refs(SelfName, Refs),
     ok;
 
-dispatch({SelfName, {receive_diff, _Refs}}) ->
+dispatch({SelfName, {receive_diff, _Refs}}) when is_binary(SelfName) ->
     Diff = gleamunison_ffi_io:compute_diff(SelfName),
     {ok, Diff};
 
-dispatch({_SelfName, {request_defs, Refs}}) ->
+dispatch({_SelfName, {request_defs, Refs}}) when is_list(Refs) ->
     Defs = gleamunison_ffi_io:fetch_defs_binary(Refs),
     {ok, Defs};
 
-dispatch({_SelfName, {push_defs, Defs}}) ->
+dispatch({_SelfName, {push_defs, Defs}}) when is_list(Defs) ->
     gleamunison_ffi_io:receive_pushed_defs(Defs),
     ok;
 
 dispatch(_Unknown) ->
     {error, <<"unknown message type">>}.
+
+safe_decode(Bin) ->
+    try {ok, binary_to_term(Bin, [safe])}
+    catch _:_ -> {error, <<"invalid message">>}
+    end.

@@ -753,3 +753,31 @@ Consolidating massive test specs into a portable external database (JSON/EDN) in
 Monitoring Ranch/Cowboy network sockets by tracking the underlying Erlang port (`erlang:monitor(port, Socket)`) instead of process identifiers, avoiding lifecycle synchronization errors when Cowboy recycles handler processes.
 
 **Applied in:** `gleamunison_http_routes.erl`
+
+---
+
+## 83. Pure S-Expression Immutable Database State
+
+Representing the entire database state as immutable nested S-expression pairs and dicts, where each transaction returns a brand new version of the database. This leverages the purity of the language to enable simple time-travel, as-of querying, and bitemporal history replays without relying on host-level mutations or mutable garbage collection halts.
+
+**Applied in:** `gleamunison_datalog/src/`
+
+---
+
+## 84. FFI Jet Compilation Interception
+
+Intercepting specific content-addressed definition hashes at compile time to substitute dynamic AST compilation with a direct delegation call to a pre-compiled native Erlang/Gleam module. This maintains a uniform, content-addressed identity space in user code while achieving bare-metal execution performance for core platform primitives.
+
+**Applied in:** `src/gleamunison/jets.gleam`, `src/gleamunison/compile.gleam`
+
+---
+
+## 85. Strict S-Expression AST Decomposition and Safe Map Traversals
+
+1. **Nested Let Binding Composition**: Ensuring all S-expression `let` bindings strictly form 4-element AST tuples `SLet(var, val, body)` via recursive nesting `(let a 1 (let b 2 body))` instead of sequential declaration shapes.
+2. **Product Pair vs List Cons Separation**: Disambiguating 2-tuple product records `(pair a b)` from collection lists `[H | T]` by providing `cons` (`(list-append (list x) xs)`), `list-head`, and `list-tail` abstractions over primitive lists.
+3. **Map Nil-Safety**: Guarding dynamic map lookups against uninitialized integer sentinels and `null` atoms via `dict-safe-get` to eliminate BEAM runtime `{badmap, ...}` exceptions.
+
+**Applied in:** `gleamunison_datalog/src/01_core.lisp`, `gleamunison_datalog/src/02_index.lisp`, `gleamunison_datalog/src/05_query.lisp`
+
+

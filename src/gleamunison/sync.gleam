@@ -3,7 +3,7 @@ import gleam/list
 import gleam/option.{Some}
 import gleam/set
 import gleam/string
-import gleamunison/codebase.{type Codebase}
+import gleamunison/codebase.{type Codebase, list_refs}
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/sync_types.{
@@ -25,7 +25,11 @@ pub fn pull_sync(
   let PeerId(name) = peer
   case sync_connect(name) {
     Ok(_) -> {
-      let our_refs = set.to_list(state.known_refs)
+      let our_refs =
+        set.to_list(set.union(
+          state.known_refs,
+          set.from_list(list_refs(codebase)),
+        ))
       let ref_strings =
         list.map(our_refs, fn(r) {
           let Ref(h) = r

@@ -55,7 +55,7 @@ fn dispatch(
           io.println(
             "Unknown command: '"
             <> cmd
-            <> "'. Try: server, repl, all, verify, level1..level1000",
+            <> "'. Try: server, repl, all, verify, level1..level6697",
           )
       }
   }
@@ -77,7 +77,7 @@ fn run_all_levels(levels: dict.Dict(String, fn() -> Nil)) -> Nil {
       Error(_) -> Nil
     }
   })
-  io.println("=== All 1250 levels complete ===")
+  io.println("=== All available levels complete ===")
 }
 
 fn print_help() -> Nil {
@@ -86,6 +86,6 @@ fn print_help() -> Nil {
   io.println("  server [port]   — start web server (default port 8080)")
   io.println("  repl            — interactive REPL")
   io.println("  verify [file]   — verify a scratch.lisp file")
-  io.println("  all             — run all levels (1-1250)")
-  io.println("  levelN          — run level N (1-1250)")
+  io.println("  all             — run all available levels")
+  io.println("  levelN          — run level N")
 }
