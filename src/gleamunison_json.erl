@@ -10,8 +10,7 @@ encode(Term) ->
 
 decode(Bin) when is_binary(Bin) ->
     try json:decode(Bin) of
-        {ok, Term} -> {ok, erl_to_gleam(Term)};
-        {error, Reason} -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
+        Term -> {ok, erl_to_gleam(Term)}
     catch
         _:Reason -> {error, unicode:characters_to_binary(io_lib:format("~p", [Reason]))}
     end.
