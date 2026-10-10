@@ -1,6 +1,7 @@
 -module(gleamunison_ffi_test).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
 -export([start_echo_server/0]).
+-export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 
 test_storage_owner_survives() ->
     Parent = self(),
@@ -230,3 +231,33 @@ echo_content_length([], Acc) -> Acc.
 echo_name(K) when is_atom(K) -> atom_to_binary(K, utf8);
 echo_name(K) when is_binary(K) -> K;
 echo_name(K) when is_list(K) -> list_to_binary(K).
+
+%% Test-grade mutable cells via the process dictionary (each gleeunit test
+%% runs in one process, so scripted handlers can count and record).
+pd_counter_inc(Key) ->
+    N = case erlang:get({pd_counter, Key}) of
+        undefined -> 1;
+        M when is_integer(M) -> M + 1
+    end,
+    erlang:put({pd_counter, Key}, N),
+    N.
+
+pd_counter_get(Key) ->
+    case erlang:get({pd_counter, Key}) of
+        undefined -> 0;
+        M -> M
+    end.
+
+pd_record(Key, Value) ->
+    Old = case erlang:get({pd_records, Key}) of
+        undefined -> [];
+        L -> L
+    end,
+    erlang:put({pd_records, Key}, [Value | Old]),
+    nil.
+
+pd_records(Key) ->
+    case erlang:get({pd_records, Key}) of
+        undefined -> [];
+        L -> lists:reverse(L)
+    end.
