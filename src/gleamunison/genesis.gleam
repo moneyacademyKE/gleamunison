@@ -217,3 +217,14 @@ pub fn builtin_http_get() -> DefinitionRef {
 pub fn builtin_file_read() -> DefinitionRef {
   Ref(identity.hash_from_bytes(<<53:256>>))
 }
+
+// Abilities (54+): the ability definition itself carries the hash; its
+// operations are positional indices handled via effects.run handler frames.
+pub fn builtin_ability_llm() -> DefinitionRef {
+  Ref(identity.hash_from_bytes(<<54:256>>))
+}
+
+// Reserved: streaming LLM op (gap-analysis concept G, deferred).
+pub fn builtin_ability_llm_stream() -> DefinitionRef {
+  Ref(identity.hash_from_bytes(<<55:256>>))
+}
