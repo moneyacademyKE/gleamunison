@@ -1,5 +1,6 @@
 -module(gleamunison_ffi_test).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
+-export([start_echo_server/0]).
 
 test_storage_owner_survives() ->
     Parent = self(),
@@ -156,3 +157,76 @@ test_ffi_io_coverage() ->
     {error, <<"hmac failed">>} = gleamunison_crypto:hmac(<<"trigger_error">>, <<"key">>, Bin),
 
     {ok, nil}.
+
+%% One-shot HTTP echo server for tests: accepts a single request, replies 200
+%% with a body describing exactly what the server received (headers + body).
+start_echo_server() ->
+    {ok, _} = application:ensure_all_started(inets),
+    case whereis(gleamunison_echo_test) of
+        undefined -> ok;
+        _ -> erlang:error({echo_server_busy, gleamunison_echo_test})
+    end,
+    {ok, LSock} = gen_tcp:listen(0, [
+        binary, {active, false}, {reuseaddr, true},
+        {packet, http_bin}, {ip, {127, 0, 0, 1}}
+    ]),
+    {ok, Port} = inet:port(LSock),
+    Pid = spawn(fun() -> echo_accept(LSock) end),
+    register(gleamunison_echo_test, Pid),
+    {ok, Port}.
+
+echo_accept(LSock) ->
+    case gen_tcp:accept(LSock, 10000) of
+        {ok, Sock} ->
+            echo_collect(Sock, []),
+            gen_tcp:close(Sock);
+        {error, _} -> ok
+    end,
+    gen_tcp:close(LSock),
+    unregister(gleamunison_echo_test),
+    ok.
+
+echo_collect(Sock, Headers) ->
+    case gen_tcp:recv(Sock, 0, 5000) of
+        {ok, {http_request, _Method, _Path, _V}} ->
+            echo_collect(Sock, Headers);
+        {ok, {http_header, _, Name, _, Value}} ->
+            echo_collect(Sock, [{Name, Value} | Headers]);
+        {ok, http_eoh} ->
+            Len = echo_content_length(Headers, 0),
+            inet:setopts(Sock, [{packet, raw}]),
+            Body = case Len of
+                0 -> <<>>;
+                _ ->
+                    case gen_tcp:recv(Sock, Len, 5000) of
+                        {ok, B} -> B;
+                        _ -> <<>>
+                    end
+            end,
+            HeaderTxt = iolist_to_binary([
+                [echo_name(K), <<": ">>, V, <<"\n">>]
+             || {K, V} <- lists:reverse(Headers)
+            ]),
+            RespBody = <<HeaderTxt/binary, <<"BODY:">>/binary, Body/binary>>,
+            Resp = iolist_to_binary([
+                <<"HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\ncontent-length: ">>,
+                integer_to_binary(byte_size(RespBody)),
+                <<"\r\nconnection: close\r\n\r\n">>,
+                RespBody
+            ]),
+            gen_tcp:send(Sock, Resp),
+            ok;
+        _ -> ok
+    end.
+
+echo_content_length([{K, V} | Rest], _Acc) ->
+    case string:lowercase(echo_name(K)) of
+        <<"content-length">> ->
+            binary_to_integer(iolist_to_binary(V));
+        _ -> echo_content_length(Rest, _Acc)
+    end;
+echo_content_length([], Acc) -> Acc.
+
+echo_name(K) when is_atom(K) -> atom_to_binary(K, utf8);
+echo_name(K) when is_binary(K) -> K;
+echo_name(K) when is_list(K) -> list_to_binary(K).

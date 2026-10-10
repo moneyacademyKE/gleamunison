@@ -1,8 +1,21 @@
 import gleam/bit_array
 import gleam/list
+import gleam/string
 
 pub opaque type HttpResponse {
   HttpResponse(status: Int, headers: List(#(String, String)), body: BitArray)
+}
+
+pub fn status(resp: HttpResponse) -> Int {
+  resp.status
+}
+
+pub fn body(resp: HttpResponse) -> BitArray {
+  resp.body
+}
+
+pub fn headers(resp: HttpResponse) -> List(#(String, String)) {
+  resp.headers
 }
 
 pub type HttpError {
@@ -51,6 +64,44 @@ fn map_headers(
       #(unpack(k), unpack(v))
     })
   res
+}
+
+@external(erlang, "gleamunison_http_client", "request")
+fn ffi_request(
+  method: BitArray,
+  url: BitArray,
+  headers: List(#(BitArray, BitArray)),
+  body: BitArray,
+) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
+
+/// Header-aware request — the general form; get/post/put/delete are the
+/// no-header conveniences preserved for existing callers.
+pub fn request(
+  method: String,
+  url: String,
+  headers: List(#(String, String)),
+  body: BitArray,
+) -> Result(HttpResponse, HttpError) {
+  let bin_headers =
+    list.map(headers, fn(kv) {
+      let #(k, v) = kv
+      #(pack(k), pack(v))
+    })
+  case
+    ffi_request(pack(string.uppercase(method)), pack(url), bin_headers, body)
+  {
+    Ok(#(status, resp_headers, resp_body)) ->
+      Ok(HttpResponse(status, map_headers(resp_headers), resp_body))
+    Error(e) -> Error(HttpError(unpack(e)))
+  }
+}
+
+pub fn post_with_headers(
+  url: String,
+  headers: List(#(String, String)),
+  body: BitArray,
+) -> Result(HttpResponse, HttpError) {
+  request("POST", url, headers, body)
 }
 
 pub fn get(url: String) -> Result(HttpResponse, HttpError) {
