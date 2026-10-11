@@ -1,6 +1,7 @@
 -module(gleamunison_ffi_test).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
 -export([start_echo_server/0]).
+-export([start_http_server/1, http_post/3]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 
 test_storage_owner_survives() ->
@@ -260,4 +261,59 @@ pd_records(Key) ->
     case erlang:get({pd_records, Key}) of
         undefined -> [];
         L -> lists:reverse(L)
+    end.
+
+%% Start the real HTTP server on Port, backgrounded, and wait until the
+%% listener accepts connections (up to ~1s).
+start_http_server(Port) ->
+    spawn(fun() -> gleamunison_http:start_server(Port) end),
+    wait_for_port(Port, 10),
+    nil.
+
+wait_for_port(_Port, 0) -> ok;
+wait_for_port(Port, N) ->
+    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 200) of
+        {ok, S} -> gen_tcp:close(S), ok;
+        {error, _} -> timer:sleep(100), wait_for_port(Port, N - 1)
+    end.
+
+%% Raw POST client: sends Body with Content-Length, returns {Status, RespBody}.
+http_post(Port, Path, Body) ->
+    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {error, Reason} ->
+            {error, iolist_to_binary(io_lib:format("connect: ~p", [Reason]))};
+        {ok, Socket} ->
+            Req = iolist_to_binary(io_lib:format(
+                "POST ~s HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
+                [Path, byte_size(Body), Body])),
+            ok = gen_tcp:send(Socket, Req),
+            Result = recv_all(Socket, <<>>),
+            gen_tcp:close(Socket),
+            case Result of
+                {ok, Resp} -> parse_http_response(Resp);
+                {error, R} ->
+                    {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
+            end
+    end.
+
+recv_all(Socket, Acc) ->
+    case gen_tcp:recv(Socket, 0, 5000) of
+        {ok, Data} -> recv_all(Socket, <<Acc/binary, Data/binary>>);
+        {error, closed} -> {ok, Acc};
+        {error, Reason} -> {error, Reason}
+    end.
+
+parse_http_response(Bin) ->
+    case binary:split(Bin, <<"\r\n">>) of
+        [StatusLine, Rest] ->
+            case binary:split(StatusLine, <<" ">>, [global]) of
+                [_, CodeBin | _] ->
+                    Status = binary_to_integer(CodeBin),
+                    case binary:split(Rest, <<"\r\n\r\n">>) of
+                        [_Headers, Body] -> {ok, {Status, Body}};
+                        [_] -> {ok, {Status, <<>>}}
+                    end;
+                _ -> {error, <<"bad status line">>}
+            end;
+        _ -> {error, <<"bad response">>}
     end.
