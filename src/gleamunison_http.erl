@@ -49,12 +49,69 @@ handle_request(Socket) ->
     case gen_tcp:recv(Socket, 0, 5000) of
         {ok, {http_request, 'GET', {abs_path, Path}, _Version}} ->
             handle_route(Socket, Path);
+        {ok, {http_request, 'POST', {abs_path, Path}, _Version}} ->
+            handle_post(Socket, Path);
         {ok, _Other} ->
             gleamunison_http_util:send_response(Socket, 501, <<"Not Implemented">>);
         {error, closed} ->
             ok;
         {error, timeout} ->
             gen_tcp:close(Socket)
+    end.
+
+%% Read headers until end-of-headers, keeping Content-Length, then read
+%% exactly that many body bytes. Socket is in {packet, http_bin} mode at
+%% entry; switches to raw mode for the body.
+handle_post(Socket, Path) ->
+    case read_headers(Socket, 0) of
+        {ok, ContentLength} ->
+            inet:setopts(Socket, [{packet, raw}]),
+            Body = case ContentLength of
+                0 -> <<>>;
+                _ ->
+                    case gen_tcp:recv(Socket, ContentLength, 5000) of
+                        {ok, B} -> B;
+                        {error, _} -> <<>>
+                    end
+            end,
+            handle_post_route(Socket, Path, Body);
+        {error, _} ->
+            gen_tcp:close(Socket)
+    end.
+
+read_headers(Socket, ContentLength) ->
+    case gen_tcp:recv(Socket, 0, 5000) of
+        {ok, {http_header, _, 'Content-Length', _, Value}} ->
+            read_headers(Socket, binary_to_integer(Value));
+        {ok, {http_header, _, _, _, _}} ->
+            read_headers(Socket, ContentLength);
+        {ok, http_eoh} ->
+            {ok, ContentLength};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+handle_post_route(Socket, <<"/mcp">>, Body) ->
+    handle_mcp_route(Socket, Body);
+handle_post_route(Socket, _Path, _Body) ->
+    gleamunison_http_util:send_json(Socket, 404, <<"{\"error\":\"not found\"}">>).
+
+handle_mcp_route(Socket, Body) ->
+    case whereis(gleamunison_mcp_session) of
+        undefined ->
+            gleamunison_http_util:send_json(
+                Socket, 503, <<"{\"error\":\"mcp session not running\"}">>);
+        Pid ->
+            Pid ! {rpc, Body, self()},
+            receive
+                {mcp_reply, {ok, Reply}} ->
+                    gleamunison_http_util:send_json(Socket, 200, Reply);
+                {mcp_reply, no_reply} ->
+                    gleamunison_http_util:send_json(Socket, 202, <<>>)
+            after 30000 ->
+                gleamunison_http_util:send_json(
+                    Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
+            end
     end.
 
 handle_route(Socket, <<"/eval", Rest/binary>>) ->
