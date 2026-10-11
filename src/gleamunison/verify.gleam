@@ -8,7 +8,7 @@ import gleamunison/repl_eval
 import gleamunison/types.{type TypeCache, empty_cache}
 import simplifile
 
-fn parse_all_sexprs(
+pub fn parse_all_sexprs(
   tokens: List(lexer.TokenInfo),
   acc: List(SExpr),
 ) -> Result(List(SExpr), lexer.ParseError) {
@@ -23,7 +23,7 @@ fn parse_all_sexprs(
   }
 }
 
-fn terms_from_sexprs(
+pub fn terms_from_sexprs(
   exprs: List(SExpr),
   acc: List(SurfaceTerm),
 ) -> Result(List(SurfaceTerm), lexer.ParseError) {
@@ -65,7 +65,7 @@ fn verify_terms(
   }
 }
 
-fn get_init_defs() -> List(#(String, SurfaceDef)) {
+pub fn get_init_defs() -> List(#(String, SurfaceDef)) {
   let init_defs =
     list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
   let assert Ok(compare_term) =
