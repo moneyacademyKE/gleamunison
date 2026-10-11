@@ -6,6 +6,7 @@ import gleam/io
 import gleam/list
 import gleamunison/cli_llm
 import gleamunison/cli_mcp
+import gleamunison/cli_watch
 import gleamunison/http
 import gleamunison/repl
 import gleamunison/verify
@@ -23,6 +24,8 @@ pub fn run(args: List(String)) -> Nil {
     [] -> print_help()
     ["llm", ..rest] -> io.println(cli_llm.command(rest))
     ["mcp", ..rest] -> cli_mcp.command(rest)
+    ["watch", path] -> cli_watch.command(path)
+    ["watch"] -> io.println("usage: gleam run -- watch <file.lisp>")
     [cmd] -> dispatch(cmd, "8080", levels)
     [cmd, param] -> dispatch(cmd, param, levels)
     [cmd, ..] -> dispatch(cmd, "8080", levels)
