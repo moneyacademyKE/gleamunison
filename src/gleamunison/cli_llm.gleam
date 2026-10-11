@@ -8,7 +8,6 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
-import gleam/string
 import gleamunison/effects.{type OpHandler}
 import gleamunison/json
 import gleamunison/llm.{
