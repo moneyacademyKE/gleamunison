@@ -5,6 +5,7 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleamunison/cli_llm
+import gleamunison/cli_mcp
 import gleamunison/http
 import gleamunison/repl
 import gleamunison/verify
@@ -21,6 +22,7 @@ pub fn run(args: List(String)) -> Nil {
   case args {
     [] -> print_help()
     ["llm", ..rest] -> io.println(cli_llm.command(rest))
+    ["mcp", ..rest] -> cli_mcp.command(rest)
     [cmd] -> dispatch(cmd, "8080", levels)
     [cmd, param] -> dispatch(cmd, param, levels)
     [cmd, ..] -> dispatch(cmd, "8080", levels)
@@ -90,6 +92,9 @@ fn print_help() -> Nil {
   io.println("  verify [file]   — verify a scratch.lisp file")
   io.println(
     "  llm [provider] <prompt> — call an LLM (openai|anthropic, env keys)",
+  )
+  io.println(
+    "  mcp [port] [--load f] — MCP server for agents (default port 8099)",
   )
   io.println("  all             — run all available levels")
   io.println("  levelN          — run level N")
