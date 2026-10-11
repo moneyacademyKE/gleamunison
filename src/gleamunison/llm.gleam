@@ -126,7 +126,7 @@ fn join_contents(msgs: List(Message)) -> String {
   |> string.join("\n")
 }
 
-fn messages_json(msgs: List(Message)) -> String {
+pub fn messages_json(msgs: List(Message)) -> String {
   let parts =
     list.map(msgs, fn(m) {
       "{\"role\":"

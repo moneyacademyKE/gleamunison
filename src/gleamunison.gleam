@@ -4,6 +4,7 @@ import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
+import gleamunison/cli_llm
 import gleamunison/http
 import gleamunison/repl
 import gleamunison/verify
@@ -19,6 +20,7 @@ pub fn run(args: List(String)) -> Nil {
   let levels = dogfood.all_levels()
   case args {
     [] -> print_help()
+    ["llm", ..rest] -> io.println(cli_llm.command(rest))
     [cmd] -> dispatch(cmd, "8080", levels)
     [cmd, param] -> dispatch(cmd, param, levels)
     [cmd, ..] -> dispatch(cmd, "8080", levels)
@@ -86,6 +88,9 @@ fn print_help() -> Nil {
   io.println("  server [port]   — start web server (default port 8080)")
   io.println("  repl            — interactive REPL")
   io.println("  verify [file]   — verify a scratch.lisp file")
+  io.println(
+    "  llm [provider] <prompt> — call an LLM (openai|anthropic, env keys)",
+  )
   io.println("  all             — run all available levels")
   io.println("  levelN          — run level N")
 }
