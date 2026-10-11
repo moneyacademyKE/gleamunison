@@ -4,7 +4,9 @@ import gleam/string
 import gleamunison/cli_llm
 import gleamunison/llm.{Completion}
 
-fn fake_env(pairs: List(#(String, String))) -> fn(String) -> Result(String, Nil) {
+fn fake_env(
+  pairs: List(#(String, String)),
+) -> fn(String) -> Result(String, Nil) {
   fn(key) {
     case list_find(pairs, key) {
       Ok(v) -> Ok(v)
@@ -13,7 +15,10 @@ fn fake_env(pairs: List(#(String, String))) -> fn(String) -> Result(String, Nil)
   }
 }
 
-fn list_find(pairs: List(#(String, String)), key: String) -> Result(String, Nil) {
+fn list_find(
+  pairs: List(#(String, String)),
+  key: String,
+) -> Result(String, Nil) {
   case pairs {
     [] -> Error(Nil)
     [#(k, v), ..rest] ->
@@ -60,8 +65,7 @@ pub fn default_provider_prefers_anthropic_when_key_present_test() {
 }
 
 pub fn complete_with_mock_returns_completion_test() {
-  let handler =
-    llm.mock_handler(Completion("hello back", "mock-model", 3, 7))
+  let handler = llm.mock_handler(Completion("hello back", "mock-model", 3, 7))
   let assert Ok(c) = cli_llm.complete_with(handler, "hi")
   let assert True = c.content == "hello back"
   let assert True = c.model == "mock-model"
@@ -69,16 +73,13 @@ pub fn complete_with_mock_returns_completion_test() {
 }
 
 pub fn complete_with_surfaces_handler_error_test() {
-  let handler = fn(_args, cont) {
-    cont(cast_error("quota exhausted"))
-  }
+  let handler = fn(_args, cont) { cont(cast_error("quota exhausted")) }
   let assert Error(msg) = cli_llm.complete_with(handler, "hi")
   let assert True = string.contains(msg, "quota exhausted")
 }
 
 pub fn command_with_handler_end_to_end_test() {
-  let handler =
-    llm.mock_handler(Completion("it works", "mock-1", 1, 2))
+  let handler = llm.mock_handler(Completion("it works", "mock-1", 1, 2))
   let env = fake_env([#("ANTHROPIC_API_KEY", "sk-ant")])
   let out = cli_llm.command_with_handler(["anthropic", "say hi"], env, handler)
   let assert True = string.contains(out, "it works")

@@ -2,6 +2,54 @@
 
 ---
 
+## What's New in v3.13.0 (2026-10-12)
+
+Release v3.13.0 gives the codebase a machine-facing socket and closes the small parity items from the Unison 1.5.0 gap analysis:
+
+### 1. MCP Server (`mcp.gleam`, `mcp_session.gleam`, `cli_mcp.gleam`)
+- **Pure JSON-RPC 2.0 protocol layer**: initialize, `tools/list`, `tools/call` — data in, data out, fully tested without sockets.
+- **Four tools over the real search engine**: `search_definitions`, `get_definition`, `list_definitions`, `parse_query` — backed by the existing BM25 + vector index, no fake datalog executor.
+- **HTTP transport learned to read bodies**: the server previously dropped everything after the header terminator; it now honors Content-Length POSTs and routes `/mcp`.
+- **CLI**: `gleam run -- mcp [--port N]` (default 8099). Point any MCP client at `http://localhost:8099/mcp`.
+
+### 2. Watch Mode
+- `gleam run -- watch <file.lisp>` — polls file mtime and re-verifies on every change, the `run>`-style DX loop.
+
+### 3. Argon2id Jet (`argon2id.erl`, `blake2b.erl`, `secure_compare`)
+- Pure-Erlang BLAKE2b and Argon2id memory-hard hashing, validated against the RFC 7693 and RFC 9106 reference vectors (cross-checked per-round against the RFC's own C reference implementation).
+- Constant-time `secure_compare` for credential verification.
+
+### 4. Named Patch Entity (`patch.gleam`)
+- Content-addressed, named patch definitions mapping an old definition ref to a new one, with dependent rewriting — the durable update-propagation entity.
+
+---
+
+## What's New in v3.12.0 (2026-10-11)
+
+Release v3.12.0 adds the full LLM surface from the BAML gap analysis:
+
+### 1. LLM Ability (`llm.gleam`, `cli_llm.gleam`)
+- The LLM call as an effect: OpenAI and Anthropic providers as handlers; retries, fallbacks, and test mocks as plain handler composition.
+- CLI: `gleam run -- llm [openai|anthropic] <prompt>`, keys via `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`.
+
+### 2. SAP Tolerant Parser (`sap.gleam`)
+- Schema-aligned parsing of near-miss model output: code fences, preamble yapping, trailing commas, single quotes, unquoted keys, comments, and Python literals, with field-path validation errors.
+
+### 3. Content-Addressed Prompts (`prompts.gleam`)
+- Prompt templates live in the Merkle DAG as hashed definitions: hash-pinned rollout, conflict-free sync, audit identity by construction.
+
+### 4. Schema Printer (`schema.gleam`)
+- `ast.Type` to compact schema text (`List<string>`-style) for structured-output prompting.
+
+### 5. Root Fixes
+- Repaired the runtime JSON decode path for OTP 27 bare-term semantics (previously crashed on every decode, genesis builtin 51 included).
+- HTTP client header support (`request/4`, `post_with_headers`).
+
+### 6. Documentation
+- Gap analyses: `docs/gap-analysis-gleamunison-vs-baml.md`, `docs/gap-analysis-v3.12.0-unison-v1.5.0.md`.
+
+---
+
 ## What's New in v3.11.0 (2026-08-14)
 
 Release v3.11.0 introduces the **Native Content-Addressed Datalog Database Engine**, complete security hardening across all FFI boundaries, and automated Hex package publishing:
