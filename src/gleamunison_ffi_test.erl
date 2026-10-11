@@ -1,7 +1,7 @@
 -module(gleamunison_ffi_test).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
 -export([start_echo_server/0]).
--export([start_http_server/1, http_post/3]).
+-export([start_http_server/1, http_post/3, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 
 test_storage_owner_survives() ->
@@ -302,6 +302,10 @@ recv_all(Socket, Acc) ->
         {error, closed} -> {ok, Acc};
         {error, Reason} -> {error, Reason}
     end.
+
+%% Native OTP BLAKE2b-64 for cross-checking our pure implementation.
+otp_blake2b64(Data) ->
+    crypto:hash(blake2b, Data).
 
 parse_http_response(Bin) ->
     case binary:split(Bin, <<"\r\n">>) of

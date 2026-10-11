@@ -64,3 +64,108 @@ pub fn hash_hex(
     Error(e) -> Error(e)
   }
 }
+
+/// Hex-encode raw bytes (no hashing).
+pub fn to_hex(bytes: BitArray) -> String {
+  ffi_hash_to_hex(bytes)
+}
+
+// ── BLAKE2b with variable digest length (RFC 7693) ─────────────────────
+
+@external(erlang, "gleamunison_crypto", "blake2b")
+fn ffi_blake2b(data: BitArray, out_len: Int) -> Result(BitArray, String)
+
+pub fn blake2b(data: BitArray, out_len: Int) -> Result(BitArray, CryptoError) {
+  ffi_blake2b(data, out_len)
+  |> result.map_error(fn(e) { InvalidInput(e) })
+}
+
+pub fn blake2b_hex(
+  data: BitArray,
+  out_len: Int,
+) -> Result(String, CryptoError) {
+  case blake2b(data, out_len) {
+    Ok(d) -> Ok(ffi_hash_to_hex(d))
+    Error(e) -> Error(e)
+  }
+}
+
+// ── Argon2id password hashing (RFC 9106) ────────────────────────────────
+
+pub type Argon2Params {
+  Argon2Params(
+    password: BitArray,
+    salt: BitArray,
+    secret: BitArray,
+    ad: BitArray,
+    passes: Int,
+    memory_kib: Int,
+    parallelism: Int,
+    tag_length: Int,
+  )
+}
+
+@external(erlang, "gleamunison_crypto", "argon2id")
+fn ffi_argon2id(
+  password: BitArray,
+  salt: BitArray,
+  secret: BitArray,
+  ad: BitArray,
+  passes: Int,
+  memory_kib: Int,
+  parallelism: Int,
+  tag_length: Int,
+) -> Result(BitArray, String)
+
+pub fn argon2id(params: Argon2Params) -> Result(BitArray, CryptoError) {
+  ffi_argon2id(
+    params.password,
+    params.salt,
+    params.secret,
+    params.ad,
+    params.passes,
+    params.memory_kib,
+    params.parallelism,
+    params.tag_length,
+  )
+  |> result.map_error(fn(e) { InvalidInput(e) })
+}
+
+@external(erlang, "gleamunison_crypto", "argon2_h0")
+fn ffi_argon2_h0(
+  password: BitArray,
+  salt: BitArray,
+  secret: BitArray,
+  ad: BitArray,
+  passes: Int,
+  memory_kib: Int,
+  parallelism: Int,
+  tag_length: Int,
+) -> BitArray
+
+/// Test support: H0 intermediate for RFC 9106 section 5.3 cross-checks.
+/// Never call on production password material.
+pub fn argon2_h0_debug_hex(
+  params: Argon2Params,
+) -> Result(String, CryptoError) {
+  Ok(
+    ffi_hash_to_hex(ffi_argon2_h0(
+      params.password,
+      params.salt,
+      params.secret,
+      params.ad,
+      params.passes,
+      params.memory_kib,
+      params.parallelism,
+      params.tag_length,
+    )),
+  )
+}
+
+@external(erlang, "gleamunison_crypto", "secure_compare")
+fn ffi_secure_compare(a: BitArray, b: BitArray) -> Bool
+
+/// Constant-time comparison (for tag verification).
+pub fn secure_compare(a: BitArray, b: BitArray) -> Bool {
+  ffi_secure_compare(a, b)
+}
