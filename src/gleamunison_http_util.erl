@@ -203,10 +203,13 @@ send_response(Socket, StatusCode, Body) ->
     gen_tcp:close(Socket).
 
 status_text(200) -> <<"OK">>;
+status_text(202) -> <<"Accepted">>;
 status_text(400) -> <<"Bad Request">>;
 status_text(404) -> <<"Not Found">>;
 status_text(403) -> <<"Forbidden">>;
 status_text(501) -> <<"Not Implemented">>;
+status_text(503) -> <<"Service Unavailable">>;
+status_text(504) -> <<"Gateway Timeout">>;
 status_text(_) -> <<"Internal Server Error">>.
 
 mime_type(Path) when is_binary(Path) ->
