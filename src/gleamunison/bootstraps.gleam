@@ -21,6 +21,7 @@ pub type BootstrapDef {
 pub fn get_init_defs_data() -> List(BootstrapDef) {
   [
     BAbility("Console", [BOp("print", [BTText], BTInt)]),
+    BAbility("Test", [BOp("expect", [BTInt], BTInt)]),
     BAbility("State", [
       BOp("get", [BTText], BTText),
       BOp("set", [BTText, BTText], BTText),
