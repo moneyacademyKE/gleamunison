@@ -7,6 +7,7 @@ import gleam/list
 import gleamunison/cli_find
 import gleamunison/cli_llm
 import gleamunison/cli_mcp
+import gleamunison/cli_sync
 import gleamunison/cli_watch
 import gleamunison/http
 import gleamunison/repl
@@ -26,6 +27,7 @@ pub fn run(args: List(String)) -> Nil {
     ["llm", ..rest] -> io.println(cli_llm.command(rest))
     ["mcp", ..rest] -> cli_mcp.command(rest)
     ["find", ..rest] -> cli_find.command(rest)
+    ["sync", ..rest] -> cli_sync.command(rest)
     ["watch", path] -> cli_watch.command(path)
     ["watch"] -> io.println("usage: gleam run -- watch <file.lisp>")
     [cmd] -> dispatch(cmd, "8080", levels)
