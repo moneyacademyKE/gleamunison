@@ -13,6 +13,7 @@ import gleamunison/cli_mcp
 import gleamunison/cli_publish
 import gleamunison/cli_replay
 import gleamunison/cli_sync
+import gleamunison/cli_tape_to_test
 import gleamunison/cli_test
 import gleamunison/cli_watch
 import gleamunison/http
@@ -40,6 +41,7 @@ pub fn run(args: List(String)) -> Nil {
     ["mcp", ..rest] -> cli_mcp.command(rest)
     ["find", ..rest] -> cli_find.command(rest)
     ["replay", ..rest] -> cli_replay.command(rest)
+    ["tape-to-test", ..rest] -> cli_tape_to_test.command(rest)
     ["test", ..rest] -> cli_test.command(rest)
     ["publish", ..rest] -> cli_publish.command(rest)
     ["evidence", ..rest] -> cli_evidence.command(rest)
