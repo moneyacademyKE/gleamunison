@@ -57,7 +57,10 @@ fn verify_terms_valued(
   cache: TypeCache,
   prev_defs: List(#(String, SurfaceDef)),
   last: option.Option(String),
-) -> Result(#(TypeCache, List(#(String, SurfaceDef)), option.Option(String)), String) {
+) -> Result(
+  #(TypeCache, List(#(String, SurfaceDef)), option.Option(String)),
+  String,
+) {
   case terms {
     [] -> Ok(#(cache, prev_defs, last))
     [term, ..rest] -> {
@@ -156,7 +159,9 @@ fn run_file(path: String) -> Result(option.Option(String), String) {
               let init_defs = get_init_defs()
               let #(cache, bootstrap_list) =
                 repl_eval.bootstrap_defs(init_defs, empty_cache())
-              case verify_terms_valued(terms, cache, bootstrap_list, option.None) {
+              case
+                verify_terms_valued(terms, cache, bootstrap_list, option.None)
+              {
                 Ok(#(_, _, last)) -> Ok(last)
                 Error(err) -> Error(err)
               }

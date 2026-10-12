@@ -27,12 +27,7 @@ fn unsafe_coerce(val: Dynamic) -> a
 
 /// One test definition's outcome: assertion tallies from the Test tape.
 pub type TestResult {
-  TestResult(
-    name: String,
-    passed: Int,
-    failed: Int,
-    error: Option(String),
-  )
+  TestResult(name: String, passed: Int, failed: Int, error: Option(String))
 }
 
 /// The Test ability's ref: surface-declared abilities are keyed by name hash.
@@ -52,7 +47,10 @@ fn expect_handler() -> OpHandler {
 }
 
 fn expect_frame() -> HandlerFrame {
-  HandlerFrame(ability: ability_ref(), ops: dict.from_list([#(0, expect_handler())]))
+  HandlerFrame(
+    ability: ability_ref(),
+    ops: dict.from_list([#(0, expect_handler())]),
+  )
 }
 
 fn is_test_name(name: String) -> Bool {
@@ -105,14 +103,18 @@ pub fn run_suite(
         let frames = transcript.wrap_frames(rec, [expect_frame()])
         let outcome =
           effects.run(RuntimeConfig(ambient_handlers: frames), fn() {
-            to_dynamic(repl_eval.do_eval(body, name <> "__run", loaded_cache, defs))
+            to_dynamic(repl_eval.do_eval(
+              body,
+              name <> "__run",
+              loaded_cache,
+              defs,
+            ))
           })
         let eval_result: Result(#(String, ast.Type, TypeCache), String) =
           unsafe_coerce(outcome)
         let entries = transcript.entries(rec)
         transcript.stop(rec)
-        let failed =
-          list.count(entries, fn(e) { e.result_repr == "0" })
+        let failed = list.count(entries, fn(e) { e.result_repr == "0" })
         case eval_result {
           Error(err) ->
             TestResult(name:, passed: 0, failed: 0, error: Some(err))
@@ -161,9 +163,7 @@ pub fn attach_results(
   |> list.filter_map(fn(r) {
     let subject_name = string.drop_start(r.name, 5)
     let subject_exists =
-      list.any(defs, fn(pair) {
-        pair.0 == subject_name && is_term_def(pair.1)
-      })
+      list.any(defs, fn(pair) { pair.0 == subject_name && is_term_def(pair.1) })
     case subject_exists {
       False -> Error(Nil)
       True -> {

@@ -4,8 +4,8 @@ import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
-import gleamunison/cli_find
 import gleamunison/cli_datalog
+import gleamunison/cli_find
 import gleamunison/cli_llm
 import gleamunison/cli_mcp
 import gleamunison/cli_sync

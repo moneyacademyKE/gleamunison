@@ -1,7 +1,9 @@
 import gleam/list
 import gleam/string
 import gleamunison/codebase
-import gleamunison/elab_types.{type SurfaceTerm, SApply, SDo, SInt, SVar, SurfaceTermDef}
+import gleamunison/elab_types.{
+  type SurfaceTerm, SApply, SDo, SInt, SVar, SurfaceTermDef,
+}
 import gleamunison/evidence
 import gleamunison/identity.{hash_to_debug_string}
 import gleamunison/repl_eval
@@ -31,7 +33,9 @@ pub fn passing_test_records_one_pass_test() {
 
 pub fn failing_test_records_one_failure_test() {
   let #(cache, defs) = boot()
-  let user_defs = [#("test_bad", SurfaceTermDef(SDo("Test", "expect", [SInt(0)])))]
+  let user_defs = [
+    #("test_bad", SurfaceTermDef(SDo("Test", "expect", [SInt(0)]))),
+  ]
   let results = test_runner.run_suite(list.append(defs, user_defs), cache)
   let assert [result] = results
   result.passed |> should.equal(0)
@@ -46,10 +50,7 @@ pub fn expects_using_defs_pass_test() {
       "test_answer",
       SurfaceTermDef(
         SDo("Test", "expect", [
-          SApply(
-            SApply(SVar("eq?"), SVar("answer")),
-            SInt(42),
-          ),
+          SApply(SApply(SVar("eq?"), SVar("answer")), SInt(42)),
         ]),
       ),
     ),

@@ -104,11 +104,7 @@ fn run_terms(terms, cache: TypeCache, defs, out: List(String)) {
             Error(err) -> Error("define " <> name <> ": " <> err)
           }
         }
-        elab_types.SList([
-          elab_types.SVar("define"),
-          elab_types.SVar(name),
-          val,
-        ]) -> {
+        elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), val]) -> {
           case repl_eval.handle_define(name, val, cache, defs) {
             Ok(#(nc, ndefs)) ->
               run_terms(rest, nc, ndefs, ["(defined " <> name <> ")", ..out])
