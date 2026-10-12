@@ -24,7 +24,13 @@ pub fn infer_term(
           use t <- result.try(infer_term(first, cache))
           case list_all_match(rest, t, cache, infer_term) {
             True -> Ok(ast.Builtin(ast.ListType))
-            False -> Error(TypeMismatch(t, ast.TypeVar(0), "element mismatch", option.None))
+            False ->
+              Error(TypeMismatch(
+                t,
+                ast.TypeVar(0),
+                "element mismatch",
+                option.None,
+              ))
           }
         }
       }

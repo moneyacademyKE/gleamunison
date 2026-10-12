@@ -1,8 +1,8 @@
 import gleam/dict
 import gleamunison/ast
+import gleamunison/elab_ctx
 import gleamunison/elab_def
 import gleamunison/types
-import gleamunison/elab_ctx
 
 import gleamunison/elab_term
 import gleamunison/elab_types

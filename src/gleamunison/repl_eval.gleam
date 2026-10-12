@@ -311,4 +311,3 @@ fn int_int_int() -> ast.Type {
   let int = ast.Builtin(ast.IntType)
   ast.Fn([int, int], int, ast.Required([]))
 }
-

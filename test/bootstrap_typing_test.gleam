@@ -1,5 +1,4 @@
 import gleam/dict
-import gleam/option
 import gleamunison/ast
 import gleamunison/elab_ctx
 import gleamunison/elab_def
@@ -33,13 +32,11 @@ pub fn bootstrap_add_is_typed_and_error_is_located_test() {
       ops: dict.new(),
     )
   let cache2 =
-    types.TypeCache(
-      dict.insert(
-        cache.entries,
-        greeting_ref,
-        types.CTTerm(ast.Builtin(ast.TextType)),
-      ),
-    )
+    types.TypeCache(dict.insert(
+      cache.entries,
+      greeting_ref,
+      types.CTTerm(ast.Builtin(ast.TextType)),
+    ))
   let assert Ok(term) = parser.parse_string("(add 1 greeting)")
   let result =
     elab_def.elab_term_def(term, ctx, repl_eval.ref_for_name("bad"), cache2)

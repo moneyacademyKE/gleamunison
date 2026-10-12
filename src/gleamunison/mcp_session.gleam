@@ -153,7 +153,9 @@ fn hits_json(hits: List(SearchHit)) -> String {
       <> h.kind
       <> "\",\"ref\":\""
       <> h.ref_hex
-      <> "\"}"
+      <> "\",\"score\":"
+      <> float.to_string(h.score)
+      <> "}"
     })
   "[" <> string.join(parts, ",") <> "]"
 }
@@ -198,7 +200,7 @@ fn string_arg(
 
 /// One search hit: the triple a CLI or an agent actually needs.
 pub type SearchHit {
-  SearchHit(name: String, kind: String, ref_hex: String)
+  SearchHit(name: String, kind: String, ref_hex: String, score: Float)
 }
 
 /// BM25-ranked search over definition names and bodies. Name tokens count
@@ -206,15 +208,18 @@ pub type SearchHit {
 /// Ties break alphabetically for stable output.
 pub fn search(state: SessionState, query: String) -> List(SearchHit) {
   let scored =
-    rank.rank(
+    rank.rank_hybrid(
       query,
       list.map(state.defs, fn(pair) {
-        let name_tokens = rank.tokenize(pair.0)
-        let body_tokens = def_body_tokens(pair.1)
-        rank.Doc(
+        rank.DocV(
           id: pair,
-          tokens: list.append(name_tokens, name_tokens)
-            |> list.append(body_tokens),
+          // Name twice: a name match is stronger intent evidence than a
+          // body mention (mirrors the BM25 weighting this replaces).
+          text: pair.0
+            <> " "
+            <> pair.0
+            <> " "
+            <> string.join(def_body_tokens(pair.1), " "),
         )
       }),
     )
@@ -231,6 +236,7 @@ pub fn search(state: SessionState, query: String) -> List(SearchHit) {
       name: def_pair.0,
       kind: kind(def_pair.1),
       ref_hex: ref_hex(def_pair.0, def_pair.1),
+      score: pair.0,
     )
   })
 }
