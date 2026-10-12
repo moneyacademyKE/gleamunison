@@ -10,6 +10,7 @@ import gleamunison/cli_find
 import gleamunison/cli_llm
 import gleamunison/cli_lsp
 import gleamunison/cli_mcp
+import gleamunison/cli_publish
 import gleamunison/cli_replay
 import gleamunison/cli_sync
 import gleamunison/cli_test
@@ -40,6 +41,7 @@ pub fn run(args: List(String)) -> Nil {
     ["find", ..rest] -> cli_find.command(rest)
     ["replay", ..rest] -> cli_replay.command(rest)
     ["test", ..rest] -> cli_test.command(rest)
+    ["publish", ..rest] -> cli_publish.command(rest)
     ["evidence", ..rest] -> cli_evidence.command(rest)
     ["lsp", ..rest] -> cli_lsp.command(rest)
     ["sync", ..rest] -> cli_sync.command(rest)
