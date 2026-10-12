@@ -119,6 +119,11 @@ assert_throws_corrupted_stack(Fun) ->
         error:{corrupted_handler_stack, _} -> ok;
         error:{invalid_handler_stack, _} -> ok;
         error:{invalid_handler, _} -> ok
+    after
+        %% The probe corrupts the stack BEFORE calling us, so the value on
+        %% entry is already poison. Tests share the BEAM process: leave a
+        %% valid empty stack behind or every later effects test fails.
+        erlang:put({gleamunison_handlers}, {trusted_stack, []})
     end.
 
 test_soft_purge_scenario() ->
