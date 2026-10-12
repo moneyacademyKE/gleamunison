@@ -296,7 +296,7 @@ pub fn bootstrap_defs(
 /// to builtin misuse. Seed the genesis refs with the declared op types so
 /// every RefTo resolves honestly. This is a pure data move: the op table is
 /// the source of truth, the cache just stops dropping it.
-fn seed_builtin_term_types(cache: TypeCache) -> TypeCache {
+pub fn seed_builtin_term_types(cache: TypeCache) -> TypeCache {
   let seeds = [
     #(genesis.builtin_int_add(), int_int_int()),
     #(genesis.builtin_sub(), int_int_int()),

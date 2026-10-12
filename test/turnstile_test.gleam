@@ -1,4 +1,3 @@
-import gleam/option
 import gleamunison/evidence
 import gleamunison/storage
 import gleamunison/turnstile
@@ -23,7 +22,7 @@ pub fn passing_evidence_admits_test() {
       kind: evidence.Test,
       verdict: "pass",
       payload: "test_parse-json: 3 passed, 0 failed",
-      ts: 1_000,
+      ts: 1000,
     )
   let assert Ok(_) =
     evidence.attach(
@@ -32,7 +31,7 @@ pub fn passing_evidence_admits_test() {
       kind: evidence.Test,
       verdict: "pass",
       payload: "test_render: 1 passed, 0 failed",
-      ts: 1_001,
+      ts: 1001,
     )
   let assert Ok(passed) =
     turnstile.check(a, [#("parse-json", "abc123"), #("render", "def456")])
@@ -48,7 +47,7 @@ pub fn failing_verdict_is_not_evidence_test() {
       kind: evidence.Test,
       verdict: "fail",
       payload: "test_parse-json: 1 passed, 2 failed",
-      ts: 1_000,
+      ts: 1000,
     )
   let assert Error(missing) = turnstile.check(a, [#("parse-json", "abc123")])
   assert missing == ["parse-json"]
