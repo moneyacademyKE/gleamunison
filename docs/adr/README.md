@@ -66,6 +66,7 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0060](0060-developer-experience-improvements.md) | Developer Experience (DX) Improvements | Accepted |
 | [ADR-0061](0061-phase13-roadmap-hardening-and-data-driven-dogfooding.md) | Phase 13 Hardening and Data-Driven Dogfooding | Accepted |
 | [ADR-0062](0062-native-content-addressed-datalog-database.md) | Native Content-Addressed Datalog Database in S-expressions | Accepted |
+| [ADR-0063](0063-gadts-indexed-abilities-deferred.md) | GADTs and indexed abilities — deferred, with a tripwire | Deferred |
 
 
 
