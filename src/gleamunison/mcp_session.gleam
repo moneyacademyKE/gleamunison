@@ -137,26 +137,22 @@ fn search_definitions(
 ) -> Result(String, String) {
   case string_arg(args, "query") {
     Error(e) -> Error(e)
-    Ok(query) -> {
-      let matches =
-        list.filter(state.defs, fn(pair) {
-          string.contains(pair.0, query)
-          || string.contains(string.inspect(pair.1), query)
-        })
-      // Name matches rank above body-only matches; alphabetical inside groups.
-      let ranked =
-        list.sort(matches, fn(a, b) {
-          let an = string.contains(a.0, query)
-          let bn = string.contains(b.0, query)
-          case an, bn {
-            True, False -> order.Lt
-            False, True -> order.Gt
-            _, _ -> string.compare(a.0, b.0)
-          }
-        })
-      Ok(defs_json(ranked))
-    }
+    Ok(query) -> Ok(hits_json(search(state, query)))
   }
+}
+
+fn hits_json(hits: List(SearchHit)) -> String {
+  let parts =
+    list.map(hits, fn(h) {
+      "{\"name\":\""
+      <> h.name
+      <> "\",\"kind\":\""
+      <> h.kind
+      <> "\",\"ref\":\""
+      <> h.ref_hex
+      <> "\"}"
+    })
+  "[" <> string.join(parts, ",") <> "]"
 }
 
 fn eval_tool(
@@ -195,6 +191,38 @@ fn string_arg(
         Error(_) -> Error("argument must be a string: " <> key)
       }
   }
+}
+
+/// One search hit: the triple a CLI or an agent actually needs.
+pub type SearchHit {
+  SearchHit(name: String, kind: String, ref_hex: String)
+}
+
+/// Substring search over definition names and bodies. Name matches rank
+/// above body-only matches; alphabetical inside groups.
+pub fn search(state: SessionState, query: String) -> List(SearchHit) {
+  let matches =
+    list.filter(state.defs, fn(pair) {
+      string.contains(pair.0, query)
+      || string.contains(string.inspect(pair.1), query)
+    })
+  let ranked =
+    list.sort(matches, fn(a, b) {
+      let an = string.contains(a.0, query)
+      let bn = string.contains(b.0, query)
+      case an, bn {
+        True, False -> order.Lt
+        False, True -> order.Gt
+        _, _ -> string.compare(a.0, b.0)
+      }
+    })
+  list.map(ranked, fn(pair) {
+    SearchHit(
+      name: pair.0,
+      kind: kind(pair.1),
+      ref_hex: ref_hex(pair.0, pair.1),
+    )
+  })
 }
 
 fn defs_json(defs: List(#(String, SurfaceDef))) -> String {

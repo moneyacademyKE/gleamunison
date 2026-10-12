@@ -1,5 +1,4 @@
 import gleam/bit_array
-import gleam/option.{Some}
 import gleamunison/evidence.{PropertyCheck, Review, Test}
 import gleamunison/identity.{Ref}
 import gleamunison/storage
