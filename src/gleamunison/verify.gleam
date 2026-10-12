@@ -1,4 +1,5 @@
 import gleam/list
+import gleam/option
 import gleam/string
 import gleamunison/bootstraps
 import gleamunison/elab_types.{type SurfaceDef, type SurfaceTerm, SurfaceTermDef}
@@ -43,20 +44,35 @@ fn verify_terms(
   cache: TypeCache,
   prev_defs: List(#(String, SurfaceDef)),
 ) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
+  case verify_terms_valued(terms, cache, prev_defs, option.None) {
+    Ok(#(c, d, _)) -> Ok(#(c, d))
+    Error(e) -> Error(e)
+  }
+}
+
+/// Like verify_terms, but carries the value of the last evaluated
+/// non-define form so callers (eval_file) can observe it.
+fn verify_terms_valued(
+  terms: List(SurfaceTerm),
+  cache: TypeCache,
+  prev_defs: List(#(String, SurfaceDef)),
+  last: option.Option(String),
+) -> Result(#(TypeCache, List(#(String, SurfaceDef)), option.Option(String)), String) {
   case terms {
-    [] -> Ok(#(cache, prev_defs))
+    [] -> Ok(#(cache, prev_defs, last))
     [term, ..rest] -> {
       case term {
         elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), val]) -> {
           case repl_eval.handle_define(name, val, cache, prev_defs) {
             Ok(#(next_cache, next_defs)) ->
-              verify_terms(rest, next_cache, next_defs)
+              verify_terms_valued(rest, next_cache, next_defs, last)
             Error(err) -> Error("Define Error for '" <> name <> "': " <> err)
           }
         }
         _ -> {
           case repl_eval.do_eval(term, "verify_expr", cache, prev_defs) {
-            Ok(#(_, _, next_cache)) -> verify_terms(rest, next_cache, prev_defs)
+            Ok(#(val, _, next_cache)) ->
+              verify_terms_valued(rest, next_cache, prev_defs, option.Some(val))
             Error(err) -> Error("Evaluation Error: " <> err)
           }
         }
@@ -108,7 +124,9 @@ fn convert_bootstrap_type(t: bootstraps.BootstrapType) -> elab_types.Typ {
   }
 }
 
-pub fn verify_file(path: String) -> Result(String, String) {
+/// Shared pipeline: read, parse, bootstrap, evaluate. Returns the value of
+/// the last non-define form (None when the file only defines).
+fn run_file(path: String) -> Result(option.Option(String), String) {
   case simplifile.read(path) {
     Error(e) -> Error("Failed to read file: " <> string.inspect(e))
     Ok(content) -> {
@@ -138,8 +156,8 @@ pub fn verify_file(path: String) -> Result(String, String) {
               let init_defs = get_init_defs()
               let #(cache, bootstrap_list) =
                 repl_eval.bootstrap_defs(init_defs, empty_cache())
-              case verify_terms(terms, cache, bootstrap_list) {
-                Ok(_) -> Ok("Verification successful: " <> path)
+              case verify_terms_valued(terms, cache, bootstrap_list, option.None) {
+                Ok(#(_, _, last)) -> Ok(last)
                 Error(err) -> Error(err)
               }
             }
@@ -147,5 +165,23 @@ pub fn verify_file(path: String) -> Result(String, String) {
         }
       }
     }
+  }
+}
+
+pub fn verify_file(path: String) -> Result(String, String) {
+  case run_file(path) {
+    Ok(_) -> Ok("Verification successful: " <> path)
+    Error(err) -> Error(err)
+  }
+}
+
+/// Evaluate a file and return the last form's rendered value. Use this when
+/// the caller needs the RESULT (test harnesses, datalog queries), not just
+/// proof the file evaluates.
+pub fn eval_file(path: String) -> Result(String, String) {
+  case run_file(path) {
+    Ok(option.Some(val)) -> Ok(val)
+    Ok(option.None) -> Error("file produced no value (defines only)")
+    Error(err) -> Error(err)
   }
 }
