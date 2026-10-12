@@ -13,7 +13,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "26.2"
-          gleam-version: "1.17.0"
+          gleam-version: "1.19.1"
       - run: gleam deps download
       - name: Publish to Hex.pm
         env:

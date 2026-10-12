@@ -2,6 +2,39 @@
 
 ---
 
+## What's New in v3.14.0 (2026-10-12)
+
+Release v3.14.0 builds the agent-era substrate: five design leads that only a content-addressed, ability-gated language on BEAM can carry. The theme is verification you can run, not process you must trust.
+
+### 1. Effect Transcripts (`transcript.gleam`)
+- Record every ability op (ability, op index, args, result) through the handler stack with original values preserved.
+- **Replay**: playback frames serve recorded results through the continuation without touching the inner handler — deterministic re-execution of effectful runs.
+- **JSON tapes** for audit and DAG storage; first-divergence `diff` for comparing runs.
+
+### 2. Capability-Scoped Execution (`capability.gleam`)
+- The effect row is the sandbox policy: an allow-list over content-addressed ability keys, deny-by-default.
+- Denied ops raise a structured `{capability_denied, key, op}` — loud and matchable, never a fabricated result.
+- `run_scoped` stacks a catch-all innermost, so ambient authority (any ability without an explicitly allowed frame) is impossible by construction. Running untrusted agent-written code becomes boring.
+
+### 3. Evidence in the DAG (`evidence.gleam`)
+- Content-addressed attestations (subject, kind, verdict, payload, timestamp) stored as CAS chunks.
+- Discovery by ref scan with integrity re-verification on read: tampered chunks are excluded by construction.
+- `verified/3` gates on kind + passing verdict — "did you test it?" becomes a structural fact, not a social one.
+
+### 4. Semantic Find (`cli_find.gleam`)
+- `gleam run -- find "<intent>" [--load file.lisp ...] [--limit N]` — search the codebase by intent, get back name, kind, and content hash.
+- Reuses the MCP session's boot + search pipeline; hashes in output are directly referenceable.
+
+### 5. Sync Hardening + CLI (`sync.gleam`, `cli_sync.gleam`)
+- **CAS acceptance on pull**: refs are pinned first-write-wins — byte-identical re-delivery is idempotent, conflicting bytes under a held ref raise `HashConflict` instead of silently overwriting.
+- Unsolicited chunks (bytes for refs never requested) fail the transfer loudly.
+- New CLI: `gleam run -- sync <peer> [--store path]` with dets persistence.
+
+### Fixes
+- `mcp_session.server_version` now tracks gleam.toml (was stale at 3.12.0).
+
+---
+
 ## What's New in v3.13.0 (2026-10-12)
 
 Release v3.13.0 gives the codebase a machine-facing socket and closes the small parity items from the Unison 1.5.0 gap analysis:

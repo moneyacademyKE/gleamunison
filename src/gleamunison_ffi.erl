@@ -7,6 +7,8 @@
     binary_to_erl_literal/1,
     get_plain_args/0,
     to_dynamic/1,
+    from_dynamic/1,
+    deny_capability/2,
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
     test_soft_purge_scenario/0,
     eval_expression/1,
@@ -142,6 +144,13 @@ get_plain_args() ->
     [list_to_binary(A) || A <- init:get_plain_arguments()].
 
 to_dynamic(X) -> X.
+
+from_dynamic(X) -> X.
+
+%% Structured denial for capability-scoped execution: a distinct, matchable
+%% error term so sandbox runners can catch it apart from unhandled_ability.
+deny_capability(AbilityKey, OpIdx) ->
+    erlang:error({capability_denied, AbilityKey, OpIdx}).
 
 eval_expression(Expr) ->
     gleamunison_ffi_io:eval_expression(Expr).

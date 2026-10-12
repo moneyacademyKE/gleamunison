@@ -25,6 +25,12 @@ pub fn empty() -> Codebase {
   Codebase(adapter: inmemory(), seen: dict.new())
 }
 
+/// A codebase over a caller-chosen adapter (dets for persistence, mnesia
+/// for replication). Sync and CLI paths need real storage, not inmemory.
+pub fn with_adapter(adapter: StorageAdapter) -> Codebase {
+  Codebase(adapter: adapter, seen: dict.new())
+}
+
 pub type InsertError {
   HashMismatch(hash_expected: Hash, hash_got: Hash)
   DuplicateDef(existing: DefinitionRef, incoming: DefinitionRef)
