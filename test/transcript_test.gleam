@@ -104,3 +104,31 @@ pub fn diff_reports_first_divergence_test() {
   let assert [d] = transcript.diff(mk("left"), mk("right"))
   d.seq |> should.equal(0)
 }
+
+pub fn json_round_trip_preserves_replay_test() {
+  let rec = transcript.start()
+  let frames = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
+  let assert [frame] = frames
+  let assert Ok(handler) = dict.get(frame.ops, 0)
+  let _ = handler([to_dynamic("hello")], fn(d) { d })
+  let tape = transcript.capture(rec)
+  let json = transcript.to_json(tape)
+  let assert Ok(loaded) = transcript.from_json(json)
+  transcript.is_replayable(loaded) |> should.be_true
+  let pb = transcript.playback(loaded)
+  let replayed = transcript.replay_frames(pb, [llm_frame(boom_handler())])
+  let assert [rframe] = replayed
+  let assert Ok(rhandler) = dict.get(rframe.ops, 0)
+  let result = rhandler([to_dynamic("hello")], fn(d) { d })
+  let decoded: String = unsafe_coerce(result)
+  decoded |> should.equal("handled:hello")
+  transcript.stop_playback(pb)
+  transcript.stop(rec)
+}
+
+pub fn v1_tape_loads_audit_only_test() {
+  let v1 =
+    "[{\"ability\":\"m_abcd1234\",\"op\":0,\"args\":\"x\",\"result\":\"y\",\"seq\":0}]"
+  let assert Ok(tape) = transcript.from_json(v1)
+  transcript.is_replayable(tape) |> should.be_false
+}

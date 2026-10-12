@@ -2,6 +2,7 @@ import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/list
+import gleam/option.{type Option}
 import gleam/result
 import gleam/string
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
@@ -213,35 +214,104 @@ fn jstr(s: String) -> String {
 }
 
 /// Audit serialization: one JSON object per entry, in order.
+@external(erlang, "gleamunison_transcript", "term_to_b64")
+fn term_to_b64(term: Dynamic) -> String
+
+@external(erlang, "gleamunison_transcript", "b64_to_term")
+fn b64_to_term(b64: String) -> Dynamic
+
+@external(erlang, "gleamunison_transcript", "run_replay")
+fn run_replay_ffi(entries: Dynamic, thunk: fn() -> a) -> a
+
+/// Serialize a tape for audit AND replay: alongside the human-readable
+/// reprs, each entry carries base64 term_to_binary blobs of the raw args
+/// and result. A tape loaded back from this format replays for real.
+/// Tapes built from_entries (no raw) serialize in the old audit-only shape.
 pub fn to_json(tape: Tape) -> String {
+  let raw_by_seq = raw_index(tape.raw)
   let body =
     list.map(tape.entries, fn(e) {
-      "{\"ability\":"
-      <> jstr(e.ability)
-      <> ",\"op\":"
-      <> int.to_string(e.op)
-      <> ",\"args\":"
-      <> jstr(e.args_repr)
-      <> ",\"result\":"
-      <> jstr(e.result_repr)
-      <> ",\"seq\":"
-      <> int.to_string(e.seq)
-      <> "}"
+      let base =
+        "{\"ability\":"
+        <> jstr(e.ability)
+        <> ",\"op\":"
+        <> int.to_string(e.op)
+        <> ",\"args\":"
+        <> jstr(e.args_repr)
+        <> ",\"result\":"
+        <> jstr(e.result_repr)
+        <> ",\"seq\":"
+        <> int.to_string(e.seq)
+      case dict.get(raw_by_seq, e.seq) {
+        Error(_) -> base <> "}"
+        Ok(#(args, result)) ->
+          base
+          <> ",\"args_b64\":"
+          <> jstr(term_to_b64(args))
+          <> ",\"result_b64\":"
+          <> jstr(term_to_b64(result))
+          <> "}"
+      }
     })
   "[" <> string.join(body, ",") <> "]"
 }
 
+fn raw_index(raw: Dynamic) -> dict.Dict(Int, #(Dynamic, Dynamic)) {
+  let entries: List(#(String, Int, Dynamic, Dynamic, Int)) = from_dynamic(raw)
+  list.fold(entries, dict.new(), fn(acc, entry) {
+    dict.insert(acc, entry.4, #(entry.2, entry.3))
+  })
+}
+
+/// True when the tape carries raw values and can drive a real replay.
+pub fn is_replayable(tape: Tape) -> Bool {
+  let raw: List(Dynamic) = from_dynamic(tape.raw)
+  raw != []
+}
+
+/// Run a thunk under playback of the tape. Divergence from the recorded
+/// call sequence raises; the tape must be replayable (is_replayable).
+pub fn run_with_playback(tape: Tape, thunk: fn() -> a) -> a {
+  pb_start(tape.raw)
+  let result = run_replay_ffi(tape.raw, thunk)
+  pb_stop()
+  result
+}
+
 /// Parse an audit JSON tape. Entry fields decode as strings; a malformed
 /// payload is an Error, never a partial tape.
+/// Parse a tape file. Entry fields decode as strings; a malformed payload
+/// is an Error, never a partial tape. When every entry carries v2 base64
+/// blobs, the raw values are rebuilt and the tape replays for real;
+/// otherwise it loads audit-only (all-or-nothing: a half-raw tape is a
+/// lie about which run it records).
 pub fn from_json(json: String) -> Result(Tape, String) {
-  use entries <- result.try(parse_entries(json, []))
-  Ok(from_entries(entries))
+  use parsed <- result.try(parse_entries(json, []))
+  let entries = list.map(parsed, fn(pair) { pair.0 })
+  let blobs = list.map(parsed, fn(pair) { pair.1 })
+  case list.all(blobs, fn(b) { b != option.None }) {
+    False -> Ok(from_entries(entries))
+    True -> {
+      let raw =
+        list.map(list.zip(entries, blobs), fn(pair) {
+          let assert option.Some(#(args_b64, result_b64)) = pair.1
+          #(
+            pair.0.ability,
+            pair.0.op,
+            b64_to_term(args_b64),
+            b64_to_term(result_b64),
+            pair.0.seq,
+          )
+        })
+      Ok(Tape(entries: entries, raw: to_dynamic(raw)))
+    }
+  }
 }
 
 fn parse_entries(
   json: String,
-  acc: List(OpRecord),
-) -> Result(List(OpRecord), String) {
+  acc: List(#(OpRecord, Option(#(String, String)))),
+) -> Result(List(#(OpRecord, Option(#(String, String)))), String) {
   let trimmed = string.trim(json)
   case trimmed {
     "[]" -> Ok(list.reverse(acc))
@@ -252,16 +322,17 @@ fn parse_entries(
 
 fn parse_entry_list(
   s: String,
-  acc: List(OpRecord),
-) -> Result(List(OpRecord), String) {
+  acc: List(#(OpRecord, Option(#(String, String)))),
+) -> Result(List(#(OpRecord, Option(#(String, String)))), String) {
   case s {
     "]" -> Ok(list.reverse(acc))
     _ -> {
-      use #(entry, rest) <- result.try(parse_one_entry(s, ""))
+      use #(entry, b64, rest) <- result.try(parse_one_entry(s, ""))
       let next = string.trim(rest)
       case next {
-        "," <> more -> parse_entry_list(string.trim(more), [entry, ..acc])
-        "]" -> Ok(list.reverse([entry, ..acc]))
+        "," <> more ->
+          parse_entry_list(string.trim(more), [#(entry, b64), ..acc])
+        "]" -> Ok(list.reverse([#(entry, b64), ..acc]))
         _ -> Error("transcript.from_json: expected ',' or ']'")
       }
     }
@@ -271,17 +342,37 @@ fn parse_entry_list(
 fn parse_one_entry(
   s: String,
   _acc: String,
-) -> Result(#(OpRecord, String), String) {
+) -> Result(#(OpRecord, Option(#(String, String)), String), String) {
   use #(ability, r1) <- result.try(field_string(s, "ability"))
   use #(op, r2) <- result.try(field_int(r1, "op"))
   use #(args, r3) <- result.try(field_string(r2, "args"))
   use #(result_repr, r4) <- result.try(field_string(r3, "result"))
   use #(seq, r5) <- result.try(field_int(r4, "seq"))
-  let rest = case string.trim(r5) {
-    "}" <> tail -> tail
-    other -> other
+  let trimmed = string.trim(r5)
+  // v2 tapes carry base64 term_to_binary blobs of the raw args/result
+  // after seq; v1 (audit-only) entries end the object there.
+  case string.starts_with(trimmed, ",") {
+    False -> {
+      let rest = case trimmed {
+        "}" <> tail -> tail
+        other -> other
+      }
+      Ok(#(OpRecord(ability, op, args, result_repr, seq), option.None, rest))
+    }
+    True -> {
+      use #(args_b64, r6) <- result.try(field_string(trimmed, "args_b64"))
+      use #(result_b64, r7) <- result.try(field_string(r6, "result_b64"))
+      let rest = case string.trim(r7) {
+        "}" <> tail -> tail
+        other -> other
+      }
+      Ok(#(
+        OpRecord(ability, op, args, result_repr, seq),
+        option.Some(#(args_b64, result_b64)),
+        rest,
+      ))
+    }
   }
-  Ok(#(OpRecord(ability, op, args, result_repr, seq), rest))
 }
 
 fn skip_to_field(s: String, name: String) -> Result(String, String) {

@@ -8,6 +8,7 @@
     get_plain_args/0,
     to_dynamic/1,
     from_dynamic/1,
+    rescue/1,
     deny_capability/2,
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
     test_soft_purge_scenario/0,
@@ -28,6 +29,16 @@ hex(N) -> $a + N - 10.
 
 string_to_binary(S) when is_binary(S) -> S;
 string_to_binary(S) when is_list(S) -> list_to_binary(S).
+
+%% Run a zero-arg fun and capture any raised reason as {error, Rendered}.
+%% CLIs use this to turn runtime crashes (replay divergence, unhandled
+%% abilities) into error values the caller can print.
+rescue(F) when is_function(F, 0) ->
+    try F() of
+        R -> {ok, R}
+    catch
+        Class:Reason -> {error, iolist_to_binary(io_lib:format("~p:~p", [Class, Reason]))}
+    end.
 
 compile_source(Source) when is_binary(Source) ->
     case erl_scan:string(binary_to_list(Source)) of
