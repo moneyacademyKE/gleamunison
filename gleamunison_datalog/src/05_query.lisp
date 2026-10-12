@@ -66,12 +66,12 @@
       (list)
       lst))))
 
-;; Fold over an AVET attribute map, collecting matching bindings
-;; Since dict-fold is not available, we use an accumulator trick via state
-;; This is a limitation — we return results collected via list-fold over known vals
+;; Fold over an AVET attribute map, collecting matching bindings.
+;; v bound  → point lookup, then unify the entity.
+;; v unbound → iterate every value in the attribute index via dict-keys,
+;;             unifying both the value and the entity.
 (define db-avet-fold
   (lam attr-map (lam e-pat (lam v-pat (lam bindings
-    ;; Attempt to resolve v-pat to scan more efficiently
     (let v-resolved (resolve-part v-pat bindings)
       (if (fst v-resolved)
         ;; v is bound — look up entity directly
@@ -79,13 +79,24 @@
           (let e (dict-safe-get attr-map v 0)
             (if (eq? e 0)
               (list)
-              (let u-result (unify-part e-pat (pair "val" e) bindings)
+              (let u-result (unify-part e-pat e bindings)
                 (if (fst u-result)
                   (list (snd u-result))
                   (list))))))
-        ;; Both unbound — we can't iterate, return empty (limitation)
-        ;; In production this would use dict-keys when available
-        (list))))))))
+        ;; v unbound — scan every value in this attribute's index
+        (list-filter-map
+          (lam v
+            (let e (dict-safe-get attr-map v 0)
+              (if (eq? e 0)
+                (pair false bindings)
+                (let u1 (unify-part v-pat v bindings)
+                  (if (fst u1)
+                    (let u2 (unify-part e-pat e (snd u1))
+                      (if (fst u2)
+                        (pair true (snd u2))
+                        (pair false bindings)))
+                    (pair false bindings))))))
+          (dict-keys attr-map)))))))))
 
 ;; Scan all entities for those matching (attr, v-pat)
 (define db-scan-attr
