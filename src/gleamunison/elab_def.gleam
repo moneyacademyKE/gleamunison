@@ -7,12 +7,41 @@ import gleamunison/ast
 import gleamunison/elab_ctx.{type ElabCtx}
 import gleamunison/elab_term.{elaborate_term}
 import gleamunison/elab_types.{
-  type ElaborateError, type SurfaceOp, type SurfaceTerm, type Typ, InferFailed,
+  type ElaborateError, type Span, type SurfaceOp, type SurfaceTerm, type Typ,
+  InferFailed,
 }
 import gleamunison/identity.{type DefinitionRef, Local}
 import gleamunison/inference.{infer_term}
 import gleamunison/lower.{lower_type_ref, type_ref_to_type}
-import gleamunison/types.{type TypeCache, CTAbility, CTTerm, CTType, TypeCache}
+import gleamunison/types.{
+  type InferenceError, type TypeCache, CTAbility, CTTerm, CTType, TypeCache,
+  TypeMismatch,
+}
+
+/// Render an inference error for the user without the embedded subterm
+/// (which would be an unreadable AST dump); the subterm's span is attached
+/// separately as an At wrapper.
+fn render_inference_error(e: InferenceError) -> String {
+  case e {
+    TypeMismatch(expected, actual, message, _) ->
+      message
+      <> ": expected "
+      <> string.inspect(expected)
+      <> ", got "
+      <> string.inspect(actual)
+    other -> string.inspect(other)
+  }
+}
+
+/// The source location of an inference failure, when the failing subterm
+/// carried one through elaboration.
+fn inference_error_span(e: InferenceError) -> option.Option(Span) {
+  case e {
+    TypeMismatch(_, _, _, option.Some(ast.Located(_, span))) ->
+      option.Some(span)
+    _ -> option.None
+  }
+}
 
 pub fn elab_term_def(
   st: SurfaceTerm,
@@ -28,7 +57,13 @@ pub fn elab_term_def(
             TypeCache(dict.insert(cache.entries, ref, CTTerm(typ)))
           Ok(#(ast.TermDef(term:, typ:), next_cache))
         }
-        Error(e) -> Error(InferFailed(string.inspect(e)))
+        Error(e) -> {
+          let err = InferFailed(render_inference_error(e))
+          case inference_error_span(e) {
+            option.Some(span) -> Error(elab_types.At(err, span))
+            option.None -> Error(err)
+          }
+        }
       }
     }
     Error(e) -> Error(e)

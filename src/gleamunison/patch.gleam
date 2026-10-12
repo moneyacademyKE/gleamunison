@@ -145,6 +145,7 @@ pub fn rewrite_term(p: Patch, term: ast.Term) -> ast.Term {
       )
     ast.Use(binder, call, body) ->
       ast.Use(binder, rewrite_term(p, call), rewrite_term(p, body))
+    ast.Located(inner, span) -> ast.Located(rewrite_term(p, inner), span)
     _ -> term
   }
 }
@@ -181,6 +182,7 @@ fn term_references_probe(term: ast.Term, target: DefinitionRef) -> Bool {
       ctor_ref == target || list.any(args, term_references_probe(_, target))
     ast.Use(_, call, body) ->
       term_references_probe(call, target) || term_references_probe(body, target)
+    ast.Located(inner, _) -> term_references_probe(inner, target)
     _ -> False
   }
 }

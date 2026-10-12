@@ -1,4 +1,7 @@
 import gleam/dict
+import gleamunison/ast
+import gleamunison/elab_def
+import gleamunison/types
 import gleamunison/elab_ctx
 
 import gleamunison/elab_term
@@ -65,4 +68,35 @@ pub fn application_error_cites_call_site_test() {
   let assert Error(elab_types.At(elab_types.NameNotFound("missing-fn"), span)) =
     result
   let assert elab_types.Span(1, 2) = span
+}
+
+pub fn type_error_in_application_reports_arg_span_test() {
+  // (add 1 greeting): add expects Int, greeting is Text. The failing node
+  // is the argument `greeting` at col 8 — the error must cite it.
+  let add_ref = repl_eval.ref_for_name("add")
+  let greeting_ref = repl_eval.ref_for_name("greeting")
+  let ctx =
+    elab_ctx.ElabCtx(
+      names: dict.from_list([
+        #("add", add_ref),
+        #("greeting", greeting_ref),
+      ]),
+      bindings: dict.new(),
+      next_local: 0,
+      abilities: dict.new(),
+      ops: dict.new(),
+    )
+  let int = ast.Builtin(ast.IntType)
+  let cache =
+    types.TypeCache(
+      entries: dict.from_list([
+        #(add_ref, types.CTTerm(ast.Fn([int, int], int, ast.Required([])))),
+        #(greeting_ref, types.CTTerm(ast.Builtin(ast.TextType))),
+      ]),
+    )
+  let assert Ok(term) = parser.parse_string("(add 1 greeting)")
+  let result =
+    elab_def.elab_term_def(term, ctx, repl_eval.ref_for_name("bad"), cache)
+  let assert Error(elab_types.At(elab_types.InferFailed(_msg), span)) = result
+  let assert elab_types.Span(1, 8) = span
 }

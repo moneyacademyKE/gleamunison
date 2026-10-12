@@ -24,12 +24,13 @@ pub fn infer_term(
           use t <- result.try(infer_term(first, cache))
           case list_all_match(rest, t, cache, infer_term) {
             True -> Ok(ast.Builtin(ast.ListType))
-            False -> Error(TypeMismatch(t, ast.TypeVar(0), "element mismatch"))
+            False -> Error(TypeMismatch(t, ast.TypeVar(0), "element mismatch", option.None))
           }
         }
       }
     }
     ast.LocalVarRef(Local(i)) -> Ok(ast.TypeVar(i))
+    ast.Located(inner, _) -> infer_term(inner, cache)
     ast.Lambda(binder: Local(i), body:) ->
       infer_term(body, cache)
       |> result.map(fn(ret) {
@@ -61,11 +62,24 @@ pub fn infer_term(
                     _ -> Ok(ast.Fn(rest, ret, req))
                   }
                 False ->
-                  Error(TypeMismatch(
-                    param_typ,
-                    arg_typ,
-                    "argument type mismatch",
-                  ))
+                  // A type-variable argument is not a mismatch: the checker
+                  // rejects only *definitely wrong* code (concrete vs
+                  // concrete). Var-vs-concrete is deferred — false positives
+                  // would send agents into repair loops on correct code.
+                  case arg_typ {
+                    ast.TypeVar(_) ->
+                      case rest {
+                        [] -> Ok(ret)
+                        _ -> Ok(ast.Fn(rest, ret, req))
+                      }
+                    _ ->
+                      Error(TypeMismatch(
+                        param_typ,
+                        arg_typ,
+                        "argument type mismatch",
+                        option.Some(a),
+                      ))
+                  }
               }
           }
         }
@@ -75,6 +89,7 @@ pub fn infer_term(
             ast.Fn([], ast.TypeVar(0), ast.Required([])),
             other,
             "not a function",
+            option.Some(f),
           ))
       }
     }
@@ -98,6 +113,7 @@ pub fn infer_term(
                 ast.TypeVar(-1),
                 ast.TypeVar(-1),
                 "op index out of bounds",
+                option.None,
               ))
           }
         }
@@ -145,6 +161,7 @@ fn collect_reqs(
 ) -> List(ast.ReqElement) {
   case term {
     ast.Int(_) | ast.Float(_) | ast.Text(_) | ast.Hole | ast.LocalVarRef(_) -> []
+    ast.Located(inner, _) -> collect_reqs(inner, cache, bound)
     ast.RefTo(ref) ->
       case dict.get(cache.entries, ref) {
         Ok(CTTerm(ast.Fn(_, _, ast.Required(reqs)))) -> reqs
@@ -196,6 +213,7 @@ pub fn check_linearity(
 ) -> Result(Nil, InferenceError) {
   let _ = cache
   case term {
+    ast.Located(inner, _) -> check_linearity(inner, cache)
     ast.Lambda(..) -> {
       let ast.Lambda(binder: _, body: b) = term
       check_linearity(b, cache)
