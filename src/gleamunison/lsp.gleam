@@ -120,7 +120,7 @@ fn dispatch(msg: Message, _state: String) -> List(String) {
 
 fn initialize_result() -> String {
   "{\"capabilities\":{\"textDocumentSync\":1},"
-  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.15.0\"}}"
+  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.16.0\"}}"
 }
 
 fn respond(id: Dynamic, result: String) -> String {

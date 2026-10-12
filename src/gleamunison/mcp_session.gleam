@@ -28,7 +28,7 @@ import gleamunison/verify
 import simplifile
 
 // Keep in step with gleam.toml at release time.
-const server_version = "3.15.0"
+const server_version = "3.16.0"
 
 pub opaque type SessionState {
   SessionState(cache: TypeCache, defs: List(#(String, SurfaceDef)))
