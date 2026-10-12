@@ -59,19 +59,19 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
     SAtom(IntVal(n), _, _) -> Ok(SInt(n))
     SAtom(FloatVal(f), _, _) -> Ok(SFloat(f))
     SAtom(Symbol("?"), _, _) -> Ok(SHole)
-    SAtom(Symbol(name), _, _) -> {
+    SAtom(Symbol(name), l, c) -> {
       case string.starts_with(name, "\"") && string.ends_with(name, "\"") {
         True -> {
           let inner = string.slice(name, 1, string.length(name) - 2)
           Ok(elab_types.SText(string_to_binary(inner)))
         }
-        False -> Ok(SVar(name))
+        False -> Ok(elab_types.SLoc(SVar(name), elab_types.Span(l, c)))
       }
     }
     SAtom(lexer.UnterminatedString(_), l, c) ->
       Error(ParseError("Unterminated string literal", l, c))
     SAtom(_, l, c) -> Error(ParseError("Invalid atom", l, c))
-    SListExpr(exprs, _l, _c) -> {
+    SListExpr(exprs, l, c) -> {
       case exprs {
         [SAtom(Symbol("let"), _, _), SAtom(Symbol(name), _, _), val, body] -> {
           use val_t <- result.try(sexpr_to_term(val))
@@ -109,12 +109,18 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
           ..args
         ] -> {
           use parsed_args <- result.try(list.try_map(args, sexpr_to_term))
-          Ok(elab_types.SDo(ab, op, parsed_args))
+          Ok(elab_types.SLoc(
+            elab_types.SDo(ab, op, parsed_args),
+            elab_types.Span(l, c),
+          ))
         }
         [SAtom(Symbol("handle"), _, _), comp, handler, SAtom(Symbol(ab), _, _)] -> {
           use comp_t <- result.try(sexpr_to_term(comp))
           use handler_t <- result.try(sexpr_to_term(handler))
-          Ok(elab_types.SHandle(comp_t, handler_t, ab))
+          Ok(elab_types.SLoc(
+            elab_types.SHandle(comp_t, handler_t, ab),
+            elab_types.Span(l, c),
+          ))
         }
         [SAtom(Symbol("type"), _, _), SAtom(Symbol(type_name), _, _), ..ctors] -> {
           use ctor_terms <- result.try(list.try_map(ctors, sexpr_to_term))

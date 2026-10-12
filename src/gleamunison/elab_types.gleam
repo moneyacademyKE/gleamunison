@@ -1,6 +1,12 @@
 import gleam/option.{type Option}
 import gleamunison/identity.{type DefinitionRef}
 
+/// Source location (1-based line and column) carried from the lexer
+/// through elaboration so errors can name the place they happened.
+pub type Span {
+  Span(line: Int, col: Int)
+}
+
 pub type SurfaceTerm {
   SInt(Int)
   SFloat(Float)
@@ -19,6 +25,9 @@ pub type SurfaceTerm {
   SHole
   SGuardGuard(guard: SurfaceTerm)
   SUse(binder: String, call: SurfaceTerm, body: SurfaceTerm)
+  /// A term annotated with its source span. Elaboration unwraps it and
+  /// attaches the span to any error raised inside.
+  SLoc(inner: SurfaceTerm, span: Span)
 }
 
 pub type SCase {
@@ -71,4 +80,6 @@ pub type ElaborateError {
   MissingAbilityDecl(String)
   InferFailed(message: String)
   UnsupportedTypeRef(description: String)
+  /// An error with the source span where it originated.
+  At(error: ElaborateError, span: Span)
 }
