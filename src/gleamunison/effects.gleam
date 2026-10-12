@@ -21,7 +21,10 @@ fn ffi_handle_comp(handler: Dynamic, thunk: fn() -> Dynamic) -> Dynamic
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn to_dynamic(val: any) -> Dynamic
 
-fn ability_key(ref: DefinitionRef) -> String {
+/// The handler-stack key for an ability: "m_" + last 8 of its hash.
+/// Public so tooling (transcripts, capability gates) keys frames the same
+/// way the runtime does.
+pub fn ability_key(ref: DefinitionRef) -> String {
   let Ref(h) = ref
   let full = hash_to_debug_string(h)
   "m_" <> string.slice(full, string.length(full) - 8, 8)
