@@ -84,6 +84,7 @@ pub fn get_init_defs_data() -> List(BootstrapDef) {
     BTerm("dict-new", genesis.builtin_dict_new()),
     BTerm("dict-get", genesis.builtin_dict_get()),
     BTerm("dict-set", genesis.builtin_dict_set()),
+    BTerm("dict-keys", genesis.builtin_dict_keys()),
     BTerm("set-new", genesis.builtin_set_new()),
     BTerm("set-insert", genesis.builtin_set_insert()),
     BTerm("json-parse", genesis.builtin_json_parse()),
