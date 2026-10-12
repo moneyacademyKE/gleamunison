@@ -96,71 +96,12 @@ pub fn replay_from_file(
 /// Load a file and compile the named definition. Only `define` forms are
 /// processed: evaluating a stray expression at load time would call real
 /// handlers outside any replay/recording frame, which is exactly the
-/// accident this tool exists to prevent.
+/// accident this tool exists to prevent. The loader itself lives in
+/// verify.load_defs_file — one loader, shared by every CLI that loads code.
 fn load_and_compile(path: String, name: String) -> Result(String, String) {
-  use content <- result.try(case simplifile.read(path) {
-    Ok(c) -> Ok(c)
-    Error(e) -> Error("replay: cannot read file: " <> string.inspect(e))
-  })
-  let tokens = lexer.tokenize(content)
-  use exprs <- result.try(case verify.parse_all_sexprs(tokens, []) {
-    Ok(e) -> Ok(e)
-    Error(e) ->
-      Error(
-        "Parse Error: " <> e.message <> " at line " <> string.inspect(e.line),
-      )
-  })
-  use terms <- result.try(case verify.terms_from_sexprs(exprs, []) {
-    Ok(t) -> Ok(t)
-    Error(e) -> Error("S-Expression Error: " <> e.message)
-  })
-  let init_defs = verify.get_init_defs()
-  let #(cache, defs) = repl_eval.bootstrap_defs(init_defs, types.empty_cache())
-  use #(found, _cache, _defs) <- result.try(fold_defines(
-    terms,
-    cache,
-    defs,
-    name,
-    False,
-  ))
-  case found {
+  use #(_cache, defs) <- result.try(verify.load_defs_file(path))
+  case list.any(defs, fn(pair) { pair.0 == name }) {
     False -> Error("replay: no definition named " <> name <> " in " <> path)
     True -> Ok(compile.module_name_for(repl_eval.ref_for_name(name)))
-  }
-}
-
-fn fold_defines(
-  terms: List(SurfaceTerm),
-  cache: types.TypeCache,
-  defs: List(#(String, elab_types.SurfaceDef)),
-  target: String,
-  found: Bool,
-) -> Result(
-  #(Bool, types.TypeCache, List(#(String, elab_types.SurfaceDef))),
-  String,
-) {
-  case terms {
-    [] -> Ok(#(found, cache, defs))
-    [term, ..rest] ->
-      case term {
-        SList([SVar("define"), SVar(def_name), val]) ->
-          case repl_eval.handle_define(def_name, val, cache, defs) {
-            Ok(#(next_cache, next_defs)) ->
-              fold_defines(
-                rest,
-                next_cache,
-                next_defs,
-                target,
-                found || def_name == target,
-              )
-            Error(err) ->
-              Error("Define Error for '" <> def_name <> "': " <> err)
-          }
-        _ ->
-          Error(
-            "replay: file must contain only definitions; "
-            <> "add a `(define main ...)` that calls what you want to run",
-          )
-      }
   }
 }

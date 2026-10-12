@@ -153,12 +153,14 @@ pub fn elaborated_def_for(
 /// Attach one evidence record per test result to its subject's hash.
 /// A test named `test_foo` attests the definition `foo`. Orphan tests
 /// (no such subject) attach nothing and are skipped in the output.
+/// Each entry: #(subject_hex, evidence_ref, payload) — the subject is
+/// what a caller verifies against; the evidence ref is where it lives.
 pub fn attach_results(
   adapter: StorageAdapter,
   results: List(TestResult),
   defs: List(#(String, SurfaceDef)),
   cache: TypeCache,
-) -> List(Result(#(DefinitionRef, String), evidence.AttachError)) {
+) -> List(Result(#(String, DefinitionRef, String), evidence.AttachError)) {
   results
   |> list.filter_map(fn(r) {
     let subject_name = string.drop_start(r.name, 5)
@@ -183,14 +185,20 @@ pub fn attach_results(
                 Some(e) -> ", error: " <> e
                 None -> ""
               }
-            Ok(evidence.attach(
-              adapter,
-              subject: subject_hex,
-              kind: evidence.Test,
-              verdict: verdict_of(r),
-              payload:,
-              ts: datetime.to_unix(datetime.now()),
-            ))
+            case
+              evidence.attach(
+                adapter,
+                subject: subject_hex,
+                kind: evidence.Test,
+                verdict: verdict_of(r),
+                payload:,
+                ts: datetime.to_unix(datetime.now()),
+              )
+            {
+              Ok(#(evidence_ref, _)) ->
+                Ok(Ok(#(subject_hex, evidence_ref, payload)))
+              Error(e) -> Ok(Error(e))
+            }
           }
         }
       }
