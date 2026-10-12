@@ -11,11 +11,9 @@ import gleam/result
 import gleam/string
 import gleamunison/compile
 import gleamunison/effects.{type HandlerFrame, RuntimeConfig}
-import gleamunison/elab_types.{type SurfaceTerm, SList, SVar}
-import gleamunison/lexer
+
 import gleamunison/repl_eval
 import gleamunison/transcript
-import gleamunison/types
 import gleamunison/verify
 import simplifile
 

@@ -9,7 +9,6 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
-import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/test_runner.{type TestResult}
 import gleamunison/verify

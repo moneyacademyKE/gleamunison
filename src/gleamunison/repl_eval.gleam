@@ -82,7 +82,9 @@ fn find_suggestions(
   })
 }
 
-fn format_elab_error(
+/// Render an elaboration error for humans. Public: the LSP server renders
+/// the same messages, but needs the span separately (see span_of_error).
+pub fn format_elab_error(
   err: elab_types.ElaborateError,
   prev_defs: List(#(String, SurfaceDef)),
 ) -> String {

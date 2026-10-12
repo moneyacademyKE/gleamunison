@@ -39,17 +39,6 @@ pub fn terms_from_sexprs(
   }
 }
 
-fn verify_terms(
-  terms: List(SurfaceTerm),
-  cache: TypeCache,
-  prev_defs: List(#(String, SurfaceDef)),
-) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
-  case verify_terms_valued(terms, cache, prev_defs, option.None) {
-    Ok(#(c, d, _)) -> Ok(#(c, d))
-    Error(e) -> Error(e)
-  }
-}
-
 /// Like verify_terms, but carries the value of the last evaluated
 /// non-define form so callers (eval_file) can observe it.
 fn verify_terms_valued(

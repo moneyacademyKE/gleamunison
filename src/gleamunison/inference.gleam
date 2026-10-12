@@ -3,7 +3,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleamunison/ast
-import gleamunison/identity.{type DefinitionRef, Local}
+import gleamunison/identity.{Local}
 import gleamunison/infer_helper.{list_all_match, substitute}
 import gleamunison/types.{
   type InferenceError, type TypeCache, CTAbility, CTTerm, TypeMismatch,

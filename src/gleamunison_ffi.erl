@@ -9,6 +9,7 @@
     to_dynamic/1,
     from_dynamic/1,
     rescue/1,
+    stdio_binary_mode/0, stdio_read_line/0, stdio_read_chars/1, stdio_write/1,
     deny_capability/2,
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
     test_soft_purge_scenario/0,
@@ -39,6 +40,34 @@ rescue(F) when is_function(F, 0) ->
     catch
         Class:Reason -> {error, iolist_to_binary(io_lib:format("~p:~p", [Class, Reason]))}
     end.
+
+%% LSP stdio pump helpers. Binary mode matters: Content-Length counts
+%% bytes, and io in list mode would miscount UTF-8 beyond ASCII.
+stdio_binary_mode() ->
+    io:setopts(standard_io, [binary]),
+    nil.
+
+%% One header line (through \n), or {error, nil} on EOF.
+stdio_read_line() ->
+    case io:get_line(standard_io, '') of
+        eof -> {error, nil};
+        {error, _} -> {error, nil};
+        Bin when is_binary(Bin) -> {ok, Bin};
+        L when is_list(L) -> {ok, unicode:characters_to_binary(L)}
+    end.
+
+%% Exactly N bytes (the message body), or {error, nil} on EOF/short read.
+stdio_read_chars(N) ->
+    case io:get_chars(standard_io, '', N) of
+        eof -> {error, nil};
+        {error, _} -> {error, nil};
+        Bin when is_binary(Bin) -> {ok, Bin};
+        L when is_list(L) -> {ok, unicode:characters_to_binary(L)}
+    end.
+
+stdio_write(Bin) when is_binary(Bin) ->
+    io:put_chars(standard_io, Bin),
+    nil.
 
 compile_source(Source) when is_binary(Source) ->
     case erl_scan:string(binary_to_list(Source)) of
