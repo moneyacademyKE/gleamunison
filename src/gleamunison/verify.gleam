@@ -39,17 +39,6 @@ pub fn terms_from_sexprs(
   }
 }
 
-fn verify_terms(
-  terms: List(SurfaceTerm),
-  cache: TypeCache,
-  prev_defs: List(#(String, SurfaceDef)),
-) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
-  case verify_terms_valued(terms, cache, prev_defs, option.None) {
-    Ok(#(c, d, _)) -> Ok(#(c, d))
-    Error(e) -> Error(e)
-  }
-}
-
 /// Like verify_terms, but carries the value of the last evaluated
 /// non-define form so callers (eval_file) can observe it.
 fn verify_terms_valued(
@@ -177,6 +166,66 @@ pub fn verify_file(path: String) -> Result(String, String) {
   case run_file(path) {
     Ok(_) -> Ok("Verification successful: " <> path)
     Error(err) -> Error(err)
+  }
+}
+
+/// Load a file's definitions without evaluating anything: parse, bootstrap,
+/// and fold `define` forms through handle_define (each is compiled and
+/// loaded). Stray expressions are rejected — evaluating them at load time
+/// would fire real handlers outside whatever frame the caller is about to
+/// install (replay, recording, test). Returns the advanced cache and the
+/// full def list (bootstrap + file).
+pub fn load_defs_file(
+  path: String,
+) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
+  case simplifile.read(path) {
+    Error(e) -> Error("Failed to read file: " <> string.inspect(e))
+    Ok(content) -> {
+      let tokens = lexer.tokenize(content)
+      case parse_all_sexprs(tokens, []) {
+        Error(e) ->
+          Error(
+            "Parse Error: "
+            <> e.message
+            <> " at line "
+            <> string.inspect(e.line),
+          )
+        Ok(exprs) ->
+          case terms_from_sexprs(exprs, []) {
+            Error(e) -> Error("S-Expression Error: " <> e.message)
+            Ok(terms) -> {
+              let init_defs = get_init_defs()
+              let #(cache, bootstrap_list) =
+                repl_eval.bootstrap_defs(init_defs, empty_cache())
+              fold_defines(terms, cache, bootstrap_list)
+            }
+          }
+      }
+    }
+  }
+}
+
+fn fold_defines(
+  terms: List(SurfaceTerm),
+  cache: TypeCache,
+  defs: List(#(String, SurfaceDef)),
+) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
+  case terms {
+    [] -> Ok(#(cache, defs))
+    [term, ..rest] ->
+      case term {
+        elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), val]) ->
+          case repl_eval.handle_define(name, val, cache, defs) {
+            Ok(#(next_cache, next_defs)) ->
+              fold_defines(rest, next_cache, next_defs)
+            Error(err) -> Error("Define Error for '" <> name <> "': " <> err)
+          }
+        _ ->
+          Error(
+            "file must contain only definitions; add a `(define main ...)`"
+            <> " that calls what you want to run",
+          )
+      }
   }
 }
 

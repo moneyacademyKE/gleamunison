@@ -1,5 +1,5 @@
 -module(gleamunison_repl_ffi).
--export([eval_module/1, read_line/1]).
+-export([eval_module/1, eval_module_bare/1, read_line/1]).
 
 eval_module(Mod) ->
     ModuleAtom = case is_binary(Mod) of
@@ -76,6 +76,23 @@ eval_module(Mod) ->
                 end)
             end)
         end),
+        {ok, list_to_binary(io_lib:format("~tp", [Val]))}
+    catch
+        Class:Reason:Stacktrace ->
+            {error, list_to_binary(io_lib:format("~p:~p at ~p", [Class, Reason, Stacktrace]))}
+    end.
+
+%% Evaluate a module with NO default ability handlers. Tooling (transcript
+%% recording, replay, capability gates) installs its own frames around the
+%% call; the defaults here would shadow them (innermost handler wins), so
+%% the bare variant leaves the stack exactly as the caller arranged it.
+eval_module_bare(Mod) ->
+    ModuleAtom = case is_binary(Mod) of
+        true -> erlang:binary_to_atom(Mod, utf8);
+        false -> Mod
+    end,
+    try
+        Val = ModuleAtom:'$eval'(),
         {ok, list_to_binary(io_lib:format("~tp", [Val]))}
     catch
         Class:Reason:Stacktrace ->

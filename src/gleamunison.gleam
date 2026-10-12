@@ -5,10 +5,14 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleamunison/cli_datalog
+import gleamunison/cli_evidence
 import gleamunison/cli_find
 import gleamunison/cli_llm
+import gleamunison/cli_lsp
 import gleamunison/cli_mcp
+import gleamunison/cli_replay
 import gleamunison/cli_sync
+import gleamunison/cli_test
 import gleamunison/cli_watch
 import gleamunison/http
 import gleamunison/repl
@@ -34,6 +38,10 @@ pub fn run(args: List(String)) -> Nil {
     ["datalog"] -> io.println("usage: gleam run -- datalog <file.lisp>")
     ["mcp", ..rest] -> cli_mcp.command(rest)
     ["find", ..rest] -> cli_find.command(rest)
+    ["replay", ..rest] -> cli_replay.command(rest)
+    ["test", ..rest] -> cli_test.command(rest)
+    ["evidence", ..rest] -> cli_evidence.command(rest)
+    ["lsp", ..rest] -> cli_lsp.command(rest)
     ["sync", ..rest] -> cli_sync.command(rest)
     ["watch", path] -> cli_watch.command(path)
     ["watch"] -> io.println("usage: gleam run -- watch <file.lisp>")

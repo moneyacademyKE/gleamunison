@@ -2,7 +2,7 @@ import gleam/int
 import gleam/list
 import gleam/result
 import gleam/string
-import gleamunison/elab_types.{SurfaceTermDef}
+import gleamunison/elab_types
 import gleamunison/lexer
 import gleamunison/parser
 import gleamunison/repl_eval

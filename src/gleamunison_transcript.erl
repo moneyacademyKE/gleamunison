@@ -10,6 +10,7 @@
 -module(gleamunison_transcript).
 -export([log_start/0, log_append/4, log_entries/0, log_stop/0]).
 -export([pb_start/1, pb_next/2, pb_remaining/0, pb_stop/0]).
+-export([term_to_b64/1, b64_to_term/1, run_replay/2]).
 
 -define(LOG_KEY, gleamunison_transcript_log).
 -define(PB_KEY, gleamunison_transcript_playback).
@@ -65,3 +66,48 @@ pb_remaining() ->
 pb_stop() ->
     erase(?PB_KEY),
     nil.
+
+%% Faithful serialization of raw captured values: term_to_binary under
+%% base64, so a tape file carries everything replay needs. b64_to_term
+%% decodes with [safe]: a tape is data a user hands back to the runtime,
+%% and must never mint new atoms.
+term_to_b64(Term) ->
+    base64:encode(term_to_binary(Term)).
+
+b64_to_term(B64) ->
+    binary_to_term(base64:decode(B64), [safe]).
+
+%% Replay a tape around a thunk: push one playback frame per ability key
+%% found in the entries, keyed exactly as the runtime keys handlers.
+%% Playback handlers serve recorded results in order via pb_next; any
+%% divergence (wrong ability, wrong op, exhausted tape) raises — replay
+%% is verification, and silent drift must be loud.
+run_replay(Entries, Thunk) when is_list(Entries), is_function(Thunk, 0) ->
+    Keys = unique_keys(Entries, []),
+    Stacked = lists:foldl(
+        fun(Key, Fun) ->
+            fun() -> gleamunison_effets:handle_comp(playback_frame(Key, Entries), Fun) end
+        end,
+        Thunk,
+        Keys
+    ),
+    Stacked().
+
+unique_keys([], Acc) -> lists:reverse(Acc);
+unique_keys([{Key, _, _, _, _} | Rest], Acc) ->
+    case lists:member(Key, Acc) of
+        true -> unique_keys(Rest, Acc);
+        false -> unique_keys(Rest, [Key | Acc])
+    end.
+
+playback_frame(Key, Entries) ->
+    Ops = maps:from_list([
+        {OpIdx, fun(_Args, Cont) ->
+            case pb_next(Key, OpIdx) of
+                {ok, Recorded} -> Cont(Recorded);
+                {error, Reason} -> error({transcript_replay, Reason})
+            end
+        end}
+     || {K, OpIdx, _, _, _} <- Entries, K =:= Key
+    ]),
+    {Key, Ops}.

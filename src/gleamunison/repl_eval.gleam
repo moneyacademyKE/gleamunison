@@ -82,7 +82,9 @@ fn find_suggestions(
   })
 }
 
-fn format_elab_error(
+/// Render an elaboration error for humans. Public: the LSP server renders
+/// the same messages, but needs the span separately (see span_of_error).
+pub fn format_elab_error(
   err: elab_types.ElaborateError,
   prev_defs: List(#(String, SurfaceDef)),
 ) -> String {
@@ -138,7 +140,11 @@ pub fn ref_for_name(name: String) -> DefinitionRef {
   Ref(identity.hash_bytes(string_to_binary(name)))
 }
 
-pub fn do_eval(
+/// Elaborate + compile + load a term definition, returning the loaded
+/// module name, its type, and the advanced cache. Split from do_eval so
+/// callers can choose how to run the module: plainly (REPL), or wrapped
+/// in handler frames (replay, capabilities, transcripts).
+pub fn compile_def_module(
   term: SurfaceTerm,
   name: String,
   cache: TypeCache,
@@ -161,24 +167,35 @@ pub fn do_eval(
               case load_binary(mod_name, beam) {
                 Error(err) -> Error("Load Error: " <> err)
                 Ok(_) ->
-                  case eval_module(mod_name) {
-                    Error(err) -> Error("Runtime Error: " <> err)
-                    Ok(val_str) -> {
-                      case def {
-                        ast.TermDef(term: _, typ:) ->
-                          Ok(#(val_str, typ, next_cache))
-                        _ ->
-                          Error(
-                            "Expected term definition, but got type or ability declaration",
-                          )
-                      }
-                    }
+                  case def {
+                    ast.TermDef(term: _, typ:) ->
+                      Ok(#(mod_name, typ, next_cache))
+                    _ ->
+                      Error(
+                        "Expected term definition, but got type or ability declaration",
+                      )
                   }
               }
           }
         }
       }
     }
+  }
+}
+
+pub fn do_eval(
+  term: SurfaceTerm,
+  name: String,
+  cache: TypeCache,
+  prev_defs: List(#(String, SurfaceDef)),
+) -> Result(#(String, ast.Type, TypeCache), String) {
+  case compile_def_module(term, name, cache, prev_defs) {
+    Error(err) -> Error(err)
+    Ok(#(mod_name, typ, next_cache)) ->
+      case eval_module(mod_name) {
+        Error(err) -> Error("Runtime Error: " <> err)
+        Ok(val_str) -> Ok(#(val_str, typ, next_cache))
+      }
   }
 }
 

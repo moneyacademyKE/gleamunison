@@ -4,9 +4,11 @@
 //// rejected), so handlers never thread state. Tools answer from the session's
 //// own definition table — names, kinds, content-addressed refs.
 
+import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
+import gleam/float
 import gleam/list
 import gleam/order
 import gleam/string
@@ -18,6 +20,7 @@ import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/lexer
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/parser
+import gleamunison/rank
 import gleamunison/repl_eval
 import gleamunison/type_pretty
 import gleamunison/types.{type TypeCache, empty_cache}
@@ -25,7 +28,7 @@ import gleamunison/verify
 import simplifile
 
 // Keep in step with gleam.toml at release time.
-const server_version = "3.15.0"
+const server_version = "3.16.0"
 
 pub opaque type SessionState {
   SessionState(cache: TypeCache, defs: List(#(String, SurfaceDef)))
@@ -198,31 +201,100 @@ pub type SearchHit {
   SearchHit(name: String, kind: String, ref_hex: String)
 }
 
-/// Substring search over definition names and bodies. Name matches rank
-/// above body-only matches; alphabetical inside groups.
+/// BM25-ranked search over definition names and bodies. Name tokens count
+/// double (a name match is stronger intent evidence than a body mention).
+/// Ties break alphabetically for stable output.
 pub fn search(state: SessionState, query: String) -> List(SearchHit) {
-  let matches =
-    list.filter(state.defs, fn(pair) {
-      string.contains(pair.0, query)
-      || string.contains(string.inspect(pair.1), query)
-    })
-  let ranked =
-    list.sort(matches, fn(a, b) {
-      let an = string.contains(a.0, query)
-      let bn = string.contains(b.0, query)
-      case an, bn {
-        True, False -> order.Lt
-        False, True -> order.Gt
-        _, _ -> string.compare(a.0, b.0)
+  let scored =
+    rank.rank(
+      query,
+      list.map(state.defs, fn(pair) {
+        let name_tokens = rank.tokenize(pair.0)
+        let body_tokens = def_body_tokens(pair.1)
+        rank.Doc(
+          id: pair,
+          tokens: list.append(name_tokens, name_tokens)
+            |> list.append(body_tokens),
+        )
+      }),
+    )
+  let sorted =
+    list.sort(scored, fn(a, b) {
+      case float.compare(b.0, a.0) {
+        order.Eq -> string.compare(a.1.0, b.1.0)
+        o -> o
       }
     })
-  list.map(ranked, fn(pair) {
+  list.map(sorted, fn(pair) {
+    let def_pair = pair.1
     SearchHit(
-      name: pair.0,
-      kind: kind(pair.1),
-      ref_hex: ref_hex(pair.0, pair.1),
+      name: def_pair.0,
+      kind: kind(def_pair.1),
+      ref_hex: ref_hex(def_pair.0, def_pair.1),
     )
   })
+}
+
+/// The searchable corpus of a definition: the program's own words — names,
+/// text literals, constructor names — never debug serialization (inspect
+/// renders ref internals like `Hash(...)`, which would put the token "hash"
+/// in every document) and never span coordinates.
+fn def_body_tokens(def: SurfaceDef) -> List(String) {
+  case def {
+    SurfaceTermDef(term) -> term_tokens(term)
+    _ -> []
+  }
+}
+
+fn term_tokens(term: elab_types.SurfaceTerm) -> List(String) {
+  case term {
+    elab_types.SLoc(inner, _) -> term_tokens(inner)
+    elab_types.SVar(name) -> rank.tokenize(name)
+    elab_types.SText(bytes) ->
+      case bit_array.to_string(bytes) {
+        Ok(s) -> rank.tokenize(s)
+        Error(_) -> []
+      }
+    elab_types.SApply(f, a) -> list.append(term_tokens(f), term_tokens(a))
+    elab_types.SLambda(param, body) ->
+      list.append(rank.tokenize(param), term_tokens(body))
+    elab_types.SLet(name, value, body) ->
+      list.append(
+        rank.tokenize(name),
+        list.append(term_tokens(value), term_tokens(body)),
+      )
+    elab_types.SMatch(scrutinee, cases) ->
+      list.append(
+        term_tokens(scrutinee),
+        list.flat_map(cases, fn(c) { term_tokens(c.body) }),
+      )
+    elab_types.SDo(ability, op, args) ->
+      list.append(
+        rank.tokenize(ability),
+        list.append(rank.tokenize(op), list.flat_map(args, term_tokens)),
+      )
+    elab_types.SConstruct(name, args) ->
+      list.append(rank.tokenize(name), list.flat_map(args, term_tokens))
+    elab_types.SHandle(comp, handler, ability) ->
+      list.append(
+        term_tokens(comp),
+        list.append(term_tokens(handler), rank.tokenize(ability)),
+      )
+    elab_types.SLabeledFn(params, body) ->
+      list.append(
+        list.flat_map(params, fn(p) {
+          list.append(rank.tokenize(p.0), term_tokens(p.1))
+        }),
+        term_tokens(body),
+      )
+    elab_types.SUse(binder, call, body) ->
+      list.append(
+        rank.tokenize(binder),
+        list.append(term_tokens(call), term_tokens(body)),
+      )
+    elab_types.SList(items) -> list.flat_map(items, term_tokens)
+    _ -> []
+  }
 }
 
 fn defs_json(defs: List(#(String, SurfaceDef))) -> String {

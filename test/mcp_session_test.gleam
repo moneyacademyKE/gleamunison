@@ -1,3 +1,4 @@
+import gleam/list
 import gleam/string
 import gleamunison/mcp
 import gleamunison/mcp_session
@@ -70,4 +71,15 @@ pub fn tools_list_offers_four_tools_test() {
   let assert True = string.contains(resp, "get_definition")
   let assert True = string.contains(resp, "search_definitions")
   let assert True = string.contains(resp, "\"eval\"")
+}
+
+// Regression: the search corpus must be the program's own words, never
+// debug serialization — inspect(ref) renders internals like Hash(...),
+// which made every bootstrap def match the query "hash".
+pub fn search_does_not_match_ref_internals_test() {
+  let state = mcp_session.boot()
+  let hits = mcp_session.search(state, "hash")
+  let names = list.map(hits, fn(h) { h.name })
+  assert !list.contains(names, "+")
+  assert !list.contains(names, "fst")
 }

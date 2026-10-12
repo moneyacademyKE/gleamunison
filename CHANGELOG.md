@@ -2,6 +2,34 @@
 
 ---
 
+## What's New in v3.16.0 (2026-10-12)
+
+The agent-ergonomics release: search, replay, evidence, spans, and an LSP — every layer an agent touches got a real tool.
+
+### 1. Semantic find (`gleam run -- find`)
+- `rank.gleam`: pure BM25 (k1=1.2, b=0.75) over the codebase corpus. MCP `search_definitions` and the find CLI now rank by relevance instead of substring.
+- The corpus is the program's own words — variable names, text literals, constructor names — never debug serialization (inspect renders ref internals, which put the token "hash" in every document).
+
+### 2. Replay debugging (`gleam run -- replay`)
+- Tape format v2: entries carry base64 `term_to_binary` blobs of raw args and results, so a tape file replays for real (`binary_to_term` with `[safe]` — a tape never mints atoms).
+- `cli_replay`: `replay <file> <def> <tape.json>` re-runs a definition under playback; divergence fails loudly. `eval_module_bare` evaluates without default handlers, which previously shadowed caller frames (innermost wins) and silently routed ops around recording wraps.
+
+### 3. The evidence loop (`gleam run -- test`, `gleam run -- evidence`)
+- `test` runs every `test_` definition under a recording Test handler and attaches evidence to subject content hashes. `evidence <hash>` lists integrity-checked attestations. "Did you test it?" is now a lookup.
+- `verify.load_defs_file` is the shared defines-only loader — one loader, not one per CLI.
+
+### 4. Span hygiene
+- Innermost span wins: a located error propagating through an enclosing `SLoc` no longer double-wraps — `(at line 1, col 33) (at line 1, col 14)` becomes one location.
+
+### 5. Minimal LSP (`gleam run -- lsp`)
+- Stdio JSON-RPC with Content-Length framing, binary-mode so lengths count bytes. `initialize`, `didOpen`, `didChange`, `shutdown`/`exit`; diagnostics carry real elaboration spans (0-based for LSP).
+- The same `format_elab_error` the CLI prints is what the editor shows.
+
+### Deferred, with the decision written down
+- **GADTs / indexed abilities** (ADR-0063): design space, cost, and the tripwire that reopens it. Not built: HM-core surgery for a feature with zero current users is the complexity-for-novelty trade this project refuses.
+
+---
+
 ## What's New in v3.15.0 (2026-10-12)
 
 The critical-six release: six foundational gaps closed, and every claim in the repo's docs re-verified against source first.

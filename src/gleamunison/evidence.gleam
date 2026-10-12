@@ -40,6 +40,12 @@ fn kind_tag(k: Kind) -> String {
   }
 }
 
+/// Public name for a kind — reports, CLIs, and MCP tools all render the
+/// same word.
+pub fn kind_name(k: Kind) -> String {
+  kind_tag(k)
+}
+
 fn tag_kind(s: String) -> Result(Kind, Nil) {
   case s {
     "test" -> Ok(Test)
