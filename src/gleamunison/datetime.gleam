@@ -37,6 +37,12 @@ pub fn now() -> DateTime {
   DateTime(ffi_now())
 }
 
+/// Seconds since the Unix epoch.
+pub fn to_unix(dt: DateTime) -> Int {
+  let DateTime(ts) = dt
+  ts
+}
+
 pub fn now_iso8601() -> String {
   unpack(ffi_now_iso8601())
 }

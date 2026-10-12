@@ -4,6 +4,7 @@ import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
+import gleamunison/cli_datalog
 import gleamunison/cli_find
 import gleamunison/cli_llm
 import gleamunison/cli_mcp
@@ -25,6 +26,12 @@ pub fn run(args: List(String)) -> Nil {
   case args {
     [] -> print_help()
     ["llm", ..rest] -> io.println(cli_llm.command(rest))
+    ["datalog", path] ->
+      case cli_datalog.run(path) {
+        Ok(out) -> io.println(out)
+        Error(err) -> io.println("ERROR: " <> err)
+      }
+    ["datalog"] -> io.println("usage: gleam run -- datalog <file.lisp>")
     ["mcp", ..rest] -> cli_mcp.command(rest)
     ["find", ..rest] -> cli_find.command(rest)
     ["sync", ..rest] -> cli_sync.command(rest)

@@ -1,5 +1,4 @@
 import gleam/list
-import gleam/string
 import gleamunison/verify
 import simplifile
 
@@ -31,22 +30,27 @@ pub fn native_datalog_test() {
       acc <> "\n" <> content
     })
 
-  // Append execution assertions
+  // Append execution assertions: count failures across all suites.
+  // assert-eq returns (pair 1 name) on pass, (pair 0 "FAIL: name") on fail,
+  // so the run is green iff the failure count evaluates to 0.
   let suite_execution =
     "
-    (let _ (run-core-tests 0)
-      (let _ (run-query-tests 0)
-        (let _ (run-temporal-tests 0)
-          (let _ (run-graph-tests 0)
-            \"ALL NATIVE DATALOG TESTS PASSED!\"))))
+    (let failures
+      (list-filter
+        (lam r (eq? (fst r) 0))
+        (list-append (run-core-tests 0)
+          (list-append (run-query-tests 0)
+            (list-append (run-temporal-tests 0)
+              (run-graph-tests 0)))))
+      (list-length failures))
     "
 
   let final_content = combined_content <> "\n" <> suite_execution
   let temp_file = "/tmp/datalog_test_combined.lisp"
   let assert Ok(Nil) = simplifile.write(temp_file, final_content)
 
-  let assert Ok(res) = verify.verify_file(temp_file)
-  let assert True = string.contains(res, "Verification successful")
+  let assert Ok(res) = verify.eval_file(temp_file)
+  let assert True = res == "0"
 
   let _ = simplifile.delete(temp_file)
 }

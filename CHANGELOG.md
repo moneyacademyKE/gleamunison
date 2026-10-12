@@ -2,6 +2,37 @@
 
 ---
 
+## What's New in v3.15.0 (2026-10-12)
+
+The critical-six release: six foundational gaps closed, and every claim in the repo's docs re-verified against source first.
+
+### 1. Source spans in errors
+- New `SLoc`/`At` wrappers carry line/col from the lexer through elaboration — zero constructor changes.
+- `undefined variable 'nope' … (at line 4, col 12)` is now the shape of every elaboration error.
+
+### 2. Alpha-invariance: proven, documented
+- `hash_term` was already structural over de Bruijn terms; now it's proven by regression tests and written down in `docs/hashing.md`.
+
+### 3. Effect requirements in types
+- `inference.gleam` no longer stubs `Required([])`: a function's type reports the abilities its body performs (Do in, Handle out, RefTo transitive).
+
+### 4. Tests as DAG citizens
+- `Test` ability (`expect`) + `test_runner.gleam`: `test_foo` runs under a recording handler and attaches results as evidence on `foo`'s hash.
+- Fixed a pre-existing suite-poisoning bug: the corruption-probe test left a broken handler stack for every later effects test.
+
+### 5. Versioned namespace (`namespace.gleam`)
+- Content-addressed namespaces, named branch pointers, causal history chains, diff + conflict-detecting merge.
+
+### 6. Datalog: honest and reachable
+- New `dict-keys` builtin enabled fixing the AVET join (which silently returned empty for unbound values) and an entity double-wrap.
+- `db-history` ordering fixed (the log is already newest-first).
+- The datalog test harness previously returned success unconditionally — it now asserts zero failures. Three latent engine bugs were found by making it honest.
+- New CLI: `gleam run -- datalog <script.lisp>` loads the engine and prints query results.
+
+### 7. `verify.eval_file`
+- Like `verify_file` but returns the last form's value — for harnesses and query tools that need results, not just success.
+
+
 ## What's New in v3.14.0 (2026-10-12)
 
 Release v3.14.0 builds the agent-era substrate: five design leads that only a content-addressed, ability-gated language on BEAM can carry. The theme is verification you can run, not process you must trust.

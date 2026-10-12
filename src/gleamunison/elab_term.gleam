@@ -8,8 +8,8 @@ import gleamunison/elab_pat.{elaborate_pattern}
 import gleamunison/elab_types.{
   type ElaborateError, type SCase, type SurfaceTerm, MissingAbilityDecl,
   NameNotFound, SApply, SCase, SConstruct, SDo, SFloat, SGuardGuard, SHandle,
-  SHole, SInt, SLabeledFn, SLambda, SLet, SList, SMatch, SRef, SText, SUse, SVar,
-  UnknownOperation, UnsupportedTypeRef,
+  SHole, SInt, SLabeledFn, SLambda, SLet, SList, SLoc, SMatch, SRef, SText, SUse,
+  SVar, UnknownOperation, UnsupportedTypeRef,
 }
 import gleamunison/identity.{Local}
 
@@ -42,6 +42,12 @@ pub fn elaborate_term(
           |> result.map(fn(r) { #(ctx, ast.RefTo(r)) })
           |> result.replace_error(NameNotFound(name))
         }
+      }
+    }
+    SLoc(inner, span) -> {
+      case elaborate_term(inner, ctx) {
+        Ok(r) -> Ok(r)
+        Error(e) -> Error(elab_types.At(e, span))
       }
     }
     SRef(r) -> Ok(#(ctx, ast.RefTo(r)))

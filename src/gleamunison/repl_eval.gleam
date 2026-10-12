@@ -124,6 +124,13 @@ fn format_elab_error(
       <> ". The expression could not be type-checked."
     elab_types.UnsupportedTypeRef(desc) ->
       "[E005] unsupported type reference: " <> desc <> "."
+    elab_types.At(inner, span) ->
+      format_elab_error(inner, prev_defs)
+      <> " (at line "
+      <> int.to_string(span.line)
+      <> ", col "
+      <> int.to_string(span.col)
+      <> ")"
   }
 }
 

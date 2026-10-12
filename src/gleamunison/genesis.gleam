@@ -218,6 +218,10 @@ pub fn builtin_file_read() -> DefinitionRef {
   Ref(identity.hash_from_bytes(<<53:256>>))
 }
 
+pub fn builtin_dict_keys() -> DefinitionRef {
+  Ref(identity.hash_from_bytes(<<56:256>>))
+}
+
 // Abilities (54+): the ability definition itself carries the hash; its
 // operations are positional indices handled via effects.run handler frames.
 pub fn builtin_ability_llm() -> DefinitionRef {

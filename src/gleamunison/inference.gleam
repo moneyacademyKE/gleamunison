@@ -1,8 +1,9 @@
 import gleam/dict
 import gleam/list
+import gleam/option
 import gleam/result
 import gleamunison/ast
-import gleamunison/identity.{Local}
+import gleamunison/identity.{type DefinitionRef, Local}
 import gleamunison/infer_helper.{list_all_match, substitute}
 import gleamunison/types.{
   type InferenceError, type TypeCache, CTAbility, CTTerm, TypeMismatch,
@@ -31,7 +32,13 @@ pub fn infer_term(
     ast.LocalVarRef(Local(i)) -> Ok(ast.TypeVar(i))
     ast.Lambda(binder: Local(i), body:) ->
       infer_term(body, cache)
-      |> result.map(fn(ret) { ast.Fn([ast.TypeVar(i)], ret, ast.Required([])) })
+      |> result.map(fn(ret) {
+        ast.Fn(
+          [ast.TypeVar(i)],
+          ret,
+          ast.Required(collect_requirements(body, cache)),
+        )
+      })
     ast.Apply(function: f, arg: a) -> {
       use ft <- result.try(infer_term(f, cache))
       case ft {
@@ -112,6 +119,74 @@ pub fn infer_term(
     }
     ast.Hole -> Ok(ast.TypeVar(-1))
     ast.Use(_, _call, body) -> infer_term(body, cache)
+  }
+}
+
+/// Collect the abilities a term's evaluation may perform: abilities named
+/// by `Do` nodes on the evaluation spine, minus those bound by an enclosing
+/// `Handle`, plus the declared requirements of referenced definitions.
+///
+/// Deliberate under-approximation: we do not descend into nested `Lambda`
+/// bodies (an unapplied closure performs nothing), and locally-bound
+/// closures called later are not tracked. Documented in docs/adr (effects
+/// are dynamic by design); the requirement set is a lower bound.
+pub fn collect_requirements(
+  term: ast.Term,
+  cache: TypeCache,
+) -> List(ast.ReqElement) {
+  collect_reqs(term, cache, [])
+  |> list.unique
+}
+
+fn collect_reqs(
+  term: ast.Term,
+  cache: TypeCache,
+  bound: List(identity.DefinitionRef),
+) -> List(ast.ReqElement) {
+  case term {
+    ast.Int(_) | ast.Float(_) | ast.Text(_) | ast.Hole | ast.LocalVarRef(_) -> []
+    ast.RefTo(ref) ->
+      case dict.get(cache.entries, ref) {
+        Ok(CTTerm(ast.Fn(_, _, ast.Required(reqs)))) -> reqs
+        _ -> []
+      }
+    ast.List(ts) -> list.flat_map(ts, fn(t) { collect_reqs(t, cache, bound) })
+    ast.Apply(function: f, arg: a) ->
+      list.append(collect_reqs(f, cache, bound), collect_reqs(a, cache, bound))
+    ast.Lambda(..) -> []
+    ast.Let(binder: _, value: v, body: b) ->
+      list.append(collect_reqs(v, cache, bound), collect_reqs(b, cache, bound))
+    ast.Match(scrutinee: s, cases:) ->
+      list.append(
+        collect_reqs(s, cache, bound),
+        list.flat_map(cases, fn(c) {
+          let guard_reqs = case c.guard {
+            option.Some(ast.GuardTerm(t)) -> collect_reqs(t, cache, bound)
+            option.None -> []
+          }
+          list.append(guard_reqs, collect_reqs(c.body, cache, bound))
+        }),
+      )
+    ast.Do(ability, _, args) ->
+      case list.contains(bound, ability) {
+        True -> list.flat_map(args, fn(a) { collect_reqs(a, cache, bound) })
+        False -> [
+          ast.Concrete(ast.AbilityRef(decl: ability)),
+          ..list.flat_map(args, fn(a) { collect_reqs(a, cache, bound) })
+        ]
+      }
+    ast.Handle(computation: comp, handler: h, ability:) ->
+      list.append(
+        collect_reqs(comp, cache, [ability, ..bound]),
+        collect_reqs(h, cache, bound),
+      )
+    ast.Construct(_, args) ->
+      list.flat_map(args, fn(a) { collect_reqs(a, cache, bound) })
+    ast.Use(_, call, body) ->
+      list.append(
+        collect_reqs(call, cache, bound),
+        collect_reqs(body, cache, bound),
+      )
   }
 }
 

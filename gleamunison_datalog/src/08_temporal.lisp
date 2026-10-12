@@ -7,15 +7,16 @@
 ;; Get all transaction states/datoms in chronological order for (e, a)
 (define db-history
   (lam db (lam e (lam a
-    (let transactions (list-reverse (db-log db))
-      (list-flatten
-        (list-map
-          (lam tx-datoms
-            (list-filter
-              (lam d
-                (and (eq? (datom-e d) e) (eq? (datom-a d) a)))
-              tx-datoms))
-          transactions)))))))
+    ;; The log is stored newest-first (transact prepends), so history is
+    ;; already in the right order — no reverse.
+    (list-flatten
+      (list-map
+        (lam tx-datoms
+          (list-filter
+            (lam d
+              (and (eq? (datom-e d) e) (eq? (datom-a d) a)))
+            tx-datoms))
+        (db-log db)))))))
 
 ;; ── db-as-of ─────────────────────────────────────────────────────────────────
 ;; Returns a snapshot of the DB state as of a given transaction number/time tx-val.

@@ -48,7 +48,7 @@ cloud; we grew the agent-facing surface Unison still lacks.
 | **Distribution** | **Unison Cloud**: `Remote` ability ("the I/O of the cloud"), `deploy`/`submit`, ServiceHash-addressed services, Nimbus workers | Native BEAM distribution + TCP pull sync | They built a platform; we inherited OTP's 40 years. Theirs ships exactly-once stream processing as a library *today* (Volturno); ours ships the substrate and the philosophy, not that library. |
 | **Cloud storage** | `Storage`/`Transaction` abilities, Cell/OrderedTable/Database over DynamoDB, object storage over S3 | DETS + Merkle DAG storage adapter | Theirs is managed and transactional across a cluster; ours is local, embedded, zero-dependency. Different problem, honestly. |
 | **Deploy story** | ServiceHash content-addressed deploys, stable ServiceName URLs, daemons (auto-restarted threads on every node), secrets via `Environment.Config` | escript single binary + hot swap + supervision | Both content-address deploys (ServiceHash ≈ our definition hash). They have a hosted control plane; we have one file you can scp. |
-| **Agent surface (MCP)** | **UCM is an MCP server** (1.1+): `history`, `reflog`, `share-project-info` tools for AI agents | Datalog engine with BM25 + vector search over the codebase — but **no agent-facing protocol** | **Cheapest gap to close and they proved the demand.** We have the better query engine; they have the socket. MCP server over our HTTP stack is a small module. |
+| **Agent surface (MCP)** | **UCM is an MCP server** (1.1+): `history`, `reflog`, `share-project-info` tools for AI agents | MCP server shipped (v3.13.0: search/get/list/parse over definitions, substring matching today); userspace datalog engine (ADR-0062: datoms, temporal, rules, BM25 + vector) exposed via `gleam run -- datalog` (v3.15.0) | **Cheapest gap to close and they proved the demand.** Next: back MCP search with the datalog/BM25 engine instead of substring. |
 | **LLM programming surface** | None. MCP lets agents *read* the codebase; nothing lets programs *call models* | `LLM` ability, provider handlers, retry/fallback/mock middleware, SAP repair, content-addressed prompts | **We lead, decisively and new since June.** Different axis than MCP — theirs is code-query, ours is model-calls-as-effects. They have zero here. |
 | **Structured-output repair** | None | SAP (fences, yapping, trailing commas, unquoted keys, comments, Python literals) | We lead. Nothing comparable exists in the Unison ecosystem. |
 | **Prompt versioning** | N/A | Prompts as hashed DAG definitions | Structural lead — falls out of content addressing for free. |
@@ -98,12 +98,19 @@ plays. Do not build Nimbus. **Deferred by design.**
 ### 2.3. MCP — they proved agents want a protocol socket into the codebase
 
 Unison 1.1 made UCM an MCP server so agents can query types, hashes, dependents, and
-docs over JSON-RPC. We have the *stronger* query substrate — a datalog engine with BM25
-and vector search over a content-addressed store — and **no socket in front of it**.
+docs over JSON-RPC. Our query substrate is a userspace datalog engine (datoms, temporal
+queries, recursive rules, BM25 + vector — ADR-0062) that runs *in* the bootstrapped
+language, plus an MCP server (v3.13.0) answering definition search over substring
+matching.
 
-**Verdict:** this is the cheapest lead-extension available. An MCP server module over the
-existing HTTP stack, exposing datalog queries as tools, is a bounded piece of work that
-converts an internal strength into the exact surface agents already speak. **Do this one.**
+**Correction (v3.15.0):** an earlier revision of this table claimed the datalog engine
+queried "the codebase" — it is a general-purpose userspace database, not wired to the
+definition store, and until this release its test harness never asserted results (two
+latent engine bugs — AVET iteration and history ordering — were found and fixed when
+the harness was made honest). The engine is now exposed as `gleam run -- datalog`.
+
+**Verdict:** backing the MCP search tools with the datalog/BM25 engine converts an
+internal strength into the exact surface agents already speak.
 
 ---
 

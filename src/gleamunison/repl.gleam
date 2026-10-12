@@ -134,7 +134,7 @@ fn help_text() -> String {
   <> "Lists:    list-length list-reverse list-map list-filter list-fold\n"
   <> "          list-append list-flatten list-member? range list-sort\n"
   <> "Pairs:    pair fst snd left right\n"
-  <> "Dicts:    dict-new dict-get dict-set set-new set-insert\n"
+  <> "Dicts:    dict-new dict-get dict-set dict-keys set-new set-insert\n"
   <> "IO:       read_line spawn self send recv sleep now\n"
   <> "FFI:      json-parse http-get file-read\n"
   <> "Abilities: Console(print) State(get set) Math(add sub mul) Show(show)\n"
