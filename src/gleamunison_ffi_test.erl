@@ -3,6 +3,17 @@
 -export([start_echo_server/0]).
 -export([start_http_server/1, http_post/3, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
+-export([rescue/1]).
+
+%% Run a zero-arg fun and capture any raised reason as {error, Rendered}.
+%% House pattern for asserting structured denials (capability gates) without
+%% crashing the test process.
+rescue(F) when is_function(F, 0) ->
+    try F() of
+        R -> {ok, R}
+    catch
+        Class:Reason -> {error, iolist_to_binary(io_lib:format("~p:~p", [Class, Reason]))}
+    end.
 
 test_storage_owner_survives() ->
     Parent = self(),
