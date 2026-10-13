@@ -47,7 +47,7 @@
     (let tx (add (db-tx db) 1)
       (let d (datom-make e a (pair "retract" v) tx)
         (let new-eavt (eavt-remove-val (db-eavt db) e a v)
-          (let new-avet (avet-remove (db-avet db) a v)
+          (let new-avet (avet-remove (db-avet db) a v e)
             (let new-log (cons (list d) (db-log db))
               (db-make new-eavt new-avet new-log tx)))))))))))
 

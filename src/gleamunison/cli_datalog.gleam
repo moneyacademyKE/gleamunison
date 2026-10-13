@@ -39,7 +39,7 @@ pub fn run(script_path: String) -> Result(String, String) {
   eval_source(engine_src <> "\n" <> script_src)
 }
 
-fn read_engine() -> Result(String, String) {
+pub fn read_engine() -> Result(String, String) {
   list.try_fold(engine_files, "", fn(acc, path) {
     case simplifile.read(path) {
       Ok(content) -> Ok(acc <> "\n" <> content)
@@ -53,7 +53,7 @@ fn read_engine() -> Result(String, String) {
   })
 }
 
-fn eval_source(source: String) -> Result(String, String) {
+pub fn eval_source(source: String) -> Result(String, String) {
   let tokens = lexer.tokenize(source)
   use sexprs <- result.try(parse_all(tokens, []))
   use terms <- result.try(

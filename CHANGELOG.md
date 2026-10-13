@@ -2,6 +2,27 @@
 
 ---
 
+## What's New in v3.18.0 (2026-10-13)
+
+The registry release: the codebase is queryable as data through the native datalog engine, and packages are content-addressed manifests whose hashes carry their test evidence.
+
+### 1. Datalog codebase index + MCP graph tools
+- `codebase_index.gleam` walks the session definitions and emits datalog datoms: one entity per def with `def/name`, `def/hash`, `def/kind`, and one `def/dep` per in-corpus reference. Index scripts evaluate under the native engine (ADR-0062) via the same path the datalog CLI uses.
+- New MCP tools: `callers_of`, `deps_of`, `defs_by_kind` — graph questions answered by the engine, not by string matching. `ref_hex`/`kind_of` moved to `codebase_index` so search identity and index identity share one source.
+- Engine bug found and fixed: the AVET index was `{a → {v → e}}` — a unique-value assumption. Any value shared by multiple entities (e.g. `def/kind = term` across 56 bootstrap defs) silently kept only the last entity, so joins over shared values returned one result. AVET is now `{a → {v → [e]}}` with list-aware insert/remove/lookup/fold; regression test `test-multi-result-join` guards it.
+
+### 2. Package manifests — content-addressed, evidence-gated
+- `manifest.gleam`: name, version, def hash set, dependency manifests, evidence requirement. Canonical (sorted) serialization makes hashing order-independent; manifests store in the DAG under their own content hash; fetch re-hashes the stored bytes and refuses on mismatch. The DAG is the registry — no server, no mutable name→version table.
+
+### 3. pkg install / pkg publish — the registry loop
+- `pkg.publish_to_store` runs the evidence turnstile over the package's defs before the manifest is stored: no passing Test attestation on a content hash, no publish.
+- `gleam run -- pkg publish <file.lisp> --name X --version Y` prints the manifest hash — the shareable name of the package.
+- `pkg.install_from_store` fetches the manifest (integrity re-checked), gates every def through the turnstile, and commits the name bindings onto a namespace branch with causal history.
+- `gleam run -- pkg install <hash> [--peer host:port] [--branch name]` — with a peer, sync pulls first (defs, manifests and evidence all travel as content-addressed chunks).
+- Live-verified end to end: `test` attests → publish prints the hash → install binds the names.
+
+---
+
 ## What's New in v3.17.0 (2026-10-13)
 
 The agent-era substrate release: type errors with call-site spans, semantic find over vectors, an evidence turnstile, LSP language features, tape-to-test, and namespace sync.

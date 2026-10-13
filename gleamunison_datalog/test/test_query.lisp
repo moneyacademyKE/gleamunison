@@ -46,10 +46,29 @@
                             (and (eq? mx 30)
                               (eq? av 20))))))))))))))))
 
+(define test-multi-result-join
+  (lam dummy
+    ;; Three entities share one attribute value: the join must return all
+    ;; three. (AVET regression: the value→entity index used to keep only
+    ;; the last entity asserted under a shared value.)
+    (let db (db-assert db-empty 1 "kind" "term")
+      (let db (db-assert db 1 "name" "a")
+        (let db (db-assert db 2 "kind" "term")
+          (let db (db-assert db 2 "name" "b")
+            (let db (db-assert db 3 "kind" "term")
+              (let db (db-assert db 3 "name" "c")
+                (let clauses
+                  (list
+                    (pair (q-var "?e") (pair "kind" (q-val "term")))
+                    (pair (q-var "?e") (pair "name" (q-var "?n"))))
+                  (let results (db-query db clauses)
+                    (eq? (list-length results) 3)))))))))))
+
 (define run-query-tests
   (lam dummy
     (list
       (assert-eq true (test-unify 0) "test-unify")
       (assert-eq true (test-simple-query 0) "test-simple-query")
+      (assert-eq true (test-multi-result-join 0) "test-multi-result-join")
       (assert-eq true (test-aggregates 0) "test-aggregates"))))
 

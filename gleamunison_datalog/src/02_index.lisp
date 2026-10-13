@@ -38,20 +38,28 @@
     (eavt-entity-map eavt e))))
 
 ;; ── AVET helpers ─────────────────────────────────────────────────────────────
+;; avet : {a → {v → [e ...]}} — a value may be claimed by many entities.
+
 (define avet-lookup
   (lam avet (lam a (lam v
     (let attr-map (dict-safe-get avet a (dict-new))
-      (dict-safe-get attr-map v 0))))))
+      (dict-safe-get attr-map v (list)))))))
 
 (define avet-insert
   (lam avet (lam a (lam v (lam e
     (let attr-map (dict-safe-get avet a (dict-new))
-      (dict-set avet a (dict-set attr-map v e))))))))
+      (let existing (dict-safe-get attr-map v (list))
+        (if (eq? (list-member? e existing) 1)
+          (dict-set avet a (dict-set attr-map v existing))
+          (dict-set avet a (dict-set attr-map v (cons e existing)))))))))))
 
 (define avet-remove
-  (lam avet (lam a (lam v
+  (lam avet (lam a (lam v (lam e
     (let attr-map (dict-safe-get avet a (dict-new))
-      (dict-set avet a (dict-set attr-map v 0)))))))
+      (let existing (dict-safe-get attr-map v (list))
+        (dict-set avet a
+          (dict-set attr-map v
+            (list-filter (lam x (not (eq? x e))) existing))))))))))
 
 (define db-entity-attrs
   (lam db (lam e

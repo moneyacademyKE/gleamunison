@@ -10,6 +10,7 @@ import gleamunison/cli_find
 import gleamunison/cli_llm
 import gleamunison/cli_lsp
 import gleamunison/cli_mcp
+import gleamunison/cli_pkg
 import gleamunison/cli_publish
 import gleamunison/cli_replay
 import gleamunison/cli_sync
@@ -47,6 +48,7 @@ pub fn run(args: List(String)) -> Nil {
     ["evidence", ..rest] -> cli_evidence.command(rest)
     ["lsp", ..rest] -> cli_lsp.command(rest)
     ["sync", ..rest] -> cli_sync.command(rest)
+    ["pkg", ..rest] -> cli_pkg.command(rest)
     ["watch", path] -> cli_watch.command(path)
     ["watch"] -> io.println("usage: gleam run -- watch <file.lisp>")
     [cmd] -> dispatch(cmd, "8080", levels)

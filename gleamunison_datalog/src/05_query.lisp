@@ -74,29 +74,33 @@
   (lam attr-map (lam e-pat (lam v-pat (lam bindings
     (let v-resolved (resolve-part v-pat bindings)
       (if (fst v-resolved)
-        ;; v is bound — look up entity directly
+        ;; v is bound — unify e-pat against every entity recorded for v
         (let v (snd v-resolved)
-          (let e (dict-safe-get attr-map v 0)
-            (if (eq? e 0)
-              (list)
-              (let u-result (unify-part e-pat e bindings)
-                (if (fst u-result)
-                  (list (snd u-result))
-                  (list))))))
-        ;; v unbound — scan every value in this attribute's index
-        (list-filter-map
-          (lam v
-            (let e (dict-safe-get attr-map v 0)
-              (if (eq? e 0)
-                (pair false bindings)
-                (let u1 (unify-part v-pat v bindings)
-                  (if (fst u1)
-                    (let u2 (unify-part e-pat e (snd u1))
-                      (if (fst u2)
-                        (pair true (snd u2))
-                        (pair false bindings)))
-                    (pair false bindings))))))
-          (dict-keys attr-map)))))))))
+          (let es (dict-safe-get attr-map v (list))
+            (list-filter-map
+              (lam e
+                (let u-result (unify-part e-pat e bindings)
+                  (if (fst u-result)
+                    (pair true (snd u-result))
+                    (pair false bindings))))
+              es)))
+        ;; v unbound — scan every value in this attribute's index via
+        ;; dict-keys, then every entity recorded under each value
+        (list-flatten
+          (list-map
+            (lam v
+              (let es (dict-safe-get attr-map v (list))
+                (list-filter-map
+                  (lam e
+                    (let u1 (unify-part v-pat v bindings)
+                      (if (fst u1)
+                        (let u2 (unify-part e-pat e (snd u1))
+                          (if (fst u2)
+                            (pair true (snd u2))
+                            (pair false bindings)))
+                        (pair false bindings))))
+                  es)))
+            (dict-keys attr-map))))))))))
 
 ;; Scan all entities for those matching (attr, v-pat)
 (define db-scan-attr
