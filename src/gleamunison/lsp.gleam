@@ -150,7 +150,7 @@ fn dispatch(
 fn initialize_result() -> String {
   "{\"capabilities\":{\"textDocumentSync\":1,\"hoverProvider\":true,"
   <> "\"definitionProvider\":true,\"completionProvider\":{\"triggerCharacters\":[]}},"
-  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.17.0\"}}"
+  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.18.0\"}}"
 }
 
 fn error_response(id: Dynamic, code: Int, message: String) -> String {
