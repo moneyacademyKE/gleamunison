@@ -207,6 +207,15 @@ fn head_chunk_ref(
   }
 }
 
+/// Load the namespace a branch currently points at.
+pub fn load_current(
+  adapter: StorageAdapter,
+  branch: String,
+) -> Result(Namespace, String) {
+  use #(_, ns_ref) <- result.try(branch_head(adapter, branch))
+  load(adapter, ns_ref)
+}
+
 /// Walk the head chain newest-first: #(seq, namespace ref) entries.
 pub fn history(
   adapter: StorageAdapter,

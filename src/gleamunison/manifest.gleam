@@ -62,6 +62,11 @@ pub fn ref_from_hex(hex: String) -> DefinitionRef {
   Ref(hash_from_bytes(hex_to_bytes(hex)))
 }
 
+/// The hex form of a ref — the shareable name of a manifest.
+pub fn ref_hex_of(ref: DefinitionRef) -> String {
+  hash_to_debug_string(ref_hash(ref))
+}
+
 fn canonical(m: Manifest) -> String {
   let defs =
     m.defs
