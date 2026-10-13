@@ -2,6 +2,36 @@
 
 ---
 
+## What's New in v3.17.0 (2026-10-13)
+
+The agent-era substrate release: type errors with call-site spans, semantic find over vectors, an evidence turnstile, LSP language features, tape-to-test, and namespace sync.
+
+### 1. Type errors cite the failing call site
+- `ast.Located(inner, span)` is a metadata wrapper: `hash_term` skips it (identity stays structural), the compiler strips it, inference errors carry the offending subterm, and `elab_def` lifts its span into the `At` wrapper. `verify` now reports `type error: ... (at line 3, col 10)` — the argument, not the def.
+- Latent bug fixed: bootstrap terms (`add`/`sub`/`mul`) were cached as `TypeVar(-1)`, leaving the checker blind to builtin misuse. Genesis refs are now seeded with the declared Math op signatures. The checker's contract is now explicit: it rejects only *definitely wrong* code (var-vs-concrete is deferred — false positives would send agents into repair loops on correct code).
+
+### 2. Semantic find over vectors
+- `rank.embed`: deterministic sparse trigram embeddings (1024 dims, phash2, no network, no model download). `rank.cosine_shared` reports score + shared-dim count. `rank.rank_hybrid` blends normalized BM25 with cosine behind two documented noise gates (shared>=2; cosine > max(0.1, 0.5·max)). "retries" finds "retry" — BM25 alone returns nothing; a miss returns `[]` instead of the whole corpus ranked by noise.
+- `find` and MCP `search_definitions` rank hybrid; `SearchHit` carries the score.
+
+### 3. The evidence turnstile (`gleam run -- publish`)
+- `turnstile.gleam`: a pure gate — which of these #(name, content-hash) pairs carry a passing Test attestation? `test_` defs produce evidence, they are not gated.
+- `gleam run -- publish <file>` refuses unevidenced definitions by name, then merges admitted defs into `.gleamunison/published` as name → hash. Smoke: refuse → `test` attests → admit; the published hash matches the attested subject exactly.
+
+### 4. LSP language features
+- The server keeps a doc store (uri → text) and now answers `textDocument/hover` (inferred type from the elaborated unit, bootstrap-first ordering + seeded builtin types so types are real), `textDocument/definition` (define-line index), and `textDocument/completion` (file def names by text scan — mid-edit documents never parse — plus bootstrap names, prefix-filtered from the cursor word).
+- Split for the LOC ceiling: `lsp.gleam` (protocol core), `lsp_features.gleam` (language features), `lsp_types.gleam` (shared types) — no import cycles.
+
+### 5. Tape-to-test (`gleam run -- tape-to-test`)
+- Generates a self-contained regression test from a recorded transcript: the subject defs restated, a mock handler that pins the recorded args (via Test.expect inside the handler — a changed call fails) and returns the recorded result, and a test_ def asserting the recorded final value.
+- `repr_to_literal` converts Erlang/Gleam inspect reprs to surface literals (Int, Text, lists); anything else is an honest error. Ability module keys map back to surface names via the bootstrap table. v1 limits: single-op tapes, Int/Text values.
+
+### 6. Namespace sync (`gleam run -- sync --branch`)
+- `namespace.export_branch` walks the pointer cell + head chain + namespace snapshots into a chunk set; `import_branch` verifies content chunks by hash and the pointer chunk by parsing — a tampered chunk is refused, nothing partial lands.
+- Branch pointer refs are derivable from the branch name alone (`branch_pointer_ref` is now public), so a peer requests it without a negotiation round. `cli_sync --branch <name>` walks the chain over the wire after the def pull. Names travel with the code.
+
+---
+
 ## What's New in v3.16.0 (2026-10-12)
 
 The agent-ergonomics release: search, replay, evidence, spans, and an LSP — every layer an agent touches got a real tool.

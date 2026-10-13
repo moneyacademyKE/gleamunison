@@ -141,7 +141,7 @@ fn dispatch(msg: lsp_types.Message, state: lsp_types.State) -> #(List(String), l
 fn initialize_result() -> String {
   "{\"capabilities\":{\"textDocumentSync\":1,\"hoverProvider\":true,"
   <> "\"definitionProvider\":true,\"completionProvider\":{\"triggerCharacters\":[]}},"
-  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.16.0\"}}"
+  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.17.0\"}}"
 }
 
 fn error_response(id: Dynamic, code: Int, message: String) -> String {
