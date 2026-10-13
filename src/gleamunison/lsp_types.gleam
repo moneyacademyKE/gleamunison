@@ -25,7 +25,11 @@ pub fn open_doc(state: State, uri: String, text: String) -> State {
 }
 
 pub type Message {
-  Message(id: Option(Dynamic), method: String, params: dict.Dict(String, Dynamic))
+  Message(
+    id: Option(Dynamic),
+    method: String,
+    params: dict.Dict(String, Dynamic),
+  )
 }
 
 pub fn respond(id: Dynamic, result: String) -> String {

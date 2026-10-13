@@ -16,8 +16,8 @@ import gleamunison/elab_types
 import gleamunison/elaborate as elab
 import gleamunison/json
 import gleamunison/lexer
-import gleamunison/lsp_types
 import gleamunison/lsp_features
+import gleamunison/lsp_types
 import gleamunison/repl_eval
 import gleamunison/type_pretty
 import gleamunison/types.{empty_cache}
@@ -97,7 +97,10 @@ fn message_decoder() -> decode.Decoder(lsp_types.Message) {
   decode.success(lsp_types.Message(id:, method:, params:))
 }
 
-fn dispatch(msg: lsp_types.Message, state: lsp_types.State) -> #(List(String), lsp_types.State) {
+fn dispatch(
+  msg: lsp_types.Message,
+  state: lsp_types.State,
+) -> #(List(String), lsp_types.State) {
   case msg.method {
     "initialize" ->
       case msg.id {
@@ -128,8 +131,14 @@ fn dispatch(msg: lsp_types.Message, state: lsp_types.State) -> #(List(String), l
         )
       }
     "textDocument/hover" -> #(lsp_features.hover_reply(msg, state), state)
-    "textDocument/definition" -> #(lsp_features.definition_reply(msg, state), state)
-    "textDocument/completion" -> #(lsp_features.completion_reply(msg, state), state)
+    "textDocument/definition" -> #(
+      lsp_features.definition_reply(msg, state),
+      state,
+    )
+    "textDocument/completion" -> #(
+      lsp_features.completion_reply(msg, state),
+      state,
+    )
     _ ->
       case msg.id {
         Some(id) -> #([error_response(id, -32_601, "Method not found")], state)
@@ -285,4 +294,3 @@ fn unwrap_at(
     other -> #(other, acc)
   }
 }
-

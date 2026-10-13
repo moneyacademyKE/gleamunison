@@ -26,7 +26,10 @@ import gleamunison/verify
 // walk uses the SLoc spans elaboration keeps; definition uses a text scan
 // for the define form (the define's own SList carries no span today).
 
-pub fn hover_reply(msg: lsp_types.Message, state: lsp_types.State) -> List(String) {
+pub fn hover_reply(
+  msg: lsp_types.Message,
+  state: lsp_types.State,
+) -> List(String) {
   case msg.id {
     None -> []
     Some(id) ->
@@ -39,7 +42,9 @@ pub fn hover_reply(msg: lsp_types.Message, state: lsp_types.State) -> List(Strin
               lsp_types.respond(
                 id,
                 "{\"contents\":{\"kind\":\"markdown\",\"value\":"
-                  <> lsp_types.jstr("```gleamunison\n" <> name <> " : " <> typ <> "\n```")
+                  <> lsp_types.jstr(
+                  "```gleamunison\n" <> name <> " : " <> typ <> "\n```",
+                )
                   <> "}}",
               ),
             ]
@@ -57,7 +62,10 @@ pub fn hover_reply(msg: lsp_types.Message, state: lsp_types.State) -> List(Strin
   }
 }
 
-pub fn definition_reply(msg: lsp_types.Message, state: lsp_types.State) -> List(String) {
+pub fn definition_reply(
+  msg: lsp_types.Message,
+  state: lsp_types.State,
+) -> List(String) {
   case msg.id {
     None -> []
     Some(id) ->
@@ -87,7 +95,10 @@ pub fn definition_reply(msg: lsp_types.Message, state: lsp_types.State) -> List(
   }
 }
 
-pub fn completion_reply(msg: lsp_types.Message, state: lsp_types.State) -> List(String) {
+pub fn completion_reply(
+  msg: lsp_types.Message,
+  state: lsp_types.State,
+) -> List(String) {
   case msg.id {
     None -> []
     Some(id) ->
@@ -100,7 +111,9 @@ pub fn completion_reply(msg: lsp_types.Message, state: lsp_types.State) -> List(
             completion_names(text)
             |> list.filter(fn(n) { string.starts_with(n, prefix) })
             |> list.unique
-            |> list.map(fn(n) { "{\"label\":" <> lsp_types.jstr(n) <> ",\"kind\":3}" })
+            |> list.map(fn(n) {
+              "{\"label\":" <> lsp_types.jstr(n) <> ",\"kind\":3}"
+            })
           [
             lsp_types.respond(
               id,
