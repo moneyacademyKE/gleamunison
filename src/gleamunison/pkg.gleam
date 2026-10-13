@@ -50,3 +50,24 @@ pub fn install_from_store(
   use _ <- result.try(namespace.commit(adapter, branch, next))
   Ok(admitted)
 }
+
+/// Publish #(name, hash) pairs as a manifest in the DAG. The turnstile
+/// runs first: any def without passing-test evidence refuses the whole
+/// publish (Error names them). Success stores the manifest and returns
+/// its hex — the shareable name of the package.
+pub fn publish_to_store(
+  adapter: StorageAdapter,
+  defs: List(#(String, String)),
+  name: String,
+  version: String,
+) -> Result(String, List(String)) {
+  use _ <- result.try(turnstile.check(adapter, defs))
+  let m =
+    list.fold(defs, manifest.new(name, version), fn(m, d) {
+      manifest.add_def(m, d.0, d.1)
+    })
+  case manifest.store(adapter, m) {
+    Ok(ref) -> Ok(manifest.ref_hex_of(ref))
+    Error(_) -> Error(["store manifest failed"])
+  }
+}

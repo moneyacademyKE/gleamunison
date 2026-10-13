@@ -78,7 +78,7 @@ fn run(path: String) -> Nil {
   }
 }
 
-fn hash_defs(
+pub fn hash_defs(
   names: List(String),
   defs: List(#(String, elab_types.SurfaceDef)),
   cache: types.TypeCache,
