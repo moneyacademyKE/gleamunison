@@ -24,7 +24,15 @@ pub fn empty_cache() -> TypeCache {
 
 pub type InferenceError {
   UnboundVariable(Int)
-  TypeMismatch(expected: ast.Type, actual: ast.Type, message: String)
+  TypeMismatch(
+    expected: ast.Type,
+    actual: ast.Type,
+    message: String,
+    /// The elaborated subterm that failed, when the failing site had one in
+    /// scope. When that term is a `ast.Located`, its span is the source
+    /// location of the error — elab_def lifts it into an `At` wrapper.
+    term: Option(ast.Term),
+  )
   InfiniteType(variable: Int, typ: ast.Type)
   UnhandledAbility(ast.AbilityRef)
   ImpureContext(ast.Requirement)

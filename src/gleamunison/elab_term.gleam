@@ -46,7 +46,7 @@ pub fn elaborate_term(
     }
     SLoc(inner, span) -> {
       case elaborate_term(inner, ctx) {
-        Ok(r) -> Ok(r)
+        Ok(r) -> Ok(#(r.0, ast.Located(r.1, span)))
         // Innermost span wins: an error that already carries a location is
         // more precise than this wrapper's, so it passes through untouched.
         Error(elab_types.At(_, _) as located) -> Error(located)

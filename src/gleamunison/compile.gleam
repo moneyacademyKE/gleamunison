@@ -35,6 +35,7 @@ pub fn module_name_for(ref: DefinitionRef) -> String {
 
 fn emit_term(t: ast.Term) -> String {
   case t {
+    ast.Located(inner, _) -> emit_term(inner)
     ast.Int(n) -> int.to_string(n)
     ast.Float(f) -> float.to_string(f)
     ast.Text(b) -> ffi_binary_to_erl_literal(b)

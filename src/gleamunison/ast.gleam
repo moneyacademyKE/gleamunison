@@ -1,4 +1,5 @@
 import gleam/option.{type Option}
+import gleamunison/elab_types.{type Span}
 import gleamunison/identity.{type DefinitionRef, type LocalVar}
 
 pub type Type {
@@ -47,6 +48,11 @@ pub type Term {
   Construct(ctor_ref: DefinitionRef, args: List(Term))
   Hole
   Use(binder: LocalVar, call: Term, body: Term)
+  /// A term that remembers where it came from in source. Pure metadata:
+  /// `hash_term` skips the wrapper (identity stays structural), the compiler
+  /// strips it, and inference/inference errors use it to cite the failing
+  /// call site.
+  Located(inner: Term, span: Span)
 }
 
 pub type Case {

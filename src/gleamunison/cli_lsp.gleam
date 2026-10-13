@@ -6,6 +6,7 @@ import gleam/int
 import gleam/list
 import gleam/string
 import gleamunison/lsp
+import gleamunison/lsp_types
 
 @external(erlang, "gleamunison_ffi", "stdio_binary_mode")
 fn stdio_binary_mode() -> Nil
@@ -21,18 +22,18 @@ fn stdio_write(s: String) -> Nil
 
 pub fn command(_args: List(String)) -> Nil {
   stdio_binary_mode()
-  serve()
+  serve(lsp_types.new_state())
 }
 
-fn serve() -> Nil {
+fn serve(state: lsp_types.State) -> Nil {
   case read_message() {
     Error(_) -> Nil
     Ok(body) -> {
-      let replies = lsp.handle_message(body, "")
+      let #(replies, next_state) = lsp.handle_message(body, state)
       list.each(replies, fn(r) { stdio_write(lsp.encode_frame(r)) })
       case string.contains(body, "\"method\":\"exit\"") {
         True -> Nil
-        False -> serve()
+        False -> serve(next_state)
       }
     }
   }

@@ -3,6 +3,7 @@
 //// kinds and content hashes of definitions that already do it. The hash
 //// is the dependency: reference it instead of writing a new function.
 
+import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
@@ -66,7 +67,9 @@ fn run(query: String, loads: List(String), limit: Int) -> Nil {
               <> "  :  "
               <> h.kind
               <> "  #"
-              <> string.slice(h.ref_hex, 0, 12),
+              <> string.slice(h.ref_hex, 0, 12)
+              <> "  "
+              <> float.to_string(float.to_precision(h.score, 2)),
             )
           })
       }

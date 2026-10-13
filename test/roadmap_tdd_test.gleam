@@ -100,8 +100,10 @@ pub fn parser_s_expression_test() {
   let assert Ok(elab_types.SLoc(SVar("x"), elab_types.Span(1, 1))) =
     parser.parse_string("x")
   let assert Ok(SList([SInt(1), SInt(2)])) = parser.parse_string("(list 1 2)")
-  let assert Ok(elab_types.SApply(elab_types.SLoc(SVar("add"), _), SInt(1))) =
-    parser.parse_string("(add 1)")
+  let assert Ok(elab_types.SLoc(
+    elab_types.SApply(elab_types.SLoc(SVar("add"), _), SInt(1)),
+    elab_types.Span(1, 1),
+  )) = parser.parse_string("(add 1)")
   let assert Ok(SLet("x", SInt(42), elab_types.SLoc(SVar("x"), _))) =
     parser.parse_string("(let x 42 x)")
   let assert Ok(SLambda("x", elab_types.SLoc(SVar("x"), _))) =

@@ -1,5 +1,6 @@
 import gleam/list
 import gleam/option
+import gleam/result
 import gleam/string
 import gleamunison/bootstraps
 import gleamunison/elab_types.{type SurfaceDef, type SurfaceTerm, SurfaceTermDef}
@@ -175,9 +176,12 @@ pub fn verify_file(path: String) -> Result(String, String) {
 /// would fire real handlers outside whatever frame the caller is about to
 /// install (replay, recording, test). Returns the advanced cache and the
 /// full def list (bootstrap + file).
-pub fn load_defs_file(
+/// Load a file's definitions with bootstrap context. Returns the cache,
+/// the full def list (bootstrap + file), and the file-local def names —
+/// callers that gate on definitions (publish) must not gate the bootstrap.
+pub fn load_defs_file_scoped(
   path: String,
-) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
+) -> Result(#(TypeCache, List(#(String, SurfaceDef)), List(String)), String) {
   case simplifile.read(path) {
     Error(e) -> Error("Failed to read file: " <> string.inspect(e))
     Ok(content) -> {
@@ -197,12 +201,37 @@ pub fn load_defs_file(
               let init_defs = get_init_defs()
               let #(cache, bootstrap_list) =
                 repl_eval.bootstrap_defs(init_defs, empty_cache())
-              fold_defines(terms, cache, bootstrap_list)
+              let names = defined_names(terms, [])
+              use #(c, defs) <- result.try(fold_defines(
+                terms,
+                cache,
+                bootstrap_list,
+              ))
+              Ok(#(c, defs, names))
             }
           }
       }
     }
   }
+}
+
+fn defined_names(terms: List(SurfaceTerm), acc: List(String)) -> List(String) {
+  case terms {
+    [] -> list.reverse(acc)
+    [term, ..rest] ->
+      case term {
+        elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), _]) ->
+          defined_names(rest, [name, ..acc])
+        _ -> defined_names(rest, acc)
+      }
+  }
+}
+
+pub fn load_defs_file(
+  path: String,
+) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
+  use #(cache, defs, _names) <- result.try(load_defs_file_scoped(path))
+  Ok(#(cache, defs))
 }
 
 fn fold_defines(

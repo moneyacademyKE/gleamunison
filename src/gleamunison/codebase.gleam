@@ -127,6 +127,8 @@ fn hash_case(c: ast.Case) -> Hash {
 
 fn hash_term(term: ast.Term) -> Hash {
   case term {
+    // Metadata wrapper: identity is structural, so the span is skipped.
+    ast.Located(inner, _) -> hash_term(inner)
     ast.Int(n) -> hash_bytes(str_to_bits("int:" <> int.to_string(n)))
     ast.Float(f) -> hash_bytes(str_to_bits("float:" <> float.to_string(f)))
     ast.Text(b) -> hash_bytes(bit_array.concat([str_to_bits("text:"), b]))

@@ -1,3 +1,4 @@
+import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
@@ -10,8 +11,9 @@ import gleamunison/elab_types.{
   type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
 }
 import gleamunison/elaborate as elab
+import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Ref}
-import gleamunison/types.{type TypeCache}
+import gleamunison/types.{type TypeCache, CTTerm, TypeCache}
 
 @external(erlang, "gleamunison_ffi", "string_to_binary")
 pub fn string_to_binary(s: String) -> BitArray
@@ -206,6 +208,11 @@ pub fn handle_define(
   prev_defs: List(#(String, SurfaceDef)),
 ) -> Result(#(TypeCache, List(#(String, SurfaceDef))), String) {
   let name_ref = ref_for_name(name)
+  // Seed builtin terms with their declared op types BEFORE elaboration, so
+  // `RefTo(genesis_ref)` infers the real type instead of TypeVar(-1).
+  // Names match the Math ability ops by convention; Show/Remote ops keep
+  // their type variables (polymorphic is honest there).
+  let cache = seed_builtin_term_types(cache)
   let prev_defs = list.filter(prev_defs, fn(pair) { pair.0 != name })
   let defs = [#(name, SurfaceTermDef(val)), ..prev_defs]
   case
@@ -281,4 +288,26 @@ pub fn bootstrap_defs(
       _ -> acc
     }
   })
+}
+
+/// Bootstrap terms (add, sub, mul, ...) dual-register as Math ability ops
+/// whose signatures carry the real types. Elaborating a term as SRef to a
+/// genesis ref would otherwise cache TypeVar(-1), leaving the checker blind
+/// to builtin misuse. Seed the genesis refs with the declared op types so
+/// every RefTo resolves honestly. This is a pure data move: the op table is
+/// the source of truth, the cache just stops dropping it.
+pub fn seed_builtin_term_types(cache: TypeCache) -> TypeCache {
+  let seeds = [
+    #(genesis.builtin_int_add(), int_int_int()),
+    #(genesis.builtin_sub(), int_int_int()),
+    #(genesis.builtin_mul(), int_int_int()),
+  ]
+  list.fold(seeds, cache, fn(acc, pair) {
+    TypeCache(dict.insert(acc.entries, pair.0, CTTerm(pair.1)))
+  })
+}
+
+fn int_int_int() -> ast.Type {
+  let int = ast.Builtin(ast.IntType)
+  ast.Fn([int, int], int, ast.Required([]))
 }

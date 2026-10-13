@@ -176,10 +176,15 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
         }
         [first, ..rest] -> {
           use f_term <- result.try(sexpr_to_term(first))
-          list.try_fold(rest, f_term, fn(acc, arg) {
-            use arg_term <- result.try(sexpr_to_term(arg))
-            Ok(elab_types.SApply(acc, arg_term))
-          })
+          use folded <- result.try(
+            list.try_fold(rest, f_term, fn(acc, arg) {
+              use arg_term <- result.try(sexpr_to_term(arg))
+              Ok(elab_types.SApply(acc, arg_term))
+            }),
+          )
+          // The application form itself carries the call-site span; args and
+          // nested calls carry their own from their own recursion.
+          Ok(elab_types.SLoc(folded, elab_types.Span(l, c)))
         }
         [] -> Ok(SList([]))
       }

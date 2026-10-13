@@ -11,11 +11,15 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import gleamunison/ast
 import gleamunison/elab_types
 import gleamunison/elaborate as elab
 import gleamunison/json
 import gleamunison/lexer
+import gleamunison/lsp_features
+import gleamunison/lsp_types
 import gleamunison/repl_eval
+import gleamunison/type_pretty
 import gleamunison/types.{empty_cache}
 import gleamunison/verify
 
@@ -64,23 +68,22 @@ pub fn encode_frame(body: String) -> String {
 }
 
 /// Handle one JSON-RPC body. Returns reply bodies (responses and
-/// notifications) to frame and write. Empty list: nothing to say.
-pub fn handle_message(body: String, state: String) -> List(String) {
+/// notifications) to frame and write, plus the new server state.
+pub fn handle_message(
+  body: String,
+  state: lsp_types.State,
+) -> #(List(String), lsp_types.State) {
   case json.decode(bit_array.from_string(body)) {
-    Error(_) -> []
+    Error(_) -> #([], state)
     Ok(dyn) ->
       case decode.run(dyn, message_decoder()) {
-        Error(_) -> []
+        Error(_) -> #([], state)
         Ok(msg) -> dispatch(msg, state)
       }
   }
 }
 
-type Message {
-  Message(id: Option(Dynamic), method: String, params: Dict(String, Dynamic))
-}
-
-fn message_decoder() -> decode.Decoder(Message) {
+fn message_decoder() -> decode.Decoder(lsp_types.Message) {
   use method <- decode.field("method", decode.string)
   use id <- decode.optional_field("id", None, decode.map(decode.dynamic, Some))
   // params may be missing OR null (shutdown sends null) — both mean none.
@@ -91,65 +94,67 @@ fn message_decoder() -> decode.Decoder(Message) {
       decode.success(dict.new()),
     ]),
   )
-  decode.success(Message(id:, method:, params:))
+  decode.success(lsp_types.Message(id:, method:, params:))
 }
 
-fn dispatch(msg: Message, _state: String) -> List(String) {
+fn dispatch(
+  msg: lsp_types.Message,
+  state: lsp_types.State,
+) -> #(List(String), lsp_types.State) {
   case msg.method {
     "initialize" ->
       case msg.id {
-        Some(id) -> [respond(id, initialize_result())]
-        None -> []
+        Some(id) -> #([lsp_types.respond(id, initialize_result())], state)
+        None -> #([], state)
       }
-    "initialized" -> []
+    "initialized" -> #([], state)
     "shutdown" ->
       case msg.id {
-        Some(id) -> [respond(id, "null")]
-        None -> []
+        Some(id) -> #([lsp_types.respond(id, "null")], state)
+        None -> #([], state)
       }
-    "exit" -> []
-    "textDocument/didOpen" -> [diagnose_notification(msg.params, from_open)]
-    "textDocument/didChange" -> [diagnose_notification(msg.params, from_change)]
+    "exit" -> #([], state)
+    "textDocument/didOpen" ->
+      case extract_doc(msg.params, from_open) {
+        Error(_) -> #(["{}"], state)
+        Ok(doc) -> #(
+          [publish(doc.uri, diagnose(doc.text))],
+          lsp_types.open_doc(state, doc.uri, doc.text),
+        )
+      }
+    "textDocument/didChange" ->
+      case extract_doc(msg.params, from_change) {
+        Error(_) -> #(["{}"], state)
+        Ok(doc) -> #(
+          [publish(doc.uri, diagnose(doc.text))],
+          lsp_types.open_doc(state, doc.uri, doc.text),
+        )
+      }
+    "textDocument/hover" -> #(lsp_features.hover_reply(msg, state), state)
+    "textDocument/definition" -> #(
+      lsp_features.definition_reply(msg, state),
+      state,
+    )
+    "textDocument/completion" -> #(
+      lsp_features.completion_reply(msg, state),
+      state,
+    )
     _ ->
       case msg.id {
-        Some(id) -> [error_response(id, -32_601, "Method not found")]
-        None -> []
+        Some(id) -> #([error_response(id, -32_601, "Method not found")], state)
+        None -> #([], state)
       }
   }
 }
 
 fn initialize_result() -> String {
-  "{\"capabilities\":{\"textDocumentSync\":1},"
-  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.16.0\"}}"
-}
-
-fn respond(id: Dynamic, result: String) -> String {
-  "{\"jsonrpc\":\"2.0\",\"id\":"
-  <> id_json(id)
-  <> ",\"result\":"
-  <> result
-  <> "}"
+  "{\"capabilities\":{\"textDocumentSync\":1,\"hoverProvider\":true,"
+  <> "\"definitionProvider\":true,\"completionProvider\":{\"triggerCharacters\":[]}},"
+  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.17.0\"}}"
 }
 
 fn error_response(id: Dynamic, code: Int, message: String) -> String {
-  "{\"jsonrpc\":\"2.0\",\"id\":"
-  <> id_json(id)
-  <> ",\"error\":{\"code\":"
-  <> int.to_string(code)
-  <> ",\"message\":"
-  <> jstr(message)
-  <> "}}"
-}
-
-fn id_json(id: Dynamic) -> String {
-  case decode.run(id, decode.int) {
-    Ok(n) -> int.to_string(n)
-    Error(_) ->
-      case decode.run(id, decode.string) {
-        Ok(s) -> jstr(s)
-        Error(_) -> "null"
-      }
-  }
+  lsp_types.error_response(id, code, message)
 }
 
 // ── Diagnostics ─────────────────────────────────────────────────────────────
@@ -161,19 +166,6 @@ type DocSource {
 const from_open = True
 
 const from_change = False
-
-fn diagnose_notification(
-  params: Dict(String, Dynamic),
-  is_open: Bool,
-) -> String {
-  case extract_doc(params, is_open) {
-    Error(_) -> "{}"
-    Ok(doc) -> {
-      let diagnostics = diagnose(doc.text)
-      publish(doc.uri, diagnostics)
-    }
-  }
-}
 
 fn extract_doc(
   params: Dict(String, Dynamic),
@@ -227,12 +219,12 @@ fn publish(uri: String, diagnostics: List(Diagnostic)) -> String {
       <> ",\"character\":"
       <> int.to_string(d.col + 1)
       <> "}},\"severity\":1,\"message\":"
-      <> jstr(d.message)
+      <> lsp_types.jstr(d.message)
       <> "}"
     })
   "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\","
   <> "\"params\":{\"uri\":"
-  <> jstr(uri)
+  <> lsp_types.jstr(uri)
   <> ",\"diagnostics\":["
   <> string.join(diags, ",")
   <> "]}}"
@@ -301,15 +293,4 @@ fn unwrap_at(
       }
     other -> #(other, acc)
   }
-}
-
-fn jstr(s: String) -> String {
-  let escaped =
-    s
-    |> string.replace("\\", "\\\\")
-    |> string.replace("\"", "\\\"")
-    |> string.replace("\n", "\\n")
-    |> string.replace("\r", "\\r")
-    |> string.replace("\t", "\\t")
-  "\"" <> escaped <> "\""
 }
