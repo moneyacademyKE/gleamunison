@@ -234,7 +234,7 @@ pub fn search(state: SessionState, query: String) -> List(SearchHit) {
     let def_pair = pair.1
     SearchHit(
       name: def_pair.0,
-      kind: kind(def_pair.1),
+      kind: kind_of(def_pair.1),
       ref_hex: ref_hex(def_pair.0, def_pair.1),
       score: pair.0,
     )
@@ -312,13 +312,13 @@ fn def_json(name: String, def: SurfaceDef) -> String {
   "{\"name\":\""
   <> name
   <> "\",\"kind\":\""
-  <> kind(def)
+  <> kind_of(def)
   <> "\",\"ref\":\""
   <> ref_hex(name, def)
   <> "\"}"
 }
 
-fn kind(def: SurfaceDef) -> String {
+pub fn kind_of(def: SurfaceDef) -> String {
   case def {
     SurfaceTermDef(_) -> "term"
     SurfaceTypeDef(_) -> "type"
@@ -328,7 +328,7 @@ fn kind(def: SurfaceDef) -> String {
   }
 }
 
-fn ref_hex(name: String, def: SurfaceDef) -> String {
+pub fn ref_hex(name: String, def: SurfaceDef) -> String {
   case def {
     SurfaceTermDef(elab_types.SRef(r)) -> ref_to_hex(r)
     _ -> ref_to_hex(repl_eval.ref_for_name(name))
