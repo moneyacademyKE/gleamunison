@@ -61,7 +61,8 @@
 
 ;; DB state: (pair eavt (pair avet (pair log tx)))
 ;; eavt : {e → {a → [v ...]}}     — primary index
-;; avet : {a → {v → e}}           — unique/lookup index
+;; avet : {a → {v → [e ...]}}       — lookup index (values are NOT unique:
+;; many entities may share a value, e.g. def/kind = "term")
 ;; log  : [[datom ...] ...]        — append-only tx history
 ;; tx   : Int                      — current transaction number
 
