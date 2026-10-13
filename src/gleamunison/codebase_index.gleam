@@ -10,12 +10,39 @@ import gleamunison/elab_types.{
   SMatch, SRef, SText, SUse, SVar, SurfaceAbilityDef, SurfacePubTypeAlias,
   SurfaceTermDef, SurfaceTypeAlias, SurfaceTypeDef,
 }
-import gleamunison/mcp_session
+import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/repl_eval
 
 /// A datalog datom for the codebase index: entity is a stable per-def int,
 /// value is always a string (hashes, names, kinds) so q-val joins work.
 pub type Datom {
   Datom(entity: Int, attr: String, value: String)
+}
+
+/// The definition kind as the index reports it.
+pub fn kind_of(def: SurfaceDef) -> String {
+  case def {
+    SurfaceTermDef(_) -> "term"
+    SurfaceTypeDef(_) -> "type"
+    SurfaceAbilityDef(_, _) -> "ability"
+    SurfaceTypeAlias(_, _) -> "type-alias"
+    SurfacePubTypeAlias(_, _) -> "type-alias"
+  }
+}
+
+/// The ref hex for a definition: the genesis ref for builtins, the
+/// name-hash for surface defs. Single source of ref identity for the
+/// index, MCP search, and graph tools.
+pub fn ref_hex(name: String, def: SurfaceDef) -> String {
+  case def {
+    SurfaceTermDef(SRef(r)) -> ref_to_hex(r)
+    _ -> ref_to_hex(repl_eval.ref_for_name(name))
+  }
+}
+
+fn ref_to_hex(r: DefinitionRef) -> String {
+  let Ref(h) = r
+  hash_to_debug_string(h)
 }
 
 /// The index schema: one entity per definition, carrying name/hash/kind,
@@ -26,8 +53,8 @@ pub fn datoms_of(defs: List(#(String, SurfaceDef))) -> List(Datom) {
     let e = i + 1
     let base = [
       Datom(e, "def/name", pair.0),
-      Datom(e, "def/hash", mcp_session.ref_hex(pair.0, pair.1)),
-      Datom(e, "def/kind", mcp_session.kind_of(pair.1)),
+      Datom(e, "def/hash", ref_hex(pair.0, pair.1)),
+      Datom(e, "def/kind", kind_of(pair.1)),
     ]
     let deps =
       surface_deps(pair.1)

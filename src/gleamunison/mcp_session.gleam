@@ -11,7 +11,9 @@ import gleam/dynamic/decode
 import gleam/float
 import gleam/list
 import gleam/order
+import gleam/result
 import gleam/string
+import gleamunison/codebase_index
 import gleamunison/elab_types.{
   type SurfaceDef, SurfaceAbilityDef, SurfacePubTypeAlias, SurfaceTermDef,
   SurfaceTypeAlias, SurfaceTypeDef,
@@ -87,6 +89,12 @@ fn eval_terms(
   }
 }
 
+/// The session's definition set (name + surface def). Read-only view for
+/// index tooling and diagnostics.
+pub fn session_defs(state: SessionState) -> List(#(String, SurfaceDef)) {
+  state.defs
+}
+
 /// Route one JSON-RPC body through the protocol layer with the session's
 /// real tools attached.
 pub fn handle_rpc(state: SessionState, body: String) -> Response {
@@ -117,7 +125,134 @@ fn tools(state: SessionState) -> List(Tool) {
       description: "Evaluate a read-only S-expression against the session",
       handler: fn(args) { eval_tool(state, args) },
     ),
+    Tool(
+      name: "callers_of",
+      description: "List definitions that reference the given name (datalog index)",
+      handler: fn(args) {
+        case string_arg(args, "name") {
+          Error(e) -> Error(e)
+          Ok(name) ->
+            result.map(callers_of(state, name), fn(ns) { names_json(ns) })
+        }
+      },
+    ),
+    Tool(
+      name: "deps_of",
+      description: "List in-corpus names the given definition references",
+      handler: fn(args) {
+        case string_arg(args, "name") {
+          Error(e) -> Error(e)
+          Ok(name) ->
+            result.map(deps_of(state, name), fn(ns) { names_json(ns) })
+        }
+      },
+    ),
+    Tool(
+      name: "defs_by_kind",
+      description: "List definitions of a kind (term, type, ability, type-alias)",
+      handler: fn(args) {
+        case string_arg(args, "kind") {
+          Error(e) -> Error(e)
+          Ok(k) -> result.map(defs_by_kind(state, k), fn(ns) { names_json(ns) })
+        }
+      },
+    ),
   ]
+}
+
+fn names_json(names: List(String)) -> String {
+  let parts = list.map(names, fn(n) { "\"" <> n <> "\"" })
+  "[" <> string.join(parts, ",") <> "]"
+}
+
+/// Callers of a name: every definition with a def/dep edge pointing at it.
+/// Answered by the native datalog engine over the session index.
+pub fn callers_of(
+  state: SessionState,
+  name: String,
+) -> Result(List(String), String) {
+  index_names(
+    state,
+    "\n(define q (list (pair (q-var \"?e\") (pair \"def/dep\" (q-val \""
+      <> name
+      <> "\"))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
+  )
+}
+
+/// Dependencies of a definition: in-corpus names its body references.
+pub fn deps_of(
+  state: SessionState,
+  name: String,
+) -> Result(List(String), String) {
+  index_names(
+    state,
+    "\n(define q (list (pair (q-var \"?e\") (pair \"def/name\" (q-val \""
+      <> name
+      <> "\"))) (pair (q-var \"?e\") (pair \"def/dep\" (q-var \"?d\")))))\n(binding-values (db-query db q) \"?d\")\n",
+  )
+}
+
+/// Definitions filtered by kind (term, type, ability, type-alias).
+pub fn defs_by_kind(
+  state: SessionState,
+  kind: String,
+) -> Result(List(String), String) {
+  index_names(
+    state,
+    "\n(define q (list (pair (q-var \"?e\") (pair \"def/kind\" (q-val \""
+      <> kind
+      <> "\"))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
+  )
+}
+
+/// Run a query tail against the session's datalog index; extract the quoted
+/// strings from the final form's printed value.
+fn index_names(
+  state: SessionState,
+  tail: String,
+) -> Result(List(String), String) {
+  let script = codebase_index.index_source(state.defs) <> tail
+  case codebase_index.eval_index_source(script) {
+    Error(e) -> Error(e)
+    Ok(out) -> {
+      // Engine define forms print as `(defined name)` — no quotes — so every
+      // quoted string in the output belongs to the final result value. Scan
+      // all lines: long result lists wrap across them.
+      Ok(extract_quoted(out, False, "", []))
+    }
+  }
+}
+
+/// Pull every "..."-quoted string out of a printed value. Robust to either
+/// list shape the runtime prints.
+fn extract_quoted(
+  s: String,
+  in_str: Bool,
+  cur: String,
+  acc: List(String),
+) -> List(String) {
+  case string.pop_grapheme(s) {
+    Error(_) ->
+      case in_str {
+        True -> list.reverse([cur, ..acc])
+        False -> list.reverse(acc)
+      }
+    Ok(#("\\", rest)) ->
+      case string.pop_grapheme(rest) {
+        Ok(#(g, rest2)) -> extract_quoted(rest2, in_str, cur <> g, acc)
+        Error(_) -> list.reverse(acc)
+      }
+    Ok(#("\"", rest)) ->
+      case in_str {
+        True -> extract_quoted(rest, False, "", [cur, ..acc])
+        False -> extract_quoted(rest, True, "", acc)
+      }
+    Ok(#(g, rest)) ->
+      case in_str {
+        True -> extract_quoted(rest, True, cur <> g, acc)
+        False -> extract_quoted(rest, False, cur, acc)
+      }
+  }
 }
 
 fn get_definition(
@@ -234,8 +369,8 @@ pub fn search(state: SessionState, query: String) -> List(SearchHit) {
     let def_pair = pair.1
     SearchHit(
       name: def_pair.0,
-      kind: kind_of(def_pair.1),
-      ref_hex: ref_hex(def_pair.0, def_pair.1),
+      kind: codebase_index.kind_of(def_pair.1),
+      ref_hex: codebase_index.ref_hex(def_pair.0, def_pair.1),
       score: pair.0,
     )
   })
@@ -312,27 +447,10 @@ fn def_json(name: String, def: SurfaceDef) -> String {
   "{\"name\":\""
   <> name
   <> "\",\"kind\":\""
-  <> kind_of(def)
+  <> codebase_index.kind_of(def)
   <> "\",\"ref\":\""
-  <> ref_hex(name, def)
+  <> codebase_index.ref_hex(name, def)
   <> "\"}"
-}
-
-pub fn kind_of(def: SurfaceDef) -> String {
-  case def {
-    SurfaceTermDef(_) -> "term"
-    SurfaceTypeDef(_) -> "type"
-    SurfaceAbilityDef(_, _) -> "ability"
-    SurfaceTypeAlias(_, _) -> "type-alias"
-    SurfacePubTypeAlias(_, _) -> "type-alias"
-  }
-}
-
-pub fn ref_hex(name: String, def: SurfaceDef) -> String {
-  case def {
-    SurfaceTermDef(elab_types.SRef(r)) -> ref_to_hex(r)
-    _ -> ref_to_hex(repl_eval.ref_for_name(name))
-  }
 }
 
 fn ref_to_hex(r: DefinitionRef) -> String {
