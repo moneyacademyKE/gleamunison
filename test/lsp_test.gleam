@@ -1,6 +1,7 @@
 import gleam/int
 import gleam/string
 import gleamunison/lsp
+import gleamunison/lsp_types
 import gleeunit/should
 
 pub fn decode_framed_message_test() {
@@ -23,7 +24,7 @@ pub fn decode_incomplete_waits_test() {
 pub fn initialize_advertises_full_sync_test() {
   let body =
     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
-  let #(replies, _) = lsp.handle_message(body, lsp.new_state())
+  let #(replies, _) = lsp.handle_message(body, lsp_types.new_state())
   let assert [resp] = replies
   string.contains(resp, "textDocumentSync") |> should.be_true
   string.contains(resp, "\"id\":1") |> should.be_true
@@ -35,7 +36,7 @@ pub fn did_open_with_error_publishes_diagnostic_test() {
     "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/x.lisp\",\"text\":\""
     <> source
     <> "\"}}}"
-  let #(replies, _) = lsp.handle_message(body, lsp.new_state())
+  let #(replies, _) = lsp.handle_message(body, lsp_types.new_state())
   let assert [notif] = replies
   string.contains(notif, "textDocument/publishDiagnostics") |> should.be_true
   string.contains(notif, "nope-var") |> should.be_true
@@ -49,7 +50,7 @@ pub fn did_open_clean_publishes_empty_diagnostics_test() {
     "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/x.lisp\",\"text\":\""
     <> source
     <> "\"}}}"
-  let #(replies, _) = lsp.handle_message(body, lsp.new_state())
+  let #(replies, _) = lsp.handle_message(body, lsp_types.new_state())
   let assert [notif] = replies
   string.contains(notif, "publishDiagnostics") |> should.be_true
   string.contains(notif, "\"diagnostics\":[]") |> should.be_true
@@ -61,7 +62,7 @@ pub fn did_change_uses_new_text_test() {
     "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/x.lisp\"},\"contentChanges\":[{\"text\":\""
     <> source
     <> "\"}]}}"
-  let #(replies, _) = lsp.handle_message(body, lsp.new_state())
+  let #(replies, _) = lsp.handle_message(body, lsp_types.new_state())
   let assert [notif] = replies
   string.contains(notif, "broken") |> should.be_true
 }
@@ -72,7 +73,7 @@ pub fn parse_error_maps_to_diagnostic_test() {
     "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///tmp/x.lisp\",\"text\":\""
     <> source
     <> "\"}}}"
-  let #(replies, _) = lsp.handle_message(body, lsp.new_state())
+  let #(replies, _) = lsp.handle_message(body, lsp_types.new_state())
   let assert [notif] = replies
   string.contains(notif, "publishDiagnostics") |> should.be_true
   string.contains(notif, "nclosed") |> should.be_true
@@ -81,14 +82,14 @@ pub fn parse_error_maps_to_diagnostic_test() {
 pub fn shutdown_replies_result_and_exit_is_silent_test() {
   let shutdown =
     "{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"shutdown\",\"params\":null}"
-  let #(replies, _) = lsp.handle_message(shutdown, lsp.new_state())
+  let #(replies, _) = lsp.handle_message(shutdown, lsp_types.new_state())
   let assert [resp] = replies
   string.contains(resp, "\"id\":9") |> should.be_true
   string.contains(resp, "\"result\":null") |> should.be_true
   // exit is a notification: no reply
   lsp.handle_message(
     "{\"jsonrpc\":\"2.0\",\"method\":\"exit\"}",
-    lsp.new_state(),
+    lsp_types.new_state(),
   ).0
   |> should.equal([])
 }
@@ -109,7 +110,7 @@ fn open_then(source: String, request: String) -> List(String) {
     "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":\"file:///t.lisp\",\"text\":\""
     <> escaped
     <> "\"}}}"
-  let #(_, state) = lsp.handle_message(open, lsp.new_state())
+  let #(_, state) = lsp.handle_message(open, lsp_types.new_state())
   let #(replies, _) = lsp.handle_message(request, state)
   replies
 }
