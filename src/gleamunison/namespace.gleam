@@ -117,7 +117,7 @@ pub fn load(
 
 // --- Branches: mutable pointer cell + immutable history chain ----------------
 
-fn branch_pointer_ref(branch: String) -> DefinitionRef {
+pub fn branch_pointer_ref(branch: String) -> DefinitionRef {
   Ref(hash_bytes(bit_array.from_string("branchptr:" <> branch)))
 }
 
@@ -276,5 +276,158 @@ pub fn merge(a: Namespace, b: Namespace) -> Result(Namespace, List(String)) {
   case conflicts {
     [] -> Ok(Namespace(dict.merge(a.bindings, b.bindings)))
     _ -> Error(conflicts)
+  }
+}
+
+// ── Sync: branches as transferable chunk sets ───────────────────────────────
+// A branch is three kinds of data: the mutable pointer cell (keyed by a
+// name-derived ref, not content), the immutable head chain, and the
+// namespace snapshots. Export walks all three; import verifies content
+// chunks by hash and the pointer chunk by parsing. The pointer ref is
+// derivable from the branch name alone — a remote peer can request it
+// without negotiation.
+
+/// Every chunk a branch needs to travel: content chunks first (ns snapshots
+/// and head chain, each verified by content hash), the pointer cell last
+/// (verified by parsing — its ref is name-derived, not content-derived).
+pub fn export_branch(
+  adapter: StorageAdapter,
+  branch: String,
+) -> Result(List(#(String, BitArray)), String) {
+  let ptr_ref = branch_pointer_ref(branch)
+  case adapter.lookup(ptr_ref) {
+    Ok(Some(head_bytes)) -> {
+      use heads <- result.try(walk_head_chain(adapter, head_bytes, []))
+      let ns_refs =
+        list.filter_map(heads, fn(h) {
+          let #(_, _, ns_ref, _, _) = h
+          Ok(ns_ref)
+        })
+        |> list.unique
+      use ns_chunks <- result.try(
+        list.try_map(ns_refs, fn(r) { fetch_chunk(adapter, r) }),
+      )
+      let head_chunks =
+        list.map(heads, fn(h) {
+          let #(_, _, _, _, bytes) = h
+          #("chunk:" <> ref_hex(Ref(hash_bytes(bytes))), bytes)
+        })
+      let ns_entries =
+        list.map(ns_chunks, fn(pair) { #("chunk:" <> pair.0, pair.1) })
+      Ok(
+        list.flatten([
+          ns_entries,
+          head_chunks,
+          [#("pointer:" <> branch, head_bytes)],
+        ]),
+      )
+    }
+    Ok(None) -> Error("no such branch: " <> branch)
+    Error(_) -> Error("store lookup failed")
+  }
+}
+
+fn walk_head_chain(
+  adapter: StorageAdapter,
+  head_bytes: BitArray,
+  acc: List(#(String, Int, DefinitionRef, Option(DefinitionRef), BitArray)),
+) -> Result(
+  List(#(String, Int, DefinitionRef, Option(DefinitionRef), BitArray)),
+  String,
+) {
+  case parse_head(head_bytes) {
+    Error(_) -> Error("corrupt head chunk")
+    Ok(#(b, seq, ns_ref, prev)) -> {
+      let next = [#(b, seq, ns_ref, prev, head_bytes), ..acc]
+      case prev {
+        None -> Ok(next)
+        Some(prev_ref) ->
+          case adapter.lookup(prev_ref) {
+            Ok(Some(prev_bytes)) -> walk_head_chain(adapter, prev_bytes, next)
+            Ok(None) -> Error("missing head chunk in chain")
+            Error(_) -> Error("store lookup failed")
+          }
+      }
+    }
+  }
+}
+
+fn fetch_chunk(
+  adapter: StorageAdapter,
+  ref: DefinitionRef,
+) -> Result(#(String, BitArray), String) {
+  case adapter.lookup(ref) {
+    Ok(Some(bytes)) -> Ok(#(ref_hex(ref), bytes))
+    Ok(None) -> Error("missing chunk: " <> ref_hex(ref))
+    Error(_) -> Error("store lookup failed")
+  }
+}
+
+/// Import a branch chunk set. Content chunks are verified against their
+/// hash before insert; the pointer chunk must parse as a head. A tampered
+/// chunk is refused — nothing partial lands.
+pub fn import_branch(
+  adapter: StorageAdapter,
+  chunks: List(#(String, BitArray)),
+) -> Result(Nil, String) {
+  use Nil <- result.try(
+    list.try_map(chunks, fn(pair) { verify_chunk(pair) })
+    |> result.map(fn(_) { Nil }),
+  )
+  list.fold(chunks, Ok(Nil), fn(acc, pair) {
+    case acc {
+      Error(e) -> Error(e)
+      Ok(_) -> {
+        let #(key, bytes) = pair
+        let ref = case string.starts_with(key, "pointer:") {
+          True -> branch_pointer_ref(string.drop_start(key, 8))
+          False -> hex_ref(string.drop_start(key, 6))
+        }
+        adapter.insert(ref, bytes)
+        |> result.map_error(fn(_) { "store insert failed" })
+      }
+    }
+  })
+}
+
+fn verify_chunk(pair: #(String, BitArray)) -> Result(Nil, String) {
+  let #(key, bytes) = pair
+  case string.starts_with(key, "pointer:") {
+    True ->
+      case parse_head(bytes) {
+        Ok(_) -> Ok(Nil)
+        Error(_) -> Error("pointer chunk does not parse as a head")
+      }
+    False -> {
+      let expected = string.drop_start(key, 6)
+      case ref_hex(Ref(hash_bytes(bytes))) == expected {
+        True -> Ok(Nil)
+        False -> Error("chunk hash mismatch: " <> expected)
+      }
+    }
+  }
+}
+
+/// The pointer ref as hex: the id a peer requests to start a branch pull.
+pub fn pointer_ref_hex(branch: String) -> String {
+  ref_hex(branch_pointer_ref(branch))
+}
+
+/// Parse a head chunk into the refs it points at: its namespace snapshot
+/// and its predecessor (hex), so a puller can keep walking. The chunk's
+/// own content key is included for the import set.
+pub fn parse_head_hexes(
+  bytes: BitArray,
+) -> Result(#(String, String, Option(String)), String) {
+  case parse_head(bytes) {
+    Error(_) -> Error("corrupt head chunk")
+    Ok(#(_, _, ns_ref, prev)) -> {
+      let self_hex = ref_hex(Ref(hash_bytes(bytes)))
+      let prev_hex = case prev {
+        Some(r) -> Some(ref_hex(r))
+        None -> None
+      }
+      Ok(#(self_hex, ref_hex(ns_ref), prev_hex))
+    }
   }
 }
