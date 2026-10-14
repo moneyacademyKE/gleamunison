@@ -104,10 +104,14 @@ pub fn parser_s_expression_test() {
     elab_types.SApply(elab_types.SLoc(SVar("add"), _), SInt(1)),
     elab_types.Span(1, 1),
   )) = parser.parse_string("(add 1)")
-  let assert Ok(SLet("x", SInt(42), elab_types.SLoc(SVar("x"), _))) =
-    parser.parse_string("(let x 42 x)")
-  let assert Ok(SLambda("x", elab_types.SLoc(SVar("x"), _))) =
-    parser.parse_string("(lam x x)")
+  let assert Ok(elab_types.SLoc(
+    SLet("x", SInt(42), elab_types.SLoc(SVar("x"), _)),
+    elab_types.Span(1, 1),
+  )) = parser.parse_string("(let x 42 x)")
+  let assert Ok(elab_types.SLoc(
+    SLambda("x", elab_types.SLoc(SVar("x"), _)),
+    elab_types.Span(1, 1),
+  )) = parser.parse_string("(lam x x)")
 }
 
 pub fn parser_coordinate_error_test() {
