@@ -19,6 +19,16 @@ pub fn new_sync_state() -> SyncState {
   SyncState(peers: dict.new(), known_refs: set.new())
 }
 
+/// Open a connection to a peer. Stays open for subsequent fetch_refs
+/// batches — the selective-pull primitive's session handle.
+pub fn connect(peer: PeerId) -> Result(Nil, SyncError) {
+  let PeerId(name) = peer
+  case sync_connect(name) {
+    Ok(_) -> Ok(Nil)
+    Error(_) -> Error(ConnectionFailed(peer, PeerNotFound(peer)))
+  }
+}
+
 /// Accept one chunk from a peer under CAS discipline: a ref already held
 /// must map to byte-identical content — first write wins, and any later
 /// conflicting bytes for the same ref are a HashConflict, never an
@@ -46,6 +56,33 @@ pub fn accept_chunk(
         False -> Error(HashConflict(peer, ref, existing, bytes))
       }
     _ -> Ok(codebase.insert_raw(codebase, ref, bytes))
+  }
+}
+
+/// Fetch exactly the given refs from an already-connected peer:
+/// request, unsolicited-chunk validation, conflict-checked accept.
+/// Returns the codebase with the chunks applied. This is the selective
+/// transfer primitive: the caller computes the ref set (e.g. a package
+/// manifest closure) and the wire moves nothing else.
+pub fn fetch_refs(
+  peer: PeerId,
+  codebase: Codebase,
+  hexes: List(String),
+) -> Result(Codebase, SyncError) {
+  let PeerId(name) = peer
+  case sync_request_defs(name, hexes) {
+    Error(msg) -> Error(TransferFailed(peer, msg))
+    Ok(def_blobs) -> {
+      use Nil <- result.try(validate_chunk_set(hexes, def_blobs))
+      list.try_fold(def_blobs, codebase, fn(cb, pair) {
+        let #(hash_hex, bytes) = pair
+        let ref =
+          identity.Ref(
+            identity.hash_from_bytes(identity.hex_to_bytes(hash_hex)),
+          )
+        accept_chunk(peer, cb, ref, bytes)
+      })
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 name = "gleamunison"
-version = "3.19.0"
+version = "3.20.0"
 description = "Content-addressed language runtime on the BEAM, built in Gleam."
 licences = ["MIT"]
 repository = { type = "github", user = "moneyacademyKE", repo = "gleamunison" }

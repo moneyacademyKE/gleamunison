@@ -2,6 +2,25 @@
 
 ---
 
+## What's New in v3.20.0 (2026-10-14)
+
+The ergonomics release: do-notation that actually works, REPL graph queries, a formatter, and a registry that finishes what it started.
+
+### Monadic do, proven
+- `(chain ((x e1) (y e2)) body)` over continuation-invoking handlers is do-notation over effects — State threading, Maybe short-circuit, and shadowing all proven through the real binary (`docs/MONADS.md`).
+- Lisp-idiomatic sugar: `(define (f x y) body)` and `(lam (x y) body)` parse to curried lambdas; content hashes match the explicit spelling exactly.
+
+### Tooling
+- REPL code graph (roadmap 9.8): `view <name>` (kind + hash + inferred type), `dependents`, `dependencies` — backed by the datalog index.
+- `gleam run -- fmt <file>` (roadmap 9.2): one-rule opinionated formatter — flat-if-fits at 72 columns, else break after the head. Idempotent by construction, proven through the binary.
+- Roadmap truth pass: six rows shipped in earlier releases but still marked SPEC/PENDING (6.2, 6.3, 9.1, 9.2, 9.7, 9.8) now say DONE.
+
+### Registry finishes the loop
+- `pkg install` recurses into manifest deps, cycle-safe: each manifest installs once even under repeated or cyclic dep edges.
+- Selective peer fetch: `pkg install --peer` transfers exactly the manifest closure (manifests walked iteratively, defs in one batch) — an unrelated chunk on the peer never crosses the wire. New `sync.fetch_refs` primitive with unsolicited-chunk and conflict checks per batch.
+
+---
+
 ## What's New in v3.19.0 (2026-10-14)
 
 The syntax release: monadic sequencing sugar (Phase 7.7) and full span coverage in the parser.

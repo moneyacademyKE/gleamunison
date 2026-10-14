@@ -7,6 +7,7 @@ import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/lexer
 import gleamunison/parser
 import gleamunison/repl_eval
+import gleamunison/repl_graph
 import gleamunison/repl_io
 import gleamunison/type_pretty
 import gleamunison/types.{type TypeCache, empty_cache}
@@ -138,8 +139,10 @@ fn help_text() -> String {
   <> "IO:       read_line spawn self send recv sleep now\n"
   <> "FFI:      json-parse http-get file-read\n"
   <> "Abilities: Console(print) State(get set) Math(add sub mul) Show(show)\n"
-  <> "Forms:    (define name val) (lam x body) (do Ability op args...)\n"
-  <> "          (handle comp handler Ability) (match val cases...)"
+  <> "Forms:    (define name val) (define (f x) body) (lam (x) body)\n"
+  <> "          (do Ability op args...) (handle comp handler Ability)\n"
+  <> "          (match val cases...) (chain ((x m) ...) body)\n"
+  <> "Graph:    view <name>   dependents <name>   dependencies <name>"
 }
 
 fn repl_loop(
@@ -158,9 +161,16 @@ fn repl_loop(
         }
         "" -> repl_loop(cache, prev_defs)
         _ ->
-          case handle_line(trimmed, cache, prev_defs) {
-            Ok(#(next_cache, next_defs)) -> repl_loop(next_cache, next_defs)
-            Error(_) -> repl_loop(cache, prev_defs)
+          case repl_graph.try_handle(trimmed, cache, prev_defs) {
+            Ok(out) -> {
+              io.println(out)
+              repl_loop(cache, prev_defs)
+            }
+            Error(Nil) ->
+              case handle_line(trimmed, cache, prev_defs) {
+                Ok(#(next_cache, next_defs)) -> repl_loop(next_cache, next_defs)
+                Error(_) -> repl_loop(cache, prev_defs)
+              }
           }
       }
     }

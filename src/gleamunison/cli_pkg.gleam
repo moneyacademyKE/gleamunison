@@ -5,9 +5,11 @@
 //// Then install from the local store: manifest integrity re-hash, the
 //// evidence turnstile, and a namespace commit on the branch.
 
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
 import gleamunison/cli_publish
 import gleamunison/codebase
@@ -182,7 +184,7 @@ fn run(
     Ok(adapter) -> {
       case peer {
         None -> Nil
-        Some(p) -> pull_first(p, adapter)
+        Some(p) -> pull_first(p, adapter, hash_hex)
       }
       case pkg.install_from_store(adapter, hash_hex, branch) {
         Ok(installed) ->
@@ -198,16 +200,35 @@ fn run(
   }
 }
 
-fn pull_first(peer: String, adapter: storage.StorageAdapter) -> Nil {
-  let cb = codebase.with_adapter(adapter)
-  case sync.pull_sync(sync.new_sync_state(), PeerId(peer), cb) {
-    Ok(#(_, _, new_refs)) ->
-      io.println(
-        "pkg: pulled "
-        <> string.inspect(list.length(new_refs))
-        <> " chunks from "
-        <> peer,
-      )
-    Error(err) -> io.println("pkg: peer sync failed: " <> string.inspect(err))
+// Selective pull: transfer only the package's manifest closure from the
+// peer (manifests walked iteratively, defs in one batch), with the
+// sync layer's unsolicited-chunk and conflict checks on every chunk.
+fn pull_first(
+  peer: String,
+  adapter: storage.StorageAdapter,
+  root_hex: String,
+) -> Nil {
+  case sync.connect(PeerId(peer)) {
+    Error(_) -> io.println("pkg: cannot connect to peer " <> peer)
+    Ok(_) -> {
+      let cb = codebase.with_adapter(adapter)
+      let fetch = fn(hexes: List(String)) -> Result(Nil, String) {
+        sync.fetch_refs(PeerId(peer), cb, hexes)
+        |> result.map(fn(_) { Nil })
+        |> result.map_error(fn(e) { string.inspect(e) })
+      }
+      case pkg.pull_closure(adapter, root_hex, fetch) {
+        Ok(closure) ->
+          io.println(
+            "pkg: pulled "
+            <> int.to_string(list.length(closure.manifests))
+            <> " manifests, "
+            <> int.to_string(list.length(closure.defs))
+            <> " defs from "
+            <> peer,
+          )
+        Error(err) -> io.println("pkg: peer pull failed: " <> err)
+      }
+    }
   }
 }

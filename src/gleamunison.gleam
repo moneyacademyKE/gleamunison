@@ -7,6 +7,7 @@ import gleam/list
 import gleamunison/cli_datalog
 import gleamunison/cli_evidence
 import gleamunison/cli_find
+import gleamunison/cli_fmt
 import gleamunison/cli_llm
 import gleamunison/cli_lsp
 import gleamunison/cli_mcp
@@ -41,6 +42,7 @@ pub fn run(args: List(String)) -> Nil {
     ["datalog"] -> io.println("usage: gleam run -- datalog <file.lisp>")
     ["mcp", ..rest] -> cli_mcp.command(rest)
     ["find", ..rest] -> cli_find.command(rest)
+    ["fmt", ..rest] -> cli_fmt.run(rest)
     ["replay", ..rest] -> cli_replay.command(rest)
     ["tape-to-test", ..rest] -> cli_tape_to_test.command(rest)
     ["test", ..rest] -> cli_test.command(rest)
