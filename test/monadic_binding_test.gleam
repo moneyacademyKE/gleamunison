@@ -1,8 +1,6 @@
 import gleamunison/elab_ctx
 import gleamunison/elab_term
-import gleamunison/elab_types.{
-  SInt, SLet, SLoc, SUse, SVar,
-}
+import gleamunison/elab_types.{SInt, SLet, SLoc, SUse, SVar}
 import gleamunison/parser
 
 pub fn let_star_desugars_to_nested_slet_test() {
