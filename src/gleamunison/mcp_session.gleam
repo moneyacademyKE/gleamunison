@@ -43,6 +43,15 @@ pub fn boot() -> SessionState {
   SessionState(cache, defs)
 }
 
+/// Build a session from parts — the REPL carries its own cache/defs, and
+/// the graph tools should answer over exactly what the user has defined.
+pub fn from_parts(
+  cache: TypeCache,
+  defs: List(#(String, SurfaceDef)),
+) -> SessionState {
+  SessionState(cache, defs)
+}
+
 /// Extend a session by loading a lisp source file through the same
 /// pipeline `verify` uses: defines are defined, other forms evaluated.
 pub fn load_file(
