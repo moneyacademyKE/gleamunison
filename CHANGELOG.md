@@ -2,6 +2,22 @@
 
 ---
 
+## What's New in v3.19.0 (2026-10-14)
+
+The syntax release: monadic sequencing sugar (Phase 7.7) and full span coverage in the parser.
+
+### 1. Monadic bindings (Phase 7.7)
+- `(let* ((x e1) (y e2) ...) body)` desugars to nested `let` at parse time.
+- `(chain ((x e1) (y e2) ...) body)` desugars to nested `use`: monadic bind sequencing, where each computation receives the rest of the chain as its continuation (`ast.Use` compiles to nested lambdas).
+- Wrong-arity `let*`/`chain` forms error with a message instead of silently parsing as applications.
+
+### 2. Term-level spans
+- All term forms (`let`, `lam`, `fn*`, `if`, `match`, `use`) now carry form-level spans; innermost span still wins, so subterm errors keep their own positions.
+- `ParseError(0,0)` eliminated for invalid match cases, use binders, patterns, labeled params, and `let*`/`chain` pairs. Verified live: `(match x 42)` reports `line 1, col 25`.
+- `define`/`type`/`list` meta-forms intentionally stay unwrapped (8 call sites match their bare `SList` shape).
+
+---
+
 ## What's New in v3.18.0 (2026-10-13)
 
 The registry release: the codebase is queryable as data through the native datalog engine, and packages are content-addressed manifests whose hashes carry their test evidence.
