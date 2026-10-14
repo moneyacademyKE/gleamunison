@@ -82,6 +82,12 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
           use body_t <- result.try(sexpr_to_term(body))
           Ok(elab_types.SLoc(SLambda(name, body_t), elab_types.Span(l, c)))
         }
+        // Standard-lisp sugar: (lam (x y ...) body) == (lam x (lam y ... body))
+        [SAtom(Symbol("lam"), _, _), SListExpr(params, _, _), body] -> {
+          use names <- result.try(param_names(params, l, c))
+          use body_t <- result.try(sexpr_to_term(body))
+          Ok(curry_lams(names, body_t, elab_types.Span(l, c)))
+        }
         [SAtom(Symbol("fn*"), _, _), params_list, body] -> {
           use parsed_params <- result.try(parse_labeled_params(params_list))
           use body_t <- result.try(sexpr_to_term(body))
@@ -93,6 +99,23 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
         [SAtom(Symbol("define"), _, _), SAtom(Symbol(name), _, _), val] -> {
           use val_t <- result.try(sexpr_to_term(val))
           Ok(SList([SVar("define"), SVar(name), val_t]))
+        }
+        // Standard-lisp sugar: (define (f x y ...) body) keeps the bare
+        // SList([define, name, value]) loader shape, value = nested lams.
+        [
+          SAtom(Symbol("define"), _, _),
+          SListExpr([SAtom(Symbol(name), _, _), ..params], _, _),
+          body,
+        ] -> {
+          use names <- result.try(param_names(params, l, c))
+          use body_t <- result.try(sexpr_to_term(body))
+          Ok(
+            SList([
+              SVar("define"),
+              SVar(name),
+              curry_lams(names, body_t, elab_types.Span(l, c)),
+            ]),
+          )
         }
         [SAtom(Symbol("if"), _, _), cond, then_expr, else_expr] -> {
           use cond_t <- result.try(sexpr_to_term(cond))
@@ -324,6 +347,35 @@ fn parse_labeled_params(
       let #(l, c) = sexpr_span(sexpr)
       Error(ParseError("Expected parameter list for fn*", l, c))
     }
+  }
+}
+
+/// Params of the `(lam (x y ...) ...)` / `(define (f x y ...) ...)` sugar
+/// must all be bare symbols.
+fn param_names(
+  params: List(SExpr),
+  l: Int,
+  c: Int,
+) -> Result(List(String), ParseError) {
+  list.try_map(params, fn(p) {
+    case p {
+      SAtom(Symbol(name), _, _) -> Ok(name)
+      _ -> Error(ParseError("lambda parameters must be symbols", l, c))
+    }
+  })
+}
+
+/// Curry a param list into nested one-arg lambdas. Zero params = the body
+/// itself (a thunk spelled without its `lam`).
+fn curry_lams(
+  names: List(String),
+  body: SurfaceTerm,
+  span: elab_types.Span,
+) -> SurfaceTerm {
+  case names {
+    [] -> body
+    [name, ..rest] ->
+      elab_types.SLoc(SLambda(name, curry_lams(rest, body, span)), span)
   }
 }
 
