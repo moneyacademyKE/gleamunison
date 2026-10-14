@@ -174,6 +174,41 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
             _ -> Error(ParseError("Invalid use binder", 0, 0))
           }
         }
+        // (let* ((x e1) (y e2) ...) body) → nested SLet (pure sequencing).
+        [
+          SAtom(Symbol("let*"), _, _),
+          SListExpr(bindings, _, _),
+          body,
+        ] -> {
+          use pairs <- result.try(parse_binding_pairs(bindings, "let*"))
+          use body_t <- result.try(sexpr_to_term(body))
+          fold_let_pairs(pairs, body_t)
+        }
+        // (chain ((x e1) (y e2) ...) body) → nested SUse: monadic bind
+        // sequencing. Each step's computation receives the rest of the
+        // chain as its continuation (ast.Use compiles to nested lambdas).
+        [
+          SAtom(Symbol("chain"), _, _),
+          SListExpr(bindings, _, _),
+          body,
+        ] -> {
+          use pairs <- result.try(parse_binding_pairs(bindings, "chain"))
+          use body_t <- result.try(sexpr_to_term(body))
+          fold_chain_pairs(pairs, body_t)
+        }
+        // Wrong-arity let*/chain must error, not fall through to application.
+        [SAtom(Symbol("let*"), l, c), ..] ->
+          Error(ParseError(
+            "let* expects (let* ((name value) ...) body)",
+            l,
+            c,
+          ))
+        [SAtom(Symbol("chain"), l, c), ..] ->
+          Error(ParseError(
+            "chain expects (chain ((name computation) ...) body)",
+            l,
+            c,
+          ))
         [first, ..rest] -> {
           use f_term <- result.try(sexpr_to_term(first))
           use folded <- result.try(
@@ -190,6 +225,49 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
       }
     }
   }
+}
+
+/// Parse `((name val) ...)` binding lists for `let*`/`chain`.
+fn parse_binding_pairs(
+  bindings: List(SExpr),
+  form: String,
+) -> Result(List(#(String, SurfaceTerm)), ParseError) {
+  list.try_map(bindings, fn(b) {
+    case b {
+      SListExpr([SAtom(Symbol(name), _, _), val], _, _) -> {
+        use val_t <- result.try(sexpr_to_term(val))
+        Ok(#(name, val_t))
+      }
+      _ ->
+        Error(ParseError(
+          "Invalid " <> form <> " binding: expected (name value)",
+          0,
+          0,
+        ))
+    }
+  })
+}
+
+fn fold_let_pairs(
+  pairs: List(#(String, SurfaceTerm)),
+  body: SurfaceTerm,
+) -> Result(SurfaceTerm, ParseError) {
+  Ok(
+    list.fold_right(pairs, body, fn(acc, pair) {
+      SLet(pair.0, pair.1, acc)
+    }),
+  )
+}
+
+fn fold_chain_pairs(
+  pairs: List(#(String, SurfaceTerm)),
+  body: SurfaceTerm,
+) -> Result(SurfaceTerm, ParseError) {
+  Ok(
+    list.fold_right(pairs, body, fn(acc, pair) {
+      SUse(pair.0, pair.1, acc)
+    }),
+  )
 }
 
 fn sexpr_to_pattern(sexpr: SExpr) -> Result(elab_types.SPattern, ParseError) {
