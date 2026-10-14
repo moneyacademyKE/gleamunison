@@ -35,8 +35,8 @@ From architectural specification to production-grade content-addressed runtime.
 | Priority | Item | Description | Status | Effort |
 |---|---|---|---|
 | **6.1 (P0)** | **Dynamic Web Dashboard** | Full-featured admin UI with SSE real-time push, process inspector, module browser, definition editor, sync status, activity logs. Static file serving from priv/static/. | ✓ DONE (v0.9.0) | S |
-| **6.2 (P1)** | **LSP / IDE Support** | Language Server Protocol backend for autocomplete, go-to-definition, hover-type, inline diagnostics. Protocol spec and architecture documented in `docs/LSP.md`. Full implementation deferred. | ✓ SPEC (v1.1.0) | L |
-| **6.3 (P2)** | **Package Registry** | P2P hash-verified package manager. Decentralized package discovery with cryptographic immutability. | PENDING | L |
+| **6.2 (P1)** | **LSP / IDE Support** | Language Server Protocol backend: stdio JSON-RPC, diagnostics, hover (inferred type), go-to-definition, completion. | ✓ DONE (v3.15.0–v3.17.0) | L |
+| **6.3 (P2)** | **Package Registry** | P2P hash-verified package manager. Content-addressed manifests, evidence-gated publish, integrity-checked install. | ✓ DONE (v3.18.0) | L |
 
 ---
 
@@ -78,14 +78,14 @@ From architectural specification to production-grade content-addressed runtime.
 
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
-| 9.1 | LSP: completion, hover, go-to-def | ✓ SPEC (v1.1.0) | Protocol spec and architecture in `docs/LSP.md`. Full implementation deferred. |
-| 9.2 | `gleam format` | PENDING | M | Opinionated formatter, zero config, <100ms per module |
+| 9.1 | LSP: completion, hover, go-to-def | ✓ DONE (v3.17.0) | stdio server: hover with inferred types, goto-def by line scan, completion from namespace. |
+| 9.2 | `gleam format` | ✓ DONE (v3.20.0) | M | `gleam run -- fmt <file>`: one-rule formatter (flat-if-fits, 72 cols), idempotent by construction. |
 | 9.3 | Debugger integration | PENDING | L | BEAM debugger via `:debugger`, step through Gleam source |
 | 9.4 | Property-based testing | ✓ DONE (v1.1.0) | `gleamunison_property.erl` — `check/2`, `int_gen/0`, `bool_gen/0`, `list_gen/1`, `tuple_gen/2`. |
 | 9.5 | `gleam watch` | ✓ DONE (v1.1.0) | `scripts/watch.sh` — file watcher, auto-rebuild on change, optional `--test` mode. |
 | 9.6 | Error message improvement | ✓ DONE (v1.1.0) | Elm/Rust-style: `[P001]`–`[P004]` parse errors, `[E001]`–`[E005]` type errors with suggested fixes. |
-| 9.7 | Scratch-file watcher loop | PENDING | S | background file watcher (`watch-scratch`) for non-blocking local verification. |
-| 9.8 | REPL Code Graph Queries | PENDING | S | `view`, `dependents`, and `dependencies` commands in REPL console. |
+| 9.7 | Scratch-file watcher loop | ✓ DONE (v3.14.0) | S | `gleam run -- watch <file.lisp>`: mtime-polled re-verify on save (foreground). |
+| 9.8 | REPL Code Graph Queries | ✓ DONE (v3.20.0) | S | `view`, `dependents`, `dependencies` in REPL, datalog-index backed. |
 
 ---
 
