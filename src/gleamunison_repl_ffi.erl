@@ -64,13 +64,30 @@ eval_module(Mod) ->
             Cont(atom_to_binary(node(), utf8))
         end
     }},
+    LLMHandler = {<<"m_a12979b5">>, #{
+        0 => fun([Prompt], Cont) ->
+            case gleamunison@llm:complete_env(Prompt) of
+                {ok, Text} -> Cont(Text);
+                {error, Msg} -> erlang:error({llm_failed, Msg})
+            end
+        end,
+        1 => fun([System, Prompt], Cont) ->
+            Joined = <<System/binary, "\n\n", Prompt/binary>>,
+            case gleamunison@llm:complete_env(Joined) of
+                {ok, Text} -> Cont(Text);
+                {error, Msg} -> erlang:error({llm_failed, Msg})
+            end
+        end
+    }},
     try
         Val = gleamunison_effets:handle_comp(ConsoleHandler, fun() ->
             gleamunison_effets:handle_comp(StateHandler, fun() ->
                 gleamunison_effets:handle_comp(MathHandler, fun() ->
                     gleamunison_effets:handle_comp(ShowHandler, fun() ->
                         gleamunison_effets:handle_comp(RemoteHandler, fun() ->
-                            ModuleAtom:'$eval'()
+                            gleamunison_effets:handle_comp(LLMHandler, fun() ->
+                                ModuleAtom:'$eval'()
+                            end)
                         end)
                     end)
                 end)

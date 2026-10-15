@@ -53,6 +53,7 @@ pub fn run(args: List(String)) -> Nil {
     ["pkg", ..rest] -> cli_pkg.command(rest)
     ["watch", path] -> cli_watch.command(path)
     ["watch"] -> io.println("usage: gleam run -- watch <file.lisp>")
+    ["repl", ..paths] -> repl.start_repl_loading(paths)
     [cmd] -> dispatch(cmd, "8080", levels)
     [cmd, param] -> dispatch(cmd, param, levels)
     [cmd, ..] -> dispatch(cmd, "8080", levels)
@@ -73,7 +74,7 @@ fn dispatch(
       http.start_server(port)
     }
     "demo" -> print_help()
-    "repl" -> repl.start_repl()
+    "repl" -> repl.start_repl_loading([])
     "all" -> run_all_levels(levels)
     "level70" -> meta.level70()
     "verify" -> {
@@ -118,7 +119,9 @@ fn print_help() -> Nil {
   io.println("Gleamunison — content-addressed language runtime on the BEAM")
   io.println("Usage: gleam run -- <command>")
   io.println("  server [port]   — start web server (default port 8080)")
-  io.println("  repl            — interactive REPL")
+  io.println(
+    "  repl            — interactive REPL (optional: file.lisp to preload)",
+  )
   io.println("  verify [file]   — verify a scratch.lisp file")
   io.println(
     "  llm [provider] <prompt> — call an LLM (openai|anthropic, env keys)",

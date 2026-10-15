@@ -14,10 +14,15 @@ import gleam/int
 import gleam/list
 import gleam/string
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
-import gleamunison/genesis
 import gleamunison/http_client
-import gleamunison/identity.{type DefinitionRef}
+import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/json
+
+@external(erlang, "gleamunison_config", "get_env")
+fn get_env(key: String) -> Result(String, Nil)
+
+@external(erlang, "gleamunison_ffi", "from_dynamic")
+fn unsafe_coerce(val: Dynamic) -> a
 
 pub type Role {
   System
@@ -63,7 +68,98 @@ pub type ProviderConfig {
 fn to_dynamic(val: a) -> Dynamic
 
 pub fn ability_ref() -> DefinitionRef {
-  genesis.builtin_ability_llm()
+  // Abilities resolve by name hash (same rule as elaborate.ref_for_name):
+  // surface `(do LLM ...)` compiles against this ref, so handler frames
+  // keyed here actually dispatch. The genesis ordinal ref was a mismatch.
+  Ref(identity.hash_bytes(<<"LLM">>))
+}
+
+/// One-shot completion from environment config: the default live handler
+/// body. Reads OPENAI_API_KEY/OPENAI_BASE_URL/OPENAI_MODEL (or ANTHROPIC_*
+/// when its key is set). Kept dependency-free so the Erlang runtime can
+/// call it directly as the ambient handler.
+pub fn complete_env(prompt: String) -> Result(String, String) {
+  let provider = case get_env("ANTHROPIC_API_KEY") {
+    Ok(_) -> Anthropic
+    Error(_) -> OpenAI
+  }
+  let #(key_var, default_url, default_model) = case provider {
+    OpenAI -> #("OPENAI_API_KEY", "https://api.openai.com/v1", "gpt-4o-mini")
+    Anthropic -> #(
+      "ANTHROPIC_API_KEY",
+      "https://api.anthropic.com",
+      "claude-haiku-4-5",
+    )
+  }
+  case get_env(key_var) {
+    Error(_) -> Error("llm: missing " <> key_var <> " in environment")
+    Ok(key) -> {
+      let url_var = case provider {
+        OpenAI -> "OPENAI_BASE_URL"
+        Anthropic -> "ANTHROPIC_BASE_URL"
+      }
+      let model_var = case provider {
+        OpenAI -> "OPENAI_MODEL"
+        Anthropic -> "ANTHROPIC_MODEL"
+      }
+      let cfg =
+        ProviderConfig(
+          provider: provider,
+          base_url: case get_env(url_var) {
+            Ok(u) -> u
+            Error(_) -> default_url
+          },
+          api_key: key,
+          model: case get_env(model_var) {
+            Ok(m) -> m
+            Error(_) -> default_model
+          },
+          max_tokens: case get_env("LLM_MAX_TOKENS") {
+            Ok(t) ->
+              case int.parse(t) {
+                Ok(n) -> n
+                Error(_) -> 4096
+              }
+            Error(_) -> 4096
+          },
+        )
+      let body = messages_json([Message(User, prompt)])
+      let result: Result(BitArray, BitArray) =
+        unsafe_coerce(
+          provider_handler(cfg)(
+            [to_dynamic(bit_array.from_string(body))],
+            fn(d) { d },
+          ),
+        )
+      case result {
+        Error(e) ->
+          Error(
+            "llm: "
+            <> case bit_array.to_string(e) {
+              Ok(s) -> s
+              Error(_) -> "<non-utf8>"
+            },
+          )
+        Ok(bin) ->
+          case json.decode(bin) {
+            Error(_) -> Error("llm: undecodable completion payload")
+            Ok(dyn) ->
+              case decode.run(dyn, env_completion_decoder()) {
+                Ok(c) -> Ok(c.content)
+                Error(_) -> Error("llm: completion shape mismatch")
+              }
+          }
+      }
+    }
+  }
+}
+
+fn env_completion_decoder() -> decode.Decoder(Completion) {
+  use content <- decode.field("content", decode.string)
+  use model <- decode.field("model", decode.string)
+  use input_tokens <- decode.field("input_tokens", decode.int)
+  use output_tokens <- decode.field("output_tokens", decode.int)
+  decode.success(Completion(content, model, input_tokens, output_tokens))
 }
 
 /// Wrap any LLM OpHandler as a HandlerFrame for effects.run.

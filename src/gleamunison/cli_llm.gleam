@@ -118,16 +118,18 @@ pub fn resolve_config(
   case env(key_var) {
     Error(_) -> Error("llm: missing " <> key_var <> " in environment")
     Ok(key) ->
-      Ok(ProviderConfig(
-        provider: provider,
-        base_url: env_or(env, url_var(provider), default_url),
-        api_key: key,
-        model: env_or(env, model_var(provider), default_model),
-        max_tokens: case int.parse(env_or(env, "LLM_MAX_TOKENS", "4096")) {
-          Ok(n) -> n
-          Error(_) -> 4096
-        },
-      ))
+      Ok(
+        ProviderConfig(
+          provider: provider,
+          base_url: env_or(env, url_var(provider), default_url),
+          api_key: key,
+          model: env_or(env, model_var(provider), default_model),
+          max_tokens: case int.parse(env_or(env, "LLM_MAX_TOKENS", "4096")) {
+            Ok(n) -> n
+            Error(_) -> 4096
+          },
+        ),
+      )
   }
 }
 

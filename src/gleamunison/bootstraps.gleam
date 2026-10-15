@@ -37,6 +37,10 @@ pub fn get_init_defs_data() -> List(BootstrapDef) {
       BOp("await", [BTVar("task")], BTVar("a")),
       BOp("here", [], BTVar("location")),
     ]),
+    BAbility("LLM", [
+      BOp("complete", [BTText], BTText),
+      BOp("complete_with_system", [BTText, BTText], BTText),
+    ]),
     BTerm("add", genesis.builtin_int_add()),
     BTerm("+", genesis.builtin_int_add()),
     BTerm("read_line", genesis.builtin_io_read_line()),
