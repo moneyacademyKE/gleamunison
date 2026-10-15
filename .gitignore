@@ -11,3 +11,4 @@ website/dist/
 website/.wrangler/
 website/.vite/
 .bankai/
+.gleamunison/
