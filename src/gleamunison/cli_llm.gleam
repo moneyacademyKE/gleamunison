@@ -123,7 +123,10 @@ pub fn resolve_config(
         base_url: env_or(env, url_var(provider), default_url),
         api_key: key,
         model: env_or(env, model_var(provider), default_model),
-        max_tokens: 4096,
+        max_tokens: case int.parse(env_or(env, "LLM_MAX_TOKENS", "4096")) {
+          Ok(n) -> n
+          Error(_) -> 4096
+        },
       ))
   }
 }
