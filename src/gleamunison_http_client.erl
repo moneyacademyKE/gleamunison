@@ -2,6 +2,10 @@
 -export([request/4, get/1, post/2, put/2, delete/1]).
 
 request(Method, Url, Headers, Body) when is_binary(Method), is_binary(Url) ->
+    %% httpc lives in the inets application and HTTPS needs ssl; neither is
+    %% auto-started in escript/`gleam run` mode. Idempotent when running.
+    application:ensure_all_started(ssl),
+    application:ensure_all_started(inets),
     MethodAtom = method_atom(Method),
     UrlString = binary_to_list(Url),
     HeaderList0 = lists:map(fun({K,V}) -> {binary_to_list(K), binary_to_list(V)} end, Headers),
@@ -11,7 +15,7 @@ request(Method, Url, Headers, Body) when is_binary(Method), is_binary(Url) ->
         delete -> {UrlString, HeaderList};
         _ -> {UrlString, HeaderList, ContentType, Body}
     end,
-    case httpc:request(MethodAtom, Request, [], [{body_format, binary}]) of
+    case httpc:request(MethodAtom, Request, [{timeout, 180000}, {connect_timeout, 30000}], [{body_format, binary}]) of
         {ok, {{_Ver, Status, _Reason}, RespHeaders, RespBody}} ->
             BinHeaders = [{list_to_binary(K), list_to_binary(V)} || {K, V} <- RespHeaders],
             {ok, {Status, BinHeaders, RespBody}};
