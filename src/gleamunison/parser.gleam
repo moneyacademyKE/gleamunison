@@ -24,6 +24,8 @@ pub fn parse_sexpr(
 ) -> Result(#(SExpr, List(TokenInfo)), ParseError) {
   case tokens {
     [] -> Error(ParseError("Unexpected EOF", 1, 1))
+    // Comments are whitespace: emitted by the lexer, invisible to the grammar.
+    [lexer.TokenInfo(lexer.Comment(_), _, _), ..rest] -> parse_sexpr(rest)
     [lexer.TokenInfo(LParen, l, c), ..rest] -> {
       use #(exprs, rest2) <- result.try(parse_list(rest, []))
       Ok(#(SListExpr(exprs, l, c), rest2))
@@ -379,8 +381,21 @@ fn curry_lams(
   }
 }
 
+/// Strip comment tokens from a token stream. The formatter is the one
+/// consumer that keeps them; every grammar path treats them as whitespace.
+pub fn drop_comments(tokens: List(TokenInfo)) -> List(TokenInfo) {
+  list.filter(tokens, fn(t) {
+    case t {
+      lexer.TokenInfo(lexer.Comment(_), _, _) -> False
+      _ -> True
+    }
+  })
+}
+
 pub fn parse_string(input: String) -> Result(SurfaceTerm, ParseError) {
-  let tokens = lexer.tokenize(input)
+  // Comments are trivia: invisible to single-term parsing (a comment-only
+  // input is empty input, exactly as before comments became tokens).
+  let tokens = lexer.tokenize(input) |> drop_comments
   case tokens {
     [] -> Error(ParseError("Empty input", 0, 0))
     _ ->
