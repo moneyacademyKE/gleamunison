@@ -2,6 +2,18 @@
 
 ---
 
+## What's New in v3.22.0 (2026-10-17)
+
+The crash-on-bad-input release: parsing user text no longer kills the process, and constructor patterns finally match the values constructors build.
+
+### string->int returns a Result
+- `string->int` raised `badarg` on non-numeric input. A game loop died on EOF. It now returns `{left, N}` on success and `{right, bad_integer}` on garbage, including the empty string.
+- `div`, `mod`, and `string-slice` still raise on bad input. They are arithmetic, and the datalog engine uses `div` as a value. Wrapping them would break every caller. Parsing user text is the one that must not crash.
+
+### left/right match
+- `(left x)` built `{left, X}` (an atom tuple). A `(left n)` pattern compiled to `{m_<sha256("left")>, n}` (a module tuple). The two shapes never unified, so matching on `left` or `right` always crashed with `case_clause`.
+- Constructors now emit the tuple the pattern matches. `(match (left 7) ((left n) n))` returns 7.
+
 ## What's New in v3.21.0 (2026-10-16)
 
 The honesty release: comments survive the formatter, and the evidence turnstile learns the difference between pure and effectful code.
