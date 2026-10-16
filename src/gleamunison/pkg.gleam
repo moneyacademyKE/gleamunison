@@ -192,7 +192,13 @@ fn install_recursive(
       )
       use admitted <- result.try(case m.require_evidence {
         True ->
-          turnstile.check(adapter, m.defs)
+          // Manifests carry name+hash only today (no effect flags), so
+          // package defs are gated as pure: Test evidence required.
+          // Manifest-carried requirement rows are a filed follow-up.
+          turnstile.check(
+            adapter,
+            list.map(m.defs, fn(d) { #(d.0, d.1, False) }),
+          )
           |> result.map_error(fn(missing) {
             "install REFUSED — no passing test evidence for: "
             <> string.join(missing, ", ")
@@ -213,13 +219,15 @@ fn install_recursive(
   }
 }
 
-/// Publish #(name, hash) pairs as a manifest in the DAG. The turnstile
-/// runs first: any def without passing-test evidence refuses the whole
-/// publish (Error names them). Success stores the manifest and returns
-/// its hex — the shareable name of the package.
+/// Publish #(name, hash, effectful) triples as a manifest in the DAG. The
+/// turnstile runs first with the real flags: pure defs need passing-test
+/// evidence, effectful defs may carry Io attestation. Any unevidenced def
+/// refuses the whole publish (Error names them). Success stores the
+/// manifest (name+hash only — effect flags are a filed follow-up) and
+/// returns its hex: the shareable name of the package.
 pub fn publish_to_store(
   adapter: StorageAdapter,
-  defs: List(#(String, String)),
+  defs: List(#(String, String, Bool)),
   name: String,
   version: String,
 ) -> Result(String, List(String)) {

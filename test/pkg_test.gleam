@@ -74,7 +74,7 @@ pub fn install_unknown_manifest_errors_test() {
 /// names it.
 pub fn publish_refuses_unevidenced_test() {
   let adapter = storage.inmemory()
-  let pairs = [#("get-json", "aaa111")]
+  let pairs = [#("get-json", "aaa111", False)]
   let assert Error(missing) =
     pkg.publish_to_store(adapter, pairs, "http-utils", "1.0.0")
   list.contains(missing, "get-json") |> should.be_true
@@ -84,7 +84,7 @@ pub fn publish_refuses_unevidenced_test() {
 /// the hash is fetchable and carries the same def set.
 pub fn publish_stores_fetchable_manifest_test() {
   let adapter = storage.inmemory()
-  let pairs = [#("get-json", "aaa111"), #("post-json", "bbb222")]
+  let pairs = [#("get-json", "aaa111", False), #("post-json", "bbb222", False)]
   let assert Ok(_) =
     evidence.attach(adapter, "aaa111", evidence.Test, "pass", "{}", 1)
   let assert Ok(_) =
@@ -94,7 +94,8 @@ pub fn publish_stores_fetchable_manifest_test() {
   let assert Ok(m) = manifest.fetch(adapter, manifest.ref_from_hex(hex))
   m.name |> should.equal("http-utils")
   m.version |> should.equal("1.0.0")
-  m.defs |> should.equal(pairs)
+  m.defs
+  |> should.equal(list.map(pairs, fn(p) { #(p.0, p.1) }))
   m.require_evidence |> should.equal(True)
 }
 
