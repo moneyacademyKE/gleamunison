@@ -128,6 +128,7 @@ pub fn resolve_config(
             Ok(n) -> n
             Error(_) -> 4096
           },
+          reasoning_effort: env_or(env, "LLM_REASONING_EFFORT", ""),
         ),
       )
   }

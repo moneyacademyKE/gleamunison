@@ -20,6 +20,7 @@ fn openai_cfg() -> ProviderConfig {
     api_key: "sk-test",
     model: "gpt-test",
     max_tokens: 1024,
+    reasoning_effort: "",
   )
 }
 
@@ -30,6 +31,7 @@ fn anthropic_cfg() -> ProviderConfig {
     api_key: "sk-ant-test",
     model: "claude-test",
     max_tokens: 512,
+    reasoning_effort: "",
   )
 }
 
@@ -47,6 +49,17 @@ pub fn openai_request_shape_test() {
       body,
       "\"messages\":[{\"role\":\"user\",\"content\":\"Say hi\"}]",
     )
+}
+
+pub fn reasoning_effort_included_when_set_test() {
+  let cfg = ProviderConfig(..openai_cfg(), reasoning_effort: "max")
+  let #(_, _, body) = llm.build_request(cfg, [Message(User, "Hi")])
+  let assert True = string.contains(body, "\"reasoning_effort\":\"max\"")
+}
+
+pub fn reasoning_effort_omitted_when_empty_test() {
+  let #(_, _, body) = llm.build_request(openai_cfg(), [Message(User, "Hi")])
+  let assert False = string.contains(body, "reasoning_effort")
 }
 
 pub fn anthropic_request_extracts_system_test() {

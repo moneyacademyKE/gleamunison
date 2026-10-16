@@ -61,6 +61,9 @@ pub type ProviderConfig {
     api_key: String,
     model: String,
     max_tokens: Int,
+    /// OpenAI-compatible reasoning effort ("low"/"medium"/"high"/"max").
+    /// Empty string = omit from the request (provider default).
+    reasoning_effort: String,
   )
 }
 
@@ -122,6 +125,10 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
               }
             Error(_) -> 4096
           },
+          reasoning_effort: case get_env("LLM_REASONING_EFFORT") {
+            Ok(e) -> e
+            Error(_) -> ""
+          },
         )
       let body = messages_json([Message(User, prompt)])
       let result: Result(BitArray, BitArray) =
@@ -174,6 +181,10 @@ pub fn build_request(
   cfg: ProviderConfig,
   messages: List(Message),
 ) -> #(String, List(#(String, String)), String) {
+  let effort_field = case cfg.reasoning_effort {
+    "" -> ""
+    e -> ",\"reasoning_effort\":" <> jstr(e)
+  }
   case cfg.provider {
     OpenAI -> #(
       cfg.base_url <> "/chat/completions",
@@ -185,6 +196,7 @@ pub fn build_request(
         <> jstr(cfg.model)
         <> ",\"max_tokens\":"
         <> int.to_string(cfg.max_tokens)
+        <> effort_field
         <> ",\"messages\":"
         <> messages_json(messages)
         <> "}",
