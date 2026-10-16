@@ -20,8 +20,12 @@ pub fn command(args: List(String)) -> Nil {
     ["attest", hash, "io", ..note] -> attest(hash, string.join(note, " "))
     _ ->
       io.println(
-        "usage: gleam run -- evidence <subject-hash>\n"
-        <> "       gleam run -- evidence attest <subject-hash> io <note...>",
+        "usage: gleam run -- evidence <content-hash>\n"
+        <> "       gleam run -- evidence attest <content-hash> io <note...>\n"
+        <> "\n"
+        <> "The hash is the content hash (the `hash:` line from `view`),\n"
+        <> "not the name ref (the `ref:` line). Evidence attaches to the\n"
+        <> "elaborated term, so a name ref will be refused by publish.",
       )
   }
 }

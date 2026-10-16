@@ -117,17 +117,25 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
             Ok(m) -> m
             Error(_) -> default_model
           },
+          reasoning_effort: case get_env("LLM_REASONING_EFFORT") {
+            Ok(e) -> e
+            Error(_) -> ""
+          },
           max_tokens: case get_env("LLM_MAX_TOKENS") {
             Ok(t) ->
               case int.parse(t) {
                 Ok(n) -> n
                 Error(_) -> 4096
               }
-            Error(_) -> 4096
-          },
-          reasoning_effort: case get_env("LLM_REASONING_EFFORT") {
-            Ok(e) -> e
-            Error(_) -> ""
+            Error(_) ->
+              // Reasoning models spend the budget thinking before they
+              // speak. 4096 is a trap: the first dogfood call at max
+              // effort returned zero content. Raise the default only
+              // when reasoning is on and nobody set a budget.
+              case get_env("LLM_REASONING_EFFORT") {
+                Ok("") | Error(_) -> 4096
+                Ok(_) -> 16_384
+              }
           },
         )
       let body = messages_json([Message(User, prompt)])

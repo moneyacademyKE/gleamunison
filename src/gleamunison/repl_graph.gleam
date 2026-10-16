@@ -85,8 +85,10 @@ fn view(
           <> kind
           <> "\n  hash: "
           <> content
+          <> "  (content hash — evidence and publish use this)"
           <> "\n  ref: "
           <> refhex
+          <> "  (name ref — not an evidence subject)"
           <> "\n  type: "
           <> typ
         }
