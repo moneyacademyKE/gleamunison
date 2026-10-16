@@ -1,6 +1,5 @@
 //// `gleam run -- fmt <file>`: opinionated surface formatter (roadmap 9.2).
-//// Rewrites in place; warns when the file carries comments the formatter
-//// cannot preserve.
+//// Rewrites in place; comments are preserved (see formatter module docs).
 
 import gleam/int
 import gleam/io
@@ -10,10 +9,7 @@ import simplifile
 pub fn run(args: List(String)) -> Nil {
   case args {
     [path] -> format_file(path)
-    _ ->
-      io.println(
-        "usage: gleam run -- fmt <file>  (rewrites in place; drops ; comments)",
-      )
+    _ -> io.println("usage: gleam run -- fmt <file>  (rewrites in place)")
   }
 }
 
@@ -21,15 +17,6 @@ fn format_file(path: String) -> Nil {
   case simplifile.read(path) {
     Error(_) -> io.println("fmt: cannot read " <> path)
     Ok(src) -> {
-      case formatter.drops_comments(src) {
-        True ->
-          io.println(
-            "fmt: warning: "
-            <> path
-            <> " contains ; comments, which are dropped",
-          )
-        False -> Nil
-      }
       case formatter.format_source(src) {
         Error(err) ->
           io.println(
