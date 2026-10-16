@@ -2,6 +2,26 @@
 
 ---
 
+## What's New in v3.21.0 (2026-10-16)
+
+The honesty release: comments survive the formatter, and the evidence turnstile learns the difference between pure and effectful code.
+
+### Formatter preserves comments
+- `;` comments are lexer trivia (string-aware: `;` inside a string literal is content, by construction), invisible to the parser, reattached by the formatter.
+- Full-line comments stay before their form; a trailing comment joins its form's first line; a comment inside a form hoists above it (documented approximation — never dropped). Idempotent: format twice, diff is empty.
+- The `fmt` drops-comments warning is gone; nothing is dropped anymore.
+
+### Effect-aware evidence turnstile
+- New evidence kind `io`: human attestation for effectful defs. `gleam run -- evidence attest <hash> io <note>` — only `io` is attestable by hand; test/review/property stay tool-attested.
+- Turnstile rule: pure defs still require passing Test evidence; effectful defs accept Io attestation. Io never substitutes for Test on pure code.
+- Effectfulness is computed term-level: a def is effectful when its elaborated term contains an ability `Do`, transitively closed over same-batch references (a caller of a printing function is effectful even though it never writes `do` itself). Type-level requirement rows only exist on function types, so the term is the honest source.
+- Ambient jets (`now`, `read_line`) remain invisible to the closure — documented limit, not a loophole.
+
+### Consistency fix
+- REPL `view <name>` now shows the content hash computed through the same elaboration path `publish` uses, so the hash you attest is the hash the turnstile checks. The name-hash remains visible as `ref:`.
+
+---
+
 ## What's New in v3.20.0 (2026-10-14)
 
 The ergonomics release: do-notation that actually works, REPL graph queries, a formatter, and a registry that finishes what it started.
