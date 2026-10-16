@@ -10,6 +10,12 @@ pub type Token {
   RParen
   Quote
   UnterminatedString(String)
+  /// A `;` comment, text preserved including the leading semicolon.
+  /// Emitted only outside string literals (strings scan in their own
+  /// loop, so a `;` inside quotes is string content by construction).
+  /// The parser treats comments as whitespace; the formatter reattaches
+  /// them. Nothing is ever silently dropped.
+  Comment(String)
 }
 
 pub type TokenInfo {
@@ -41,7 +47,8 @@ fn do_tokenize(chars, acc, sl, sc, l, c) {
         TokenInfo(RParen, l, c),
         ..do_tokenize(rest, "", 1, 1, l, c + 1)
       ])
-    [";", ..rest] -> flush_token(acc, sl, sc, skip_line(rest, l, c + 1))
+    [";", ..rest] ->
+      flush_token(acc, sl, sc, read_comment(rest, ";", l, c, l, c + 1))
     ["'", ..rest] ->
       flush_token(acc, sl, sc, [
         TokenInfo(Quote, l, c),
@@ -76,11 +83,14 @@ fn read_string(chars, acc, sl, sc, l, c) {
   }
 }
 
-fn skip_line(chars, l, c) {
+fn read_comment(chars, acc, sl, sc, l, c) {
   case chars {
-    [] -> []
-    ["\n", ..rest] -> do_tokenize(rest, "", 1, 1, l + 1, 1)
-    [_, ..rest] -> skip_line(rest, l, c + 1)
+    [] -> [TokenInfo(Comment(acc), sl, sc)]
+    ["\n", ..rest] -> [
+      TokenInfo(Comment(acc), sl, sc),
+      ..do_tokenize(rest, "", 1, 1, l + 1, 1)
+    ]
+    [ch, ..rest] -> read_comment(rest, acc <> ch, sl, sc, l, c + 1)
   }
 }
 

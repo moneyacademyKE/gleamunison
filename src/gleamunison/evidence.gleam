@@ -14,6 +14,10 @@ pub type Kind {
   Test
   Review
   PropertyCheck
+  /// Human attestation that an effectful definition behaves: "I ran it and
+  /// it worked." The only honest evidence for IO a suite cannot drive —
+  /// and never a substitute for Test on pure defs.
+  Io
 }
 
 /// A fact about a definition hash, stored as a CAS chunk. The chunk's own
@@ -37,6 +41,7 @@ fn kind_tag(k: Kind) -> String {
     Test -> "test"
     Review -> "review"
     PropertyCheck -> "property"
+    Io -> "io"
   }
 }
 
@@ -51,6 +56,7 @@ fn tag_kind(s: String) -> Result(Kind, Nil) {
     "test" -> Ok(Test)
     "review" -> Ok(Review)
     "property" -> Ok(PropertyCheck)
+    "io" -> Ok(Io)
     _ -> Error(Nil)
   }
 }

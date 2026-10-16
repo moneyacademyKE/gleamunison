@@ -52,11 +52,10 @@ pub fn quote_sugar_normalizes_test() {
   out |> should.equal("(define xs (quote (1 2)))\n")
 }
 
-/// Comments are dropped by the lexer; the formatter must say so.
-pub fn comments_warn_test() {
+/// Comments are data: the formatter preserves them.
+pub fn comments_preserved_test() {
   let assert Ok(out) = formatter.format_source("; hello\n(define one 1)")
-  // The definition survives; the comment does not.
-  out |> should.equal("(define one 1)\n")
+  out |> should.equal("; hello\n(define one 1)\n")
 }
 
 /// Parse errors carry position, not a crash.

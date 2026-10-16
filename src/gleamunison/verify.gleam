@@ -16,6 +16,9 @@ pub fn parse_all_sexprs(
 ) -> Result(List(SExpr), lexer.ParseError) {
   case tokens {
     [] -> Ok(list.reverse(acc))
+    // Comments between forms are whitespace here too.
+    [lexer.TokenInfo(lexer.Comment(_), _, _), ..rest] ->
+      parse_all_sexprs(rest, acc)
     _ -> {
       case parse_sexpr(tokens) {
         Ok(#(expr, rest)) -> parse_all_sexprs(rest, [expr, ..acc])

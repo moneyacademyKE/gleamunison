@@ -6,14 +6,14 @@
 import gleam/list
 import gleam/string
 import gleamunison/ast
+import gleamunison/codebase
 import gleamunison/codebase_index
 import gleamunison/elab_types.{type SurfaceDef}
-import gleamunison/elaborate as elab
+import gleamunison/identity.{hash_to_debug_string}
 import gleamunison/mcp_session
-import gleamunison/repl_eval
+import gleamunison/test_runner
 import gleamunison/type_pretty
 import gleamunison/types
-import gleamunison/verify
 
 /// Handle a graph command, or pass through with Error(Nil) when the input
 /// is not one. Ok(output) includes usage errors for known command words.
@@ -49,44 +49,48 @@ fn names_or_err(result: Result(List(String), String)) -> String {
   }
 }
 
-/// kind + content hash + inferred type for one definition.
+/// kind + content hash + name-ref + inferred type for one definition.
+/// The hash is elaborated through the same path publish uses
+/// (test_runner.elaborated_def_for), so the hash shown here is the hash
+/// evidence attaches to — view and the turnstile agree by construction.
 fn view(
   name: String,
-  _cache: types.TypeCache,
+  cache: types.TypeCache,
   defs: List(#(String, SurfaceDef)),
 ) -> String {
   case list.key_find(defs, name) {
     Error(_) -> name <> ": not found in this session"
     Ok(def) -> {
       let kind = codebase_index.kind_of(def)
-      let hash = codebase_index.ref_hex(name, def)
-      let typ = view_type(name, defs)
-      name
-      <> "\n  kind: "
-      <> kind
-      <> "\n  hash: "
-      <> hash
-      <> "\n  type: "
-      <> typ
-    }
-  }
-}
-
-fn view_type(name: String, defs: List(#(String, SurfaceDef))) -> String {
-  // Bootstrap first: session defs may reference builtin names.
-  let all_defs = list.append(verify.get_init_defs(), defs)
-  let root = repl_eval.ref_for_name("repl_view")
-  case
-    elab.elaborate_unit(
-      elab_types.SurfaceUnit(root:, defs: all_defs),
-      repl_eval.seed_builtin_term_types(types.empty_cache()),
-    )
-  {
-    Error(_) -> "<untypable in this session>"
-    Ok(#(unit, _, _)) ->
-      case list.key_find(unit.defs, repl_eval.ref_for_name(name)) {
-        Ok(ast.TermDef(_, typ)) -> type_pretty.pretty_print(typ)
-        _ -> "<unknown>"
+      let refhex = codebase_index.ref_hex(name, def)
+      case test_runner.elaborated_def_for(name, defs, cache) {
+        Error(e) ->
+          name
+          <> "\n  kind: "
+          <> kind
+          <> "\n  ref: "
+          <> refhex
+          <> "\n  <elaboration failed: "
+          <> e
+          <> ">"
+        Ok(elab_def) -> {
+          let content =
+            hash_to_debug_string(codebase.hash_of_definition(elab_def))
+          let typ = case elab_def {
+            ast.TermDef(_, t) -> type_pretty.pretty_print(t)
+            _ -> "<unknown>"
+          }
+          name
+          <> "\n  kind: "
+          <> kind
+          <> "\n  hash: "
+          <> content
+          <> "\n  ref: "
+          <> refhex
+          <> "\n  type: "
+          <> typ
+        }
       }
+    }
   }
 }
