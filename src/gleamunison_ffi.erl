@@ -197,7 +197,7 @@ application_version() ->
     case application:get_key(gleamunison, vsn) of
         {ok, Vsn} when is_list(Vsn) -> list_to_binary(Vsn);
         {ok, Vsn} when is_binary(Vsn) -> Vsn;
-        undefined -> error(application_version_unavailable)
+        undefined -> <<"development">>
     end.
 
 to_dynamic(X) -> X.

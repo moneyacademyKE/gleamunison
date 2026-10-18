@@ -21,6 +21,7 @@ import gleamunison/cli_watch
 import gleamunison/http
 import gleamunison/repl
 import gleamunison/verify
+import gleamunison/version
 
 pub fn main() -> Nil {
   run(get_plain_args())
@@ -60,6 +61,9 @@ pub fn run(args: List(String)) -> Nil {
     ["watch", path] -> cli_watch.command(path)
     ["watch"] -> io.println("usage: gleam run -- watch <file.lisp>")
     ["repl", ..paths] -> repl.start_repl_loading(paths)
+    ["version"] -> io.println(version.current())
+    ["--help"] -> print_help()
+    ["help"] -> print_help()
     [cmd] -> dispatch(cmd, "8080", levels)
     [cmd, param] -> dispatch(cmd, param, levels)
     [cmd, ..] -> dispatch(cmd, "8080", levels)
@@ -95,12 +99,14 @@ fn dispatch(
     _ ->
       case dict.get(levels, cmd) {
         Ok(f) -> f()
-        Error(_) ->
+        Error(_) -> {
           io.println(
             "Unknown command: '"
             <> cmd
             <> "'. Try: server, repl, all, verify, level1..level6697",
           )
+          halt_failure()
+        }
       }
   }
 }
