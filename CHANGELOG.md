@@ -2,6 +2,24 @@
 
 ---
 
+## What's New in v3.23.0 (2026-10-18)
+
+The truth-at-the-boundary release: CLI failures now fail, evidence survives process boundaries, and protocol versions cannot drift from the package manifest.
+
+### Verification and test commands fail honestly
+- Empty or comment-only source is rejected instead of reporting successful verification.
+- Malformed verification, failed tests, vacuous zero-assertion tests, and suites with no `test_` definitions return a nonzero process status.
+- Zero-assertion tests produce an error and attach no passing Test evidence.
+
+### Evidence and publish persistence
+- CLI-owned DETS adapters close before success is reported, so test evidence and IO attestations are visible to the next process.
+- Evidence insertion and publish manifest writes are propagated as failures instead of being silently discarded.
+
+### Build and protocol integrity
+- `build_escript.sh` validates the Gleam compiler, uses `pipefail`, and preserves the previous artifact when a build fails.
+- MCP and LSP advertise the compiled application version, removing stale hardcoded protocol versions.
+- A subprocess truth suite covers exit codes, evidence persistence, publish admission, manifest-write failure, and failed compiler builds.
+
 ## What's New in v3.22.0 (2026-10-17)
 
 The crash-on-bad-input release: parsing user text no longer kills the process, and constructor patterns finally match the values constructors build.
