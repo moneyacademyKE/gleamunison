@@ -54,3 +54,14 @@ pub fn evidence_reports_absence_test() {
   let report = cli_evidence.report(adapter, "deadbeef")
   string.contains(report, "no evidence") |> should.be_true
 }
+
+pub fn failed_evidence_write_is_not_a_successful_run_test() {
+  write_suite()
+  let adapter = storage.inmemory()
+  let broken =
+    storage.StorageAdapter(..adapter, insert: fn(_, _) {
+      Error(storage.StorageError("write refused"))
+    })
+  let assert Error(message) = cli_test.run_file(suite_path, broken)
+  string.contains(message, "cannot attach evidence") |> should.be_true
+}

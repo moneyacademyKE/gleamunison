@@ -27,10 +27,8 @@ import gleamunison/repl_eval
 import gleamunison/type_pretty
 import gleamunison/types.{type TypeCache, empty_cache}
 import gleamunison/verify
+import gleamunison/version
 import simplifile
-
-// Keep in step with gleam.toml at release time.
-const server_version = "3.18.0"
 
 pub opaque type SessionState {
   SessionState(cache: TypeCache, defs: List(#(String, SurfaceDef)))
@@ -108,7 +106,7 @@ pub fn session_defs(state: SessionState) -> List(#(String, SurfaceDef)) {
 /// real tools attached.
 pub fn handle_rpc(state: SessionState, body: String) -> Response {
   let server =
-    Server(name: "gleamunison", version: server_version, tools: tools(state))
+    Server(name: "gleamunison", version: version.current(), tools: tools(state))
   mcp.handle_message(server, body)
 }
 

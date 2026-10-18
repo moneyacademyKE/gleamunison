@@ -2,6 +2,7 @@ import gleam/int
 import gleam/string
 import gleamunison/lsp
 import gleamunison/lsp_types
+import gleamunison/version
 import gleeunit/should
 
 pub fn decode_framed_message_test() {
@@ -28,6 +29,15 @@ pub fn initialize_advertises_full_sync_test() {
   let assert [resp] = replies
   string.contains(resp, "textDocumentSync") |> should.be_true
   string.contains(resp, "\"id\":1") |> should.be_true
+}
+
+pub fn initialize_advertises_package_version_test() {
+  let body =
+    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
+  let #(replies, _) = lsp.handle_message(body, lsp_types.new_state())
+  let assert [resp] = replies
+  string.contains(resp, "\"version\":\"" <> version.current() <> "\"")
+  |> should.be_true
 }
 
 pub fn did_open_with_error_publishes_diagnostic_test() {

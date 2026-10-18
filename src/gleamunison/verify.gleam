@@ -77,6 +77,15 @@ fn verify_terms_valued(
   }
 }
 
+fn require_forms(
+  terms: List(SurfaceTerm),
+) -> Result(List(SurfaceTerm), String) {
+  case terms {
+    [] -> Error("source contains no forms")
+    _ -> Ok(terms)
+  }
+}
+
 pub fn get_init_defs() -> List(#(String, SurfaceDef)) {
   let init_defs =
     list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
@@ -149,6 +158,7 @@ fn run_file(path: String) -> Result(option.Option(String), String) {
                 <> string.inspect(e.col),
               )
             Ok(terms) -> {
+              use terms <- result.try(require_forms(terms))
               let init_defs = get_init_defs()
               let #(cache, bootstrap_list) =
                 repl_eval.bootstrap_defs(init_defs, empty_cache())
@@ -201,6 +211,7 @@ pub fn load_defs_file_scoped(
           case terms_from_sexprs(exprs, []) {
             Error(e) -> Error("S-Expression Error: " <> e.message)
             Ok(terms) -> {
+              use terms <- result.try(require_forms(terms))
               let init_defs = get_init_defs()
               let #(cache, bootstrap_list) =
                 repl_eval.bootstrap_defs(init_defs, empty_cache())

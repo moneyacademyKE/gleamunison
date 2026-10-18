@@ -2,12 +2,18 @@
 # Build a standalone escript for gleamunison.
 # Produces a single file that runs with just Erlang/OTP installed.
 # Usage: ./build_escript.sh && ./gleamunison_escript server
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
 
 SCRIPT="gleamunison_escript"
+GLEAM_BIN="${GLEAM_BIN:-gleam}"
+if ! command -v "$GLEAM_BIN" >/dev/null 2>&1; then
+  echo "error: Gleam compiler not found: $GLEAM_BIN" >&2
+  exit 127
+fi
+
 echo "Building gleamunison escript..."
-gleam build 2>&1 | tail -1
+"$GLEAM_BIN" build 2>&1 | tail -1
 
 TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT

@@ -119,12 +119,22 @@ pub fn run_suite(
           Error(err) ->
             TestResult(name:, passed: 0, failed: 0, error: Some(err))
           Ok(_) ->
-            TestResult(
-              name:,
-              passed: list.length(entries) - failed,
-              failed:,
-              error: None,
-            )
+            case entries {
+              [] ->
+                TestResult(
+                  name:,
+                  passed: 0,
+                  failed: 0,
+                  error: Some("no assertions"),
+                )
+              _ ->
+                TestResult(
+                  name:,
+                  passed: list.length(entries) - failed,
+                  failed:,
+                  error: None,
+                )
+            }
         }
       }
       _ -> TestResult(name:, passed: 0, failed: 0, error: Some("not a term"))
@@ -163,41 +173,44 @@ pub fn attach_results(
 ) -> List(Result(#(String, DefinitionRef, String), evidence.AttachError)) {
   results
   |> list.filter_map(fn(r) {
-    let subject_name = string.drop_start(r.name, 5)
-    let subject_exists =
-      list.any(defs, fn(pair) { pair.0 == subject_name && is_term_def(pair.1) })
-    case subject_exists {
-      False -> Error(Nil)
-      True -> {
-        case elaborated_def_for(subject_name, defs, cache) {
-          Error(_) -> Error(Nil)
-          Ok(subject_def) -> {
-            let subject_hex =
-              hash_to_debug_string(codebase.hash_of_definition(subject_def))
-            let payload =
-              r.name
-              <> ": "
-              <> int.to_string(r.passed)
-              <> " passed, "
-              <> int.to_string(r.failed)
-              <> " failed"
-              <> case r.error {
-                Some(e) -> ", error: " <> e
-                None -> ""
+    case r.error {
+      Some(_) -> Error(Nil)
+      None -> {
+        let subject_name = string.drop_start(r.name, 5)
+        let subject_exists =
+          list.any(defs, fn(pair) {
+            pair.0 == subject_name && is_term_def(pair.1)
+          })
+        case subject_exists {
+          False -> Error(Nil)
+          True -> {
+            case elaborated_def_for(subject_name, defs, cache) {
+              Error(_) -> Error(Nil)
+              Ok(subject_def) -> {
+                let subject_hex =
+                  hash_to_debug_string(codebase.hash_of_definition(subject_def))
+                let payload =
+                  r.name
+                  <> ": "
+                  <> int.to_string(r.passed)
+                  <> " passed, "
+                  <> int.to_string(r.failed)
+                  <> " failed"
+                case
+                  evidence.attach(
+                    adapter,
+                    subject: subject_hex,
+                    kind: evidence.Test,
+                    verdict: verdict_of(r),
+                    payload:,
+                    ts: datetime.to_unix(datetime.now()),
+                  )
+                {
+                  Ok(#(evidence_ref, _)) ->
+                    Ok(Ok(#(subject_hex, evidence_ref, payload)))
+                  Error(e) -> Ok(Error(e))
+                }
               }
-            case
-              evidence.attach(
-                adapter,
-                subject: subject_hex,
-                kind: evidence.Test,
-                verdict: verdict_of(r),
-                payload:,
-                ts: datetime.to_unix(datetime.now()),
-              )
-            {
-              Ok(#(evidence_ref, _)) ->
-                Ok(Ok(#(subject_hex, evidence_ref, payload)))
-              Error(e) -> Ok(Error(e))
             }
           }
         }
