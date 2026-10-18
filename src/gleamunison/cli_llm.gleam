@@ -12,7 +12,7 @@ import gleamunison/effects.{type OpHandler}
 import gleamunison/json
 import gleamunison/llm.{
   type Completion, type Provider, type ProviderConfig, Anthropic, Completion,
-  Message, OpenAI, ProviderConfig, User,
+  Message, OpenAI, User,
 }
 import gleamunison/llm_middleware.{RetryPolicy}
 
@@ -107,50 +107,7 @@ pub fn resolve_config(
   provider: Provider,
   env: EnvLookup,
 ) -> Result(ProviderConfig, String) {
-  let #(key_var, default_url, default_model) = case provider {
-    OpenAI -> #("OPENAI_API_KEY", "https://api.openai.com/v1", "gpt-4o-mini")
-    Anthropic -> #(
-      "ANTHROPIC_API_KEY",
-      "https://api.anthropic.com",
-      "claude-haiku-4-5",
-    )
-  }
-  case env(key_var) {
-    Error(_) -> Error("llm: missing " <> key_var <> " in environment")
-    Ok(key) ->
-      Ok(ProviderConfig(
-        provider: provider,
-        base_url: env_or(env, url_var(provider), default_url),
-        api_key: key,
-        model: env_or(env, model_var(provider), default_model),
-        max_tokens: case int.parse(env_or(env, "LLM_MAX_TOKENS", "4096")) {
-          Ok(n) -> n
-          Error(_) -> 4096
-        },
-        reasoning_effort: env_or(env, "LLM_REASONING_EFFORT", ""),
-      ))
-  }
-}
-
-fn url_var(p: Provider) -> String {
-  case p {
-    OpenAI -> "OPENAI_BASE_URL"
-    Anthropic -> "ANTHROPIC_BASE_URL"
-  }
-}
-
-fn model_var(p: Provider) -> String {
-  case p {
-    OpenAI -> "OPENAI_MODEL"
-    Anthropic -> "ANTHROPIC_MODEL"
-  }
-}
-
-fn env_or(env: EnvLookup, key: String, default: String) -> String {
-  case env(key) {
-    Ok(v) -> v
-    Error(_) -> default
-  }
+  llm.resolve_config(provider, env)
 }
 
 /// Drive any LLM op handler with a single user prompt. The handler decides

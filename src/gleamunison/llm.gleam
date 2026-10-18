@@ -12,11 +12,13 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/list
+import gleam/result
 import gleam/string
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/http_client
 import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/json
+import gleamunison/llm_controls
 
 @external(erlang, "gleamunison_config", "get_env")
 fn get_env(key: String) -> Result(String, Nil)
@@ -86,58 +88,9 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
     Ok(_) -> Anthropic
     Error(_) -> OpenAI
   }
-  let #(key_var, default_url, default_model) = case provider {
-    OpenAI -> #("OPENAI_API_KEY", "https://api.openai.com/v1", "gpt-4o-mini")
-    Anthropic -> #(
-      "ANTHROPIC_API_KEY",
-      "https://api.anthropic.com",
-      "claude-haiku-4-5",
-    )
-  }
-  case get_env(key_var) {
-    Error(_) -> Error("llm: missing " <> key_var <> " in environment")
-    Ok(key) -> {
-      let url_var = case provider {
-        OpenAI -> "OPENAI_BASE_URL"
-        Anthropic -> "ANTHROPIC_BASE_URL"
-      }
-      let model_var = case provider {
-        OpenAI -> "OPENAI_MODEL"
-        Anthropic -> "ANTHROPIC_MODEL"
-      }
-      let cfg =
-        ProviderConfig(
-          provider: provider,
-          base_url: case get_env(url_var) {
-            Ok(u) -> u
-            Error(_) -> default_url
-          },
-          api_key: key,
-          model: case get_env(model_var) {
-            Ok(m) -> m
-            Error(_) -> default_model
-          },
-          reasoning_effort: case get_env("LLM_REASONING_EFFORT") {
-            Ok(e) -> e
-            Error(_) -> ""
-          },
-          max_tokens: case get_env("LLM_MAX_TOKENS") {
-            Ok(t) ->
-              case int.parse(t) {
-                Ok(n) -> n
-                Error(_) -> 4096
-              }
-            Error(_) ->
-              // Reasoning models spend the budget thinking before they
-              // speak. 4096 is a trap: the first dogfood call at max
-              // effort returned zero content. Raise the default only
-              // when reasoning is on and nobody set a budget.
-              case get_env("LLM_REASONING_EFFORT") {
-                Ok("") | Error(_) -> 4096
-                Ok(_) -> 16_384
-              }
-          },
-        )
+  case resolve_config(provider, get_env) {
+    Error(error) -> Error(error)
+    Ok(cfg) -> {
       let body = messages_json([Message(User, prompt)])
       let result: Result(BitArray, BitArray) =
         unsafe_coerce(
@@ -167,6 +120,29 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
       }
     }
   }
+}
+
+/// Resolve both CLI and ambient settings without silently accepting bad values.
+pub fn resolve_config(
+  provider: Provider,
+  env: llm_controls.EnvLookup,
+) -> Result(ProviderConfig, String) {
+  use #(url, key, model, tokens, effort) <- result.try(llm_controls.resolve(
+    provider == Anthropic,
+    env,
+  ))
+  Ok(ProviderConfig(provider, url, key, model, tokens, effort))
+}
+
+pub fn validate_config(cfg: ProviderConfig) -> Result(Nil, String) {
+  llm_controls.validate(
+    cfg.provider == Anthropic,
+    cfg.base_url,
+    cfg.api_key,
+    cfg.model,
+    cfg.max_tokens,
+    cfg.reasoning_effort,
+  )
 }
 
 fn env_completion_decoder() -> decode.Decoder(Completion) {
@@ -283,7 +259,7 @@ pub fn parse_response(
   body: String,
 ) -> Result(Completion, LlmError) {
   case status >= 200 && status < 300 {
-    False -> Error(HttpError(status, string.slice(body, 0, 500)))
+    False -> Error(HttpError(status, "provider_error_body_omitted"))
     True -> {
       case json.decode(bit_array.from_string(body)) {
         Error(e) -> Error(DecodeError("json: " <> unwrap_bit(e)))
@@ -372,11 +348,14 @@ pub fn mock_handler(response: Completion) -> OpHandler {
 /// Live provider handler: performs the HTTP call via http_client.
 pub fn provider_handler(cfg: ProviderConfig) -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-    case perform(cfg, args) {
-      Ok(json_bin) -> cont(to_dynamic(Ok(json_bin)))
-      Error(e) ->
-        cont(to_dynamic(Error(bit_array.from_string(error_string(e)))))
-    }
+    cont(case validate_config(cfg) {
+      Error(reason) -> to_dynamic(Error(bit_array.from_string(reason)))
+      Ok(Nil) ->
+        case perform(cfg, args) {
+          Ok(json_bin) -> to_dynamic(Ok(json_bin))
+          Error(e) -> to_dynamic(Error(bit_array.from_string(error_string(e))))
+        }
+    })
   }
 }
 
