@@ -89,7 +89,9 @@ fn run_publish(path: String, name: String, version: String) -> Nil {
           case cli_publish.hash_defs(term_names, defs, cache, []) {
             Error(err) -> io.println("pkg: " <> err)
             Ok(pairs) ->
-              case pkg.publish_to_store(adapter, pairs, name, version) {
+              case
+                pkg.publish_to_store_production(adapter, pairs, name, version)
+              {
                 Error(missing) ->
                   io.println(
                     "pkg: REFUSED — no passing test evidence for: "
@@ -186,7 +188,7 @@ fn run(
         None -> Nil
         Some(p) -> pull_first(p, adapter, hash_hex)
       }
-      case pkg.install_from_store(adapter, hash_hex, branch) {
+      case pkg.install_from_store_production(adapter, hash_hex, branch) {
         Ok(installed) ->
           io.println(
             "pkg: installed "

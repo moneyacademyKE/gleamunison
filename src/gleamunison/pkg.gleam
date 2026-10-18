@@ -16,6 +16,7 @@ import gleam/option.{Some}
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import gleamunison/evidence
 import gleamunison/manifest
 import gleamunison/namespace
 import gleamunison/storage.{type StorageAdapter}
@@ -155,11 +156,38 @@ pub fn install_from_store(
   manifest_hex: String,
   branch: String,
 ) -> Result(List(String), String) {
+  install_from_store_with_policy(
+    adapter,
+    manifest_hex,
+    branch,
+    evidence.AllowUnsigned,
+  )
+}
+
+pub fn install_from_store_production(
+  adapter: StorageAdapter,
+  manifest_hex: String,
+  branch: String,
+) -> Result(List(String), String) {
+  case evidence.production_policy() {
+    Error(reason) -> Error(reason)
+    Ok(policy) ->
+      install_from_store_with_policy(adapter, manifest_hex, branch, policy)
+  }
+}
+
+pub fn install_from_store_with_policy(
+  adapter: StorageAdapter,
+  manifest_hex: String,
+  branch: String,
+  policy: evidence.VerificationPolicy,
+) -> Result(List(String), String) {
   use #(names, _visited) <- result.try(install_recursive(
     adapter,
     manifest_hex,
     branch,
     set.new(),
+    policy,
   ))
   Ok(names)
 }
@@ -169,6 +197,7 @@ fn install_recursive(
   manifest_hex: String,
   branch: String,
   visited: Set(String),
+  policy: evidence.VerificationPolicy,
 ) -> Result(#(List(String), Set(String)), String) {
   case set.contains(visited, manifest_hex) {
     True -> Ok(#([], visited))
@@ -186,18 +215,17 @@ fn install_recursive(
             dep_hex,
             branch,
             vis,
+            policy,
           ))
           Ok(#(list.append(names, dn), vis2))
         }),
       )
       use admitted <- result.try(case m.require_evidence {
         True ->
-          // Manifests carry name+hash only today (no effect flags), so
-          // package defs are gated as pure: Test evidence required.
-          // Manifest-carried requirement rows are a filed follow-up.
-          turnstile.check(
+          turnstile.check_with_policy(
             adapter,
             list.map(m.defs, fn(d) { #(d.0, d.1, False) }),
+            policy,
           )
           |> result.map_error(fn(missing) {
             "install REFUSED — no passing test evidence for: "
@@ -231,7 +259,36 @@ pub fn publish_to_store(
   name: String,
   version: String,
 ) -> Result(String, List(String)) {
-  use _ <- result.try(turnstile.check(adapter, defs))
+  publish_to_store_with_policy(
+    adapter,
+    defs,
+    name,
+    version,
+    evidence.AllowUnsigned,
+  )
+}
+
+pub fn publish_to_store_production(
+  adapter: StorageAdapter,
+  defs: List(#(String, String, Bool)),
+  name: String,
+  version: String,
+) -> Result(String, List(String)) {
+  case evidence.production_policy() {
+    Error(reason) -> Error([reason])
+    Ok(policy) ->
+      publish_to_store_with_policy(adapter, defs, name, version, policy)
+  }
+}
+
+pub fn publish_to_store_with_policy(
+  adapter: StorageAdapter,
+  defs: List(#(String, String, Bool)),
+  name: String,
+  version: String,
+  policy: evidence.VerificationPolicy,
+) -> Result(String, List(String)) {
+  use _ <- result.try(turnstile.check_with_policy(adapter, defs, policy))
   let m =
     list.fold(defs, manifest.new(name, version), fn(m, d) {
       manifest.add_def(m, d.0, d.1)
