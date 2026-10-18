@@ -167,7 +167,8 @@ sync_push_defs(NodeBin, Defs) ->
                 {ok, NodeAtom} ->
                     case rpc:call(NodeAtom, gleamunison_ffi_io, receive_pushed_defs, [Defs]) of
                         {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
-                        Res -> {ok, Res}
+                        {error, _} = Error -> Error;
+                        ok -> {ok, nil}
                     end;
                 {error, Reason} -> {error, Reason}
             end;
@@ -220,23 +221,48 @@ fetch_defs_binary(Refs) ->
     end.
 
 receive_pushed_defs(Defs) ->
-    case persistent_term:get({gleamunison, active_storage}, undefined) of
-        undefined -> ok;
-        {Type, Tab} ->
-            Insert = fun(Hex, Bytes) ->
-                Key = gleamunison_ffi:hex_to_bytes(Hex),
-                case Type of
-                    ets -> gleamunison_storage:insert(Tab, Key, Bytes);
-                    dets -> gleamunison_storage:dets_insert(Tab, Key, Bytes);
-                    partitioned_dets -> gleamunison_storage:partitioned_dets_insert(Tab, Key, Bytes);
-                    mnesia -> gleamunison_storage:mnesia_insert(Tab, Key, Bytes)
-                end
-            end,
-            lists:foreach(fun({Hex, Bytes}) ->
-                Insert(Hex, Bytes)
-            end, Defs),
-            ok
+    case gleamunison_cas:verify_batch(Defs) of
+        {error, _} = Error -> Error;
+        {ok, Verified} ->
+            case persistent_term:get({gleamunison, active_storage}, undefined) of
+                undefined -> {error, <<"storage_unavailable">>};
+                {Type, Tab} ->
+                    case preflight_defs(Type, Tab, Verified) of
+                        ok -> insert_defs(Type, Tab, Verified);
+                        {error, _} = Error -> Error
+                    end
+            end
     end.
+
+preflight_defs(_Type, _Tab, []) -> ok;
+preflight_defs(Type, Tab, [{Ref, Bytes} | Rest]) ->
+    case storage_lookup(Type, Tab, Ref) of
+        {ok, none} -> preflight_defs(Type, Tab, Rest);
+        {ok, {some, Bytes}} -> preflight_defs(Type, Tab, Rest);
+        {ok, {some, _Other}} -> {error, <<"content_conflict">>};
+        {error, Reason} -> storage_failure(Reason)
+    end.
+
+insert_defs(_Type, _Tab, []) -> ok;
+insert_defs(Type, Tab, [{Ref, Bytes} | Rest]) ->
+    Result = case Type of
+        ets -> gleamunison_storage:insert(Tab, Ref, Bytes);
+        dets -> gleamunison_storage:dets_insert(Tab, Ref, Bytes);
+        partitioned_dets -> gleamunison_storage:partitioned_dets_insert(Tab, Ref, Bytes);
+        mnesia -> gleamunison_storage:mnesia_insert(Tab, Ref, Bytes)
+    end,
+    case Result of
+        {ok, nil} -> insert_defs(Type, Tab, Rest);
+        {error, Reason} -> storage_failure(Reason)
+    end.
+
+storage_lookup(ets, Tab, Ref) -> gleamunison_storage:lookup(Tab, Ref);
+storage_lookup(dets, Tab, Ref) -> gleamunison_storage:dets_lookup(Tab, Ref);
+storage_lookup(partitioned_dets, Tab, Ref) -> gleamunison_storage:partitioned_dets_lookup(Tab, Ref);
+storage_lookup(mnesia, Tab, Ref) -> gleamunison_storage:mnesia_lookup(Tab, Ref).
+
+storage_failure(Reason) ->
+    {error, iolist_to_binary(io_lib:format("storage failure: ~p", [Reason]))}.
 
 get_local_refs_hex() ->
     case persistent_term:get({gleamunison, active_storage}, undefined) of

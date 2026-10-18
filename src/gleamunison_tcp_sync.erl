@@ -165,13 +165,17 @@ dispatch({_SelfName, {request_defs, Refs}}) when is_list(Refs) ->
     {ok, Defs};
 
 dispatch({_SelfName, {push_defs, Defs}}) when is_list(Defs) ->
-    gleamunison_ffi_io:receive_pushed_defs(Defs),
-    ok;
+    gleamunison_ffi_io:receive_pushed_defs(Defs);
 
 dispatch(_Unknown) ->
     {error, <<"unknown message type">>}.
 
+safe_decode(<<131, 80, _/binary>>) ->
+    {error, <<"invalid message">>};
 safe_decode(Bin) ->
-    try {ok, binary_to_term(Bin, [safe])}
+    try
+        {Term, Used} = binary_to_term(Bin, [safe, used]),
+        true = Used =:= byte_size(Bin),
+        {ok, Term}
     catch _:_ -> {error, <<"invalid message">>}
     end.

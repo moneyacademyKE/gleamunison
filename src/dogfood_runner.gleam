@@ -266,9 +266,10 @@ pub fn run_level(lvl: LevelData) -> Nil {
     }
     dogfood_data.InsertRaw(n) -> {
       io.println("--- insert_raw ---")
-      let r = Ref(hash_bytes(bit_array.from_string("raw" <> int.to_string(n))))
-      let cb2 =
-        codebase.insert_raw(codebase.empty(), r, bit_array.from_string("data"))
+      let bytes = bit_array.from_string("raw" <> int.to_string(n))
+      let r = Ref(hash_bytes(bytes))
+      let assert Ok(cb2) =
+        codebase.insert_raw_checked(codebase.empty(), r, bytes)
       let a = codebase.get_adapter(cb2)
       let assert Ok(Some(v)) = a.lookup(r)
       io.println("Found: " <> string.inspect(v))

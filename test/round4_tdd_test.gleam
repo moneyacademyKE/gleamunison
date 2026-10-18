@@ -1,11 +1,10 @@
-import gleam/bit_array
 import gleam/dict
 import gleam/io
 import gleam/option.{Some}
-import gleam/string
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/compile.{compile_definition, new as new_compiler}
+import gleamunison/definition_codec
 import gleamunison/elab_types.{TVar}
 import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal}
 import gleamunison/inference
@@ -87,7 +86,9 @@ pub fn codebase_insert_persists_bytes_test() {
   let assert Ok(cb2) = codebase.insert(cb, unit)
   let adapter = codebase.get_adapter(cb2)
   let assert Ok(Some(bytes)) = adapter.lookup(ref)
-  let assert True = bytes == bit_array.from_string(string.inspect(def))
+  let assert True = bytes == definition_codec.encode(def)
+  let assert Ok(decoded) = definition_codec.decode(bytes)
+  let assert True = decoded == def
 }
 
 pub fn pull_sync_persists_synced_blobs_test() {

@@ -36,7 +36,31 @@ Everything content-addressed inherits these properties: the Merkle-DAG
 store, `patch` propagation, `evidence` attestations, and `sync`
 conflict detection all key on this hash.
 
-## Known boundary
+## Storage and peer admission
 
-`Unique` type declarations carry a caller-supplied GUID, so their
-identity is nominal by design. All term definitions are structural.
+Definition identity and wire bytes have separate jobs. Definitions are stored
+in a versioned `GUDEF` envelope containing bounded, uncompressed external-term
+data. `definition_codec.decode` validates its shape and canonical encoding;
+`storage.verify_content` recomputes the structural hash before admission.
+Source spans are omitted and requirement rows are canonical sets. Ordinary
+blobs still use their byte hash; prompts retain the `promptdef:` hash domain.
+
+Use `storage.insert_content` or `codebase.insert_raw_checked` for immutable
+content, and `storage.check_content` to detect corruption at a known immutable
+ref. Raw adapter writes remain trusted key/value operations because mutable
+branch pointers are not content-addressed bytes. Peer admission never exempts
+pointer-shaped payloads from verification.
+
+## Identity and payload compatibility
+
+Function requirements are part of type identity. `Unique` declarations bind
+both the nominal GUID and the full parameter/constructor schema, preventing a
+schema from being substituted under the same reference. Empty requirement
+rows preserve existing pure-function hashes; effectful and unique definitions
+and their transitive dependents need rebuilding after this change.
+
+Legacy inspect-rendered definition payloads cannot be decoded and re-hashed.
+Back up the old store and rebuild these entries from trusted source into a
+fresh store; do not accept unverifiable legacy payloads from peers. Existing
+byte-hashed blob formats are unchanged. See [ADR 0065](adr/0065-verified-cas-admission.md)
+for limits, alternatives, and the distinction between integrity and trust.
