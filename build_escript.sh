@@ -6,7 +6,6 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 SCRIPT="gleamunison_escript"
-rm -f "$SCRIPT"
 GLEAM_BIN="${GLEAM_BIN:-gleam}"
 if ! command -v "$GLEAM_BIN" >/dev/null 2>&1; then
   echo "error: Gleam compiler not found: $GLEAM_BIN" >&2
