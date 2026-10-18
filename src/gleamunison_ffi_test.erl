@@ -3,7 +3,7 @@
 -export([start_echo_server/0]).
 -export([start_http_server/1, stop_http_server/0, http_post/3, http_post_auth/4,
          http_post_auth_length/5, set_http_token/1,
-         clear_http_token/0, otp_blake2b64/1]).
+         clear_http_token/0, tcp_auth_probe/1, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([rescue/1]).
 
@@ -275,6 +275,53 @@ pd_records(Key) ->
         undefined -> [];
         L -> lists:reverse(L)
     end.
+
+tcp_auth_probe(Mode) when is_integer(Mode) ->
+    true = os:putenv("GLEAMUNISON_SYNC_TOKEN", "server-secret"),
+    ensure_tcp_sync_server(),
+    Port = gleamunison_tcp_sync:get_port(),
+    SocketResult = case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {ok, Socket} ->
+            case Mode of
+                3 ->
+                    ok = gen_tcp:send(Socket, <<1048577:32>>),
+                    receive_raw_reply(Socket);
+                _ ->
+                    Message = {<<"test-peer">>, {connect, <<"test-peer">>}},
+                    Request = case Mode of
+                        0 -> Message;
+                        1 -> {auth, <<"server-secret">>, Message};
+                        2 -> {auth, <<"wrong-secret">>, Message}
+                    end,
+                    Bin = term_to_binary(Request),
+                    ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>),
+                    receive_raw_reply(Socket)
+            end;
+        {error, Reason} -> {error, Reason}
+    end,
+    true = os:unsetenv("GLEAMUNISON_SYNC_TOKEN"),
+    list_to_binary(io_lib:format("~tp", [SocketResult])).
+
+ensure_tcp_sync_server() ->
+    case whereis(gleamunison_tcp_sync) of
+        undefined ->
+            {ok, _Pid} = gleamunison_tcp_sync:start_link(),
+            ok;
+        _Pid -> ok
+    end.
+
+receive_raw_reply(Socket) ->
+    Result = case gen_tcp:recv(Socket, 4, 2000) of
+        {ok, <<Len:32>>} ->
+            case gen_tcp:recv(Socket, Len, 2000) of
+                {ok, Bin} ->
+                    try binary_to_term(Bin, [safe]) catch _:_ -> invalid_reply end;
+                {error, Reason} -> {error, Reason}
+            end;
+        {error, Reason} -> {error, Reason}
+    end,
+    gen_tcp:close(Socket),
+    Result.
 
 %% Start the real HTTP server on Port, backgrounded, and wait until the
 %% listener accepts connections (up to ~1s).
