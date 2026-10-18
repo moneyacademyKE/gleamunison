@@ -109,7 +109,7 @@ read_headers(Socket, ContentLength, Headers, HeaderBytes) ->
                     case normalize_header_name(HeaderName) of
                         <<"content-length">> ->
                             case parse_content_length(HeaderValue) of
-                                {ok, Length} when Length =< ?MAX_BODY_BYTES ->
+                                {ok, Length} when Length >= 0, Length =< ?MAX_BODY_BYTES ->
                                     read_headers(Socket, Length, [{<<"content-length">>, HeaderValue} | Headers], NewBytes);
                                 {ok, _} -> {error, body_too_large};
                                 error -> {error, invalid_content_length}
