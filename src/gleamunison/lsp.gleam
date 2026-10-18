@@ -22,6 +22,7 @@ import gleamunison/repl_eval
 import gleamunison/type_pretty
 import gleamunison/types.{empty_cache}
 import gleamunison/verify
+import gleamunison/version
 
 /// One diagnostic: LSP wants 0-based positions; our spans are 1-based.
 pub type Diagnostic {
@@ -150,7 +151,9 @@ fn dispatch(
 fn initialize_result() -> String {
   "{\"capabilities\":{\"textDocumentSync\":1,\"hoverProvider\":true,"
   <> "\"definitionProvider\":true,\"completionProvider\":{\"triggerCharacters\":[]}},"
-  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\"3.18.0\"}}"
+  <> "\"serverInfo\":{\"name\":\"gleamunison\",\"version\":\""
+  <> version.current()
+  <> "\"}}"
 }
 
 fn error_response(id: Dynamic, code: Int, message: String) -> String {

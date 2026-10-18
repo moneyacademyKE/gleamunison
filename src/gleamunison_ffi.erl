@@ -7,6 +7,7 @@
     binary_to_erl_literal/1,
     get_plain_args/0,
     halt_failure/0,
+    application_version/0,
     to_dynamic/1,
     from_dynamic/1,
     rescue/1,
@@ -191,6 +192,13 @@ get_plain_args() ->
 
 halt_failure() ->
     erlang:halt(1).
+
+application_version() ->
+    case application:get_key(gleamunison, vsn) of
+        {ok, Vsn} when is_list(Vsn) -> list_to_binary(Vsn);
+        {ok, Vsn} when is_binary(Vsn) -> Vsn;
+        undefined -> error(application_version_unavailable)
+    end.
 
 to_dynamic(X) -> X.
 

@@ -2,6 +2,8 @@ import gleam/list
 import gleam/string
 import gleamunison/mcp
 import gleamunison/mcp_session
+import gleamunison/version
+import gleeunit/should
 import simplifile
 
 pub fn boot_lists_bootstrap_definitions_test() {
@@ -82,4 +84,13 @@ pub fn search_does_not_match_ref_internals_test() {
   let names = list.map(hits, fn(h) { h.name })
   assert !list.contains(names, "+")
   assert !list.contains(names, "fst")
+}
+
+pub fn mcp_version_matches_package_test() {
+  let body =
+    "{\"jsonrpc\":\"2.0\",\"id\":99,\"method\":\"initialize\",\"params\":{}}"
+  let assert mcp.Respond(resp) =
+    mcp_session.handle_rpc(mcp_session.boot(), body)
+  string.contains(resp, "\"version\":\"" <> version.current() <> "\"")
+  |> should.be_true
 }
