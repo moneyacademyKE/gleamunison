@@ -1,7 +1,9 @@
 -module(gleamunison_ffi_test).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
 -export([start_echo_server/0]).
--export([start_http_server/1, http_post/3, otp_blake2b64/1]).
+-export([start_http_server/1, stop_http_server/0, http_post/3, http_post_auth/4,
+         http_post_auth_length/5, set_http_token/1,
+         clear_http_token/0, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([rescue/1]).
 
@@ -281,6 +283,10 @@ start_http_server(Port) ->
     wait_for_port(Port, 10),
     nil.
 
+stop_http_server() ->
+    gleamunison_http:stop_server(),
+    nil.
+
 wait_for_port(_Port, 0) -> ok;
 wait_for_port(Port, N) ->
     case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 200) of
@@ -306,6 +312,53 @@ http_post(Port, Path, Body) ->
                     {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
             end
     end.
+
+%% POST variant used by auth and size-limit integration tests.
+http_post_auth(Port, Path, Body, Token) ->
+    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {error, Reason} ->
+            {error, iolist_to_binary(io_lib:format("connect: ~p", [Reason]))};
+        {ok, Socket} ->
+            Req = iolist_to_binary(io_lib:format(
+                "POST ~s HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer ~s\r\nContent-Type: application/json\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
+                [Path, Token, byte_size(Body), Body])),
+            ok = gen_tcp:send(Socket, Req),
+            Result = recv_all(Socket, <<>>),
+            gen_tcp:close(Socket),
+            case Result of
+                {ok, Resp} -> parse_http_response(Resp);
+                {error, R} ->
+                    {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
+            end
+    end.
+
+%% POST variant with an explicit declared length, used to reject oversized
+%% requests before the body is read.
+http_post_auth_length(Port, Path, Body, Token, DeclaredLength) ->
+    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {error, Reason} ->
+            {error, iolist_to_binary(io_lib:format("connect: ~p", [Reason]))};
+        {ok, Socket} ->
+            Req = iolist_to_binary(io_lib:format(
+                "POST ~s HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer ~s\r\nContent-Type: application/json\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
+                [Path, Token, DeclaredLength, Body])),
+            ok = gen_tcp:send(Socket, Req),
+            Result = recv_all(Socket, <<>>),
+            gen_tcp:close(Socket),
+            case Result of
+                {ok, Resp} -> parse_http_response(Resp);
+                {error, R} ->
+                    {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
+            end
+    end.
+
+set_http_token(Token) when is_binary(Token) ->
+    true = os:putenv("GLEAMUNISON_HTTP_TOKEN", binary_to_list(Token)),
+    nil.
+
+clear_http_token() ->
+    true = os:unsetenv("GLEAMUNISON_HTTP_TOKEN"),
+    nil.
 
 recv_all(Socket, Acc) ->
     case gen_tcp:recv(Socket, 0, 5000) of
