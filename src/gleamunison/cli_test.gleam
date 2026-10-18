@@ -14,9 +14,20 @@ import gleamunison/test_runner.{type TestResult}
 import gleamunison/verify
 import simplifile
 
+@external(erlang, "gleamunison_ffi", "halt_failure")
+fn halt_failure() -> Nil
+
 /// Attachments produced by a run: subject hash + human payload, in order.
 pub type Attachments =
   List(#(String, String))
+
+/// Run every `test_` definition and report whether the suite is unusable or
+/// contains a failed/error result. Empty suites are failures at the CLI
+/// boundary: a test command that ran nothing must not look green.
+pub fn has_failures(results: List(TestResult)) -> Bool {
+  list.is_empty(results)
+  || list.any(results, fn(r) { r.failed > 0 || r.error != option.None })
+}
 
 pub fn command(args: List(String)) -> Nil {
   case args {
@@ -30,14 +41,25 @@ fn run(path: String) -> Nil {
   // directory: dets opens files, it does not invent their parents.
   let _ = simplifile.create_directory_all(".gleamunison")
   case storage.dets(".gleamunison/store.dets") {
-    Error(e) -> io.println("test: cannot open store: " <> string.inspect(e))
+    Error(e) -> {
+      io.println("test: cannot open store: " <> string.inspect(e))
+      halt_failure()
+    }
     Ok(adapter) ->
       case run_file(path, adapter) {
-        Error(err) -> io.println("test: " <> err)
+        Error(err) -> {
+          io.println("test: " <> err)
+          halt_failure()
+        }
         Ok(#(results, attachments)) -> {
           list.each(results, fn(r) { io.println(format_result(r)) })
-          let failed =
-            list.count(results, fn(r) { r.failed > 0 || r.error != option.None })
+          let failed = case list.is_empty(results) {
+            True -> 1
+            False ->
+              list.count(results, fn(r) {
+                r.failed > 0 || r.error != option.None
+              })
+          }
           io.println(
             int.to_string(list.length(results))
             <> " tests, "
@@ -49,6 +71,10 @@ fn run(path: String) -> Nil {
           list.each(attachments, fn(a) {
             io.println("evidence: " <> a.0 <> "  " <> a.1)
           })
+          case has_failures(results) {
+            True -> halt_failure()
+            False -> Nil
+          }
         }
       }
   }

@@ -29,6 +29,9 @@ pub fn main() -> Nil {
 @external(erlang, "gleamunison_ffi", "get_plain_args")
 fn get_plain_args() -> List(String)
 
+@external(erlang, "gleamunison_ffi", "halt_failure")
+fn halt_failure() -> Nil
+
 pub fn run(args: List(String)) -> Nil {
   let levels = dogfood.all_levels()
   case args {
@@ -37,7 +40,10 @@ pub fn run(args: List(String)) -> Nil {
     ["datalog", path] ->
       case cli_datalog.run(path) {
         Ok(out) -> io.println(out)
-        Error(err) -> io.println("ERROR: " <> err)
+        Error(err) -> {
+          io.println("ERROR: " <> err)
+          halt_failure()
+        }
       }
     ["datalog"] -> io.println("usage: gleam run -- datalog <file.lisp>")
     ["mcp", ..rest] -> cli_mcp.command(rest)
@@ -80,7 +86,10 @@ fn dispatch(
     "verify" -> {
       case verify.verify_file(param) {
         Ok(msg) -> io.println("OK: " <> msg)
-        Error(err) -> io.println("ERROR: " <> err)
+        Error(err) -> {
+          io.println("ERROR: " <> err)
+          halt_failure()
+        }
       }
     }
     _ ->
