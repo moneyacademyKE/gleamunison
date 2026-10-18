@@ -14,6 +14,14 @@ import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
 import simplifile
 
+@external(erlang, "gleamunison_ffi", "halt_failure")
+fn halt_failure() -> Nil
+
+fn fail(message: String) -> Nil {
+  io.println(message)
+  halt_failure()
+}
+
 pub fn command(args: List(String)) -> Nil {
   case args {
     [hash] -> run(hash)
@@ -32,15 +40,13 @@ pub fn command(args: List(String)) -> Nil {
 
 fn attest(hash: String, note: String) -> Nil {
   case note {
-    "" ->
-      io.println("evidence attest: a note is required — say what you observed")
+    "" -> fail("evidence attest: a note is required — say what you observed")
     _ -> {
       let _ = simplifile.create_directory_all(".gleamunison")
       case storage.dets(".gleamunison/store.dets") {
-        Error(e) ->
-          io.println("evidence: cannot open store: " <> string.inspect(e))
-        Ok(adapter) ->
-          case
+        Error(e) -> fail("evidence: cannot open store: " <> string.inspect(e))
+        Ok(adapter) -> {
+          let outcome =
             evidence.attach(
               adapter,
               subject: hash,
@@ -49,13 +55,19 @@ fn attest(hash: String, note: String) -> Nil {
               payload: note,
               ts: datetime.to_unix(datetime.now()),
             )
-          {
-            Ok(#(_, hex)) ->
-              io.println(
-                "attested io on " <> hash <> " (evidence " <> hex <> ")",
-              )
-            Error(_) -> io.println("evidence attest: store insert failed")
+          case adapter.close() {
+            Error(e) ->
+              fail("evidence: cannot close store: " <> string.inspect(e))
+            Ok(_) ->
+              case outcome {
+                Ok(#(_, hex)) ->
+                  io.println(
+                    "attested io on " <> hash <> " (evidence " <> hex <> ")",
+                  )
+                Error(_) -> fail("evidence attest: store insert failed")
+              }
           }
+        }
       }
     }
   }
@@ -65,7 +77,13 @@ fn run(hash: String) -> Nil {
   let _ = simplifile.create_directory_all(".gleamunison")
   case storage.dets(".gleamunison/store.dets") {
     Error(e) -> io.println("evidence: cannot open store: " <> string.inspect(e))
-    Ok(adapter) -> io.println(report(adapter, hash))
+    Ok(adapter) -> {
+      let output = report(adapter, hash)
+      case adapter.close() {
+        Error(e) -> fail("evidence: cannot close store: " <> string.inspect(e))
+        Ok(_) -> io.println(output)
+      }
+    }
   }
 }
 

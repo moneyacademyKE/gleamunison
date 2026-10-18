@@ -1,7 +1,4 @@
-//// `gleamunison test <file.lisp>` — run every `test_` definition under a
-//// recording Test handler and attest the results into the codebase store.
-//// The loop this closes: test outcomes stop being chat and become evidence
-//// attached to content hashes — "did you test it?" becomes a lookup.
+//// Run in-language tests and persist evidence before reporting success.
 
 import gleam/int
 import gleam/io
@@ -21,61 +18,69 @@ fn halt_failure() -> Nil
 pub type Attachments =
   List(#(String, String))
 
-/// Run every `test_` definition and report whether the suite is unusable or
-/// contains a failed/error result. Empty suites are failures at the CLI
-/// boundary: a test command that ran nothing must not look green.
+/// No tests or no assertions is not a successful test run.
 pub fn has_failures(results: List(TestResult)) -> Bool {
   list.is_empty(results)
-  || list.any(results, fn(r) { r.failed > 0 || r.error != option.None })
+  || list.any(results, fn(r) {
+    r.passed + r.failed == 0 || r.failed > 0 || r.error != option.None
+  })
 }
 
 pub fn command(args: List(String)) -> Nil {
   case args {
     [path] -> run(path)
-    _ -> io.println("usage: gleam run -- test <file.lisp>")
+    _ -> fail("usage: gleam run -- test <file.lisp>")
   }
 }
 
+fn fail(message: String) -> Nil {
+  io.println(message)
+  halt_failure()
+}
+
 fn run(path: String) -> Nil {
-  // The project store: where evidence lives between runs. Create the
-  // directory: dets opens files, it does not invent their parents.
-  let _ = simplifile.create_directory_all(".gleamunison")
-  case storage.dets(".gleamunison/store.dets") {
-    Error(e) -> {
-      io.println("test: cannot open store: " <> string.inspect(e))
-      halt_failure()
-    }
-    Ok(adapter) ->
-      case run_file(path, adapter) {
-        Error(err) -> {
-          io.println("test: " <> err)
-          halt_failure()
-        }
-        Ok(#(results, attachments)) -> {
-          list.each(results, fn(r) { io.println(format_result(r)) })
-          let failed = case list.is_empty(results) {
-            True -> 1
-            False ->
-              list.count(results, fn(r) {
-                r.failed > 0 || r.error != option.None
-              })
-          }
-          io.println(
-            int.to_string(list.length(results))
-            <> " tests, "
-            <> int.to_string(failed)
-            <> " failed, "
-            <> int.to_string(list.length(attachments))
-            <> " evidence records attached",
-          )
-          list.each(attachments, fn(a) {
-            io.println("evidence: " <> a.0 <> "  " <> a.1)
-          })
-          case has_failures(results) {
-            True -> halt_failure()
-            False -> Nil
+  case simplifile.create_directory_all(".gleamunison") {
+    Error(e) -> fail("test: cannot create store: " <> string.inspect(e))
+    Ok(_) ->
+      case storage.dets(".gleamunison/store.dets") {
+        Error(e) -> fail("test: cannot open store: " <> string.inspect(e))
+        Ok(adapter) -> {
+          let outcome = run_file(path, adapter)
+          // This command owns the adapter. Closing flushes buffered DETS
+          // writes before any success message or nonzero process exit.
+          case adapter.close() {
+            Error(e) -> fail("test: cannot close store: " <> string.inspect(e))
+            Ok(_) ->
+              case outcome {
+                Error(err) -> fail("test: " <> err)
+                Ok(#(results, attachments)) -> report(results, attachments)
+              }
           }
         }
+      }
+  }
+}
+
+fn report(results: List(TestResult), attachments: Attachments) -> Nil {
+  list.each(results, fn(r) { io.println(format_result(r)) })
+  let failed = list.count(results, fn(r) { has_failures([r]) })
+  io.println(
+    int.to_string(list.length(results))
+    <> " tests, "
+    <> int.to_string(failed)
+    <> " failed, "
+    <> int.to_string(list.length(attachments))
+    <> " evidence records attached",
+  )
+  list.each(attachments, fn(a) {
+    io.println("evidence: " <> a.0 <> "  " <> a.1)
+  })
+  case results {
+    [] -> fail("test: no test_ definitions found")
+    _ ->
+      case has_failures(results) {
+        True -> halt_failure()
+        False -> Nil
       }
   }
 }
@@ -86,11 +91,16 @@ fn format_result(r: TestResult) -> String {
     option.None, 0 -> "pass"
     option.None, _ -> "fail"
   }
-  r.name <> "  " <> status <> "  (" <> int.to_string(r.passed) <> " assertions)"
+  r.name
+  <> "  "
+  <> status
+  <> "  ("
+  <> int.to_string(r.passed + r.failed)
+  <> " assertions)"
 }
 
-/// Load a suite file, run it, attach evidence per subject hash.
-/// Returns results plus the (subject_hex, payload) pairs attested.
+/// The caller owns the supplied adapter. Failed insertions are errors,
+/// not missing attachments silently discarded from a successful report.
 pub fn run_file(
   path: String,
   adapter: StorageAdapter,
@@ -98,13 +108,17 @@ pub fn run_file(
   use #(cache, defs) <- result.try(verify.load_defs_file(path))
   let results = test_runner.run_suite(defs, cache)
   let attached = test_runner.attach_results(adapter, results, defs, cache)
-  let ok_attachments =
-    list.filter_map(attached, fn(a) {
-      case a {
-        Ok(#(subject_hex, _evidence_ref, payload)) ->
-          Ok(#(subject_hex, payload))
-        Error(_) -> Error(Nil)
-      }
-    })
-  Ok(#(results, ok_attachments))
+  use records <- result.try(
+    result.all(attached)
+    |> result.map_error(fn(e) {
+      "cannot attach evidence: " <> string.inspect(e)
+    }),
+  )
+  Ok(#(
+    results,
+    list.map(records, fn(a) {
+      let #(subject_hex, _evidence_ref, payload) = a
+      #(subject_hex, payload)
+    }),
+  ))
 }
