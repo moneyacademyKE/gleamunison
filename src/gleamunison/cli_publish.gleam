@@ -22,20 +22,31 @@ import gleamunison/types
 import gleamunison/verify
 import simplifile
 
+@external(erlang, "gleamunison_ffi", "halt_failure")
+fn halt_failure() -> Nil
+
+fn fail(message: String) -> Nil {
+  io.println(message)
+  halt_failure()
+}
+
 pub fn command(args: List(String)) -> Nil {
   case args {
     [path] -> run(path)
-    _ -> io.println("usage: gleam run -- publish <file.lisp>")
+    _ -> fail("usage: gleam run -- publish <file.lisp>")
   }
 }
 
 fn run(path: String) -> Nil {
   let _ = simplifile.create_directory_all(".gleamunison")
   case storage.dets(".gleamunison/store.dets") {
-    Error(e) -> io.println("publish: cannot open store: " <> string.inspect(e))
+    Error(e) -> fail("publish: cannot open store: " <> string.inspect(e))
     Ok(adapter) ->
       case verify.load_defs_file_scoped(path) {
-        Error(err) -> io.println("publish: " <> err)
+        Error(err) -> {
+          let _ = adapter.close()
+          fail("publish: " <> err)
+        }
         Ok(#(cache, defs, file_names)) -> {
           let file_set = list.filter(file_names, fn(_) { True })
           let term_names =
@@ -50,11 +61,20 @@ fn run(path: String) -> Nil {
               }
             })
           case hash_defs(term_names, defs, cache, []) {
-            Error(err) -> io.println("publish: " <> err)
-            Ok(pairs) ->
-              case turnstile.check(adapter, pairs) {
+            Error(err) -> {
+              let _ = adapter.close()
+              fail("publish: " <> err)
+            }
+            Ok(pairs) -> {
+              let decision = turnstile.check(adapter, pairs)
+              case adapter.close() {
+                Error(e) ->
+                  fail("publish: cannot close store: " <> string.inspect(e))
+                Ok(_) -> Nil
+              }
+              case decision {
                 Error(missing) ->
-                  io.println(
+                  fail(
                     "publish: REFUSED — no evidence for: "
                     <> string.join(missing, ", ")
                     <> "\npublish: pure defs need `gleam run -- test "
@@ -77,6 +97,7 @@ fn run(path: String) -> Nil {
                   )
                 }
               }
+            }
           }
         }
       }
@@ -274,6 +295,8 @@ fn write_manifest(pairs: List(#(String, String, Bool))) -> Nil {
     })
   let new_lines = list.map(pairs, fn(p) { p.0 <> " " <> p.1 })
   let content = string.join(list.append(kept, new_lines), "\n") <> "\n"
-  let _ = simplifile.write(path, content)
-  Nil
+  case simplifile.write(path, content) {
+    Ok(_) -> Nil
+    Error(e) -> fail("publish: cannot write manifest: " <> string.inspect(e))
+  }
 }

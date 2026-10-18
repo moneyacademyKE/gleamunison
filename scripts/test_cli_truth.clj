@@ -57,7 +57,8 @@
          ["test" "missing.lisp" "Failed to read"]
          ["test" "fail.lisp" "1 failed"]
          ["test" "vacuous.lisp" "no assertions"]
-         ["test" "no-tests.lisp" "0 tests"]]]
+         ["test" "no-tests.lisp" "0 tests"]
+         ["publish" "no-tests.lisp" "REFUSED"]]]
   (let [{:keys [exit out] :as result} (cli command path)]
     (check! (str command " " path " fails truthfully")
             (and (not (zero? exit)) (str/includes? out needle)) result)))
@@ -84,5 +85,14 @@
           (and (zero? (:exit attested))
                (str/includes? (:out stored) "subprocess regression"))
           {:attested attested :stored stored}))
+
+(let [manifest (fs/path work ".gleamunison" "published")]
+  (fs/move manifest (fs/path work "published-backup"))
+  (fs/create-dir manifest)
+  (let [blocked (cli "publish" "pass.lisp")]
+    (check! "manifest write failure cannot report a successful publish"
+            (and (not (zero? (:exit blocked)))
+                 (str/includes? (:out blocked) "cannot write manifest")
+                 (not (str/includes? (:out blocked) "published:"))) blocked)))
 
 (println (str @checks " CLI truth checks passed; workspace: " work))
