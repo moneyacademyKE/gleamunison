@@ -12,8 +12,10 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/list
+import gleam/option.{type Option, None}
 import gleam/result
 import gleam/string
+import gleamunison/cancellation
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/http_client
 import gleamunison/identity.{type DefinitionRef, Ref}
@@ -63,6 +65,7 @@ pub type ProviderConfig {
     api_key: String,
     model: String,
     max_tokens: Int,
+    timeout_ms: Int,
     /// OpenAI-compatible reasoning effort ("low"/"medium"/"high"/"max").
     /// Empty string = omit from the request (provider default).
     reasoning_effort: String,
@@ -127,11 +130,10 @@ pub fn resolve_config(
   provider: Provider,
   env: llm_controls.EnvLookup,
 ) -> Result(ProviderConfig, String) {
-  use #(url, key, model, tokens, effort) <- result.try(llm_controls.resolve(
-    provider == Anthropic,
-    env,
-  ))
-  Ok(ProviderConfig(provider, url, key, model, tokens, effort))
+  use #(url, key, model, tokens, timeout_ms, effort) <- result.try(
+    llm_controls.resolve(provider == Anthropic, env),
+  )
+  Ok(ProviderConfig(provider, url, key, model, tokens, timeout_ms, effort))
 }
 
 pub fn validate_config(cfg: ProviderConfig) -> Result(Nil, String) {
@@ -141,6 +143,7 @@ pub fn validate_config(cfg: ProviderConfig) -> Result(Nil, String) {
     cfg.api_key,
     cfg.model,
     cfg.max_tokens,
+    cfg.timeout_ms,
     cfg.reasoning_effort,
   )
 }
@@ -347,11 +350,19 @@ pub fn mock_handler(response: Completion) -> OpHandler {
 
 /// Live provider handler: performs the HTTP call via http_client.
 pub fn provider_handler(cfg: ProviderConfig) -> OpHandler {
+  provider_handler_with_cancellation(cfg, None)
+}
+
+/// Build a live handler with an optional caller-owned cancellation token.
+pub fn provider_handler_with_cancellation(
+  cfg: ProviderConfig,
+  cancellation: Option(cancellation.Token),
+) -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
     cont(case validate_config(cfg) {
       Error(reason) -> to_dynamic(Error(bit_array.from_string(reason)))
       Ok(Nil) ->
-        case perform(cfg, args) {
+        case perform(cfg, args, cancellation) {
           Ok(json_bin) -> to_dynamic(Ok(json_bin))
           Error(e) -> to_dynamic(Error(bit_array.from_string(error_string(e))))
         }
@@ -362,6 +373,7 @@ pub fn provider_handler(cfg: ProviderConfig) -> OpHandler {
 fn perform(
   cfg: ProviderConfig,
   args: List(Dynamic),
+  cancellation: Option(cancellation.Token),
 ) -> Result(BitArray, LlmError) {
   case args {
     [messages_dyn, ..] -> {
@@ -376,10 +388,13 @@ fn perform(
                 Ok(msgs) -> {
                   let #(url, headers, body) = build_request(cfg, msgs)
                   case
-                    http_client.post_with_headers(
+                    http_client.request_with_options(
+                      "POST",
                       url,
                       headers,
                       bit_array.from_string(body),
+                      cfg.timeout_ms,
+                      cancellation,
                     )
                   {
                     Error(http_client.HttpError(reason)) ->

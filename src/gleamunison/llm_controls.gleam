@@ -7,6 +7,8 @@ import gleam/list
 import gleam/result
 import gleam/string
 
+const default_timeout_ms = 180_000
+
 pub type EnvLookup =
   fn(String) -> Result(String, Nil)
 
@@ -16,7 +18,7 @@ fn safe_url(url: String) -> Bool
 pub fn resolve(
   anthropic: Bool,
   env: EnvLookup,
-) -> Result(#(String, String, String, Int, String), String) {
+) -> Result(#(String, String, String, Int, Int, String), String) {
   let #(key_var, url_var, model_var, url_default, model_default) = case
     anthropic
   {
@@ -50,8 +52,22 @@ pub fn resolve(
   )
   let url = env_or(env, url_var, url_default)
   let model = env_or(env, model_var, model_default)
-  use Nil <- result.try(validate(anthropic, url, key, model, tokens, effort))
-  Ok(#(url, key, model, tokens, effort))
+  let timeout_text =
+    env_or(env, "LLM_HTTP_TIMEOUT_MS", int.to_string(default_timeout_ms))
+  use timeout_ms <- result.try(
+    int.parse(timeout_text)
+    |> result.replace_error("settings: invalid LLM_HTTP_TIMEOUT_MS"),
+  )
+  use Nil <- result.try(validate(
+    anthropic,
+    url,
+    key,
+    model,
+    tokens,
+    timeout_ms,
+    effort,
+  ))
+  Ok(#(url, key, model, tokens, timeout_ms, effort))
 }
 
 pub fn validate(
@@ -60,10 +76,13 @@ pub fn validate(
   key: String,
   model: String,
   tokens: Int,
+  timeout_ms: Int,
   effort: String,
 ) -> Result(Nil, String) {
-  case tokens < 1 || tokens > 131_072 {
-    True -> Error("settings: max_tokens must be 1..131072")
+  case
+    tokens < 1 || tokens > 131_072 || timeout_ms < 1 || timeout_ms > 180_000
+  {
+    True -> Error("settings: max_tokens and timeout must be within bounds")
     False ->
       case !list.contains(["", "low", "medium", "high", "max"], effort) {
         True -> Error("settings: unsupported reasoning effort")

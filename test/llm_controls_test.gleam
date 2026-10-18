@@ -26,6 +26,16 @@ fn env_with(settings: List(#(String, String))) -> cli_llm.EnvLookup {
   fn(key) { dict.get(values, key) }
 }
 
+pub fn invalid_timeout_settings_are_rejected_test() {
+  list.each(["0", "-1", "180001", "not-an-int"], fn(value) {
+    cli_llm.resolve_config(
+      llm.OpenAI,
+      env_with([#("LLM_HTTP_TIMEOUT_MS", value)]),
+    )
+    |> should.be_error
+  })
+}
+
 pub fn invalid_token_settings_are_not_silently_defaulted_test() {
   list.each(["0", "-1", "131073", "not-an-int", ""], fn(value) {
     cli_llm.resolve_config(llm.OpenAI, env_with([#("LLM_MAX_TOKENS", value)]))

@@ -1,6 +1,6 @@
 -module(gleamunison_ffi_test).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
--export([start_echo_server/0]).
+-export([start_echo_server/0, start_slow_server/0]).
 -export([start_http_server/1, stop_http_server/0, http_post/3, http_post_auth/4,
          http_post_auth_length/5, set_http_token/1,
          clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
@@ -192,6 +192,23 @@ start_echo_server() ->
     Pid = spawn(fun() -> echo_accept(LSock) end),
     register(gleamunison_echo_test, Pid),
     {ok, Port}.
+
+start_slow_server() ->
+    {ok, _} = application:ensure_all_started(inets),
+    {ok, LSock} = gen_tcp:listen(0, [binary, {active, false}, {reuseaddr, true},
+                                     {ip, {127, 0, 0, 1}}]),
+    {ok, Port} = inet:port(LSock),
+    spawn(fun() ->
+        case gen_tcp:accept(LSock, 2000) of
+            {ok, Sock} ->
+                timer:sleep(1000),
+                gen_tcp:close(Sock);
+            {error, _} -> ok
+        end,
+        gen_tcp:close(LSock)
+    end),
+    {ok, Port}.
+
 
 echo_accept(LSock) ->
     case gen_tcp:accept(LSock, 10000) of
