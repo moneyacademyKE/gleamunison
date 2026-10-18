@@ -3,7 +3,8 @@
 -export([start_echo_server/0]).
 -export([start_http_server/1, stop_http_server/0, http_post/3, http_post_auth/4,
          http_post_auth_length/5, set_http_token/1,
-         clear_http_token/0, tcp_auth_probe/1, otp_blake2b64/1]).
+         clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
+         clear_eval_timeout/0, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([rescue/1]).
 
@@ -322,6 +323,14 @@ receive_raw_reply(Socket) ->
     end,
     gen_tcp:close(Socket),
     Result.
+
+set_eval_timeout(Value) when is_integer(Value) ->
+    true = os:putenv("GLEAMUNISON_EVAL_TIMEOUT_MS", integer_to_list(Value)),
+    nil.
+
+clear_eval_timeout() ->
+    true = os:unsetenv("GLEAMUNISON_EVAL_TIMEOUT_MS"),
+    nil.
 
 %% Start the real HTTP server on Port, backgrounded, and wait until the
 %% listener accepts connections (up to ~1s).

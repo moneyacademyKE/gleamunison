@@ -1,0 +1,28 @@
+import gleam/string
+
+@external(erlang, "gleamunison_ffi_io", "eval_expression")
+fn ffi_eval_expression(expression: String) -> Result(String, String)
+
+@external(erlang, "gleamunison_repl_ffi", "eval_module")
+fn ffi_eval_module(module_name: String) -> Result(String, String)
+
+@external(erlang, "gleamunison_ffi_test", "set_eval_timeout")
+fn ffi_set_eval_timeout(timeout_ms: Int) -> Nil
+
+@external(erlang, "gleamunison_ffi_test", "clear_eval_timeout")
+fn ffi_clear_eval_timeout() -> Nil
+
+pub fn evaluation_timeout_kills_infinite_expression_test() {
+  ffi_set_eval_timeout(25)
+  let result = ffi_eval_expression("((lam f (f f)) (lam f (f f)))")
+  ffi_clear_eval_timeout()
+  let assert Error(message) = result
+  let assert True = string.contains(message, "evaluation_timeout")
+}
+
+pub fn evaluation_timeout_preserves_normal_expression_test() {
+  ffi_set_eval_timeout(1000)
+  let result = ffi_eval_module("m_0000000a")
+  ffi_clear_eval_timeout()
+  let assert Ok(_) = result
+}
