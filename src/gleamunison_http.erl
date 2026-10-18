@@ -36,6 +36,7 @@ server_loop(Port) ->
         binary, {active, false}, {reuseaddr, true},
         {packet, http_bin}, {backlog, 100}, {ip, {127, 0, 0, 1}}
     ]),
+    persistent_term:put({gleamunison_http, listener}, {self(), ListenSocket}),
     accept_loop(ListenSocket).
 
 accept_loop(ListenSocket) ->
@@ -237,16 +238,13 @@ handle_route(Socket, <<"/api/traces/", Id/binary>>) ->
     gleamunison_http_routes:handle_trace_detail_route(Socket, Id);
 handle_route(Socket, <<"/api/health">>) ->
     handle_health_route(Socket);
+handle_route(Socket, <<"/api/ready">>) ->
+    handle_health_route(Socket);
+handle_route(Socket, <<"/api/live">>) ->
+    gleamunison_http_util:send_json(Socket, 200, <<"{\"live\":true}">>);
 handle_route(Socket, Path) ->
     gleamunison_http_routes:serve_static(Socket, Path).
 
 handle_health_route(Socket) ->
-    {_Node, ModCount, _MemMB} = gleamunison_health:node_status(),
-    Status = case ModCount > 0 of
-        true -> <<"healthy">>;
-        false -> <<"unhealthy">>
-    end,
-    Json = iolist_to_binary(io_lib:format(
-        "{\"status\":\"~s\",\"loaded_modules\":~p}",
-        [Status, ModCount])),
-    gleamunison_http_util:send_json(Socket, 200, Json).
+    {Status, Json} = gleamunison_readiness:http_response(),
+    gleamunison_http_util:send_json(Socket, Status, Json).

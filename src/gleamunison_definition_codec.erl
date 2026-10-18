@@ -1,5 +1,7 @@
 -module(gleamunison_definition_codec).
--export([encode/1, decode/1]).
+-export([encode/1, decode/1, version/0]).
+
+version() -> 1.
 
 %% Wire bytes are recoverable data, not identity. Identity is recomputed by
 %% codebase:hash_of_definition after decoding this bounded, versioned envelope.

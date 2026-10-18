@@ -67,6 +67,9 @@ init([]) ->
 
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
+handle_call(readiness, _From, #state{lsock = Socket} = State) ->
+    Ready = case inet:sockname(Socket) of {ok, _} -> true; _ -> false end,
+    {reply, Ready, State};
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
 

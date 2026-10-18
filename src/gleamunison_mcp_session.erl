@@ -42,6 +42,9 @@ loop(State) ->
                 no_reply -> From ! {mcp_reply, no_reply}
             end,
             loop(State);
+        {readiness, Ref, From} when is_reference(Ref), is_pid(From) ->
+            From ! {readiness, Ref, ready},
+            loop(State);
         stop ->
             ok
     end.
