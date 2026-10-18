@@ -1,4 +1,5 @@
 import gleam/list
+import gleam/option.{Some}
 import gleam/string
 import gleamunison/codebase
 import gleamunison/elab_types.{
@@ -99,5 +100,22 @@ pub fn untested_tests_attach_nothing_test() {
   let results = test_runner.run_suite(all_defs, cache)
   let store = storage.inmemory()
   let attached = test_runner.attach_results(store, results, all_defs, cache)
+  list.length(attached) |> should.equal(0)
+}
+
+pub fn zero_assertion_tests_are_errors_and_attach_no_evidence_test() {
+  let #(cache, defs) = boot()
+  let user_defs = [
+    #("answer", SurfaceTermDef(SInt(42))),
+    #("test_answer", SurfaceTermDef(SInt(1))),
+  ]
+  let all_defs = list.append(defs, user_defs)
+  let results = test_runner.run_suite(all_defs, cache)
+  let assert [result] = results
+  result.passed |> should.equal(0)
+  result.failed |> should.equal(0)
+  result.error |> should.equal(Some("no assertions"))
+  let attached =
+    test_runner.attach_results(storage.inmemory(), results, all_defs, cache)
   list.length(attached) |> should.equal(0)
 }
