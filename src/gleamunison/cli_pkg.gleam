@@ -12,8 +12,10 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/cli_publish
+import gleamunison/cli_result
 import gleamunison/codebase
 import gleamunison/elab_types
+import gleamunison/manifest
 import gleamunison/pkg
 import gleamunison/storage
 import gleamunison/sync
@@ -117,7 +119,10 @@ fn install(args: List(String)) -> Nil {
   case parse_args(args, None, None, default_store) {
     Error(err) -> io.println("pkg: " <> err)
     Ok(#(hash_hex, peer, branch, store_path)) ->
-      run(hash_hex, peer, branch, store_path)
+      case manifest.ref_from_hex(hash_hex) {
+        Error(reason) -> cli_result.fail("pkg: " <> reason)
+        Ok(_) -> run(hash_hex, peer, branch, store_path)
+      }
   }
 }
 

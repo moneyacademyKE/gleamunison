@@ -57,10 +57,8 @@ fn closure_walk(
       case set.contains(seen, hex) {
         True -> closure_walk(adapter, rest, ms, ds, seen)
         False -> {
-          use m <- result.try(manifest.fetch(
-            adapter,
-            manifest.ref_from_hex(hex),
-          ))
+          use ref <- result.try(manifest.ref_from_hex(hex))
+          use m <- result.try(manifest.fetch(adapter, ref))
           let seen = set.insert(seen, hex)
           let def_hashes = list.map(m.defs, fn(d) { d.1 })
           closure_walk(
@@ -121,10 +119,8 @@ fn pull_manifests(
             True -> Ok(Nil)
             False -> fetch_batch([hex])
           })
-          use m <- result.try(manifest.fetch(
-            adapter,
-            manifest.ref_from_hex(hex),
-          ))
+          use ref <- result.try(manifest.ref_from_hex(hex))
+          use m <- result.try(manifest.fetch(adapter, ref))
           let def_hashes = list.map(m.defs, fn(d) { d.1 })
           pull_manifests(
             adapter,
@@ -140,9 +136,13 @@ fn pull_manifests(
 }
 
 fn is_local(adapter: StorageAdapter, hex: String) -> Bool {
-  case adapter.lookup(manifest.ref_from_hex(hex)) {
-    Ok(Some(_)) -> True
-    _ -> False
+  case manifest.ref_from_hex(hex) {
+    Error(_) -> False
+    Ok(ref) ->
+      case adapter.lookup(ref) {
+        Ok(Some(_)) -> True
+        _ -> False
+      }
   }
 }
 
@@ -203,10 +203,14 @@ fn install_recursive(
     True -> Ok(#([], visited))
     False -> {
       let visited = set.insert(visited, manifest_hex)
-      use m <- result.try(manifest.fetch(
-        adapter,
-        manifest.ref_from_hex(manifest_hex),
-      ))
+      use ref <- result.try(manifest.ref_from_hex(manifest_hex))
+      use m <- result.try(manifest.fetch(adapter, ref))
+      use def_refs <- result.try(
+        list.try_map(m.defs, fn(d) {
+          use ref <- result.try(manifest.ref_from_hex(d.1))
+          Ok(#(d.0, ref))
+        }),
+      )
       use #(dep_names, visited) <- result.try(
         list.try_fold(m.deps, #([], visited), fn(acc, dep_hex) {
           let #(names, vis) = acc
@@ -238,9 +242,7 @@ fn install_recursive(
         Error(_) -> namespace.empty()
       }
       let next =
-        list.fold(m.defs, current, fn(ns, d) {
-          namespace.set(ns, d.0, manifest.ref_from_hex(d.1))
-        })
+        list.fold(def_refs, current, fn(ns, d) { namespace.set(ns, d.0, d.1) })
       use _ <- result.try(namespace.commit(adapter, branch, next))
       Ok(#(list.append(dep_names, admitted), visited))
     }

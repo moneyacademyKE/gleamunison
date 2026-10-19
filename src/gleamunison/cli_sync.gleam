@@ -8,6 +8,7 @@ import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
+import gleamunison/cli_result
 import gleamunison/codebase
 import gleamunison/namespace
 import gleamunison/storage
@@ -69,7 +70,8 @@ fn run_pull(peer: String, store_path: String, branch: Option(String)) -> Nil {
             Some(name) -> pull_branch(peer, name, adapter)
           }
         }
-        Error(err) -> io.println("sync: pull failed: " <> string.inspect(err))
+        Error(err) ->
+          cli_result.fail("sync: pull failed: " <> string.inspect(err))
       }
     }
   }

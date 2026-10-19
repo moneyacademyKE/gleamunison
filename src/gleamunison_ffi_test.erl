@@ -96,7 +96,7 @@ test_ffi_io_coverage() ->
     [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
     ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
     [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:lookup(TabETS, gleamunison_ffi:hex_to_bytes(ContentHex)),
+    {ok, {some, <<"def">>}} = gleamunison_storage:lookup(TabETS, ContentKey),
 
     %% Test dets lookup/insert/list_refs
     file:delete("test_dets.db"),
@@ -106,7 +106,7 @@ test_ffi_io_coverage() ->
     [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
     ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
     [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:dets_lookup(TabDETS, gleamunison_ffi:hex_to_bytes(ContentHex)),
+    {ok, {some, <<"def">>}} = gleamunison_storage:dets_lookup(TabDETS, ContentKey),
     _ = gleamunison_ffi_io:compute_diff(nonexistent_peer),
     gleamunison_storage:dets_close(TabDETS),
     file:delete("test_dets.db"),
@@ -118,7 +118,7 @@ test_ffi_io_coverage() ->
     [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
     ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
     [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:partitioned_dets_lookup(TabPD, gleamunison_ffi:hex_to_bytes(ContentHex)),
+    {ok, {some, <<"def">>}} = gleamunison_storage:partitioned_dets_lookup(TabPD, ContentKey),
     _ = gleamunison_ffi_io:compute_diff(nonexistent_peer),
     gleamunison_storage:partitioned_dets_close(TabPD),
     gleamunison_storage:partitioned_dets_delete_file(<<"test_pd">>),
@@ -131,7 +131,7 @@ test_ffi_io_coverage() ->
     [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
     ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
     [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:mnesia_lookup(TabMnesia, gleamunison_ffi:hex_to_bytes(ContentHex)),
+    {ok, {some, <<"def">>}} = gleamunison_storage:mnesia_lookup(TabMnesia, ContentKey),
     _ = gleamunison_ffi_io:compute_diff(nonexistent_peer),
     application:stop(mnesia),
 
@@ -143,10 +143,11 @@ test_ffi_io_coverage() ->
 
     %% 8. ref_to_hex and hex_to_ref
     Hex = <<"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef">>,
-    Ref = {ref, {hash, gleamunison_ffi:hex_to_bytes(Hex)}},
-    Ref = gleamunison_ffi_io:hex_to_ref(Hex),
+    {ok, HexBytes} = gleamunison_ffi:hex_to_bytes(Hex),
+    Ref = {ref, {hash, HexBytes}},
+    {ok, Ref} = gleamunison_ffi_io:hex_to_ref(Hex),
     Hex = gleamunison_ffi_io:ref_to_hex(Ref),
-    Hex = gleamunison_ffi_io:ref_to_hex(gleamunison_ffi:hex_to_bytes(Hex)),
+    Hex = gleamunison_ffi_io:ref_to_hex(HexBytes),
 
     %% 9. Test gleamunison_config env lookup
     {error, nil} = gleamunison_config:get_env(<<"NONEXISTENT_ENV_VAR_12345">>),

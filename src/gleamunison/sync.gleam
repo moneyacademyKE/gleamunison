@@ -70,16 +70,23 @@ pub fn fetch_refs(
   hexes: List(String),
 ) -> Result(Codebase, SyncError) {
   let PeerId(name) = peer
+  use Nil <- result.try(
+    list.try_each(hexes, fn(hex) {
+      identity.parse_ref_hex(hex)
+      |> result.map(fn(_) { Nil })
+      |> result.map_error(fn(msg) { TransferFailed(peer, msg) })
+    }),
+  )
   case sync_request_defs(name, hexes) {
     Error(msg) -> Error(TransferFailed(peer, msg))
     Ok(def_blobs) -> {
       use Nil <- result.try(validate_chunk_set(hexes, def_blobs))
       list.try_fold(def_blobs, codebase, fn(cb, pair) {
         let #(hash_hex, bytes) = pair
-        let ref =
-          identity.Ref(
-            identity.hash_from_bytes(identity.hex_to_bytes(hash_hex)),
-          )
+        use ref <- result.try(
+          identity.parse_ref_hex(hash_hex)
+          |> result.map_error(fn(msg) { TransferFailed(peer, msg) }),
+        )
         accept_chunk(peer, cb, ref, bytes)
       })
     }
@@ -140,12 +147,12 @@ pub fn pull_sync(
                     list.try_fold(def_blobs, #(codebase, pq), fn(acc, pair) {
                       let #(cb, q) = acc
                       let #(hash_hex, bytes) = pair
-                      let ref =
-                        identity.Ref(
-                          identity.hash_from_bytes(identity.hex_to_bytes(
-                            hash_hex,
-                          )),
-                        )
+                      use ref <- result.try(
+                        identity.parse_ref_hex(hash_hex)
+                        |> result.map_error(fn(msg) {
+                          TransferFailed(peer, msg)
+                        }),
+                      )
                       case accept_chunk(peer, cb, ref, bytes) {
                         Ok(next_cb) ->
                           Ok(#(next_cb, priority_queue.push(q, ref)))

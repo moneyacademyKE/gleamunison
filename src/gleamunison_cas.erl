@@ -30,7 +30,7 @@ verify_batch(_) -> {error, <<"invalid_definition_batch">>}.
 verify_batch([], _Seen) -> {ok, []};
 verify_batch([{Hex, Bytes} | Rest], Seen) when is_binary(Hex), byte_size(Hex) =:= 64 ->
     try
-        Ref = gleamunison_ffi:hex_to_bytes(Hex),
+        {ok, Ref} = gleamunison_ffi:hex_to_bytes(Hex),
         true = is_binary(Ref) andalso byte_size(Ref) =:= 32,
         case verify(Ref, Bytes) of
             {error, _} = Error -> Error;

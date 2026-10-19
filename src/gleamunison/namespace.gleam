@@ -6,8 +6,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/identity.{
-  type DefinitionRef, Ref, hash_bytes, hash_from_bytes, hash_to_debug_string,
-  hex_to_bytes,
+  type DefinitionRef, Ref, hash_bytes, hash_to_debug_string, parse_ref_hex,
 }
 import gleamunison/storage.{type StorageAdapter}
 
@@ -59,8 +58,8 @@ fn ref_hex(r: DefinitionRef) -> String {
   hash_to_debug_string(h)
 }
 
-fn hex_ref(s: String) -> DefinitionRef {
-  Ref(hash_from_bytes(hex_to_bytes(s)))
+fn hex_ref(s: String) -> Result(DefinitionRef, Nil) {
+  parse_ref_hex(s) |> result.replace_error(Nil)
 }
 
 fn serialize_ns(ns: Namespace) -> BitArray {
@@ -80,7 +79,8 @@ fn parse_ns(bytes: BitArray) -> Result(Namespace, Nil) {
           case string.split(line, ":") {
             [name_b64, hex] -> {
               use name <- result.try(unb64(name_b64))
-              Ok([#(name, hex_ref(hex)), ..acc])
+              use ref <- result.try(hex_ref(hex))
+              Ok([#(name, ref), ..acc])
             }
             _ -> Error(Nil)
           }
@@ -145,11 +145,12 @@ fn parse_head(
     ["head", "1", branch_b64, seq_s, ns_hex, prev_hex] -> {
       use branch <- result.try(unb64(branch_b64))
       use seq <- result.try(int.parse(seq_s) |> result.replace_error(Nil))
-      let prev = case prev_hex {
-        "-" -> None
-        hex -> Some(hex_ref(hex))
-      }
-      Ok(#(branch, seq, hex_ref(ns_hex), prev))
+      use ns_ref <- result.try(hex_ref(ns_hex))
+      use prev <- result.try(case prev_hex {
+        "-" -> Ok(None)
+        hex -> hex_ref(hex) |> result.map(Some)
+      })
+      Ok(#(branch, seq, ns_ref, prev))
     }
     _ -> Error(Nil)
   }
@@ -388,10 +389,10 @@ pub fn import_branch(
       Error(e) -> Error(e)
       Ok(_) -> {
         let #(key, bytes) = pair
-        let ref = case string.starts_with(key, "pointer:") {
-          True -> branch_pointer_ref(string.drop_start(key, 8))
-          False -> hex_ref(string.drop_start(key, 6))
-        }
+        use ref <- result.try(case string.starts_with(key, "pointer:") {
+          True -> Ok(branch_pointer_ref(string.drop_start(key, 8)))
+          False -> parse_ref_hex(string.drop_start(key, 6))
+        })
         adapter.insert(ref, bytes)
         |> result.map_error(fn(_) { "store insert failed" })
       }

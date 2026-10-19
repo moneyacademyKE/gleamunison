@@ -9,12 +9,17 @@ import gleamunison/pkg
 import gleamunison/storage
 import gleeunit/should
 
+fn ref_from_hex(hex: String) {
+  let assert Ok(ref) = manifest.ref_from_hex(hex)
+  ref
+}
+
 fn seeded_store() -> #(storage.StorageAdapter, manifest.Manifest, String) {
   let adapter = storage.inmemory()
   let m =
     manifest.new("http-utils", "1.0.0")
-    |> manifest.add_def("get-json", "aaa111")
-    |> manifest.add_def("post-json", "bbb222")
+    |> manifest.add_def("get-json", string.pad_end("aaa111", 64, "0"))
+    |> manifest.add_def("post-json", string.pad_end("bbb222", 64, "0"))
   let assert Ok(ref) = manifest.store(adapter, m)
   let hex = manifest.ref_hex_of(ref)
   #(adapter, m, hex)
@@ -33,9 +38,23 @@ pub fn install_refuses_unevidenced_defs_test() {
 pub fn install_admits_evidenced_package_test() {
   let #(adapter, _m, hex) = seeded_store()
   let assert Ok(_) =
-    evidence.attach(adapter, "aaa111", evidence.Test, "pass", "{}", 1)
+    evidence.attach(
+      adapter,
+      string.pad_end("aaa111", 64, "0"),
+      evidence.Test,
+      "pass",
+      "{}",
+      1,
+    )
   let assert Ok(_) =
-    evidence.attach(adapter, "bbb222", evidence.Test, "pass", "{}", 1)
+    evidence.attach(
+      adapter,
+      string.pad_end("bbb222", 64, "0"),
+      evidence.Test,
+      "pass",
+      "{}",
+      1,
+    )
   let assert Ok(installed) = pkg.install_from_store(adapter, hex, "main")
   list.contains(installed, "get-json") |> should.be_true
   list.contains(installed, "post-json") |> should.be_true
@@ -51,7 +70,7 @@ pub fn install_without_evidence_requirement_test() {
   let adapter = storage.inmemory()
   let m =
     manifest.new("quick-lib", "0.1.0")
-    |> manifest.add_def("helper", "ccc333")
+    |> manifest.add_def("helper", string.pad_end("ccc333", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(ref) = manifest.store(adapter, m)
   let hex = manifest.ref_hex_of(ref)
@@ -62,7 +81,8 @@ pub fn install_without_evidence_requirement_test() {
 /// Unknown manifest hash: clean error, no namespace writes.
 pub fn install_unknown_manifest_errors_test() {
   let adapter = storage.inmemory()
-  let assert Error(msg) = pkg.install_from_store(adapter, "deadbeef", "main")
+  let assert Error(msg) =
+    pkg.install_from_store(adapter, string.pad_end("deadbeef", 64, "0"), "main")
   string.contains(msg, "manifest") |> should.be_true
   case namespace.load_current(adapter, "main") {
     Error(_) -> Nil
@@ -74,7 +94,7 @@ pub fn install_unknown_manifest_errors_test() {
 /// names it.
 pub fn publish_refuses_unevidenced_test() {
   let adapter = storage.inmemory()
-  let pairs = [#("get-json", "aaa111", False)]
+  let pairs = [#("get-json", string.pad_end("aaa111", 64, "0"), False)]
   let assert Error(missing) =
     pkg.publish_to_store(adapter, pairs, "http-utils", "1.0.0")
   list.contains(missing, "get-json") |> should.be_true
@@ -84,14 +104,31 @@ pub fn publish_refuses_unevidenced_test() {
 /// the hash is fetchable and carries the same def set.
 pub fn publish_stores_fetchable_manifest_test() {
   let adapter = storage.inmemory()
-  let pairs = [#("get-json", "aaa111", False), #("post-json", "bbb222", False)]
+  let pairs = [
+    #("get-json", string.pad_end("aaa111", 64, "0"), False),
+    #("post-json", string.pad_end("bbb222", 64, "0"), False),
+  ]
   let assert Ok(_) =
-    evidence.attach(adapter, "aaa111", evidence.Test, "pass", "{}", 1)
+    evidence.attach(
+      adapter,
+      string.pad_end("aaa111", 64, "0"),
+      evidence.Test,
+      "pass",
+      "{}",
+      1,
+    )
   let assert Ok(_) =
-    evidence.attach(adapter, "bbb222", evidence.Test, "pass", "{}", 1)
+    evidence.attach(
+      adapter,
+      string.pad_end("bbb222", 64, "0"),
+      evidence.Test,
+      "pass",
+      "{}",
+      1,
+    )
   let assert Ok(hex) =
     pkg.publish_to_store(adapter, pairs, "http-utils", "1.0.0")
-  let assert Ok(m) = manifest.fetch(adapter, manifest.ref_from_hex(hex))
+  let assert Ok(m) = manifest.fetch(adapter, ref_from_hex(hex))
   m.name |> should.equal("http-utils")
   m.version |> should.equal("1.0.0")
   m.defs
@@ -105,13 +142,13 @@ pub fn install_recurses_into_deps_test() {
   let adapter = storage.inmemory()
   let dep =
     manifest.new("base-lib", "1.0.0")
-    |> manifest.add_def("base-helper", "ddd444")
+    |> manifest.add_def("base-helper", string.pad_end("ddd444", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(dep_ref) = manifest.store(adapter, dep)
   let dep_hex = manifest.ref_hex_of(dep_ref)
   let root =
     manifest.new("app-lib", "2.0.0")
-    |> manifest.add_def("app-main", "eee555")
+    |> manifest.add_def("app-main", string.pad_end("eee555", 64, "0"))
     |> manifest.add_dep(dep_hex)
     |> manifest.without_evidence_requirement
   let assert Ok(root_ref) = manifest.store(adapter, root)
@@ -134,13 +171,13 @@ pub fn install_breaks_dep_cycles_test() {
   // cycle on a single manifest that depends on itself.
   let self_dep =
     manifest.new("loop-lib", "1.0.0")
-    |> manifest.add_def("loop-fn", "fff666")
+    |> manifest.add_def("loop-fn", string.pad_end("fff666", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(self_ref) = manifest.store(adapter, self_dep)
   let self_hex = manifest.ref_hex_of(self_ref)
   let cyclic =
     manifest.new("cycle-lib", "1.0.0")
-    |> manifest.add_def("cycle-fn", "077777")
+    |> manifest.add_def("cycle-fn", string.pad_end("077777", 64, "0"))
     |> manifest.add_dep(self_hex)
     |> manifest.add_dep(self_hex)
     |> manifest.without_evidence_requirement
@@ -158,13 +195,13 @@ pub fn manifest_closure_collects_transitive_refs_test() {
   let adapter = storage.inmemory()
   let dep =
     manifest.new("base", "1.0.0")
-    |> manifest.add_def("b1", "d1d1d1")
+    |> manifest.add_def("b1", string.pad_end("d1d1d1", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(dep_ref) = manifest.store(adapter, dep)
   let dep_hex = manifest.ref_hex_of(dep_ref)
   let root =
     manifest.new("top", "1.0.0")
-    |> manifest.add_def("t1", "e2e2e2")
+    |> manifest.add_def("t1", string.pad_end("e2e2e2", 64, "0"))
     |> manifest.add_dep(dep_hex)
     |> manifest.without_evidence_requirement
   let assert Ok(root_ref) = manifest.store(adapter, root)
@@ -173,8 +210,10 @@ pub fn manifest_closure_collects_transitive_refs_test() {
   let assert Ok(closure) = pkg.manifest_closure(adapter, root_hex)
   list.contains(closure.manifests, root_hex) |> should.be_true
   list.contains(closure.manifests, dep_hex) |> should.be_true
-  list.contains(closure.defs, "d1d1d1") |> should.be_true
-  list.contains(closure.defs, "e2e2e2") |> should.be_true
+  list.contains(closure.defs, string.pad_end("d1d1d1", 64, "0"))
+  |> should.be_true
+  list.contains(closure.defs, string.pad_end("e2e2e2", 64, "0"))
+  |> should.be_true
   list.length(closure.manifests) |> should.equal(2)
 }
 
@@ -187,30 +226,31 @@ pub fn pull_closure_transfers_only_the_closure_test() {
   // The package graph lives on the peer: root depends on dep.
   let dep =
     manifest.new("dep-lib", "1.0.0")
-    |> manifest.add_def("dep-fn", "0a0a0a")
+    |> manifest.add_def("dep-fn", string.pad_end("0a0a0a", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(dep_ref) = manifest.store(peer, dep)
   let dep_hex = manifest.ref_hex_of(dep_ref)
   let root =
     manifest.new("root-lib", "1.0.0")
-    |> manifest.add_def("root-fn", "0b0b0b")
+    |> manifest.add_def("root-fn", string.pad_end("0b0b0b", 64, "0"))
     |> manifest.add_dep(dep_hex)
     |> manifest.without_evidence_requirement
   let assert Ok(root_ref) = manifest.store(peer, root)
   let root_hex = manifest.ref_hex_of(root_ref)
 
   // Def chunks and an unrelated stranger chunk, peer-side only.
-  let assert Ok(_) = peer.insert(manifest.ref_from_hex("0a0a0a"), <<"dep def">>)
   let assert Ok(_) =
-    peer.insert(manifest.ref_from_hex("0b0b0b"), <<"root def">>)
+    peer.insert(ref_from_hex(string.pad_end("0a0a0a", 64, "0")), <<"dep def">>)
   let assert Ok(_) =
-    peer.insert(manifest.ref_from_hex("0c0c0c"), <<"unrelated">>)
+    peer.insert(ref_from_hex(string.pad_end("0b0b0b", 64, "0")), <<"root def">>)
+  let assert Ok(_) =
+    peer.insert(ref_from_hex(string.pad_end("0c0c0c", 64, "0")), <<"unrelated">>)
 
   let fetch = fn(hexes: List(String)) -> Result(Nil, String) {
     list.try_each(hexes, fn(hex) {
-      case peer.lookup(manifest.ref_from_hex(hex)) {
+      case peer.lookup(ref_from_hex(hex)) {
         Ok(Some(bytes)) ->
-          local.insert(manifest.ref_from_hex(hex), bytes)
+          local.insert(ref_from_hex(hex), bytes)
           |> result.map_error(fn(_) { "insert failed" })
         _ -> Error("peer missing chunk: " <> hex)
       }
@@ -221,14 +261,22 @@ pub fn pull_closure_transfers_only_the_closure_test() {
   list.length(closure.manifests) |> should.equal(2)
 
   // Local now holds both manifests and both def chunks...
-  list.each([root_hex, dep_hex, "0a0a0a", "0b0b0b"], fn(hex) {
-    case local.lookup(manifest.ref_from_hex(hex)) {
-      Ok(Some(_)) -> Nil
-      _ -> panic as "closure chunk missing locally"
-    }
-  })
+  list.each(
+    [
+      root_hex,
+      dep_hex,
+      string.pad_end("0a0a0a", 64, "0"),
+      string.pad_end("0b0b0b", 64, "0"),
+    ],
+    fn(hex) {
+      case local.lookup(ref_from_hex(hex)) {
+        Ok(Some(_)) -> Nil
+        _ -> panic as "closure chunk missing locally"
+      }
+    },
+  )
   // ...but the stranger never crossed the wire.
-  case local.lookup(manifest.ref_from_hex("0c0c0c")) {
+  case local.lookup(ref_from_hex(string.pad_end("0c0c0c", 64, "0"))) {
     Ok(None) -> Nil
     _ -> panic as "unrelated chunk leaked into local store"
   }
