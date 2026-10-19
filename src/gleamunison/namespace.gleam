@@ -109,7 +109,11 @@ pub fn load(
 ) -> Result(Namespace, String) {
   case adapter.lookup(ref) {
     Ok(Some(bytes)) ->
-      parse_ns(bytes) |> result.replace_error("corrupt namespace chunk")
+      case Ref(hash_bytes(bytes)) == ref {
+        True ->
+          parse_ns(bytes) |> result.replace_error("corrupt namespace chunk")
+        False -> Error("namespace integrity failure")
+      }
     Ok(None) -> Error("namespace not found")
     Error(_) -> Error("store lookup failed")
   }
@@ -164,8 +168,9 @@ pub fn branch_head(
   case adapter.lookup(branch_pointer_ref(branch)) {
     Ok(Some(bytes)) ->
       case parse_head(bytes) {
-        Ok(#(_, seq, ns_ref, _)) -> Ok(#(seq, ns_ref))
-        Error(_) -> Error("corrupt branch head")
+        Ok(#(name, seq, ns_ref, _)) if name == branch && seq > 0 ->
+          Ok(#(seq, ns_ref))
+        _ -> Error("corrupt branch head or branch identity mismatch")
       }
     Ok(None) -> Error("no such branch: " <> branch)
     Error(_) -> Error("store lookup failed")
@@ -374,8 +379,10 @@ fn fetch_chunk(
 }
 
 /// Import a branch chunk set. Content chunks are verified against their
-/// hash before insert; the pointer chunk must parse as a head. A tampered
-/// chunk is refused — nothing partial lands.
+/// hash before insert; the pointer must match its embedded branch. Validate
+/// the whole set, then write immutable chunks and publish ONE pointer last.
+/// Failed content writes may leave immutable, retry-safe orphan chunks;
+/// they never publish a partially imported branch. No cross-store transaction.
 pub fn import_branch(
   adapter: StorageAdapter,
   chunks: List(#(String, BitArray)),
@@ -384,7 +391,15 @@ pub fn import_branch(
     list.try_map(chunks, fn(pair) { verify_chunk(pair) })
     |> result.map(fn(_) { Nil }),
   )
-  list.fold(chunks, Ok(Nil), fn(acc, pair) {
+  let pointers =
+    list.filter(chunks, fn(p) { string.starts_with(p.0, "pointer:") })
+  use _ <- result.try(case list.length(pointers) <= 1 {
+    True -> Ok(Nil)
+    False -> Error("import accepts one branch pointer at a time")
+  })
+  let content =
+    list.filter(chunks, fn(p) { !string.starts_with(p.0, "pointer:") })
+  list.fold(list.append(content, pointers), Ok(Nil), fn(acc, pair) {
     case acc {
       Error(e) -> Error(e)
       Ok(_) -> {
@@ -403,14 +418,19 @@ pub fn import_branch(
 fn verify_chunk(pair: #(String, BitArray)) -> Result(Nil, String) {
   let #(key, bytes) = pair
   case string.starts_with(key, "pointer:") {
-    True ->
+    True -> {
+      let branch = string.drop_start(key, 8)
       case parse_head(bytes) {
-        Ok(_) -> Ok(Nil)
-        Error(_) -> Error("pointer chunk does not parse as a head")
+        Ok(#(name, seq, _, _)) if name == branch && seq > 0 -> Ok(Nil)
+        _ -> Error("pointer branch identity mismatch or invalid head")
       }
+    }
     False -> {
       let expected = string.drop_start(key, 6)
-      case ref_hex(Ref(hash_bytes(bytes))) == expected {
+      case
+        string.starts_with(key, "chunk:")
+        && ref_hex(Ref(hash_bytes(bytes))) == expected
+      {
         True -> Ok(Nil)
         False -> Error("chunk hash mismatch: " <> expected)
       }
