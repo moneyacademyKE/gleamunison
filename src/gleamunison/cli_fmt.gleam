@@ -2,24 +2,24 @@
 //// Rewrites in place; comments are preserved (see formatter module docs).
 
 import gleam/int
-import gleam/io
+import gleamunison/cli_result
 import gleamunison/formatter
 import simplifile
 
-pub fn run(args: List(String)) -> Nil {
+pub fn run(args: List(String)) -> Result(Nil, String) {
   case args {
     [path] -> format_file(path)
-    _ -> io.println("usage: gleam run -- fmt <file>  (rewrites in place)")
+    _ -> Error("usage: gleam run -- fmt <file>  (rewrites in place)")
   }
 }
 
-fn format_file(path: String) -> Nil {
+fn format_file(path: String) -> Result(Nil, String) {
   case simplifile.read(path) {
-    Error(_) -> io.println("fmt: cannot read " <> path)
+    Error(_) -> Error("fmt: cannot read " <> path)
     Ok(src) -> {
       case formatter.format_source(src) {
         Error(err) ->
-          io.println(
+          Error(
             "fmt: parse error in "
             <> path
             <> " at line "
@@ -31,11 +31,12 @@ fn format_file(path: String) -> Nil {
           )
         Ok(formatted) ->
           case formatted == src {
-            True -> io.println("fmt: " <> path <> " unchanged")
-            False -> {
-              let assert Ok(_) = simplifile.write(path, formatted)
-              io.println("fmt: formatted " <> path)
-            }
+            True -> cli_result.success("fmt: " <> path <> " unchanged")
+            False ->
+              case simplifile.write(path, formatted) {
+                Error(_) -> Error("fmt: cannot write " <> path)
+                Ok(_) -> cli_result.success("fmt: formatted " <> path)
+              }
           }
       }
     }

@@ -13,6 +13,18 @@ pub fn finish(result: Result(Nil, String)) -> Nil {
   }
 }
 
+pub fn success(message: String) -> Result(Nil, String) {
+  io.println(message)
+  Ok(Nil)
+}
+
+pub fn print(result: Result(String, String)) -> Nil {
+  case result {
+    Ok(message) -> finish(success(message))
+    Error(message) -> finish(Error(message))
+  }
+}
+
 pub fn fail(message: String) -> Nil {
   io.println(message)
   halt_failure()

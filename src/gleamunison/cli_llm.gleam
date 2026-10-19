@@ -8,6 +8,7 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
+import gleam/result
 import gleamunison/effects.{type OpHandler}
 import gleamunison/json
 import gleamunison/llm.{
@@ -34,14 +35,23 @@ pub fn command(args: List(String)) -> String {
 }
 
 pub fn command_with_env(args: List(String), env: EnvLookup) -> String {
-  case parse_args(args, env) {
-    Error(msg) -> msg
-    Ok(#(provider, prompt)) ->
-      case resolve_config(provider, env) {
-        Error(msg) -> msg
-        Ok(cfg) -> command_with_handler_cfg(cfg, prompt)
-      }
+  case command_result_with_env(args, env) {
+    Ok(message) | Error(message) -> message
   }
+}
+
+/// The process boundary must not guess success from the rendered text.
+pub fn command_result(args: List(String)) -> Result(String, String) {
+  command_result_with_env(args, ffi_get_env)
+}
+
+fn command_result_with_env(
+  args: List(String),
+  env: EnvLookup,
+) -> Result(String, String) {
+  use #(provider, prompt) <- result.try(parse_args(args, env))
+  use cfg <- result.try(resolve_config(provider, env))
+  command_with_handler_cfg(cfg, prompt)
 }
 
 /// Test seam: same pipeline with the handler swapped in.
@@ -56,13 +66,16 @@ pub fn command_with_handler(
   }
 }
 
-fn command_with_handler_cfg(cfg: ProviderConfig, prompt: String) -> String {
+fn command_with_handler_cfg(
+  cfg: ProviderConfig,
+  prompt: String,
+) -> Result(String, String) {
   let handler =
     llm_middleware.retry_handler(
       llm.provider_handler(cfg),
       RetryPolicy(max_attempts: 3, base_delay_ms: 500),
     )
-  format_result(complete_with(handler, prompt))
+  complete_with(handler, prompt) |> result.map(fn(c) { format_result(Ok(c)) })
 }
 
 fn parse_args(

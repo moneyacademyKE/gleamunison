@@ -6,28 +6,21 @@
 //// property evidence must come from the tools that ran them.
 
 import gleam/int
-import gleam/io
 import gleam/list
+import gleam/result
 import gleam/string
+import gleamunison/cli_result
+import gleamunison/cli_store
 import gleamunison/datetime
 import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
-import simplifile
 
-@external(erlang, "gleamunison_ffi", "halt_failure")
-fn halt_failure() -> Nil
-
-fn fail(message: String) -> Nil {
-  io.println(message)
-  halt_failure()
-}
-
-pub fn command(args: List(String)) -> Nil {
+pub fn command(args: List(String)) -> Result(Nil, String) {
   case args {
     [hash] -> run(hash)
     ["attest", hash, "io", ..note] -> attest(hash, string.join(note, " "))
     _ ->
-      io.println(
+      Error(
         "usage: gleam run -- evidence <content-hash>\n"
         <> "       gleam run -- evidence attest <content-hash> io <note...>\n"
         <> "\n"
@@ -38,53 +31,38 @@ pub fn command(args: List(String)) -> Nil {
   }
 }
 
-fn attest(hash: String, note: String) -> Nil {
+fn attest(hash: String, note: String) -> Result(Nil, String) {
   case note {
-    "" -> fail("evidence attest: a note is required — say what you observed")
+    "" -> Error("evidence attest: a note is required — say what you observed")
     _ -> {
-      let _ = simplifile.create_directory_all(".gleamunison")
-      case storage.dets(".gleamunison/store.dets") {
-        Error(e) -> fail("evidence: cannot open store: " <> string.inspect(e))
-        Ok(adapter) -> {
-          let outcome =
-            evidence.attach(
-              adapter,
-              subject: hash,
-              kind: evidence.Io,
-              verdict: "approved",
-              payload: note,
-              ts: datetime.to_unix(datetime.now()),
-            )
-          case adapter.close() {
-            Error(e) ->
-              fail("evidence: cannot close store: " <> string.inspect(e))
-            Ok(_) ->
-              case outcome {
-                Ok(#(_, hex)) ->
-                  io.println(
-                    "attested io on " <> hash <> " (evidence " <> hex <> ")",
-                  )
-                Error(_) -> fail("evidence attest: store insert failed")
-              }
-          }
-        }
-      }
+      use output <- result.try(
+        cli_store.with_dets(".gleamunison/store.dets", fn(adapter) {
+          evidence.attach(
+            adapter,
+            subject: hash,
+            kind: evidence.Io,
+            verdict: "approved",
+            payload: note,
+            ts: datetime.to_unix(datetime.now()),
+          )
+          |> result.map(fn(pair) {
+            "attested io on " <> hash <> " (evidence " <> pair.1 <> ")"
+          })
+          |> result.map_error(fn(_) { "evidence attest: store insert failed" })
+        }),
+      )
+      cli_result.success(output)
     }
   }
 }
 
-fn run(hash: String) -> Nil {
-  let _ = simplifile.create_directory_all(".gleamunison")
-  case storage.dets(".gleamunison/store.dets") {
-    Error(e) -> io.println("evidence: cannot open store: " <> string.inspect(e))
-    Ok(adapter) -> {
-      let output = report(adapter, hash)
-      case adapter.close() {
-        Error(e) -> fail("evidence: cannot close store: " <> string.inspect(e))
-        Ok(_) -> io.println(output)
-      }
-    }
-  }
+fn run(hash: String) -> Result(Nil, String) {
+  use output <- result.try(
+    cli_store.with_dets(".gleamunison/store.dets", fn(adapter) {
+      Ok(report(adapter, hash))
+    }),
+  )
+  cli_result.success(output)
 }
 
 /// A plain-text attestation report for a subject hash. Tampered chunks are
