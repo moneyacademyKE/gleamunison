@@ -126,9 +126,8 @@ handle_status_route(Socket) ->
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_static_file(Socket, FilePath) ->
-    case binary:match(FilePath, <<"../">>) of
-        nomatch ->
-            FullPath = filename:join(["priv", "static", FilePath]),
+    case gleamunison_static:resolve(FilePath) of
+        {ok, FullPath} ->
             case file:read_file(FullPath) of
                 {ok, Content} ->
                     Mime = gleamunison_http_util:mime_type(FilePath),

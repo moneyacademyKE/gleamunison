@@ -168,10 +168,15 @@ authorized(Path, Headers) ->
             end
     end.
 
-protected_path(<<"/eval", _/binary>>) -> true;
-protected_path(<<"/define", _/binary>>) -> true;
-protected_path(<<"/mcp">>) -> true;
-protected_path(_) -> false.
+%% Public: the UI shell/assets and bounded operational probes. Every data
+%% and mutation route (including unknown future routes) requires the token.
+protected_path(<<"/">>) -> false;
+protected_path(<<"/index.html">>) -> false;
+protected_path(<<"/static/", _/binary>>) -> false;
+protected_path(<<"/api/live">>) -> false;
+protected_path(<<"/api/ready">>) -> false;
+protected_path(<<"/api/health">>) -> false;
+protected_path(_) -> true.
 
 constant_time_equal(Expected, Provided) when is_binary(Expected), is_binary(Provided) ->
     constant_time_hash_compare(crypto:hash(sha256, Expected), crypto:hash(sha256, Provided), 0).
