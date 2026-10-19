@@ -68,6 +68,8 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0062](0062-native-content-addressed-datalog-database.md) | Native Content-Addressed Datalog Database in S-expressions | Accepted |
 | [ADR-0063](0063-gadts-indexed-abilities-deferred.md) | GADTs and indexed abilities — deferred, with a tripwire | Deferred |
 | [ADR-0064](0064-s-expression-syntax-rationale.md) | S-expression syntax rationale — why Lisp, its costs, and the front-end escape hatch | Accepted |
+| [ADR-0065](0065-verified-cas-admission.md) | Verified CAS admission and recoverable definition payloads | Accepted |
+| [ADR-0066](0066-bounded-readiness-and-metrics.md) | Bounded readiness and supervised in-process metrics | Accepted |
 
 
 

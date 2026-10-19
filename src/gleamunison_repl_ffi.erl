@@ -2,6 +2,9 @@
 -export([eval_module/1, eval_module_bare/1, read_line/1]).
 
 eval_module(Mod) ->
+    run_with_timeout(fun() -> eval_module_inner(Mod) end).
+
+eval_module_inner(Mod) ->
     ModuleAtom = case is_binary(Mod) of
         true -> erlang:binary_to_atom(Mod, utf8);
         false -> Mod
@@ -104,6 +107,9 @@ eval_module(Mod) ->
 %% call; the defaults here would shadow them (innermost handler wins), so
 %% the bare variant leaves the stack exactly as the caller arranged it.
 eval_module_bare(Mod) ->
+    run_with_timeout(fun() -> eval_module_bare_inner(Mod) end).
+
+eval_module_bare_inner(Mod) ->
     ModuleAtom = case is_binary(Mod) of
         true -> erlang:binary_to_atom(Mod, utf8);
         false -> Mod
@@ -114,6 +120,62 @@ eval_module_bare(Mod) ->
     catch
         Class:Reason:Stacktrace ->
             {error, list_to_binary(io_lib:format("~p:~p at ~p", [Class, Reason, Stacktrace]))}
+    end.
+
+run_with_timeout(Fun) when is_function(Fun, 0) ->
+    InitialState = copyable_process_dictionary(),
+    Work = fun() ->
+        Result = run_in_worker(InitialState, Fun),
+        {Result, copyable_process_dictionary()}
+    end,
+    case gleamunison_eval_scope:run(Work, evaluation_timeout_ms()) of
+        {ok, {{ok, Result}, UpdatedState}} ->
+            restore_process_dictionary(UpdatedState),
+            Result;
+        {ok, {{raised, Class, Reason}, UpdatedState}} ->
+            restore_process_dictionary(UpdatedState),
+            {error, list_to_binary(io_lib:format("~p:~p", [Class, Reason]))};
+        {error, _} = Error -> Error
+    end.
+
+run_in_worker(State, Fun) ->
+    restore_process_dictionary(State),
+    try Fun() of
+        Value -> {ok, Value}
+    catch
+        Class:Reason -> {raised, Class, Reason}
+    end.
+
+copyable_process_dictionary() ->
+    [Entry || Entry = {Key, _Value} <- erlang:get(), copyable_key(Key)].
+
+copyable_key({gleamunison_handlers}) -> true;
+copyable_key(gleamunison_transcript_log) -> true;
+copyable_key(gleamunison_transcript_playback) -> true;
+copyable_key({state_val, _Key}) -> true;
+copyable_key({pd_counter, _Key}) -> true;
+copyable_key({pd_records, _Key}) -> true;
+copyable_key(Key) when is_binary(Key) -> true;
+copyable_key(_) -> false.
+
+restore_process_dictionary(Entries) ->
+    lists:foreach(fun({Key, Value}) -> erlang:put(Key, Value) end, Entries).
+
+evaluation_timeout_ms() ->
+    case os:getenv("GLEAMUNISON_EVAL_TIMEOUT_MS") of
+        false -> 30000;
+        "" -> 30000;
+        Value ->
+            try
+                Parsed = list_to_integer(Value),
+                if
+                    Parsed < 1 -> 30000;
+                    Parsed > 300000 -> 300000;
+                    true -> Parsed
+                end
+            catch
+                _:_ -> 30000
+            end
     end.
 
 read_line(_Prompt) ->

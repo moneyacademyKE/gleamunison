@@ -6,6 +6,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
+import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/test_runner.{type TestResult}
 import gleamunison/verify
@@ -39,13 +40,20 @@ fn fail(message: String) -> Nil {
 }
 
 fn run(path: String) -> Nil {
+  case evidence.production_signer() {
+    Error(reason) -> fail("test: " <> reason)
+    Ok(signer) -> run_with_signer(path, signer)
+  }
+}
+
+fn run_with_signer(path: String, signer: evidence.Signer) -> Nil {
   case simplifile.create_directory_all(".gleamunison") {
     Error(e) -> fail("test: cannot create store: " <> string.inspect(e))
     Ok(_) ->
       case storage.dets(".gleamunison/store.dets") {
         Error(e) -> fail("test: cannot open store: " <> string.inspect(e))
         Ok(adapter) -> {
-          let outcome = run_file(path, adapter)
+          let outcome = run_file_with_signer(path, adapter, signer)
           // This command owns the adapter. Closing flushes buffered DETS
           // writes before any success message or nonzero process exit.
           case adapter.close() {
@@ -108,6 +116,30 @@ pub fn run_file(
   use #(cache, defs) <- result.try(verify.load_defs_file(path))
   let results = test_runner.run_suite(defs, cache)
   let attached = test_runner.attach_results(adapter, results, defs, cache)
+  use records <- result.try(
+    result.all(attached)
+    |> result.map_error(fn(e) {
+      "cannot attach evidence: " <> string.inspect(e)
+    }),
+  )
+  Ok(#(
+    results,
+    list.map(records, fn(a) {
+      let #(subject_hex, _evidence_ref, payload) = a
+      #(subject_hex, payload)
+    }),
+  ))
+}
+
+pub fn run_file_with_signer(
+  path: String,
+  adapter: StorageAdapter,
+  signer: evidence.Signer,
+) -> Result(#(List(TestResult), Attachments), String) {
+  use #(cache, defs) <- result.try(verify.load_defs_file(path))
+  let results = test_runner.run_suite(defs, cache)
+  let attached =
+    test_runner.attach_results_signed(adapter, results, defs, cache, signer)
   use records <- result.try(
     result.all(attached)
     |> result.map_error(fn(e) {

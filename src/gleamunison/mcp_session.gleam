@@ -168,7 +168,7 @@ fn tools(state: SessionState) -> List(Tool) {
 }
 
 fn names_json(names: List(String)) -> String {
-  let parts = list.map(names, fn(n) { "\"" <> n <> "\"" })
+  let parts = list.map(names, mcp.json_string)
   "[" <> string.join(parts, ",") <> "]"
 }
 
@@ -289,13 +289,13 @@ fn search_definitions(
 fn hits_json(hits: List(SearchHit)) -> String {
   let parts =
     list.map(hits, fn(h) {
-      "{\"name\":\""
-      <> h.name
-      <> "\",\"kind\":\""
-      <> h.kind
-      <> "\",\"ref\":\""
-      <> h.ref_hex
-      <> "\",\"score\":"
+      "{\"name\":"
+      <> mcp.json_string(h.name)
+      <> ",\"kind\":"
+      <> mcp.json_string(h.kind)
+      <> ",\"ref\":"
+      <> mcp.json_string(h.ref_hex)
+      <> ",\"score\":"
       <> float.to_string(h.score)
       <> "}"
     })
@@ -451,13 +451,13 @@ fn defs_json(defs: List(#(String, SurfaceDef))) -> String {
 }
 
 fn def_json(name: String, def: SurfaceDef) -> String {
-  "{\"name\":\""
-  <> name
-  <> "\",\"kind\":\""
-  <> codebase_index.kind_of(def)
-  <> "\",\"ref\":\""
-  <> codebase_index.ref_hex(name, def)
-  <> "\"}"
+  "{\"name\":"
+  <> mcp.json_string(name)
+  <> ",\"kind\":"
+  <> mcp.json_string(codebase_index.kind_of(def))
+  <> ",\"ref\":"
+  <> mcp.json_string(codebase_index.ref_hex(name, def))
+  <> "}"
 }
 
 fn ref_to_hex(r: DefinitionRef) -> String {

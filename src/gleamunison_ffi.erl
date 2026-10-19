@@ -130,7 +130,10 @@ load_binary(Mod, Binary) ->
     end.
 
 hex_to_bytes(Hex) when is_binary(Hex) ->
-    binary:decode_hex(Hex).
+    try {ok, binary:decode_hex(Hex)}
+    catch error:badarg -> {error, <<"invalid hex: expected an even number of hexadecimal digits">>}
+    end;
+hex_to_bytes(_) -> {error, <<"invalid hex: expected a binary string">>}.
 
 unload_binary(Mod) ->
     ModuleAtom = case is_binary(Mod) of
@@ -197,7 +200,7 @@ application_version() ->
     case application:get_key(gleamunison, vsn) of
         {ok, Vsn} when is_list(Vsn) -> list_to_binary(Vsn);
         {ok, Vsn} when is_binary(Vsn) -> Vsn;
-        undefined -> error(application_version_unavailable)
+        undefined -> <<"development">>
     end.
 
 to_dynamic(X) -> X.

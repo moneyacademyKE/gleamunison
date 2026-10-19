@@ -1,12 +1,13 @@
 import gleam/bit_array
-import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
 import gleam/list
+import gleam/result
 import gleam/string
 
 import gleam/option
 import gleamunison/ast
+import gleamunison/definition_codec
 import gleamunison/identity.{
   type DefinitionRef, type Hash, Local, Ref, hash_bytes, hash_equal,
   hash_to_debug_string,
@@ -18,22 +19,23 @@ fn str_to_bits(s: String) -> BitArray {
 }
 
 pub opaque type Codebase {
-  Codebase(adapter: StorageAdapter, seen: Dict(Hash, DefinitionRef))
+  Codebase(adapter: StorageAdapter)
 }
 
 pub fn empty() -> Codebase {
-  Codebase(adapter: inmemory(), seen: dict.new())
+  Codebase(adapter: inmemory())
 }
 
 /// A codebase over a caller-chosen adapter (dets for persistence, mnesia
 /// for replication). Sync and CLI paths need real storage, not inmemory.
 pub fn with_adapter(adapter: StorageAdapter) -> Codebase {
-  Codebase(adapter: adapter, seen: dict.new())
+  Codebase(adapter: adapter)
 }
 
 pub type InsertError {
   HashMismatch(hash_expected: Hash, hash_got: Hash)
   DuplicateDef(existing: DefinitionRef, incoming: DefinitionRef)
+  StorageFailure(storage.StorageError)
 }
 
 fn hash_to_binary(h: Hash) -> BitArray {
@@ -220,13 +222,16 @@ fn hash_type(typ: ast.Type) -> Hash {
     ast.TypeVar(i) -> hash_bytes(str_to_bits("var:" <> int.to_string(i)))
     ast.AbilityVar(i) ->
       hash_bytes(str_to_bits("abilityvar:" <> int.to_string(i)))
-    ast.Fn(params:, result:, requires: _) ->
+    ast.Fn(params:, result:, requires:) ->
       hash_bytes(
-        bit_array.concat([
-          str_to_bits("fn:"),
-          hash_to_binary(hash_type(result)),
-          ..list.map(params, fn(p) { hash_to_binary(hash_type(p)) })
-        ]),
+        bit_array.concat(list.append(
+          [
+            str_to_bits("fn:"),
+            hash_to_binary(hash_type(result)),
+            ..list.map(params, fn(p) { hash_to_binary(hash_type(p)) })
+          ],
+          requirement_bytes(requires),
+        )),
       )
     ast.App(Ref(h), args:) ->
       hash_bytes(
@@ -236,6 +241,31 @@ fn hash_type(typ: ast.Type) -> Hash {
           ..list.map(args, fn(a) { hash_to_binary(hash_type(a)) })
         ]),
       )
+  }
+}
+
+fn requirement_bytes(requirement: ast.Requirement) -> List(BitArray) {
+  let ast.Required(abilities) = requirement
+  case abilities {
+    [] -> []
+    _ -> {
+      let parts =
+        list.map(abilities, fn(ability) {
+          case ability {
+            ast.ReqVar(i) -> "var:" <> int.to_string(i)
+            ast.Concrete(ast.AbilityRef(Ref(h))) ->
+              "ref:" <> hash_to_debug_string(h)
+          }
+        })
+        |> list.unique
+        |> list.sort(string.compare)
+      [
+        str_to_bits("requires:"),
+        ..list.map(parts, fn(part) {
+          hash_to_binary(hash_bytes(str_to_bits(part)))
+        })
+      ]
+    }
   }
 }
 
@@ -267,10 +297,18 @@ pub fn hash_of_definition(def: ast.Definition) -> Hash {
         ]),
       )
     }
-    ast.TypeDef(ast.Unique(Local(n), guid:, parameters: _, constructors: _)) ->
-      hash_bytes(str_to_bits(
-        "typedef:unique:" <> int.to_string(n) <> ":" <> guid,
-      ))
+    ast.TypeDef(ast.Unique(Local(n), guid:, parameters:, constructors:)) ->
+      hash_bytes(
+        bit_array.concat([
+          str_to_bits("typedef:unique:" <> int.to_string(n) <> ":" <> guid),
+          str_to_bits(":schema:"),
+          hash_to_binary(
+            hash_of_definition(
+              ast.TypeDef(ast.Structural(Local(n), parameters, constructors)),
+            ),
+          ),
+        ]),
+      )
     ast.AbilityDecl(ast.AbilityDeclaration(Local(n), operations:)) -> {
       hash_bytes(
         bit_array.concat([
@@ -291,24 +329,7 @@ fn verify_and_store(
   let Ref(hash) = ref
   case hash_equal(computed, hash) {
     False -> Error(HashMismatch(hash_expected: computed, hash_got: hash))
-    True ->
-      case dict.get(codebase.seen, computed) {
-        Ok(_existing) -> Ok(codebase)
-        // idempotent: same content-addressed content
-        Error(_) -> {
-          let _ =
-            codebase.adapter.insert(
-              ref,
-              bit_array.from_string(string.inspect(def)),
-            )
-          Ok(
-            Codebase(
-              ..codebase,
-              seen: dict.insert(codebase.seen, computed, ref),
-            ),
-          )
-        }
-      }
+    True -> insert_raw_checked(codebase, ref, definition_codec.encode(def))
   }
 }
 
@@ -324,14 +345,29 @@ pub fn insert(
   })
 }
 
+/// Compatibility wrapper: rejected content leaves the codebase unchanged.
+/// Use insert_raw_checked when admission or storage errors must be observed.
 pub fn insert_raw(
   codebase: Codebase,
   ref: DefinitionRef,
   bytes: BitArray,
 ) -> Codebase {
-  let _ = codebase.adapter.insert(ref, bytes)
-  let Ref(h) = ref
-  Codebase(..codebase, seen: dict.insert(codebase.seen, h, ref))
+  case insert_raw_checked(codebase, ref, bytes) {
+    Ok(updated) -> updated
+    Error(_) -> codebase
+  }
+}
+
+pub fn insert_raw_checked(
+  codebase: Codebase,
+  ref: DefinitionRef,
+  bytes: BitArray,
+) -> Result(Codebase, InsertError) {
+  use Nil <- result.try(
+    storage.insert_content(codebase.adapter, ref, bytes)
+    |> result.map_error(StorageFailure),
+  )
+  Ok(codebase)
 }
 
 pub fn get_adapter(codebase: Codebase) -> StorageAdapter {

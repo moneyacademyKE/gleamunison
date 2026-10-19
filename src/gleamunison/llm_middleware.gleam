@@ -9,6 +9,7 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleamunison/effects.{type OpHandler}
 import gleamunison/llm.{type Completion}
+import gleamunison/llm_controls
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn to_dynamic(val: a) -> Dynamic
@@ -26,8 +27,8 @@ pub type RetryPolicy {
   RetryPolicy(max_attempts: Int, base_delay_ms: Int)
 }
 
-/// Retry the inner handler with linear backoff (base_delay_ms * attempt).
-/// Any {error, _} result is retryable; {ok, _} passes straight through.
+/// At most three attempts with at most 1000ms delay per retry. Terminal
+/// settings/auth/decode/cancellation errors must not repeat a keyed call.
 pub fn retry_handler(inner: OpHandler, policy: RetryPolicy) -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
     cont(attempt(inner, policy, args, 1))
@@ -43,11 +44,14 @@ fn attempt(
   let result = inner(args, fn(d) { d })
   case as_result(result) {
     Ok(_) -> result
-    Error(_) ->
-      case n < policy.max_attempts {
+    Error(reason) ->
+      case
+        n < llm_controls.attempts(policy.max_attempts)
+        && llm_controls.retryable(reason)
+      {
         False -> result
         True -> {
-          sleep(policy.base_delay_ms * n)
+          sleep(llm_controls.retry_delay(policy.base_delay_ms, n))
           attempt(inner, policy, args, n + 1)
         }
       }

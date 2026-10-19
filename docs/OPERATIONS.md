@@ -54,23 +54,23 @@ Use the CLI to override config at startup:
 
 ## Monitor
 
-### Health Checks
-```
-GET /api/health → {"status":"healthy","loaded_modules":52}
-GET /api/status  → node info, memory, uptime
-```
+### Health and readiness
 
-### Key Metrics
-- **Memory**: `< 4GB` is normal for development workloads
-- **Loaded modules**: Should match genesis count (52) + user definitions
-- **Process count**: Normal range 50–200 per node
-- **Message queue length**: Per-process queues should stay `< 100`
+The runtime exposes three deliberately different probes:
 
-### Prometheus/StatsD (planned)
-Gleamunison emits typed telemetry events via `:telemetry`. Attach reporters:
-```erlang
-:telemetry.attach("prometheus-reporter", [:gleamunison, :compile], handler, nil)
-```
+- `GET /api/live` is liveness only and returns `200` while the HTTP process can answer.
+- `GET /api/ready` is required-resource readiness. It returns `200` only when storage, application version, definition-codec schema, memory, and configured required services pass; failure is structured JSON with HTTP `503`.
+- `GET /api/health` is the same structured readiness report for compatibility. It no longer returns a false-green `200`.
+
+The JSON report contains `ready`, `status`, `version`, `schema_version`, and bounded `checks` entries with `name`, `required`, `ok`, and a safe detail. Set `GLEAMUNISON_REQUIRED_SERVICES` to a comma-separated subset of `http,mcp,sync` when those listeners are required for this deployment. Invalid service names fail closed. `GLEAMUNISON_MAX_MEMORY_MB` defaults to `4096`; invalid or non-positive values fail readiness.
+
+Readiness is not a backup check, a full CAS audit, a code-execution test, or provenance proof. Each sequential worker has a 150 ms timeout (seven timed probes, plus configuration parsing). Closed stores and unresponsive services fail their checks. Partitioned DETS currently checks directory availability, not every shard; Mnesia checks that the local table is available. `schema_version` describes runtime codec support, not an audited on-disk migration level.
+
+### Bounded in-process metrics
+
+`metrics.counter`, `metrics.gauge`, and `metrics.histogram` use a dedicated supervised registry rather than ETS owned by the first caller. The registry admits at most **256 kind/name series**, names of **1–128 bytes**, and the most recent **128 histogram samples per series**. New series beyond the cap and invalid names are dropped; existing admitted series continue updating. Counters use ETS atomic increments. `gleamunison_metrics:list_metrics/0` is the bounded in-process inspection surface.
+
+Telemetry events, when the optional telemetry module is present, use fixed `[gleamunison, counter|gauge|histogram]` event names with numeric `value` measurements and `name` metadata. No Prometheus/StatsD exporter, durable metric history, or external monitoring service is shipped. Registry restart recovers the worker but resets its in-memory observations; survival of short-lived callers is not durability.
 
 ## Upgrade
 

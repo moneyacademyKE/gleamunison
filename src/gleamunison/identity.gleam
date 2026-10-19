@@ -1,3 +1,4 @@
+import gleam/result
 import gleam/string
 
 /// Opaque hash type. No access to the inner bytes outside this module.
@@ -21,7 +22,18 @@ pub type LocalVar {
 fn ffi_hash_bytes(_bytes: BitArray) -> BitArray
 
 @external(erlang, "gleamunison_ffi", "hex_to_bytes")
-pub fn hex_to_bytes(hex: String) -> BitArray
+pub fn hex_to_bytes(hex: String) -> Result(BitArray, String)
+
+/// Parse an external SHA-256 reference before it reaches storage or transport.
+pub fn parse_ref_hex(hex: String) -> Result(DefinitionRef, String) {
+  case string.length(hex) == 64 {
+    False -> Error("invalid reference: expected 64 hexadecimal SHA-256 digits")
+    True -> {
+      use bytes <- result.try(hex_to_bytes(hex))
+      Ok(Ref(hash_from_bytes(bytes)))
+    }
+  }
+}
 
 @external(erlang, "gleamunison_ffi", "hash_equal")
 fn ffi_hash_equal(_a: BitArray, _b: BitArray) -> Bool

@@ -19,8 +19,13 @@
   (swap! checks inc)
   (println (str "PASS: " label)))
 
+;; This key is generated per run, belongs only to the disposable store,
+;; and must never reuse the caller's production signing identity.
+(def fixture-signing-key (str (java.util.UUID/randomUUID)))
+
 (defn cli [& args]
-  @(apply process/process {:dir work :out :string :err :string :continue true}
+  @(apply process/process {:dir work :out :string :err :string :continue true
+                           :extra-env {"GLEAMUNISON_EVIDENCE_SIGNING_KEY" fixture-signing-key}}
           executable args))
 
 (defn digest [path]
@@ -72,7 +77,7 @@
   (let [stored (cli "evidence" subject)]
     (check! "evidence survives process exit"
             (and (zero? (:exit stored))
-                 (str/includes? (:out stored) "verified: test evidence")) stored))
+                 (str/includes? (:out stored) "test  pass  test_answer: 1 passed, 0 failed")) stored))
   (let [published (cli "publish" "pass.lisp")]
     (check! "separate publish consumes persisted evidence"
             (and (zero? (:exit published))

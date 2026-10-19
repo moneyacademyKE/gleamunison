@@ -1,7 +1,12 @@
 -module(gleamunison_http_client).
--export([request/4, get/1, post/2, put/2, delete/1]).
+-export([request/4, request_with_options/6, get/1, post/2, put/2, delete/1]).
 
-request(Method, Url, Headers, Body) when is_binary(Method), is_binary(Url) ->
+request(Method, Url, Headers, Body) ->
+    request_with_options(Method, Url, Headers, Body, 180000, none).
+
+request_with_options(Method, Url, Headers, Body, TimeoutMs, Cancellation)
+    when is_binary(Method), is_binary(Url), is_integer(TimeoutMs),
+         TimeoutMs > 0, TimeoutMs =< 180000 ->
     %% httpc lives in the inets application and HTTPS needs ssl; neither is
     %% auto-started in escript/`gleam run` mode. Idempotent when running.
     application:ensure_all_started(ssl),
@@ -15,13 +20,56 @@ request(Method, Url, Headers, Body) when is_binary(Method), is_binary(Url) ->
         delete -> {UrlString, HeaderList};
         _ -> {UrlString, HeaderList, ContentType, Body}
     end,
-    case httpc:request(MethodAtom, Request, [{timeout, 180000}, {connect_timeout, 30000}], [{body_format, binary}]) of
-        {ok, {{_Ver, Status, _Reason}, RespHeaders, RespBody}} ->
-            BinHeaders = [{list_to_binary(K), list_to_binary(V)} || {K, V} <- RespHeaders],
-            {ok, {Status, BinHeaders, RespBody}};
+    case cancelled(Cancellation) of
+        true -> {error, <<"request_cancelled">>};
+        false -> request_httpc(MethodAtom, Request, TimeoutMs, Cancellation)
+    end;
+request_with_options(_, _, _, _, _, _) ->
+    {error, <<"request_timeout_invalid">>}.
+
+request_httpc(Method, Request, TimeoutMs, Cancellation) ->
+    Result = httpc:request(Method, Request,
+        [{timeout, TimeoutMs}, {connect_timeout, TimeoutMs}],
+        [{sync, false}, {max_body_size, 8 * 1024 * 1024}]),
+    case Result of
+        {ok, RequestId} ->
+            Deadline = erlang:monotonic_time(millisecond) + TimeoutMs,
+            wait_for_response(RequestId, Deadline, Cancellation);
         {error, Reason} ->
-            {error, list_to_binary(io_lib:format("~p", [Reason]))}
+            {error, error_binary(Reason)}
     end.
+
+wait_for_response(RequestId, Deadline, Cancellation) ->
+    case cancelled(Cancellation) of
+        true -> cancel_request(RequestId, <<"request_cancelled">>);
+        false ->
+            Remaining = Deadline - erlang:monotonic_time(millisecond),
+            case Remaining =< 0 of
+                true -> cancel_request(RequestId, <<"request_timeout">>);
+                false ->
+                    receive
+                        {http, {RequestId, {{_Ver, Status, _Reason}, RespHeaders, RespBody}}} ->
+                            BinHeaders = [{list_to_binary(K), list_to_binary(V)} || {K, V} <- RespHeaders],
+                            {ok, {Status, BinHeaders, RespBody}};
+                        {http, {RequestId, {error, Reason}}} ->
+                            {error, error_binary(Reason)}
+                    after
+                        erlang:min(Remaining, 50) ->
+                            wait_for_response(RequestId, Deadline, Cancellation)
+                    end
+            end
+    end.
+
+cancel_request(RequestId, Reason) ->
+    _ = catch httpc:cancel_request(RequestId),
+    {error, Reason}.
+
+cancelled(none) -> false;
+cancelled({some, Token}) -> gleamunison_cancellation:cancelled(Token).
+
+error_binary(timeout) -> <<"request_timeout">>;
+error_binary({failed_connect, _}) -> <<"connect_failed">>;
+error_binary(Reason) -> list_to_binary(io_lib:format("~p", [Reason])).
 
 method_atom(<<"GET">>) -> get;
 method_atom(<<"POST">>) -> post;

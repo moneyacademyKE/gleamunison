@@ -20,6 +20,7 @@ fn openai_cfg() -> ProviderConfig {
     api_key: "sk-test",
     model: "gpt-test",
     max_tokens: 1024,
+    timeout_ms: 180_000,
     reasoning_effort: "",
   )
 }
@@ -31,6 +32,7 @@ fn anthropic_cfg() -> ProviderConfig {
     api_key: "sk-ant-test",
     model: "claude-test",
     max_tokens: 512,
+    timeout_ms: 180_000,
     reasoning_effort: "",
   )
 }

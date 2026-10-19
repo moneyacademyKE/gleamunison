@@ -22,10 +22,18 @@ pub fn check(
   adapter: StorageAdapter,
   defs: List(#(String, String, Bool)),
 ) -> Result(List(String), List(String)) {
+  check_with_policy(adapter, defs, evidence.AllowUnsigned)
+}
+
+pub fn check_with_policy(
+  adapter: StorageAdapter,
+  defs: List(#(String, String, Bool)),
+  policy: evidence.VerificationPolicy,
+) -> Result(List(String), List(String)) {
   let gated = list.filter(defs, fn(d) { !string.starts_with(d.0, "test_") })
   let missing =
     list.filter_map(gated, fn(d) {
-      case admitted(adapter, d.1, d.2) {
+      case admitted(adapter, d.1, d.2, policy) {
         True -> Error(Nil)
         False -> Ok(d.0)
       }
@@ -38,7 +46,15 @@ pub fn check(
 
 /// The gate rule for one def: Test evidence always admits; Io attestation
 /// admits only when the def's inferred requirement row is non-empty.
-fn admitted(adapter: StorageAdapter, subject: String, effectful: Bool) -> Bool {
-  evidence.verified(adapter, subject, evidence.Test)
-  || { effectful && evidence.verified(adapter, subject, evidence.Io) }
+fn admitted(
+  adapter: StorageAdapter,
+  subject: String,
+  effectful: Bool,
+  policy: evidence.VerificationPolicy,
+) -> Bool {
+  evidence.verified_with_policy(adapter, subject, evidence.Test, policy)
+  || {
+    effectful
+    && evidence.verified_with_policy(adapter, subject, evidence.Io, policy)
+  }
 }

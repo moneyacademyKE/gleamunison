@@ -6,8 +6,7 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/identity.{
-  type DefinitionRef, Ref, hash_bytes, hash_from_bytes, hash_to_debug_string,
-  hex_to_bytes,
+  type DefinitionRef, Ref, hash_bytes, hash_to_debug_string, parse_ref_hex,
 }
 import gleamunison/storage.{type StorageAdapter}
 
@@ -59,8 +58,8 @@ fn ref_hex(r: DefinitionRef) -> String {
   hash_to_debug_string(h)
 }
 
-fn hex_ref(s: String) -> DefinitionRef {
-  Ref(hash_from_bytes(hex_to_bytes(s)))
+fn hex_ref(s: String) -> Result(DefinitionRef, Nil) {
+  parse_ref_hex(s) |> result.replace_error(Nil)
 }
 
 fn serialize_ns(ns: Namespace) -> BitArray {
@@ -80,7 +79,8 @@ fn parse_ns(bytes: BitArray) -> Result(Namespace, Nil) {
           case string.split(line, ":") {
             [name_b64, hex] -> {
               use name <- result.try(unb64(name_b64))
-              Ok([#(name, hex_ref(hex)), ..acc])
+              use ref <- result.try(hex_ref(hex))
+              Ok([#(name, ref), ..acc])
             }
             _ -> Error(Nil)
           }
@@ -109,7 +109,11 @@ pub fn load(
 ) -> Result(Namespace, String) {
   case adapter.lookup(ref) {
     Ok(Some(bytes)) ->
-      parse_ns(bytes) |> result.replace_error("corrupt namespace chunk")
+      case Ref(hash_bytes(bytes)) == ref {
+        True ->
+          parse_ns(bytes) |> result.replace_error("corrupt namespace chunk")
+        False -> Error("namespace integrity failure")
+      }
     Ok(None) -> Error("namespace not found")
     Error(_) -> Error("store lookup failed")
   }
@@ -145,11 +149,12 @@ fn parse_head(
     ["head", "1", branch_b64, seq_s, ns_hex, prev_hex] -> {
       use branch <- result.try(unb64(branch_b64))
       use seq <- result.try(int.parse(seq_s) |> result.replace_error(Nil))
-      let prev = case prev_hex {
-        "-" -> None
-        hex -> Some(hex_ref(hex))
-      }
-      Ok(#(branch, seq, hex_ref(ns_hex), prev))
+      use ns_ref <- result.try(hex_ref(ns_hex))
+      use prev <- result.try(case prev_hex {
+        "-" -> Ok(None)
+        hex -> hex_ref(hex) |> result.map(Some)
+      })
+      Ok(#(branch, seq, ns_ref, prev))
     }
     _ -> Error(Nil)
   }
@@ -163,8 +168,9 @@ pub fn branch_head(
   case adapter.lookup(branch_pointer_ref(branch)) {
     Ok(Some(bytes)) ->
       case parse_head(bytes) {
-        Ok(#(_, seq, ns_ref, _)) -> Ok(#(seq, ns_ref))
-        Error(_) -> Error("corrupt branch head")
+        Ok(#(name, seq, ns_ref, _)) if name == branch && seq > 0 ->
+          Ok(#(seq, ns_ref))
+        _ -> Error("corrupt branch head or branch identity mismatch")
       }
     Ok(None) -> Error("no such branch: " <> branch)
     Error(_) -> Error("store lookup failed")
@@ -373,8 +379,10 @@ fn fetch_chunk(
 }
 
 /// Import a branch chunk set. Content chunks are verified against their
-/// hash before insert; the pointer chunk must parse as a head. A tampered
-/// chunk is refused — nothing partial lands.
+/// hash before insert; the pointer must match its embedded branch. Validate
+/// the whole set, then write immutable chunks and publish ONE pointer last.
+/// Failed content writes may leave immutable, retry-safe orphan chunks;
+/// they never publish a partially imported branch. No cross-store transaction.
 pub fn import_branch(
   adapter: StorageAdapter,
   chunks: List(#(String, BitArray)),
@@ -383,15 +391,23 @@ pub fn import_branch(
     list.try_map(chunks, fn(pair) { verify_chunk(pair) })
     |> result.map(fn(_) { Nil }),
   )
-  list.fold(chunks, Ok(Nil), fn(acc, pair) {
+  let pointers =
+    list.filter(chunks, fn(p) { string.starts_with(p.0, "pointer:") })
+  use _ <- result.try(case list.length(pointers) <= 1 {
+    True -> Ok(Nil)
+    False -> Error("import accepts one branch pointer at a time")
+  })
+  let content =
+    list.filter(chunks, fn(p) { !string.starts_with(p.0, "pointer:") })
+  list.fold(list.append(content, pointers), Ok(Nil), fn(acc, pair) {
     case acc {
       Error(e) -> Error(e)
       Ok(_) -> {
         let #(key, bytes) = pair
-        let ref = case string.starts_with(key, "pointer:") {
-          True -> branch_pointer_ref(string.drop_start(key, 8))
-          False -> hex_ref(string.drop_start(key, 6))
-        }
+        use ref <- result.try(case string.starts_with(key, "pointer:") {
+          True -> Ok(branch_pointer_ref(string.drop_start(key, 8)))
+          False -> parse_ref_hex(string.drop_start(key, 6))
+        })
         adapter.insert(ref, bytes)
         |> result.map_error(fn(_) { "store insert failed" })
       }
@@ -402,14 +418,19 @@ pub fn import_branch(
 fn verify_chunk(pair: #(String, BitArray)) -> Result(Nil, String) {
   let #(key, bytes) = pair
   case string.starts_with(key, "pointer:") {
-    True ->
+    True -> {
+      let branch = string.drop_start(key, 8)
       case parse_head(bytes) {
-        Ok(_) -> Ok(Nil)
-        Error(_) -> Error("pointer chunk does not parse as a head")
+        Ok(#(name, seq, _, _)) if name == branch && seq > 0 -> Ok(Nil)
+        _ -> Error("pointer branch identity mismatch or invalid head")
       }
+    }
     False -> {
       let expected = string.drop_start(key, 6)
-      case ref_hex(Ref(hash_bytes(bytes))) == expected {
+      case
+        string.starts_with(key, "chunk:")
+        && ref_hex(Ref(hash_bytes(bytes))) == expected
+      {
         True -> Ok(Nil)
         False -> Error("chunk hash mismatch: " <> expected)
       }

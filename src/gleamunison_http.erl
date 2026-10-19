@@ -1,56 +1,100 @@
 -module(gleamunison_http).
--export([start_server/1, stop_server/0]).
+-behaviour(gen_server).
+-export([start_link/1, start_server/1, stop_server/0, init/1, handle_call/3,
+         handle_cast/2, handle_info/2, terminate/2, worker_count/1]).
+
+-define(MAX_BODY_BYTES, 1048576).
+-define(MAX_HEADER_COUNT, 64).
+-define(MAX_HEADER_BYTES, 16384).
+-define(MAX_WORKERS, 64).
+
+start_link(Port) when is_integer(Port) ->
+    gen_server:start_link(?MODULE, Port, []).
 
 start_server(Port) when is_integer(Port) ->
+    case gleamunison_runtime_sup:start_http(Port) of
+        {ok, Pid} -> wait_for_server(Pid), ok;
+        {error, {already_started, Pid}} -> wait_for_server(Pid), ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
+wait_for_server(Pid) when is_pid(Pid) ->
+    Ref = erlang:monitor(process, Pid),
+    receive
+        {'DOWN', Ref, process, Pid, _Reason} -> ok
+    end.
+
+stop_server() ->
+    gleamunison_runtime_sup:stop_http().
+
+init(Port) ->
+    application:ensure_all_started(crypto),
+    ensure_counter(),
+    case gen_tcp:listen(Port, [binary, {active, false}, {reuseaddr, true},
+                               {packet, http_bin}, {backlog, 100},
+                               {ip, {127, 0, 0, 1}}]) of
+        {ok, ListenSocket} ->
+            Owner = self(),
+            Acceptor = spawn_link(fun() -> accept_loop(Owner, ListenSocket) end),
+            persistent_term:put({gleamunison_http, listener}, {self(), ListenSocket}),
+            {ok, #{socket => ListenSocket, acceptor => Acceptor, workers => #{}}};
+        {error, Reason} -> {stop, Reason}
+    end.
+
+ensure_counter() ->
     case ets:whereis(gleamunison_http_counter) of
         undefined ->
             ets:new(gleamunison_http_counter, [set, public, named_table]),
             ets:insert(gleamunison_http_counter, {count, 0});
-        _ ->
-            ok
-    end,
-    spawn(fun() -> server_loop(Port) end),
-    io:format("Gleamunison webserver listening on http://localhost:~p~n", [Port]),
-    server_control_loop(Port).
-
-server_control_loop(Port) ->
-    receive
-        stop -> ok;
-        _ -> server_control_loop(Port)
+        _ -> ok
     end.
 
-stop_server() ->
-    case erlang:whereis(gleamunison_http_server) of
-        undefined -> ok;
-        Pid -> exit(Pid, shutdown)
+worker_count(Pid) when is_pid(Pid) ->
+    case sys:get_state(Pid) of
+        #{workers := Workers} -> map_size(Workers)
     end.
 
-server_loop(Port) ->
-    register(gleamunison_http_server, self()),
-    {ok, ListenSocket} = gen_tcp:listen(Port, [
-        binary, {active, false}, {reuseaddr, true},
-        {packet, http_bin}, {backlog, 100}, {ip, {127, 0, 0, 1}}
-    ]),
-    accept_loop(ListenSocket).
+handle_call(stop, _From, State) -> {stop, normal, ok, State};
+handle_call(_Request, _From, State) -> {reply, {error, unsupported}, State}.
+handle_cast(_, State) -> {noreply, State}.
 
-accept_loop(ListenSocket) ->
+handle_info({accepted, Socket}, #{workers := Workers} = State) ->
+    case map_size(Workers) < ?MAX_WORKERS of
+        true ->
+            {Pid, Mon} = spawn_monitor(fun() -> handle_request(Socket) end),
+            {noreply, State#{workers := Workers#{Pid => Mon}}};
+        false ->
+            gleamunison_http_util:send_response(Socket, 503, <<"busy">>),
+            gen_tcp:close(Socket),
+            {noreply, State}
+    end;
+handle_info({'DOWN', Mon, process, Pid, _Reason}, #{workers := Workers} = State) ->
+    case maps:find(Pid, Workers) of
+        {ok, Mon} -> {noreply, State#{workers := maps:remove(Pid, Workers)}};
+        error -> {noreply, State}
+    end;
+handle_info(_, State) -> {noreply, State}.
+
+terminate(_, #{socket := Socket, acceptor := Acceptor, workers := Workers}) ->
+    catch gen_tcp:close(Socket),
+    exit(Acceptor, shutdown),
+    maps:foreach(fun(Pid, _) -> exit(Pid, shutdown) end, Workers),
+    persistent_term:erase({gleamunison_http, listener}),
+    ok.
+
+accept_loop(Owner, ListenSocket) ->
     case gen_tcp:accept(ListenSocket) of
-        {ok, Socket} ->
-            spawn(fun() -> handle_request(Socket) end),
-            accept_loop(ListenSocket);
-        {error, closed} ->
-            ok;
-        {error, Reason} ->
-            io:format("Accept error: ~p~n", [Reason]),
-            accept_loop(ListenSocket)
+        {ok, Socket} -> Owner ! {accepted, Socket}, accept_loop(Owner, ListenSocket);
+        {error, closed} -> ok;
+        {error, _Reason} -> timer:sleep(25), accept_loop(Owner, ListenSocket)
     end.
 
 handle_request(Socket) ->
     case gen_tcp:recv(Socket, 0, 5000) of
         {ok, {http_request, 'GET', {abs_path, Path}, _Version}} ->
-            handle_route(Socket, Path);
+            handle_get_headers(Socket, Path);
         {ok, {http_request, 'POST', {abs_path, Path}, _Version}} ->
-            handle_post(Socket, Path);
+            handle_post_headers(Socket, Path);
         {ok, _Other} ->
             gleamunison_http_util:send_response(Socket, 501, <<"Not Implemented">>);
         {error, closed} ->
@@ -59,37 +103,132 @@ handle_request(Socket) ->
             gen_tcp:close(Socket)
     end.
 
-%% Read headers until end-of-headers, keeping Content-Length, then read
-%% exactly that many body bytes. Socket is in {packet, http_bin} mode at
-%% entry; switches to raw mode for the body.
-handle_post(Socket, Path) ->
-    case read_headers(Socket, 0) of
-        {ok, ContentLength} ->
-            inet:setopts(Socket, [{packet, raw}]),
-            Body = case ContentLength of
-                0 -> <<>>;
-                _ ->
-                    case gen_tcp:recv(Socket, ContentLength, 5000) of
-                        {ok, B} -> B;
-                        {error, _} -> <<>>
-                    end
-            end,
-            handle_post_route(Socket, Path, Body);
-        {error, _} ->
-            gen_tcp:close(Socket)
+handle_get_headers(Socket, Path) ->
+    case read_headers(Socket, 0, [], 0) of
+        {ok, _ContentLength, Headers} ->
+            case authorized(Path, Headers) of
+                true -> handle_route(Socket, Path);
+                false -> send_unauthorized(Socket)
+            end;
+        {error, headers_too_large} -> send_error(Socket, 413, <<"headers too large">>);
+        {error, _} -> send_error(Socket, 400, <<"invalid headers">>)
     end.
 
-read_headers(Socket, ContentLength) ->
+handle_post_headers(Socket, Path) ->
+    case read_headers(Socket, 0, [], 0) of
+        {ok, ContentLength, Headers} ->
+            case authorized(Path, Headers) of
+                false -> send_unauthorized(Socket);
+                true -> handle_post_body(Socket, Path, ContentLength)
+            end;
+        {error, body_too_large} -> send_error(Socket, 413, <<"request body too large">>);
+        {error, headers_too_large} -> send_error(Socket, 413, <<"headers too large">>);
+        {error, _} -> send_error(Socket, 400, <<"invalid headers">>)
+    end.
+
+handle_post_body(Socket, Path, ContentLength) ->
+    inet:setopts(Socket, [{packet, raw}]),
+    case recv_body(Socket, ContentLength, <<>>) of
+        {ok, Body} -> handle_post_route(Socket, Path, Body);
+        {error, _} -> send_error(Socket, 400, <<"incomplete request body">>)
+    end.
+
+%% Read headers until end-of-headers. Header names are normalized so auth and
+%% content-length checks do not depend on OTP's packet representation.
+read_headers(Socket, ContentLength, Headers, HeaderBytes) ->
     case gen_tcp:recv(Socket, 0, 5000) of
-        {ok, {http_header, _, 'Content-Length', _, Value}} ->
-            read_headers(Socket, binary_to_integer(Value));
-        {ok, {http_header, _, _, _, _}} ->
-            read_headers(Socket, ContentLength);
+        {ok, {http_header, _, Name, _, Value}} ->
+            HeaderName = header_binary(Name),
+            HeaderValue = header_binary(Value),
+            NewBytes = HeaderBytes + byte_size(HeaderName) + byte_size(HeaderValue),
+            case {length(Headers) < ?MAX_HEADER_COUNT, NewBytes =< ?MAX_HEADER_BYTES} of
+                {false, _} -> {error, headers_too_large};
+                {_, false} -> {error, headers_too_large};
+                {true, true} ->
+                    case normalize_header_name(HeaderName) of
+                        <<"content-length">> ->
+                            case parse_content_length(HeaderValue) of
+                                {ok, Length} when Length >= 0, Length =< ?MAX_BODY_BYTES ->
+                                    read_headers(Socket, Length, [{<<"content-length">>, HeaderValue} | Headers], NewBytes);
+                                {ok, _} -> {error, body_too_large};
+                                error -> {error, invalid_content_length}
+                            end;
+                        Normalized ->
+                            read_headers(Socket, ContentLength, [{Normalized, HeaderValue} | Headers], NewBytes)
+                    end
+            end;
         {ok, http_eoh} ->
-            {ok, ContentLength};
+            {ok, ContentLength, Headers};
         {error, Reason} ->
             {error, Reason}
     end.
+
+recv_body(_Socket, 0, Acc) -> {ok, Acc};
+recv_body(Socket, Remaining, Acc) ->
+    case gen_tcp:recv(Socket, Remaining, 5000) of
+        {ok, Chunk} ->
+            Size = byte_size(Chunk),
+            recv_body(Socket, Remaining - Size, <<Acc/binary, Chunk/binary>>);
+        {error, Reason} -> {error, Reason}
+    end.
+
+header_binary(Value) when is_binary(Value) -> Value;
+header_binary(Value) when is_atom(Value) -> atom_to_binary(Value, utf8);
+header_binary(Value) when is_list(Value) -> list_to_binary(Value).
+
+normalize_header_name(Name) ->
+    list_to_binary(string:lowercase(binary_to_list(Name))).
+
+parse_content_length(Value) ->
+    try
+        {ok, binary_to_integer(list_to_binary(string:trim(binary_to_list(Value))))}
+    catch
+        _:_ -> error
+    end.
+
+authorized(Path, Headers) ->
+    case os:getenv("GLEAMUNISON_HTTP_TOKEN") of
+        false -> true;
+        "" -> true;
+        Expected ->
+            case protected_path(Path) of
+                false -> true;
+                true ->
+                    ExpectedBin = list_to_binary(Expected),
+                    Provided = case lists:keyfind(<<"authorization">>, 1, Headers) of
+                        {_, Value} -> Value;
+                        false -> <<>>
+                    end,
+                    case Provided of
+                        <<"Bearer ", Token/binary>> -> constant_time_equal(ExpectedBin, Token);
+                        _ -> false
+                    end
+            end
+    end.
+
+%% Public: the UI shell/assets and bounded operational probes. Every data
+%% and mutation route (including unknown future routes) requires the token.
+protected_path(<<"/">>) -> false;
+protected_path(<<"/index.html">>) -> false;
+protected_path(<<"/static/", _/binary>>) -> false;
+protected_path(<<"/api/live">>) -> false;
+protected_path(<<"/api/ready">>) -> false;
+protected_path(<<"/api/health">>) -> false;
+protected_path(_) -> true.
+
+constant_time_equal(Expected, Provided) when is_binary(Expected), is_binary(Provided) ->
+    constant_time_hash_compare(crypto:hash(sha256, Expected), crypto:hash(sha256, Provided), 0).
+
+constant_time_hash_compare(<<A, RestA/binary>>, <<B, RestB/binary>>, Acc) ->
+    constant_time_hash_compare(RestA, RestB, Acc bor (A bxor B));
+constant_time_hash_compare(<<>>, <<>>, Acc) -> Acc =:= 0.
+
+send_unauthorized(Socket) ->
+    gleamunison_http_util:send_json(Socket, 401, <<"{\"error\":\"unauthorized\"}">>).
+
+send_error(Socket, Status, Message) ->
+    Json = iolist_to_binary(io_lib:format("{\"error\":~ts}", [gleamunison_http_util:escape_json(Message)])),
+    gleamunison_http_util:send_json(Socket, Status, Json).
 
 handle_post_route(Socket, <<"/mcp">>, Body) ->
     handle_mcp_route(Socket, Body);
@@ -101,16 +240,18 @@ handle_mcp_route(Socket, Body) ->
         undefined ->
             gleamunison_http_util:send_json(
                 Socket, 503, <<"{\"error\":\"mcp session not running\"}">>);
-        Pid ->
-            Pid ! {rpc, Body, self()},
-            receive
-                {mcp_reply, {ok, Reply}} ->
+        _Pid ->
+            case catch gen_server:call(gleamunison_mcp_session, {rpc, Body}, 30000) of
+                {ok, {respond, Reply}} ->
                     gleamunison_http_util:send_json(Socket, 200, Reply);
-                {mcp_reply, no_reply} ->
-                    gleamunison_http_util:send_json(Socket, 202, <<>>)
-            after 30000 ->
-                gleamunison_http_util:send_json(
-                    Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
+                {ok, no_reply} ->
+                    gleamunison_http_util:send_json(Socket, 202, <<>>);
+                {error, busy} ->
+                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session busy\"}">>);
+                {'EXIT', _} ->
+                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session unavailable\"}">>);
+                _ ->
+                    gleamunison_http_util:send_json(Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
             end
     end.
 
@@ -142,17 +283,13 @@ handle_route(Socket, <<"/api/traces/", Id/binary>>) ->
     gleamunison_http_routes:handle_trace_detail_route(Socket, Id);
 handle_route(Socket, <<"/api/health">>) ->
     handle_health_route(Socket);
+handle_route(Socket, <<"/api/ready">>) ->
+    handle_health_route(Socket);
+handle_route(Socket, <<"/api/live">>) ->
+    gleamunison_http_util:send_json(Socket, 200, <<"{\"live\":true}">>);
 handle_route(Socket, Path) ->
     gleamunison_http_routes:serve_static(Socket, Path).
 
 handle_health_route(Socket) ->
-    {_Node, ModCount, _MemMB} = gleamunison_health:node_status(),
-    Status = case ModCount > 0 of
-        true -> <<"healthy">>;
-        false -> <<"unhealthy">>
-    end,
-    Json = iolist_to_binary(io_lib:format(
-        "{\"status\":\"~s\",\"loaded_modules\":~p}",
-        [Status, ModCount])),
-    gleamunison_http_util:send_json(Socket, 200, Json).
-
+    {Status, Json} = gleamunison_readiness:http_response(),
+    gleamunison_http_util:send_json(Socket, Status, Json).

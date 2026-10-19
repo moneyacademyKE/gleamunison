@@ -4,10 +4,12 @@
 //// byte-for-byte, and unsolicited chunks fail the transfer.
 
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleam/string
+import gleamunison/cli_result
+import gleamunison/cli_store
 import gleamunison/codebase
 import gleamunison/namespace
 import gleamunison/storage
@@ -16,11 +18,39 @@ import gleamunison/sync_types.{PeerId}
 
 const default_store = ".gleamunison/store.dets"
 
-pub fn command(args: List(String)) -> Nil {
-  case parse_args(args, None, default_store, None) {
-    Error(err) -> io.println("sync: " <> err)
-    Ok(#(peer, store_path, branch)) -> run_pull(peer, store_path, branch)
-  }
+pub fn command(args: List(String)) -> Result(Nil, String) {
+  use #(peer, store_path, branch) <- result.try(parse_args(
+    args,
+    None,
+    default_store,
+    None,
+  ))
+  use output <- result.try(
+    cli_store.with_dets(store_path, fn(adapter) {
+      let cb = codebase.with_adapter(adapter)
+      let state = sync.new_sync_state()
+      use #(_, _, new_refs) <- result.try(
+        sync.pull_sync(state, PeerId(peer), cb)
+        |> result.map_error(fn(e) { "sync: pull failed: " <> string.inspect(e) }),
+      )
+      use _ <- result.try(case branch {
+        None -> Ok(Nil)
+        Some(name) -> pull_branch(peer, name, adapter)
+      })
+      let branch_status = case branch {
+        None -> ""
+        Some(name) -> "; branch " <> name <> " pulled and verified"
+      }
+      Ok(
+        "sync: pulled "
+        <> int.to_string(list.length(new_refs))
+        <> " new definitions from "
+        <> peer
+        <> branch_status,
+      )
+    }),
+  )
+  cli_result.success(output)
 }
 
 fn parse_args(
@@ -50,31 +80,6 @@ fn parse_args(
   }
 }
 
-fn run_pull(peer: String, store_path: String, branch: Option(String)) -> Nil {
-  case storage.dets(store_path) {
-    Error(_) -> io.println("sync: cannot open store at " <> store_path)
-    Ok(adapter) -> {
-      let cb = codebase.with_adapter(adapter)
-      let state = sync.new_sync_state()
-      case sync.pull_sync(state, PeerId(peer), cb) {
-        Ok(#(_, _, new_refs)) -> {
-          io.println(
-            "sync: pulled "
-            <> int.to_string(list.length(new_refs))
-            <> " new definitions from "
-            <> peer,
-          )
-          case branch {
-            None -> Nil
-            Some(name) -> pull_branch(peer, name, adapter)
-          }
-        }
-        Error(err) -> io.println("sync: pull failed: " <> string.inspect(err))
-      }
-    }
-  }
-}
-
 /// Pull a branch's chunk set: the pointer ref is derivable from the branch
 /// name, each head chunk names its namespace and predecessor. Walk until
 /// the chain ends, then import the whole set (import verifies integrity).
@@ -82,17 +87,12 @@ fn pull_branch(
   peer: String,
   branch: String,
   adapter: storage.StorageAdapter,
-) -> Nil {
-  case
-    fetch_branch_chunks(peer, branch, [namespace.pointer_ref_hex(branch)], [])
-  {
-    Error(err) -> io.println("sync: branch " <> branch <> ": " <> err)
-    Ok(chunks) ->
-      case namespace.import_branch(adapter, chunks) {
-        Ok(_) -> io.println("sync: branch " <> branch <> " pulled and verified")
-        Error(err) -> io.println("sync: branch import failed: " <> err)
-      }
-  }
+) -> Result(Nil, String) {
+  use chunks <- result.try(
+    fetch_branch_chunks(peer, branch, [namespace.pointer_ref_hex(branch)], []),
+  )
+  namespace.import_branch(adapter, chunks)
+  |> result.map_error(fn(e) { "sync: branch import failed: " <> e })
 }
 
 fn fetch_branch_chunks(
@@ -114,7 +114,7 @@ fn fetch_branch_chunks(
               let is_pointer = hex == namespace.pointer_ref_hex(branch)
               case is_pointer {
                 True -> {
-                  use #(self_hex, ns_hex, prev) <- result_try(
+                  use #(self_hex, ns_hex, prev) <- result.try(
                     namespace.parse_head_hexes(bytes),
                   )
                   let next =
@@ -141,15 +141,5 @@ fn fetch_branch_chunks(
             }
           }
       }
-  }
-}
-
-fn result_try(
-  r: Result(a, String),
-  f: fn(a) -> Result(b, String),
-) -> Result(b, String) {
-  case r {
-    Ok(v) -> f(v)
-    Error(e) -> Error(e)
   }
 }

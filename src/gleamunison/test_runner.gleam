@@ -171,6 +171,26 @@ pub fn attach_results(
   defs: List(#(String, SurfaceDef)),
   cache: TypeCache,
 ) -> List(Result(#(String, DefinitionRef, String), evidence.AttachError)) {
+  attach_results_with_signer(adapter, results, defs, cache, None)
+}
+
+pub fn attach_results_signed(
+  adapter: StorageAdapter,
+  results: List(TestResult),
+  defs: List(#(String, SurfaceDef)),
+  cache: TypeCache,
+  signer: evidence.Signer,
+) -> List(Result(#(String, DefinitionRef, String), evidence.AttachError)) {
+  attach_results_with_signer(adapter, results, defs, cache, Some(signer))
+}
+
+fn attach_results_with_signer(
+  adapter: StorageAdapter,
+  results: List(TestResult),
+  defs: List(#(String, SurfaceDef)),
+  cache: TypeCache,
+  signer: Option(evidence.Signer),
+) -> List(Result(#(String, DefinitionRef, String), evidence.AttachError)) {
   results
   |> list.filter_map(fn(r) {
     case r.error {
@@ -196,16 +216,28 @@ pub fn attach_results(
                   <> " passed, "
                   <> int.to_string(r.failed)
                   <> " failed"
-                case
-                  evidence.attach(
-                    adapter,
-                    subject: subject_hex,
-                    kind: evidence.Test,
-                    verdict: verdict_of(r),
-                    payload:,
-                    ts: datetime.to_unix(datetime.now()),
-                  )
-                {
+                let signed = case signer {
+                  None ->
+                    evidence.attach(
+                      adapter,
+                      subject: subject_hex,
+                      kind: evidence.Test,
+                      verdict: verdict_of(r),
+                      payload:,
+                      ts: datetime.to_unix(datetime.now()),
+                    )
+                  Some(s) ->
+                    evidence.attach_signed(
+                      adapter,
+                      signer: s,
+                      subject: subject_hex,
+                      kind: evidence.Test,
+                      verdict: verdict_of(r),
+                      payload:,
+                      ts: datetime.to_unix(datetime.now()),
+                    )
+                }
+                case signed {
                   Ok(#(evidence_ref, _)) ->
                     Ok(Ok(#(subject_hex, evidence_ref, payload)))
                   Error(e) -> Ok(Error(e))

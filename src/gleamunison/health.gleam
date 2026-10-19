@@ -88,6 +88,5 @@ pub fn run_checks(checks: List(HealthCheck)) -> HealthStatus {
   }
 }
 
-pub fn readiness() -> Bool {
-  check_loaded_modules()
-}
+@external(erlang, "gleamunison_readiness", "ready")
+pub fn readiness() -> Bool

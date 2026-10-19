@@ -8,11 +8,12 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
+import gleam/result
 import gleamunison/effects.{type OpHandler}
 import gleamunison/json
 import gleamunison/llm.{
   type Completion, type Provider, type ProviderConfig, Anthropic, Completion,
-  Message, OpenAI, ProviderConfig, User,
+  Message, OpenAI, User,
 }
 import gleamunison/llm_middleware.{RetryPolicy}
 
@@ -34,14 +35,23 @@ pub fn command(args: List(String)) -> String {
 }
 
 pub fn command_with_env(args: List(String), env: EnvLookup) -> String {
-  case parse_args(args, env) {
-    Error(msg) -> msg
-    Ok(#(provider, prompt)) ->
-      case resolve_config(provider, env) {
-        Error(msg) -> msg
-        Ok(cfg) -> command_with_handler_cfg(cfg, prompt)
-      }
+  case command_result_with_env(args, env) {
+    Ok(message) | Error(message) -> message
   }
+}
+
+/// The process boundary must not guess success from the rendered text.
+pub fn command_result(args: List(String)) -> Result(String, String) {
+  command_result_with_env(args, ffi_get_env)
+}
+
+fn command_result_with_env(
+  args: List(String),
+  env: EnvLookup,
+) -> Result(String, String) {
+  use #(provider, prompt) <- result.try(parse_args(args, env))
+  use cfg <- result.try(resolve_config(provider, env))
+  command_with_handler_cfg(cfg, prompt)
 }
 
 /// Test seam: same pipeline with the handler swapped in.
@@ -56,13 +66,16 @@ pub fn command_with_handler(
   }
 }
 
-fn command_with_handler_cfg(cfg: ProviderConfig, prompt: String) -> String {
+fn command_with_handler_cfg(
+  cfg: ProviderConfig,
+  prompt: String,
+) -> Result(String, String) {
   let handler =
     llm_middleware.retry_handler(
       llm.provider_handler(cfg),
       RetryPolicy(max_attempts: 3, base_delay_ms: 500),
     )
-  format_result(complete_with(handler, prompt))
+  complete_with(handler, prompt) |> result.map(fn(c) { format_result(Ok(c)) })
 }
 
 fn parse_args(
@@ -107,50 +120,7 @@ pub fn resolve_config(
   provider: Provider,
   env: EnvLookup,
 ) -> Result(ProviderConfig, String) {
-  let #(key_var, default_url, default_model) = case provider {
-    OpenAI -> #("OPENAI_API_KEY", "https://api.openai.com/v1", "gpt-4o-mini")
-    Anthropic -> #(
-      "ANTHROPIC_API_KEY",
-      "https://api.anthropic.com",
-      "claude-haiku-4-5",
-    )
-  }
-  case env(key_var) {
-    Error(_) -> Error("llm: missing " <> key_var <> " in environment")
-    Ok(key) ->
-      Ok(ProviderConfig(
-        provider: provider,
-        base_url: env_or(env, url_var(provider), default_url),
-        api_key: key,
-        model: env_or(env, model_var(provider), default_model),
-        max_tokens: case int.parse(env_or(env, "LLM_MAX_TOKENS", "4096")) {
-          Ok(n) -> n
-          Error(_) -> 4096
-        },
-        reasoning_effort: env_or(env, "LLM_REASONING_EFFORT", ""),
-      ))
-  }
-}
-
-fn url_var(p: Provider) -> String {
-  case p {
-    OpenAI -> "OPENAI_BASE_URL"
-    Anthropic -> "ANTHROPIC_BASE_URL"
-  }
-}
-
-fn model_var(p: Provider) -> String {
-  case p {
-    OpenAI -> "OPENAI_MODEL"
-    Anthropic -> "ANTHROPIC_MODEL"
-  }
-}
-
-fn env_or(env: EnvLookup, key: String, default: String) -> String {
-  case env(key) {
-    Ok(v) -> v
-    Error(_) -> default
-  }
+  llm.resolve_config(provider, env)
 }
 
 /// Drive any LLM op handler with a single user prompt. The handler decides

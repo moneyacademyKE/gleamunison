@@ -29,18 +29,9 @@ pub fn connect(peer: PeerId) -> Result(Nil, SyncError) {
   }
 }
 
-/// Accept one chunk from a peer under CAS discipline: a ref already held
-/// must map to byte-identical content — first write wins, and any later
-/// conflicting bytes for the same ref are a HashConflict, never an
-/// overwrite. Fresh refs store raw. This is the check that makes "content-
-/// addressed" mean something on the wire: once any honest peer's bytes
-/// land, no peer can rewrite that ref's binding.
-///
-/// Known boundary: storage holds inspect-rendered bytes whose structural
-/// hash cannot be recomputed from the bytes alone, so a *first* write
-/// still trusts the sender. Full binding needs canonical serialization
-/// (the known debug-serialization debt); until then, consistency pinning
-/// is the honest check with teeth.
+/// Verify the content binding even on the first write. Existing refs remain
+/// byte-identical and storage errors are failures, never a missing value.
+/// Legacy inspect-rendered definitions cannot be verified and fail closed.
 pub fn accept_chunk(
   peer: PeerId,
   codebase: Codebase,
@@ -52,10 +43,19 @@ pub fn accept_chunk(
     Ok(Some(existing)) ->
       case existing == bytes {
         // idempotent: same content-addressed content
-        True -> Ok(codebase)
+        True ->
+          codebase.insert_raw_checked(codebase, ref, bytes)
+          |> result.map_error(fn(_) {
+            TransferFailed(peer, "content admission failed")
+          })
         False -> Error(HashConflict(peer, ref, existing, bytes))
       }
-    _ -> Ok(codebase.insert_raw(codebase, ref, bytes))
+    Ok(_) ->
+      codebase.insert_raw_checked(codebase, ref, bytes)
+      |> result.map_error(fn(_) {
+        TransferFailed(peer, "content admission failed")
+      })
+    Error(_) -> Error(TransferFailed(peer, "storage lookup failed"))
   }
 }
 
@@ -70,16 +70,23 @@ pub fn fetch_refs(
   hexes: List(String),
 ) -> Result(Codebase, SyncError) {
   let PeerId(name) = peer
+  use Nil <- result.try(
+    list.try_each(hexes, fn(hex) {
+      identity.parse_ref_hex(hex)
+      |> result.map(fn(_) { Nil })
+      |> result.map_error(fn(msg) { TransferFailed(peer, msg) })
+    }),
+  )
   case sync_request_defs(name, hexes) {
     Error(msg) -> Error(TransferFailed(peer, msg))
     Ok(def_blobs) -> {
       use Nil <- result.try(validate_chunk_set(hexes, def_blobs))
       list.try_fold(def_blobs, codebase, fn(cb, pair) {
         let #(hash_hex, bytes) = pair
-        let ref =
-          identity.Ref(
-            identity.hash_from_bytes(identity.hex_to_bytes(hash_hex)),
-          )
+        use ref <- result.try(
+          identity.parse_ref_hex(hash_hex)
+          |> result.map_error(fn(msg) { TransferFailed(peer, msg) }),
+        )
         accept_chunk(peer, cb, ref, bytes)
       })
     }
@@ -140,12 +147,12 @@ pub fn pull_sync(
                     list.try_fold(def_blobs, #(codebase, pq), fn(acc, pair) {
                       let #(cb, q) = acc
                       let #(hash_hex, bytes) = pair
-                      let ref =
-                        identity.Ref(
-                          identity.hash_from_bytes(identity.hex_to_bytes(
-                            hash_hex,
-                          )),
-                        )
+                      use ref <- result.try(
+                        identity.parse_ref_hex(hash_hex)
+                        |> result.map_error(fn(msg) {
+                          TransferFailed(peer, msg)
+                        }),
+                      )
                       case accept_chunk(peer, cb, ref, bytes) {
                         Ok(next_cb) ->
                           Ok(#(next_cb, priority_queue.push(q, ref)))

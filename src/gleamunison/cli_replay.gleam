@@ -5,10 +5,10 @@
 //// run the tape records is the run the code performs.
 
 import gleam/dynamic.{type Dynamic}
-import gleam/io
 import gleam/list
 import gleam/result
 import gleam/string
+import gleamunison/cli_result
 import gleamunison/compile
 import gleamunison/effects.{type HandlerFrame, RuntimeConfig}
 
@@ -31,17 +31,15 @@ fn to_dynamic(val: a) -> Dynamic
 @external(erlang, "gleamunison_repl_ffi", "eval_module_bare")
 fn eval_module_bare(mod_name: String) -> Result(String, String)
 
-pub fn command(args: List(String)) -> Nil {
+pub fn command(args: List(String)) -> Result(Nil, String) {
   case args {
     [path, name, tape_path] ->
       case replay_from_file(path, name, tape_path) {
-        Ok(val) -> io.println("replay verified: " <> name <> " = " <> val)
-        Error(err) -> io.println("replay failed: " <> err)
+        Ok(val) ->
+          cli_result.success("replay verified: " <> name <> " = " <> val)
+        Error(err) -> Error("replay failed: " <> err)
       }
-    _ ->
-      io.println(
-        "usage: gleam run -- replay <file.lisp> <def-name> <tape.json>",
-      )
+    _ -> Error("usage: gleam run -- replay <file.lisp> <def-name> <tape.json>")
   }
 }
 

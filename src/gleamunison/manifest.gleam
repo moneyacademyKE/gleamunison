@@ -12,8 +12,8 @@ import gleam/option
 import gleam/result
 import gleam/string
 import gleamunison/identity.{
-  type DefinitionRef, type Hash, Ref, hash_bytes, hash_from_bytes,
-  hash_to_debug_string, hex_to_bytes,
+  type DefinitionRef, type Hash, Ref, hash_bytes, hash_to_debug_string,
+  parse_ref_hex,
 }
 import gleamunison/storage.{type StorageAdapter}
 
@@ -58,8 +58,9 @@ pub fn ref_of(m: Manifest) -> DefinitionRef {
 }
 
 /// A ref from a hex string (what a user pastes into `pkg install`).
-pub fn ref_from_hex(hex: String) -> DefinitionRef {
-  Ref(hash_from_bytes(hex_to_bytes(hex)))
+pub fn ref_from_hex(hex: String) -> Result(DefinitionRef, String) {
+  parse_ref_hex(hex)
+  |> result.map_error(fn(reason) { "invalid manifest reference: " <> reason })
 }
 
 /// The hex form of a ref — the shareable name of a manifest.

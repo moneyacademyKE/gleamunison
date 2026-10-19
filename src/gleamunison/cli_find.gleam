@@ -8,15 +8,16 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleam/string
+import gleamunison/cli_result
 import gleamunison/mcp_session
 
-pub fn command(args: List(String)) -> Nil {
+pub fn command(args: List(String)) -> Result(Nil, String) {
   case parse_args(args, [], [], 10) {
-    Error(err) -> io.println("find: " <> err)
+    Error(err) -> Error("find: " <> err)
     Ok(#(query, loads, limit)) ->
       case query {
         "" ->
-          io.println(
+          Error(
             "usage: gleam run -- find <intent> [--load file.lisp ...] [--limit N]",
           )
         _ -> run(query, loads, limit)
@@ -42,7 +43,8 @@ fn parse_args(
     ["--load"] -> Error("--load needs a file path")
     ["--limit", n, ..rest] ->
       case int.parse(n) {
-        Ok(l) -> parse_args(rest, query_parts, loads, l)
+        Ok(l) if l > 0 -> parse_args(rest, query_parts, loads, l)
+        Ok(_) -> Error("--limit must be positive")
         Error(_) -> Error("--limit needs a number")
       }
     ["--limit"] -> Error("--limit needs a number")
@@ -50,15 +52,15 @@ fn parse_args(
   }
 }
 
-fn run(query: String, loads: List(String), limit: Int) -> Nil {
+fn run(query: String, loads: List(String), limit: Int) -> Result(Nil, String) {
   let state = mcp_session.boot()
   case load_all(state, loads) {
-    Error(err) -> io.println("find: " <> err)
+    Error(err) -> Error("find: " <> err)
     Ok(loaded) -> {
       let hits = mcp_session.search(loaded, query)
       case list.is_empty(hits) {
-        True -> io.println("no definitions match: " <> query)
-        False ->
+        True -> cli_result.success("no definitions match: " <> query)
+        False -> {
           hits
           |> list.take(limit)
           |> list.each(fn(h) {
@@ -72,6 +74,8 @@ fn run(query: String, loads: List(String), limit: Int) -> Nil {
               <> float.to_string(float.to_precision(h.score, 2)),
             )
           })
+          Ok(Nil)
+        }
       }
     }
   }

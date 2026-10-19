@@ -61,3 +61,47 @@ pub fn non_evidence_chunks_are_ignored_test() {
   let assert Ok(Nil) = adapter.insert(Ref(junk), bit_array.from_string("junk"))
   evidence.for_subject(adapter, subject_hex) |> should.equal([])
 }
+
+pub fn unsigned_evidence_is_rejected_by_trusted_policy_test() {
+  let adapter = storage.inmemory()
+  let trusted = evidence.signer("ci", <<"ci-secret">>)
+  let assert Ok(_) =
+    evidence.attach(adapter, subject_hex, Test, "pass", "legacy", 1)
+  evidence.verified_with_policy(
+    adapter,
+    subject_hex,
+    Test,
+    evidence.require_signer(trusted),
+  )
+  |> should.be_false
+}
+
+pub fn signed_evidence_requires_matching_identity_and_secret_test() {
+  let adapter = storage.inmemory()
+  let trusted = evidence.signer("ci", <<"ci-secret">>)
+  let wrong_secret = evidence.signer("ci", <<"wrong-secret">>)
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      signer: trusted,
+      subject: subject_hex,
+      kind: Test,
+      verdict: "pass",
+      payload: "signed by ci",
+      ts: 2,
+    )
+  evidence.verified_with_policy(
+    adapter,
+    subject_hex,
+    Test,
+    evidence.require_signer(trusted),
+  )
+  |> should.be_true
+  evidence.verified_with_policy(
+    adapter,
+    subject_hex,
+    Test,
+    evidence.require_signer(wrong_secret),
+  )
+  |> should.be_false
+}

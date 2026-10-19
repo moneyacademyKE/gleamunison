@@ -1,5 +1,6 @@
 import gleam/list
-import gleam/option.{type Option}
+import gleam/option.{type Option, None, Some}
+import gleam/result
 import gleamunison/identity.{
   type DefinitionRef, Ref, hash_from_bytes, hash_to_bytes,
 }
@@ -10,6 +11,8 @@ pub type StorageError {
   IoError(reason: String)
 }
 
+/// Trusted key/value primitives, including mutable branch pointers.
+/// Untrusted immutable content must use insert_content, not insert directly.
 pub type StorageAdapter {
   StorageAdapter(
     insert: fn(DefinitionRef, BitArray) -> Result(Nil, StorageError),
@@ -111,6 +114,45 @@ fn ffi_mnesia_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "mnesia_close")
 fn ffi_mnesia_close(tab: BitArray) -> Result(Nil, StorageError)
+
+@external(erlang, "gleamunison_cas", "verify")
+fn ffi_verify_content(ref: BitArray, bytes: BitArray) -> Result(Nil, String)
+
+pub fn verify_content(
+  ref: DefinitionRef,
+  bytes: BitArray,
+) -> Result(Nil, StorageError) {
+  let Ref(hash) = ref
+  ffi_verify_content(hash_to_bytes(hash), bytes)
+  |> result.map_error(StorageError)
+}
+
+/// Validate before write; preserve the first valid binding and report I/O errors.
+pub fn insert_content(
+  adapter: StorageAdapter,
+  ref: DefinitionRef,
+  bytes: BitArray,
+) -> Result(Nil, StorageError) {
+  use Nil <- result.try(verify_content(ref, bytes))
+  case adapter.lookup(ref) {
+    Ok(None) -> adapter.insert(ref, bytes)
+    Ok(Some(existing)) if existing == bytes -> Ok(Nil)
+    Ok(Some(_)) -> Error(StorageError("content_conflict"))
+    Error(error) -> Error(error)
+  }
+}
+
+/// Check a known immutable ref. Mutable pointer cells are not CAS content.
+pub fn check_content(
+  adapter: StorageAdapter,
+  ref: DefinitionRef,
+) -> Result(Nil, StorageError) {
+  case adapter.lookup(ref) {
+    Ok(Some(bytes)) -> verify_content(ref, bytes)
+    Ok(None) -> Error(NotFound)
+    Error(error) -> Error(error)
+  }
+}
 
 pub fn inmemory() -> StorageAdapter {
   let tab = ffi_new()

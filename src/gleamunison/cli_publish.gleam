@@ -13,6 +13,7 @@ import gleam/string
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/elab_types.{SurfaceTermDef}
+import gleamunison/evidence
 import gleamunison/identity.{Ref, hash_to_debug_string}
 import gleamunison/repl_eval
 import gleamunison/storage
@@ -66,7 +67,11 @@ fn run(path: String) -> Nil {
               fail("publish: " <> err)
             }
             Ok(pairs) -> {
-              let decision = turnstile.check(adapter, pairs)
+              let decision = case evidence.production_policy() {
+                Error(reason) -> Error([reason])
+                Ok(policy) ->
+                  turnstile.check_with_policy(adapter, pairs, policy)
+              }
               case adapter.close() {
                 Error(e) ->
                   fail("publish: cannot close store: " <> string.inspect(e))

@@ -1,7 +1,10 @@
 -module(gleamunison_ffi_test).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
--export([start_echo_server/0]).
--export([start_http_server/1, http_post/3, otp_blake2b64/1]).
+-export([start_echo_server/0, start_slow_server/0]).
+-export([start_http_server/1, stop_http_server/0, http_post/3, http_post_auth/4,
+         http_post_auth_length/5, set_http_token/1,
+         clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
+         clear_eval_timeout/0, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([rescue/1]).
 
@@ -79,29 +82,31 @@ test_ffi_io_coverage() ->
 
     %% Save active storage state to restore it later
     OldActive = persistent_term:get({gleamunison, active_storage}, undefined),
+    ContentKey = gleamunison_ffi:hash_bytes(<<"def">>),
+    ContentHex = gleamunison_ffi_io:ref_to_hex(ContentKey),
 
     %% 7. fetch_defs_binary, receive_pushed_defs, compute_diff when storage undefined
     persistent_term:erase({gleamunison, active_storage}),
-    [] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    ok = gleamunison_ffi_io:receive_pushed_defs([{<<"ab">>, <<"def">>}]),
+    [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    {error, <<"storage_unavailable">>} = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
 
     %% Test ets lookup/insert/list_refs
     TabETS = gleamunison_storage:new(),
     persistent_term:put({gleamunison, active_storage}, {ets, TabETS}),
-    [] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    ok = gleamunison_ffi_io:receive_pushed_defs([{<<"ab">>, <<"def">>}]),
-    [{<<"ab">>, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:lookup(TabETS, gleamunison_ffi:hex_to_bytes(<<"ab">>)),
+    [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
+    [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    {ok, {some, <<"def">>}} = gleamunison_storage:lookup(TabETS, ContentKey),
 
     %% Test dets lookup/insert/list_refs
     file:delete("test_dets.db"),
     {error, _} = gleamunison_storage:dets_new(<<".">>),
     {ok, TabDETS} = gleamunison_storage:dets_new(<<"test_dets.db">>),
     persistent_term:put({gleamunison, active_storage}, {dets, TabDETS}),
-    [] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    ok = gleamunison_ffi_io:receive_pushed_defs([{<<"ab">>, <<"def">>}]),
-    [{<<"ab">>, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:dets_lookup(TabDETS, gleamunison_ffi:hex_to_bytes(<<"ab">>)),
+    [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
+    [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    {ok, {some, <<"def">>}} = gleamunison_storage:dets_lookup(TabDETS, ContentKey),
     _ = gleamunison_ffi_io:compute_diff(nonexistent_peer),
     gleamunison_storage:dets_close(TabDETS),
     file:delete("test_dets.db"),
@@ -110,10 +115,10 @@ test_ffi_io_coverage() ->
     file:delete("test_pd"),
     {ok, TabPD} = gleamunison_storage:partitioned_dets_new(<<"test_pd">>),
     persistent_term:put({gleamunison, active_storage}, {partitioned_dets, TabPD}),
-    [] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    ok = gleamunison_ffi_io:receive_pushed_defs([{<<"ab">>, <<"def">>}]),
-    [{<<"ab">>, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:partitioned_dets_lookup(TabPD, gleamunison_ffi:hex_to_bytes(<<"ab">>)),
+    [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
+    [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    {ok, {some, <<"def">>}} = gleamunison_storage:partitioned_dets_lookup(TabPD, ContentKey),
     _ = gleamunison_ffi_io:compute_diff(nonexistent_peer),
     gleamunison_storage:partitioned_dets_close(TabPD),
     gleamunison_storage:partitioned_dets_delete_file(<<"test_pd">>),
@@ -123,10 +128,10 @@ test_ffi_io_coverage() ->
     {ok, TabMnesia} = gleamunison_storage:mnesia_new(<<"test_tab">>),
     {ok, TabMnesia} = gleamunison_storage:mnesia_new(<<"test_tab">>),
     persistent_term:put({gleamunison, active_storage}, {mnesia, TabMnesia}),
-    [] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    ok = gleamunison_ffi_io:receive_pushed_defs([{<<"ab">>, <<"def">>}]),
-    [{<<"ab">>, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([<<"ab">>]),
-    {ok, {some, <<"def">>}} = gleamunison_storage:mnesia_lookup(TabMnesia, gleamunison_ffi:hex_to_bytes(<<"ab">>)),
+    [] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    ok = gleamunison_ffi_io:receive_pushed_defs([{ContentHex, <<"def">>}]),
+    [{ContentHex, <<"def">>}] = gleamunison_ffi_io:fetch_defs_binary([ContentHex]),
+    {ok, {some, <<"def">>}} = gleamunison_storage:mnesia_lookup(TabMnesia, ContentKey),
     _ = gleamunison_ffi_io:compute_diff(nonexistent_peer),
     application:stop(mnesia),
 
@@ -138,10 +143,11 @@ test_ffi_io_coverage() ->
 
     %% 8. ref_to_hex and hex_to_ref
     Hex = <<"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef">>,
-    Ref = {ref, {hash, gleamunison_ffi:hex_to_bytes(Hex)}},
-    Ref = gleamunison_ffi_io:hex_to_ref(Hex),
+    {ok, HexBytes} = gleamunison_ffi:hex_to_bytes(Hex),
+    Ref = {ref, {hash, HexBytes}},
+    {ok, Ref} = gleamunison_ffi_io:hex_to_ref(Hex),
     Hex = gleamunison_ffi_io:ref_to_hex(Ref),
-    Hex = gleamunison_ffi_io:ref_to_hex(gleamunison_ffi:hex_to_bytes(Hex)),
+    Hex = gleamunison_ffi_io:ref_to_hex(HexBytes),
 
     %% 9. Test gleamunison_config env lookup
     {error, nil} = gleamunison_config:get_env(<<"NONEXISTENT_ENV_VAR_12345">>),
@@ -187,6 +193,23 @@ start_echo_server() ->
     Pid = spawn(fun() -> echo_accept(LSock) end),
     register(gleamunison_echo_test, Pid),
     {ok, Port}.
+
+start_slow_server() ->
+    {ok, _} = application:ensure_all_started(inets),
+    {ok, LSock} = gen_tcp:listen(0, [binary, {active, false}, {reuseaddr, true},
+                                     {ip, {127, 0, 0, 1}}]),
+    {ok, Port} = inet:port(LSock),
+    spawn(fun() ->
+        case gen_tcp:accept(LSock, 2000) of
+            {ok, Sock} ->
+                timer:sleep(1000),
+                gen_tcp:close(Sock);
+            {error, _} -> ok
+        end,
+        gen_tcp:close(LSock)
+    end),
+    {ok, Port}.
+
 
 echo_accept(LSock) ->
     case gen_tcp:accept(LSock, 10000) of
@@ -274,11 +297,78 @@ pd_records(Key) ->
         L -> lists:reverse(L)
     end.
 
-%% Start the real HTTP server on Port, backgrounded, and wait until the
-%% listener accepts connections (up to ~1s).
+tcp_auth_probe(Mode) when is_integer(Mode) ->
+    true = os:putenv("GLEAMUNISON_SYNC_TOKEN", "server-secret"),
+    ensure_tcp_sync_server(),
+    Port = gleamunison_tcp_sync:get_port(),
+    SocketResult = case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {ok, Socket} ->
+            case Mode of
+                3 ->
+                    ok = gen_tcp:send(Socket, <<1048577:32>>),
+                    receive_raw_reply(Socket);
+                _ ->
+                    Message = {<<"test-peer">>, {connect, <<"test-peer">>}},
+                    Request = case Mode of
+                        0 -> Message;
+                        1 -> {auth, <<"server-secret">>, Message};
+                        2 -> {auth, <<"wrong-secret">>, Message}
+                    end,
+                    Bin = term_to_binary(Request),
+                    ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>),
+                    receive_raw_reply(Socket)
+            end;
+        {error, Reason} -> {error, Reason}
+    end,
+    true = os:unsetenv("GLEAMUNISON_SYNC_TOKEN"),
+    list_to_binary(io_lib:format("~tp", [SocketResult])).
+
+ensure_tcp_sync_server() ->
+    case whereis(gleamunison_tcp_sync) of
+        undefined ->
+            {ok, _Pid} = gleamunison_tcp_sync:start_link(),
+            ok;
+        _Pid -> ok
+    end.
+
+receive_raw_reply(Socket) ->
+    Result = case gen_tcp:recv(Socket, 4, 2000) of
+        {ok, <<Len:32>>} ->
+            case gen_tcp:recv(Socket, Len, 2000) of
+                {ok, Bin} ->
+                    try binary_to_term(Bin, [safe]) catch _:_ -> invalid_reply end;
+                {error, Reason} -> {error, Reason}
+            end;
+        {error, Reason} -> {error, Reason}
+    end,
+    gen_tcp:close(Socket),
+    Result.
+
+set_eval_timeout(Value) when is_integer(Value) ->
+    true = os:putenv("GLEAMUNISON_EVAL_TIMEOUT_MS", integer_to_list(Value)),
+    nil.
+
+clear_eval_timeout() ->
+    true = os:unsetenv("GLEAMUNISON_EVAL_TIMEOUT_MS"),
+    nil.
+
+%% Start the real HTTP server on Port in a monitored process and wait until
+%% the listener accepts connections (up to ~1s).
 start_http_server(Port) ->
-    spawn(fun() -> gleamunison_http:start_server(Port) end),
-    wait_for_port(Port, 10),
+    {Pid, Monitor} = spawn_monitor(fun() -> gleamunison_http:start_server(Port) end),
+    try
+        wait_for_port(Port, 10),
+        erlang:demonitor(Monitor, [flush]),
+        nil
+    catch
+        error:Reason ->
+            exit(Pid, kill),
+            receive {'DOWN', Monitor, process, Pid, _} -> ok after 1000 -> ok end,
+            erlang:error(Reason)
+    end.
+
+stop_http_server() ->
+    gleamunison_http:stop_server(),
     nil.
 
 wait_for_port(_Port, 0) -> ok;
@@ -306,6 +396,53 @@ http_post(Port, Path, Body) ->
                     {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
             end
     end.
+
+%% POST variant used by auth and size-limit integration tests.
+http_post_auth(Port, Path, Body, Token) ->
+    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {error, Reason} ->
+            {error, iolist_to_binary(io_lib:format("connect: ~p", [Reason]))};
+        {ok, Socket} ->
+            Req = iolist_to_binary(io_lib:format(
+                "POST ~s HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer ~s\r\nContent-Type: application/json\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
+                [Path, Token, byte_size(Body), Body])),
+            ok = gen_tcp:send(Socket, Req),
+            Result = recv_all(Socket, <<>>),
+            gen_tcp:close(Socket),
+            case Result of
+                {ok, Resp} -> parse_http_response(Resp);
+                {error, R} ->
+                    {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
+            end
+    end.
+
+%% POST variant with an explicit declared length, used to reject oversized
+%% requests before the body is read.
+http_post_auth_length(Port, Path, Body, Token, DeclaredLength) ->
+    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {error, Reason} ->
+            {error, iolist_to_binary(io_lib:format("connect: ~p", [Reason]))};
+        {ok, Socket} ->
+            Req = iolist_to_binary(io_lib:format(
+                "POST ~s HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer ~s\r\nContent-Type: application/json\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
+                [Path, Token, DeclaredLength, Body])),
+            ok = gen_tcp:send(Socket, Req),
+            Result = recv_all(Socket, <<>>),
+            gen_tcp:close(Socket),
+            case Result of
+                {ok, Resp} -> parse_http_response(Resp);
+                {error, R} ->
+                    {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
+            end
+    end.
+
+set_http_token(Token) when is_binary(Token) ->
+    true = os:putenv("GLEAMUNISON_HTTP_TOKEN", binary_to_list(Token)),
+    nil.
+
+clear_http_token() ->
+    true = os:unsetenv("GLEAMUNISON_HTTP_TOKEN"),
+    nil.
 
 recv_all(Socket, Acc) ->
     case gen_tcp:recv(Socket, 0, 5000) of

@@ -1,0 +1,290 @@
+;; Explicit manual/non-executable examples; never passing tests.
+;; Source changes invalidate an entry; --strict rejects all exclusions.
+{65
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 62
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 370
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "2e03f2748e5b1789e42b02bb11ba130b0dd8125e52f7a8e3c49b06a0a4cb680f"},
+ 59
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 86
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 58
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 60
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 175
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "cb613d868461d09da1bfc59934b97d6e720f14109abe1f19baac9b1d0ee3fdbf"},
+ 27
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 69
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 85
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 39
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 88
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 46
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 4
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "ae1438dd1886642b826db6e4546c72bf3f5703e37283d28af49490d26c3cdb09"},
+ 77
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "08b24c4f413b47b05dd5561038fba49e8cc45283a03d83fc1afce05168e89c44"},
+ 534
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "44ed3626ebcbe66ebfb20957d83b2404f08ea22de8946bd7abfe6b13606e179c"},
+ 92
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "271cb3c446f6985b54be4306bdc72a0c3958e08d9a8290f713871ec5e4057b07"},
+ 290
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "460b99438131d5db236279aa6fd493d0f4a5116898f2e708a2add8587052a019"},
+ 361
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "a37c563cb2d88d7d51474755f8cc22e8d8fe943cba18002eaf334f821f10d651"},
+ 15
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "80ac35baf023b36281703c3042b54f4a29c83cb564fac76b4e860514f1fff015"},
+ 99
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 136
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 139
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 40
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 531
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "f5f7e4f775ab7d90151df0cd5fdc891a4cf836840810fe99478ed16974155b8f"},
+ 56
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 36
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 150
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 184
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "2687cce8a4d22fa9b65f45cb9928b6aefc4ca14511ac7f89d073dfca8022f418"},
+ 219
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "5cc13b70ed809fdf09735f7a53ed6d75a73129cdf63293043325be52ea1b0fd1"},
+ 100
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "6deada9f3273a2b98b8be9bf823efe78a4a9aa79f9ab16a00d328a9d02052b21"},
+ 131
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 122
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "aa2d64c91262eb46a5109e87482f81fa619b23b8e019bcc986b9df687a6236b2"},
+ 61
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 29
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 44
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 28
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 64
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 285
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "d2b0220715d059dd4f77246aca1ce3d5920a292a64154b7bb92a48ec69b8ac53"},
+ 3
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "0cec98bb895a0aead7ca04bce3ed519f88c4c3876fc409bae06b4757ca977c84"},
+ 536
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "4a76fb8d6e51eb72ce0eb0f1de6006cb526715b36afffac4862ed625d70456ee"},
+ 66
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 142
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 532
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "de4b2439e3ba5a33ce452413af1d662fe23cbb1dfb38f294461a5359c0a8abc2"},
+ 537
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "89cc1ccc3bfe9564964478d3d4be6b6327623fac53ee3de3e8e76b027c5b5e28"},
+ 35
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "1b239cf0a73fa061a12efb205308716ad503ec52f3e03d54d2808d22658479d3"},
+ 533
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "5033d8ae5bad09f61abaa5075d28684c958638cfe622f111e79c800022cb9c04"},
+ 76
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "be5b9bd904b456ccc46607c8dd89210663bfc5f1ab4773efc44a105e784c3a11"},
+ 19
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "89636e4ccef6b3caeac843858b166423c388b4bb47a6cfd19e492e42d168350a"},
+ 57
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 68
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 9
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "cc99252b09f172758c96f3acf5104155c154d3feec12c2840ba7078bbd6e20b6"},
+ 5
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "62ac16f6788985c0cf02d38b6e70425d20ce62fffe5e4b1b28b259233596fe78"},
+ 254
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 83
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 78
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "295197996b74a8d2f05d085a07814e6ca36cead31ebc327b31b9179da903585d"},
+ 132
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 26
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 441
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "f2938b02cae1e22f5fe6c703d830fb2b2aad78bb8294543b5a342af86566cbf4"},
+ 381
+ {:reason "incomplete syntax example",
+  :source-sha256
+  "4e978b39e71695a2100fd459b427f9151f86b425e9c7f1a7dbabc89710fc2693"},
+ 81
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "9464caa68dbdaeb2c198cf19f338e2761571c29d2bdd8d70d00e7026e2b9c12b"},
+ 126
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 87
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 10
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 272
+ {:reason "interactive/effectful example needs a dedicated harness",
+  :source-sha256
+  "1e7a56538b4f4283588b77a51ec0d76662852a5ad94ceb35c68b0bd20336af09"},
+ 209
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 147
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 67
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 37
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 63
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},
+ 84
+ {:reason "no executable cases",
+  :source-sha256
+  "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"}}

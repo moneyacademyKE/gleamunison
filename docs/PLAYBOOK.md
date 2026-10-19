@@ -80,6 +80,22 @@ Always pre-verify all remote transfers:
 2. Run standard pushes (`env -u GITHUB_TOKEN git push`).
 3. Never use standard `--force`. If history rewriting is required, use `--force-with-lease --force-if-includes`.
 
+### Content admission and persistence
+
+- Keep definition identity separate from storage encoding: use the versioned
+  `definition_codec` payload, then re-hash the decoded AST. Never persist an
+  inspect string as a remotely verifiable definition.
+- Use `storage.insert_content` / `codebase.insert_raw_checked` at immutable
+  boundaries. Raw adapter writes are trusted key/value operations, including
+  mutable branch pointers; they are not an untrusted CAS API.
+- Use `storage.check_content` for non-destructive corruption detection at a
+  known immutable ref. Never classify a failed lookup as a missing ref.
+- Definition wire payloads omit spans; identity includes effect requirements
+  and unique-type schemas. Old inspect payloads and old effectful/unique refs
+  require a backed-up, source-based rebuild. See [ADR 0065](adr/0065-verified-cas-admission.md).
+- DETS write and close errors must propagate. A validated batch is not a
+  multi-record crash transaction, and validation is not an execution sandbox.
+
 ### Interactive REPL
 
 Start the interactive loop to dogfood the codebase:

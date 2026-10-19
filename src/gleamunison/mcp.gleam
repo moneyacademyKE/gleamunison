@@ -46,20 +46,45 @@ pub fn handle_message(server: Server, body: String) -> Response {
   case json.decode(bit_array.from_string(body)) {
     Error(_) -> Respond(error_body(NoId, -32_700, "Parse error"))
     Ok(dyn) ->
-      case decode.run(dyn, request_decoder()) {
+      case validate_request(dyn) {
         Error(_) -> Respond(error_body(NoId, -32_600, "Invalid Request"))
-        Ok(req) -> dispatch(server, req)
+        Ok(_) ->
+          case decode.run(dyn, request_decoder()) {
+            Error(_) -> Respond(error_body(NoId, -32_600, "Invalid Request"))
+            Ok(req) -> dispatch(server, req)
+          }
+      }
+  }
+}
+
+fn validate_request(dyn: Dynamic) -> Result(Nil, Nil) {
+  case decode.run(dyn, decode.dict(decode.string, decode.dynamic)) {
+    Error(_) -> Error(Nil)
+    Ok(fields) ->
+      case dict.get(fields, "jsonrpc"), dict.get(fields, "method") {
+        Ok(version_dyn), Ok(method_dyn) ->
+          case
+            decode.run(version_dyn, decode.string),
+            decode.run(method_dyn, decode.string)
+          {
+            Ok("2.0"), Ok(_) -> Ok(Nil)
+            _, _ -> Error(Nil)
+          }
+        _, _ -> Error(Nil)
       }
   }
 }
 
 fn request_decoder() -> decode.Decoder(Request) {
+  use _jsonrpc <- decode.field("jsonrpc", decode.string)
   use method <- decode.field("method", decode.string)
   use id <- decode.optional_field("id", NoId, id_decoder())
   use params <- decode.optional_field(
     "params",
     dict.new(),
-    decode.dict(decode.string, decode.dynamic),
+    decode.one_of(decode.dict(decode.string, decode.dynamic), or: [
+      decode.success(dict.new()),
+    ]),
   )
   decode.success(Request(id: id, method: method, params: params))
 }
@@ -95,41 +120,65 @@ fn initialize_result(server: Server) -> String {
   <> "}}"
 }
 
-fn tools_list_result(server: Server) -> String {
+pub fn tools_list_result(server: Server) -> String {
   let tools =
     list.map(server.tools, fn(t) {
       "{\"name\":"
       <> jstr(t.name)
       <> ",\"description\":"
       <> jstr(t.description)
-      <> ",\"inputSchema\":{\"type\":\"object\"}}"
+      <> ",\"inputSchema\":"
+      <> tool_schema(t.name)
+      <> "}"
     })
   "{\"tools\":[" <> string.join(tools, ",") <> "]}"
 }
 
+fn tool_schema(name: String) -> String {
+  case name {
+    "get_definition" ->
+      "{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"}}}"
+    "search_definitions" ->
+      "{\"type\":\"object\",\"required\":[\"query\"],\"properties\":{\"query\":{\"type\":\"string\"}}}"
+    "eval" ->
+      "{\"type\":\"object\",\"required\":[\"expr\"],\"properties\":{\"expr\":{\"type\":\"string\"}}}"
+    "callers_of" ->
+      "{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"}}}"
+    "deps_of" ->
+      "{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"}}}"
+    "defs_by_kind" ->
+      "{\"type\":\"object\",\"required\":[\"kind\"],\"properties\":{\"kind\":{\"type\":\"string\"}}}"
+    _ -> "{\"type\":\"object\",\"additionalProperties\":true}"
+  }
+}
+
 fn tools_call(server: Server, req: Request) -> String {
-  let name = case dict.get(req.params, "name") {
-    Ok(dyn) ->
-      case decode.run(dyn, decode.string) {
-        Ok(n) -> n
-        Error(_) -> ""
+  case dict.get(req.params, "name"), dict.get(req.params, "arguments") {
+    Error(_), _ -> error_body(req.id, -32_602, "Invalid params")
+    Ok(name_dyn), Error(_) -> error_body(req.id, -32_602, "Invalid params")
+    Ok(name_dyn), Ok(args_dyn) ->
+      case
+        decode.run(name_dyn, decode.string),
+        decode.run(args_dyn, decode.dict(decode.string, decode.dynamic))
+      {
+        Ok(name), Ok(args) -> dispatch_tool(server, req.id, name, args)
+        _, _ -> error_body(req.id, -32_602, "Invalid params")
       }
-    Error(_) -> ""
   }
-  let args = case dict.get(req.params, "arguments") {
-    Ok(dyn) ->
-      case decode.run(dyn, decode.dict(decode.string, decode.dynamic)) {
-        Ok(d) -> d
-        Error(_) -> dict.new()
-      }
-    Error(_) -> dict.new()
-  }
+}
+
+fn dispatch_tool(
+  server: Server,
+  id: JsonId,
+  name: String,
+  args: Dict(String, Dynamic),
+) -> String {
   case list.find(server.tools, fn(t) { t.name == name }) {
-    Error(_) -> ok_body(req.id, tool_result("unknown tool: " <> name, True))
+    Error(_) -> ok_body(id, tool_result("unknown tool: " <> name, True))
     Ok(tool) ->
       case tool.handler(args) {
-        Ok(text) -> ok_body(req.id, tool_result(text, False))
-        Error(err) -> ok_body(req.id, tool_result(err, True))
+        Ok(text) -> ok_body(id, tool_result(text, False))
+        Error(err) -> ok_body(id, tool_result(err, True))
       }
   }
 }
@@ -172,14 +221,17 @@ fn id_json(id: JsonId) -> String {
   }
 }
 
-fn jstr(s: String) -> String {
-  "\"" <> escape(s) <> "\""
+pub fn json_string(s: String) -> String {
+  case json.encode(s) {
+    Ok(encoded) ->
+      case bit_array.to_string(encoded) {
+        Ok(value) -> value
+        Error(_) -> "\"\""
+      }
+    Error(_) -> "\"\""
+  }
 }
 
-fn escape(s: String) -> String {
-  s
-  |> string.replace("\\", "\\\\")
-  |> string.replace("\"", "\\\"")
-  |> string.replace("\n", "\\n")
-  |> string.replace("\t", "\\t")
+fn jstr(s: String) -> String {
+  json_string(s)
 }

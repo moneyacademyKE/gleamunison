@@ -1,5 +1,13 @@
 // Gleamunison Console Dashboard
 
+// Values from notebook, modules and processes are text, never HTML.
+function textElement(tag, className, text) {
+  const element = document.createElement(tag);
+  element.className = className;
+  element.textContent = text ?? '';
+  return element;
+}
+
 // Tab switching
 function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -117,7 +125,7 @@ function updateStats() {
 function updateModuleList(modules) {
   const listDiv = document.getElementById('module-list');
   if (!listDiv) return;
-  listDiv.innerHTML = '';
+  listDiv.replaceChildren();
   if (modules.length === 0) {
     listDiv.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No compiled modules loaded</div>';
   } else {
@@ -127,7 +135,9 @@ function updateModuleList(modules) {
       const name = typeof m === 'string' ? m : (m.name || m);
       const hash = typeof m === 'object' ? m.hash : '';
       const beamTag = typeof m === 'object' && m.diagnostics ? m.diagnostics : 'BEAM';
-      item.innerHTML = '<span>' + name + (hash ? ' <span class="module-hash">' + hash + '</span>' : '') + '</span><span class="module-tag">' + beamTag + '</span>';
+      const label = textElement('span', '', name);
+      if (hash) label.appendChild(textElement('span', 'module-hash', hash));
+      item.append(label, textElement('span', 'module-tag', beamTag));
       listDiv.appendChild(item);
     });
   }
@@ -140,11 +150,15 @@ function updateProcesses() {
     .then(d => {
       const el = document.getElementById('process-list');
       if (!el) return;
-      el.innerHTML = '<div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:8px;">' + d.total_count + ' processes, ' + d.total_memory_kb + ' KB</div>';
+      const summary = textElement('div', '', d.total_count + ' processes, ' + d.total_memory_kb + ' KB');
+      summary.style.cssText = 'color:var(--text-muted);font-size:0.75rem;margin-bottom:8px;';
+      el.replaceChildren(summary);
       (d.processes || []).forEach(p => {
         const item = document.createElement('div');
         item.className = 'process-item';
-        item.innerHTML = '<span class="process-pid">' + p.pid + '</span><span class="process-name">' + (p.name || '-') + '</span><span class="process-mem">' + p.memory_kb + ' KB</span>';
+        item.append(textElement('span', 'process-pid', p.pid),
+          textElement('span', 'process-name', p.name || '-'),
+          textElement('span', 'process-mem', p.memory_kb + ' KB'));
         el.appendChild(item);
       });
     });
@@ -157,11 +171,12 @@ function updateDefinitions() {
     .then(d => {
       const el = document.getElementById('definitions-list');
       if (!el) return;
-      el.innerHTML = '';
+      el.replaceChildren();
       (d.defs || []).forEach(def => {
         const item = document.createElement('div');
         item.className = 'def-item';
-        item.innerHTML = '<span class="def-name">' + def.name + '</span><div class="def-expr">' + (def.expr || '') + '</div>';
+        item.append(textElement('span', 'def-name', def.name),
+          textElement('div', 'def-expr', def.expr || ''));
         item.onclick = () => {
           document.getElementById('def-name').value = def.name;
           document.getElementById('def-expr').value = def.expr || '';
@@ -191,7 +206,7 @@ function updateRedefinitions() {
     .then(d => {
       const el = document.getElementById('redef-list');
       if (!el) return;
-      el.innerHTML = '';
+      el.replaceChildren();
       (d.events || []).forEach(e => {
         const item = document.createElement('div');
         item.className = 'timeline-entry warn';
@@ -208,7 +223,7 @@ function updateLogs() {
     .then(d => {
       const el = document.getElementById('log-viewer');
       if (!el) return;
-      el.innerHTML = '';
+      el.replaceChildren();
       (d.entries || []).forEach(e => {
         const entry = document.createElement('div');
         entry.className = 'timeline-entry ' + (e.level || 'info');

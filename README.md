@@ -121,6 +121,8 @@ Gleamunison combines the scheduling, distribution, and runtime efficiency of the
 
 ## Conformance Tests
 
+Supported toolchain matrix (kept in lockstep with CI): Erlang/OTP **29**, Gleam **1.19.1**, rebar3 **3**. Both test and publish workflows run `gleam test`, `gleam format --check src test`, and `./build_escript.sh`; the test workflow also executes `./gleamunison_escript version` as the artifact smoke test.
+
 To execute the unit and integration test suites:
 ```sh
 gleam test                          # Runs all 54 unit test suites including native Datalog
