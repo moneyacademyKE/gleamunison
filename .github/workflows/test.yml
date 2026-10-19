@@ -22,4 +22,4 @@ jobs:
       - run: gleam test
       - run: gleam format --check src test
       - run: ./build_escript.sh
-      - run: test -x gleamunison_escript && ./gleamunison_escript version
+      - run: bash scripts/test_artifact.sh

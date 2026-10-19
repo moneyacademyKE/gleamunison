@@ -37,9 +37,23 @@ for dir in build/dev/erlang/*/ebin; do
 done
 shopt -u nullglob
 
+# Build output may retain test BEAMs from the preceding test run. Remove
+# test-origin modules by their source paths, not an incomplete name guess.
+for source in test/*.gleam test/*.erl src/*_test.erl; do
+  [[ -f "$source" ]] || continue
+  module=$(basename "$source")
+  module=${module%.*}
+  rm -f "$build_dir/$module.beam"
+done
 find "$build_dir" -maxdepth 1 -type f \( \
-  -name 'gleamunison_test.beam' -o -name 'gleeunit*.beam' \
+  \( -name '*_test.beam' ! -name 'gleamunison@cli_test.beam' \) -o \
+  -name '*_test_ffi.beam' -o \
+  -name 'gleeunit*.beam' -o -name 'birdie*.beam' \
 \) -delete
+
+# The compiler derives this metadata from gleam.toml. Load it at escript
+# startup rather than maintaining another version literal.
+cp build/dev/erlang/gleamunison/ebin/gleamunison.app "$build_dir/"
 
 # Compile raw Erlang genesis modules. Any failure aborts the build.
 for source in src/m_*.erl; do
@@ -57,7 +71,7 @@ printf '  Beams: %s\n' "$beam_count"
 zip_path="$build_dir/$SCRIPT.zip"
 (
   cd "$build_dir"
-  zip -q "$zip_path" ./*.beam
+  zip -q "$zip_path" ./*.beam ./gleamunison.app
 )
 
 artifact_tmp="$build_dir/$SCRIPT"
