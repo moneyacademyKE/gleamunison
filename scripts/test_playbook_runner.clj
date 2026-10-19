@@ -10,6 +10,11 @@
 (fs/set-posix-file-permissions slow "rwx------")
 (with-redefs [playbook-session/executable (constantly bad)]
   (assert (= :fail (:status (playbook-session/host-level 21 1000)))))
+(let [result @(p/process ["bb" "scripts/run_playbook_tests.clj" "21"]
+                        {:out :string :err :string :continue true
+                         :extra-env {"PLAYBOOK_EXECUTABLE" bad}})]
+  (assert (= 1 (:exit result)))
+  (println "injected code_server crash + OK marker => runner exit" (:exit result)))
 (with-redefs [playbook-session/executable (constantly slow)]
   (assert (= :timeout (:status (playbook-session/host-level 21 30)))))
 (load-file "scripts/playbook_policy.clj")
