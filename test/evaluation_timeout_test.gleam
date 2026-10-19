@@ -1,4 +1,26 @@
 import gleam/string
+import gleeunit/should
+
+@external(erlang, "evaluation_scope_test_ffi", "descendants_die")
+fn descendants_die() -> Bool
+
+@external(erlang, "evaluation_scope_test_ffi", "cancelled_owner")
+fn cancelled_owner() -> Bool
+
+@external(erlang, "evaluation_scope_test_ffi", "successful_scope")
+fn successful_scope() -> Bool
+
+pub fn caller_cancellation_cleans_up_owned_processes_test() {
+  cancelled_owner() |> should.be_true
+}
+
+pub fn successful_scope_does_not_leave_child_processes_test() {
+  successful_scope() |> should.be_true
+}
+
+pub fn evaluation_timeout_kills_unlinked_child_and_grandchild_test() {
+  descendants_die() |> should.be_true
+}
 
 @external(erlang, "gleamunison_ffi_io", "eval_expression")
 fn ffi_eval_expression(expression: String) -> Result(String, String)

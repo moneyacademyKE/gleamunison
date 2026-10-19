@@ -123,29 +123,19 @@ eval_module_bare_inner(Mod) ->
     end.
 
 run_with_timeout(Fun) when is_function(Fun, 0) ->
-    Parent = self(),
-    Ref = make_ref(),
     InitialState = copyable_process_dictionary(),
-    {Pid, Mon} = spawn_monitor(fun() ->
+    Work = fun() ->
         Result = run_in_worker(InitialState, Fun),
-        Parent ! {Ref, Result, copyable_process_dictionary()}
-    end),
-    Timeout = evaluation_timeout_ms(),
-    receive
-        {Ref, {ok, Result}, UpdatedState} ->
-            erlang:demonitor(Mon, [flush]),
+        {Result, copyable_process_dictionary()}
+    end,
+    case gleamunison_eval_scope:run(Work, evaluation_timeout_ms()) of
+        {ok, {{ok, Result}, UpdatedState}} ->
             restore_process_dictionary(UpdatedState),
             Result;
-        {Ref, {raised, Class, Reason}, UpdatedState} ->
-            erlang:demonitor(Mon, [flush]),
+        {ok, {{raised, Class, Reason}, UpdatedState}} ->
             restore_process_dictionary(UpdatedState),
             {error, list_to_binary(io_lib:format("~p:~p", [Class, Reason]))};
-        {'DOWN', Mon, process, Pid, Reason} ->
-            {error, list_to_binary(io_lib:format("evaluation_worker_down: ~p", [Reason]))}
-    after Timeout ->
-        exit(Pid, kill),
-        receive {'DOWN', Mon, process, Pid, _} -> ok after 1000 -> ok end,
-        {error, <<"evaluation_timeout">>}
+        {error, _} = Error -> Error
     end.
 
 run_in_worker(State, Fun) ->
