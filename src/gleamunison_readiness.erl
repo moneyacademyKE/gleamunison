@@ -116,9 +116,14 @@ service_check(mcp) ->
     case whereis(gleamunison_mcp_session) of
         undefined -> {false, <<"mcp_not_running">>};
         Pid ->
-            Ref = make_ref(),
-            Pid ! {readiness, Ref, self()},
-            receive {readiness, Ref, ready} -> {true, <<"mcp_responsive">>} end
+            case process_info(Pid, status) of
+                {status, suspended} -> {false, <<"check_timeout">>};
+                _ ->
+                    case catch gen_server:call(Pid, readiness, 100) of
+                        true -> {true, <<"mcp_responsive">>};
+                        _ -> {false, <<"mcp_unavailable">>}
+                    end
+            end
     end;
 service_check(sync) ->
     case whereis(gleamunison_tcp_sync) of

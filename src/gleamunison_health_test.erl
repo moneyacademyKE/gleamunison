@@ -70,9 +70,8 @@ start_real_services() ->
 http_fixture(Mode, Path) ->
     with_mode(Mode, fun() ->
         Port = 18103,
-        {Control, Monitor} = spawn_monitor(fun() -> gleamunison_http:start_server(Port) end),
+        {ServerPid, ServerMonitor} = start_http_server(Port),
         try
-            ok = wait_for_port(Port, 20),
             {ok, _} = application:ensure_all_started(inets),
             Url = "http://127.0.0.1:" ++ integer_to_list(Port) ++ binary_to_list(Path),
             case httpc:request(get, {Url, []}, [{timeout, 2000}, {connect_timeout, 1000}],
@@ -81,24 +80,35 @@ http_fixture(Mode, Path) ->
                 {error, Reason} -> {error, iolist_to_binary(io_lib:format("~p", [Reason]))}
             end
         after
-            stop_listener(),
-            Control ! stop,
-            receive {'DOWN', Monitor, process, Control, _} -> ok after 2000 -> error(control_leak) end
+            ok = gleamunison_http:stop_server(),
+            wait_for_server_exit(ServerPid, ServerMonitor)
         end
     end).
+
+start_http_server(Port) ->
+    {Pid, Monitor} = spawn_monitor(fun() ->
+        ok = gleamunison_http:start_server(Port)
+    end),
+    try
+        ok = wait_for_port(Port, 20),
+        {Pid, Monitor}
+    catch
+        error:Reason ->
+            exit(Pid, kill),
+            receive {'DOWN', Monitor, process, Pid, _} -> ok after 1000 -> ok end,
+            error(Reason)
+    end.
+
+wait_for_server_exit(Pid, Monitor) ->
+    receive
+        {'DOWN', Monitor, process, Pid, _Reason} -> ok
+    after 1000 ->
+        error(http_stop_timeout)
+    end.
 
 wait_for_port(_Port, 0) -> error(listener_start_timeout);
 wait_for_port(Port, Attempts) ->
     case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 50) of
         {ok, Socket} -> gen_tcp:close(Socket), ok;
         {error, _} -> timer:sleep(20), wait_for_port(Port, Attempts - 1)
-    end.
-
-stop_listener() ->
-    case whereis(gleamunison_http_server) of
-        undefined -> ok;
-        Pid ->
-            Monitor = erlang:monitor(process, Pid),
-            gleamunison_http:stop_server(),
-            receive {'DOWN', Monitor, process, Pid, _} -> ok after 2000 -> error(listener_leak) end
     end.

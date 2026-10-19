@@ -352,12 +352,20 @@ clear_eval_timeout() ->
     true = os:unsetenv("GLEAMUNISON_EVAL_TIMEOUT_MS"),
     nil.
 
-%% Start the real HTTP server on Port, backgrounded, and wait until the
-%% listener accepts connections (up to ~1s).
+%% Start the real HTTP server on Port in a monitored process and wait until
+%% the listener accepts connections (up to ~1s).
 start_http_server(Port) ->
-    spawn(fun() -> gleamunison_http:start_server(Port) end),
-    wait_for_port(Port, 10),
-    nil.
+    {Pid, Monitor} = spawn_monitor(fun() -> gleamunison_http:start_server(Port) end),
+    try
+        wait_for_port(Port, 10),
+        erlang:demonitor(Monitor, [flush]),
+        nil
+    catch
+        error:Reason ->
+            exit(Pid, kill),
+            receive {'DOWN', Monitor, process, Pid, _} -> ok after 1000 -> ok end,
+            erlang:error(Reason)
+    end.
 
 stop_http_server() ->
     gleamunison_http:stop_server(),

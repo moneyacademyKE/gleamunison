@@ -1,54 +1,92 @@
 -module(gleamunison_http).
--export([start_server/1, stop_server/0]).
+-behaviour(gen_server).
+-export([start_link/1, start_server/1, stop_server/0, init/1, handle_call/3,
+         handle_cast/2, handle_info/2, terminate/2, worker_count/1]).
 
 -define(MAX_BODY_BYTES, 1048576).
 -define(MAX_HEADER_COUNT, 64).
 -define(MAX_HEADER_BYTES, 16384).
+-define(MAX_WORKERS, 64).
+
+start_link(Port) when is_integer(Port) ->
+    gen_server:start_link(?MODULE, Port, []).
 
 start_server(Port) when is_integer(Port) ->
+    case gleamunison_runtime_sup:start_http(Port) of
+        {ok, Pid} -> wait_for_server(Pid), ok;
+        {error, {already_started, Pid}} -> wait_for_server(Pid), ok;
+        {error, Reason} -> {error, Reason}
+    end.
+
+wait_for_server(Pid) when is_pid(Pid) ->
+    Ref = erlang:monitor(process, Pid),
+    receive
+        {'DOWN', Ref, process, Pid, _Reason} -> ok
+    end.
+
+stop_server() ->
+    gleamunison_runtime_sup:stop_http().
+
+init(Port) ->
     application:ensure_all_started(crypto),
+    ensure_counter(),
+    case gen_tcp:listen(Port, [binary, {active, false}, {reuseaddr, true},
+                               {packet, http_bin}, {backlog, 100},
+                               {ip, {127, 0, 0, 1}}]) of
+        {ok, ListenSocket} ->
+            Owner = self(),
+            Acceptor = spawn_link(fun() -> accept_loop(Owner, ListenSocket) end),
+            persistent_term:put({gleamunison_http, listener}, {self(), ListenSocket}),
+            {ok, #{socket => ListenSocket, acceptor => Acceptor, workers => #{}}};
+        {error, Reason} -> {stop, Reason}
+    end.
+
+ensure_counter() ->
     case ets:whereis(gleamunison_http_counter) of
         undefined ->
             ets:new(gleamunison_http_counter, [set, public, named_table]),
             ets:insert(gleamunison_http_counter, {count, 0});
-        _ ->
-            ok
-    end,
-    spawn(fun() -> server_loop(Port) end),
-    io:format("Gleamunison webserver listening on http://localhost:~p~n", [Port]),
-    server_control_loop(Port).
-
-server_control_loop(Port) ->
-    receive
-        stop -> ok;
-        _ -> server_control_loop(Port)
+        _ -> ok
     end.
 
-stop_server() ->
-    case erlang:whereis(gleamunison_http_server) of
-        undefined -> ok;
-        Pid -> exit(Pid, shutdown)
+worker_count(Pid) when is_pid(Pid) ->
+    case sys:get_state(Pid) of
+        #{workers := Workers} -> map_size(Workers)
     end.
 
-server_loop(Port) ->
-    register(gleamunison_http_server, self()),
-    {ok, ListenSocket} = gen_tcp:listen(Port, [
-        binary, {active, false}, {reuseaddr, true},
-        {packet, http_bin}, {backlog, 100}, {ip, {127, 0, 0, 1}}
-    ]),
-    persistent_term:put({gleamunison_http, listener}, {self(), ListenSocket}),
-    accept_loop(ListenSocket).
+handle_call(stop, _From, State) -> {stop, normal, ok, State};
+handle_call(_Request, _From, State) -> {reply, {error, unsupported}, State}.
+handle_cast(_, State) -> {noreply, State}.
 
-accept_loop(ListenSocket) ->
+handle_info({accepted, Socket}, #{workers := Workers} = State) ->
+    case map_size(Workers) < ?MAX_WORKERS of
+        true ->
+            {Pid, Mon} = spawn_monitor(fun() -> handle_request(Socket) end),
+            {noreply, State#{workers := Workers#{Pid => Mon}}};
+        false ->
+            gleamunison_http_util:send_response(Socket, 503, <<"busy">>),
+            gen_tcp:close(Socket),
+            {noreply, State}
+    end;
+handle_info({'DOWN', Mon, process, Pid, _Reason}, #{workers := Workers} = State) ->
+    case maps:find(Pid, Workers) of
+        {ok, Mon} -> {noreply, State#{workers := maps:remove(Pid, Workers)}};
+        error -> {noreply, State}
+    end;
+handle_info(_, State) -> {noreply, State}.
+
+terminate(_, #{socket := Socket, acceptor := Acceptor, workers := Workers}) ->
+    catch gen_tcp:close(Socket),
+    exit(Acceptor, shutdown),
+    maps:foreach(fun(Pid, _) -> exit(Pid, shutdown) end, Workers),
+    persistent_term:erase({gleamunison_http, listener}),
+    ok.
+
+accept_loop(Owner, ListenSocket) ->
     case gen_tcp:accept(ListenSocket) of
-        {ok, Socket} ->
-            spawn(fun() -> handle_request(Socket) end),
-            accept_loop(ListenSocket);
-        {error, closed} ->
-            ok;
-        {error, Reason} ->
-            io:format("Accept error: ~p~n", [Reason]),
-            accept_loop(ListenSocket)
+        {ok, Socket} -> Owner ! {accepted, Socket}, accept_loop(Owner, ListenSocket);
+        {error, closed} -> ok;
+        {error, _Reason} -> timer:sleep(25), accept_loop(Owner, ListenSocket)
     end.
 
 handle_request(Socket) ->
@@ -202,16 +240,18 @@ handle_mcp_route(Socket, Body) ->
         undefined ->
             gleamunison_http_util:send_json(
                 Socket, 503, <<"{\"error\":\"mcp session not running\"}">>);
-        Pid ->
-            Pid ! {rpc, Body, self()},
-            receive
-                {mcp_reply, {ok, Reply}} ->
+        _Pid ->
+            case catch gen_server:call(gleamunison_mcp_session, {rpc, Body}, 30000) of
+                {ok, {respond, Reply}} ->
                     gleamunison_http_util:send_json(Socket, 200, Reply);
-                {mcp_reply, no_reply} ->
-                    gleamunison_http_util:send_json(Socket, 202, <<>>)
-            after 30000 ->
-                gleamunison_http_util:send_json(
-                    Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
+                {ok, no_reply} ->
+                    gleamunison_http_util:send_json(Socket, 202, <<>>);
+                {error, busy} ->
+                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session busy\"}">>);
+                {'EXIT', _} ->
+                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session unavailable\"}">>);
+                _ ->
+                    gleamunison_http_util:send_json(Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
             end
     end.
 
