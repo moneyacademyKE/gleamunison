@@ -35,10 +35,12 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
   case note {
     "" -> Error("evidence attest: a note is required — say what you observed")
     _ -> {
+      use signer <- result.try(evidence.production_signer())
       use output <- result.try(
         cli_store.with_dets(".gleamunison/store.dets", fn(adapter) {
-          evidence.attach(
+          evidence.attach_signed(
             adapter,
+            signer,
             subject: hash,
             kind: evidence.Io,
             verdict: "approved",
@@ -59,7 +61,10 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
 fn run(hash: String) -> Result(Nil, String) {
   use output <- result.try(
     cli_store.with_dets(".gleamunison/store.dets", fn(adapter) {
-      Ok(report(adapter, hash))
+      case evidence.production_policy() {
+        Ok(policy) -> Ok(report_with_policy(adapter, hash, policy))
+        Error(_) -> Ok(report(adapter, hash))
+      }
     }),
   )
   cli_result.success(output)
@@ -69,6 +74,14 @@ fn run(hash: String) -> Result(Nil, String) {
 /// excluded upstream by for_subject (integrity re-verified on read), so
 /// everything rendered here is proof, not claims.
 pub fn report(adapter: StorageAdapter, subject: String) -> String {
+  report_with_policy(adapter, subject, evidence.AllowUnsigned)
+}
+
+pub fn report_with_policy(
+  adapter: StorageAdapter,
+  subject: String,
+  policy: evidence.VerificationPolicy,
+) -> String {
   let records = evidence.for_subject(adapter, subject)
   case records {
     [] -> "no evidence for " <> subject
@@ -85,12 +98,14 @@ pub fn report(adapter: StorageAdapter, subject: String) -> String {
           <> ")"
         })
       let verified_line = case
-        evidence.verified(adapter, subject, evidence.Test)
+        evidence.verified_with_policy(adapter, subject, evidence.Test, policy)
       {
         True -> "verified: test evidence with passing verdict exists"
         False -> "verified: no passing test attestation"
       }
-      let io_line = case evidence.verified(adapter, subject, evidence.Io) {
+      let io_line = case
+        evidence.verified_with_policy(adapter, subject, evidence.Io, policy)
+      {
         True -> "io: human-approved attestation exists"
         False -> "io: no io attestation"
       }
