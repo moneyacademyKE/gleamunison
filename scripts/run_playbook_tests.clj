@@ -55,32 +55,13 @@
             @in-code-block (swap! current-code conj line)))))
     @levels))
 
-(defn run-real-level [n]
-  (let [res (proc/shell {:out :string :err :string :continue true} "./gleamunison_escript" (str "level" n))]
-    (if (str/includes? (:out res) (str "Level " n ": OK"))
-      {:status :pass :output (:out res)}
-      {:status :fail :output (str (:out res) "\nERROR:\n" (:err res))})))
+(load-file "scripts/playbook_session.clj")
+(load-file "scripts/playbook_policy.clj")
 
-(defn start-repl-session []
-  (let [p (proc/process ["./gleamunison_escript" "repl"] {:err :inherit})
-        w (io/writer (:in p)) r (io/reader (:out p))]
-    (dotimes [_ 2] (.readLine r))
-    {:process p :writer w :reader r}))
+(defn run-real-level [n] (playbook-session/host-level n 15000))
+(defn start-repl-session [] (playbook-session/start))
+(defn eval-expr [session expr] (playbook-session/evaluate session expr))
 
-(defn eval-expr-raw [session expr]
-  (let [w (:writer session) r (:reader session)]
-    (.write w (str expr "\n"))
-    (.write w "\"__level_done__\"\n")
-    (.flush w)
-    (loop [lines []]
-      (let [line (.readLine r)]
-        (if (or (nil? line) (str/includes? line "__level_done__"))
-          lines
-          (recur (conj lines line)))))))
-
-(defn eval-expr [session expr]
-  (let [fut (future (eval-expr-raw session expr))]
-    (try (deref fut 15000 :timeout) (catch Exception _ :timeout))))
 
 (defn clean-value [v]
   (if-not v ""
@@ -92,7 +73,8 @@
 
 (defn verify-result [output expected]
   (let [o-val (clean-value output) e-val (clean-value expected)]
-    (if (or (str/includes? o-val e-val) (str/includes? e-val o-val))
+    (if (and (not (str/blank? o-val)) (not (str/blank? e-val))
+             (or (str/includes? o-val e-val) (str/includes? e-val o-val)))
       {:status :pass}
       {:status :fail :reason (str "Mismatch: Expected '" e-val "', got '" o-val "'") :expected e-val :actual o-val})))
 
@@ -121,53 +103,63 @@
           (or (str/includes? expr "read_line") (str/includes? expr "spawn") (str/includes? expr "recv")
               (str/includes? expr "(do Console") (str/includes? expr "(do State")
               (= (str/trim expr) "exit") (= (str/trim expr) "quit"))
-          (recur (next cases))
-          (not (balanced? expr)) (recur (next cases))
+          {:status :skipped :reason "interactive/effectful example needs a dedicated harness" :expr expr}
+          (not (balanced? expr)) {:status :skipped :reason "incomplete syntax example" :expr expr}
           :else
-          (let [outputs (eval-expr session expr)]
-            (if (= outputs :timeout) {:status :timeout :expr expr}
-              (let [res-line (str/join "\n" (remove #(or (str/starts-with? % "gleamunison>") (str/starts-with? % "...")) outputs))
+          (let [evaluation (eval-expr session expr)]
+            (if (not= :ok (:status evaluation)) (assoc evaluation :expr expr)
+              (let [outputs (:outputs evaluation)
+                    res-line (str/join "\n" (remove #(or (str/starts-with? % "gleamunison>") (str/starts-with? % "...")) outputs))
                     exp-val (if (define-expr? expr) (expected-define-output expr) expected)
                     res (if exp-val (verify-result res-line exp-val) {:status :pass})]
                 (if (= (:status res) :pass) (recur (next cases))
                   {:status :fail :reason (:reason res) :expr expr :outputs outputs :expected exp-val})))))))))
 
+(defn selected-levels []
+  (if-let [arg (first (remove #{"--strict"} *command-line-args*))]
+    (mapv parse-long (str/split arg #","))
+    (range 1 1001)))
+
 (defn -main []
-  (println "=== Playbook Conformance Test Runner ===")
-  (let [levels (parse-playbooks)
-        session (atom (start-repl-session))
-        passed (atom 0) failed (atom 0) skipped (atom 0) timed-out (atom 0)]
+  (println "=== Playbook Conformance Test Runner (strict) ===")
+  (let [levels (parse-playbooks) policy (playbook-policy/read-policy) session (atom nil)
+        summary (atom {:passed 0 :failed 0 :skipped 0 :timed-out 0 :excluded 0})]
     (try
-      (doseq [n (range 1 1001)]
-        (let [test-cases (get levels n)]
-          (cond
-            (contains? real-levels n)
-            (let [res (run-real-level n)]
-              (if (= (:status res) :pass)
-                (do (swap! passed inc) (println "Level" n " (Host): PASS") (flush))
-                (do (swap! failed inc) (println "Level" n " (Host): FAIL") (flush))))
-            (seq test-cases)
-            (do
-              (when (contains? #{71 101} n)
-                (try (proc/destroy (:process @session)) (catch Exception _))
-                (reset! session (start-repl-session)))
-              (let [res (run-repl-level @session n test-cases)]
-                (cond
-                  (= (:status res) :pass)
-                  (do (swap! passed inc) (println "Level" n " (REPL): PASS") (flush))
-                  (= (:status res) :timeout)
-                  (do (swap! timed-out inc)
-                      (println "Level" n " (REPL): TIMEOUT on" (:expr res) "- restarting session") (flush)
-                      (try (proc/destroy (:process @session)) (catch Exception _))
-                      (reset! session (start-repl-session)))
-                  :else
-                  (do (swap! failed inc)
-                      (println "Level" n " (REPL): FAIL -" (:reason res) "on" (:expr res)) (flush)))))
-            :else
-            (do (swap! skipped inc) (println "Level" n ": SKIPPED (no cases)") (flush)))))
-      (finally (proc/destroy (:process @session))))
-    (println "\n=== Summary ===")
-    (prn {:passed @passed :failed @failed :skipped @skipped :timed-out @timed-out})
-    (when (pos? @failed) (System/exit 1))))
+      (doseq [n (selected-levels)]
+        (when (and (contains? #{71 101} n) @session)
+          (let [stopped (playbook-session/stop @session)]
+            (when-not (= :pass (:status stopped))
+              (throw (ex-info "REPL reset failed" stopped))))
+          (reset! session nil))
+        (let [cases (get levels n)
+              res (cond
+                    (contains? real-levels n) (run-real-level n)
+                    (seq cases) (do
+                                  (when-not @session (reset! session (start-repl-session)))
+                                  (run-repl-level @session n cases))
+                    :else {:status :skipped :reason "no executable cases"})
+              res (playbook-policy/disposition policy n cases res)
+              field (case (:status res) :pass :passed :timeout :timed-out :skipped :skipped :excluded :excluded :failed)]
+          (swap! summary update field inc)
+          (println "Level" n (pr-str res))
+          (flush)
+          (when (= :timeout (:status res))
+            (when @session (playbook-session/stop @session))
+            (reset! session nil))))
+      (catch Exception e
+        (swap! summary update :failed inc)
+        (println "Runner exception:" (ex-message e)))
+      (finally
+        ;; Emit provisional counts before cleanup; cleanup is checked, never
+        ;; an unchecked destroy that turns a crash into a green shell status.
+        (println "=== Evaluation summary before cleanup ===" (pr-str @summary))
+        (when @session
+          (let [stopped (playbook-session/stop @session)]
+            (when-not (= :pass (:status stopped))
+              (swap! summary update :failed inc)
+              (println "Session shutdown failed:" (pr-str stopped)))))))
+    (println "=== Final summary ===" (pr-str @summary))
+    (when (pos? (+ (:failed @summary) (:skipped @summary) (:timed-out @summary)))
+      (System/exit 1))))
 
 (when (= *file* (System/getProperty "babashka.file")) (-main))
