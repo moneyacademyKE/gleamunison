@@ -113,9 +113,14 @@
 
 ;; --- 4: failed upgrade is detected -------------------------------------------
 (spit installed "corrupt-not-a-real-escript")
-(let [r (shell {:continue true :out :string :err :string} installed "version")]
+;; Linux exec rejects the shebang-less file with ENOEXEC, which Java surfaces as an
+;; IOException before any exit code exists (macOS returns a code instead). Both are
+;; "failing loudly": a corrupt artifact must never pretend to run.
+(let [r (try (shell {:continue true :out :string :err :string} installed "version")
+             (catch java.io.IOException e
+               {:exit -1 :out "" :err (str "exec rejected: " (.getMessage e))}))]
   (check "corrupt-artifact-fails-loudly" (not (zero? (:exit r)))
-         (str "exit=" (:exit r))))
+         (str "exit=" (:exit r) " err=" (str/trim (:err r)))))
 
 ;; --- 5: rollback ---------------------------------------------------------------
 (fs/copy (str sandbox "/gleamunison-prev-backup") installed {:replace-existing true})
