@@ -13,6 +13,14 @@
          '[cheshire.core :as json])
 
 (def repo (-> *file* fs/absolutize fs/parent fs/parent str))
+
+;; The gate must not depend on the caller's PATH: verification re-runs invoke
+;; this script bare, and gleam lives under /opt/homebrew/bin, bb under
+;; ~/.local/bin on this host. Extra env merges over the inherited environment.
+(def gate-env
+  {"PATH" (str "/opt/homebrew/bin:"
+               (System/getProperty "user.home") "/.local/bin:"
+               (System/getenv "PATH"))})
 (def witness-date "2026-10-20")
 (def witness-path
   (str repo "/docs/verification/production-boundaries-" witness-date ".md"))
@@ -28,7 +36,8 @@
   [name cmd-args & [{:keys [informational]}]]
   (println (str "GATE " name ": " (str/join " " cmd-args)))
   (let [t0 (now-ms)
-        r (apply shell {:continue true :dir repo :out :string :err :string}
+        r (apply shell {:continue true :dir repo :out :string :err :string
+                        :extra-env gate-env}
                  cmd-args)
         dur (- (now-ms) t0)
         entry {:name name :cmd (str/join " " cmd-args) :exit (:exit r)
