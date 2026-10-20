@@ -16,11 +16,15 @@
 
 ;; The gate must not depend on the caller's PATH: verification re-runs invoke
 ;; this script bare, and gleam lives under /opt/homebrew/bin, bb under
-;; ~/.local/bin on this host. Extra env merges over the inherited environment.
-(def gate-env
-  {"PATH" (str "/opt/homebrew/bin:"
-               (System/getProperty "user.home") "/.local/bin:"
-               (System/getenv "PATH"))})
+;; ~/.local/bin on this host. macOS JVMs resolve non-absolute executables
+;; against the PARENT PATH (:extra-env cannot fix lookup), so every gate
+;; command runs behind /usr/bin/env with the pinned PATH — which also
+;; propagates to sub-scripts and their children.
+(def path-str
+  (str "/opt/homebrew/bin:"
+       (System/getProperty "user.home") "/.local/bin:"
+       (System/getenv "PATH")))
+(def env-prefix ["/usr/bin/env" (str "PATH=" path-str)])
 (def witness-date "2026-10-20")
 (def witness-path
   (str repo "/docs/verification/production-boundaries-" witness-date ".md"))
@@ -36,9 +40,8 @@
   [name cmd-args & [{:keys [informational]}]]
   (println (str "GATE " name ": " (str/join " " cmd-args)))
   (let [t0 (now-ms)
-        r (apply shell {:continue true :dir repo :out :string :err :string
-                        :extra-env gate-env}
-                 cmd-args)
+        r (apply shell {:continue true :dir repo :out :string :err :string}
+                 (concat env-prefix cmd-args))
         dur (- (now-ms) t0)
         entry {:name name :cmd (str/join " " cmd-args) :exit (:exit r)
                :duration_ms dur :informational (boolean informational)
@@ -112,7 +115,8 @@
    :gates @results
    :exclusions ["playbook strict mode: manual-skip exits are policy, recorded informationally"
                 "CI matrix (OTP 27/28/29 x ubuntu/macos) runs on push; local proof is OTP 29 / macOS arm64"
-                "LOC ceiling: src/gleamunison_ffi_test.erl (625 LOC, base 471) is a test-only probe module called exclusively from test/*.gleam, exempt under the test-file exemption; every production file touched by this branch is under 500 LOC"]
+                "LOC ceiling: src/gleamunison_ffi_test.erl (625 LOC, base 471) is a test-only probe module called exclusively from test/*.gleam, exempt under the test-file exemption; every production file touched by this branch is under 500 LOC"
+                "all gates execute behind /usr/bin/env with a pinned tool PATH (homebrew + ~/.local/bin) so results never depend on the caller environment; recorded commands are the logical ones"]
    :unresolved_risks ["transient full-suite failure (507 passed/1 failed) seen sporadically: twice around the llm LOC split, then green on 6 consecutive re-runs; failing test never identified, suspected listener timing in the drain probe"
                       "LLM cost metering is estimate-only until operator rates are configured"
                       "provider error bodies are omitted, so provider-side debugging needs the provider dashboard"]
