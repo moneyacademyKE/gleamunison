@@ -115,8 +115,15 @@ worker_count(Pid) when is_pid(Pid) ->
 handle_call(stop, _From, State) -> {stop, normal, ok, State};
 handle_call({drain, Timeout}, _From, #{socket := Socket, acceptor := Acceptor, workers := Workers} = State) ->
     %% Close the listener and stop the acceptor first: no new work arrives
-    %% while we wait. Worker DOWNs are consumed here so the wait observes
-    %% real progress instead of a frozen map.
+    %% while we wait. Unlink BEFORE the shutdown: the acceptor is linked to
+    %% this server, so the shutdown reason backfires through the link and
+    %% kills the server before it replies whenever the acceptor has not yet
+    %% noticed the closed socket — the race CI caught on macos-28 (PR #30):
+    %% the drain caller crashed with {shutdown, {gen_server, call, ...}}.
+    %% unlink/1 also discards an exit signal already in flight.
+    %% Worker DOWNs are consumed here so the wait observes real progress
+    %% instead of a frozen map.
+    unlink(Acceptor),
     catch gen_tcp:close(Socket),
     exit(Acceptor, shutdown),
     persistent_term:erase({gleamunison_http, listener}),
@@ -144,6 +151,9 @@ handle_info({'DOWN', Mon, process, Pid, _Reason}, #{workers := Workers} = State)
 handle_info(_, State) -> {noreply, State}.
 
 terminate(_, #{socket := Socket, acceptor := Acceptor, workers := Workers}) ->
+    %% Same unlink as in drain: the acceptor's shutdown must not backfire
+    %% through the link and rewrite the reason this server terminates with.
+    unlink(Acceptor),
     catch gen_tcp:close(Socket),
     exit(Acceptor, shutdown),
     maps:foreach(fun(Pid, _) -> exit(Pid, shutdown) end, Workers),
