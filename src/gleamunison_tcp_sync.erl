@@ -24,24 +24,41 @@ send_message({Host, Port}, Message) when is_list(Host); is_binary(Host) ->
     HostStr = case is_binary(Host) of true -> binary_to_list(Host); false -> Host end,
     case gen_tcp:connect(HostStr, Port, [binary, {packet, 0}, {active, false}], 5000) of
         {ok, Sock} ->
-            Bin = term_to_binary(outgoing_message(Message)),
-            Result = case byte_size(Bin) =< ?MAX_FRAME_BYTES of
-                false -> {error, message_too_large};
-                true ->
-                    ok = gen_tcp:send(Sock, <<(byte_size(Bin)):32, Bin/binary>>),
-                    receive_reply(Sock)
-            end,
+            Result = handshake_and_send(Sock, Message),
             gen_tcp:close(Sock),
             Result;
         {error, Reason} ->
             {error, {connect, Reason}}
     end.
 
-outgoing_message(Message) ->
-    case os:getenv("GLEAMUNISON_SYNC_TOKEN") of
-        false -> Message;
-        "" -> Message;
-        Token -> {auth, list_to_binary(Token), Message}
+%% Protocol v2: hello → challenge → HMAC proof → message. The token never
+%% crosses the wire; the proof binds client nonce + server nonce + message
+%% digest, so a captured frame cannot be replayed to another session or with
+%% another payload. Without a configured token (loopback local profile) the
+%% legacy single-frame path is preserved.
+handshake_and_send(Sock, Message) ->
+    case configured_token() of
+        none -> send_frame(Sock, Message), receive_reply(Sock);
+        {ok, Token} ->
+            ClientNonce = crypto:strong_rand_bytes(16),
+            send_frame(Sock, {hello, ClientNonce}),
+            case receive_reply(Sock) of
+                {ok, {challenge, ServerNonce}} when is_binary(ServerNonce) ->
+                    Digest = crypto:hash(sha256, term_to_binary(Message)),
+                    Proof = crypto:mac(hmac, sha256, Token,
+                                       <<ClientNonce/binary, ServerNonce/binary, Digest/binary>>),
+                    send_frame(Sock, {auth2, ClientNonce, Proof, Message}),
+                    receive_reply(Sock);
+                {error, _} = Error -> Error;
+                _Other -> {error, handshake_failed}
+            end
+    end.
+
+send_frame(Sock, Term) ->
+    Bin = term_to_binary(Term),
+    case byte_size(Bin) =< ?MAX_FRAME_BYTES of
+        false -> oversized;
+        true -> gen_tcp:send(Sock, <<(byte_size(Bin)):32, Bin/binary>>)
     end.
 
 receive_reply(Sock) ->
@@ -98,44 +115,77 @@ acceptor(LSock) ->
     end.
 
 handle_connection(Sock) ->
+    case configured_token() of
+        none -> handle_legacy_frame(Sock);
+        {ok, Token} -> handle_handshake(Sock, Token)
+    end,
+    gen_tcp:close(Sock).
+
+handle_legacy_frame(Sock) ->
+    case recv_frame(Sock) of
+        {ok, Request} -> send_reply(Sock, dispatch(Request));
+        {error, Reason} -> send_reply(Sock, {error, Reason})
+    end.
+
+%% v2 server side: issue a per-connection nonce, then accept exactly one
+%% proof. Replay is rejected because the (client, server) nonce pair is
+%% single-use and the server nonce is fresh per connection.
+handle_handshake(Sock, Token) ->
+    case recv_frame(Sock) of
+        {ok, {hello, ClientNonce}} when is_binary(ClientNonce), byte_size(ClientNonce) =< 64 ->
+            ServerNonce = crypto:strong_rand_bytes(16),
+            send_reply(Sock, {challenge, ServerNonce}),
+            case recv_frame(Sock) of
+                {ok, {auth2, ClientNonce, Proof, Message}} when is_binary(Proof) ->
+                    Digest = crypto:hash(sha256, term_to_binary(Message)),
+                    Expected = crypto:mac(hmac, sha256, Token,
+                                          <<ClientNonce/binary, ServerNonce/binary, Digest/binary>>),
+                    case constant_time_equal(Expected, Proof) of
+                        false -> send_reply(Sock, {error, auth_failed});
+                        true ->
+                            case claim_session(ClientNonce, ServerNonce) of
+                                ok -> send_reply(Sock, dispatch(Message));
+                                replay -> send_reply(Sock, {error, auth_replay})
+                            end
+                    end;
+                {ok, _} -> send_reply(Sock, {error, auth_required});
+                {error, Reason} -> send_reply(Sock, {error, Reason})
+            end;
+        {ok, {auth, _, _}} -> send_reply(Sock, {error, legacy_auth_rejected});
+        {ok, _} -> send_reply(Sock, {error, auth_required});
+        {error, Reason} -> send_reply(Sock, {error, Reason})
+    end.
+
+recv_frame(Sock) ->
     case gen_tcp:recv(Sock, 4, 30000) of
         {ok, <<Len:32>>} when Len =< ?MAX_FRAME_BYTES ->
             case gen_tcp:recv(Sock, Len, 30000) of
-                {ok, Bin} ->
-                    Reply = case safe_decode(Bin) of
-                        {ok, Request} -> authenticated_dispatch(Request);
-                        {error, Reason} -> {error, Reason}
-                    end,
-                    send_reply(Sock, Reply);
-                {error, _} ->
-                    ok
+                {ok, Bin} -> safe_decode(Bin);
+                {error, Reason} -> {error, Reason}
             end;
-        {ok, <<_Len:32>>} ->
-            send_reply(Sock, {error, message_too_large});
-        {error, _} ->
-            ok
-    end,
-    gen_tcp:close(Sock).
+        {ok, <<_Len:32>>} -> {error, message_too_large};
+        {error, Reason} -> {error, Reason}
+    end.
+
+claim_session(ClientNonce, ServerNonce) ->
+    ensure_session_table(),
+    Key = crypto:hash(sha256, <<ClientNonce/binary, ServerNonce/binary>>),
+    case ets:insert_new(gleamunison_sync_sessions, {Key}) of
+        true -> ok;
+        false -> replay
+    end.
+
+ensure_session_table() ->
+    case ets:whereis(gleamunison_sync_sessions) of
+        undefined ->
+            try ets:new(gleamunison_sync_sessions, [set, public, named_table])
+            catch _:_ -> gleamunison_sync_sessions end;
+        _ -> gleamunison_sync_sessions
+    end.
 
 send_reply(Sock, Reply) ->
     ReplyBin = term_to_binary(Reply),
     gen_tcp:send(Sock, <<(byte_size(ReplyBin)):32, ReplyBin/binary>>).
-
-authenticated_dispatch({auth, Token, Request}) when is_binary(Token) ->
-    case configured_token() of
-        {ok, Expected} ->
-            case constant_time_equal(Expected, Token) of
-                true -> dispatch(Request);
-                false -> {error, auth_failed}
-            end;
-        none ->
-            {error, auth_not_configured}
-    end;
-authenticated_dispatch(Request) ->
-    case configured_token() of
-        {ok, _Expected} -> {error, auth_required};
-        none -> dispatch(Request)
-    end.
 
 configured_token() ->
     case os:getenv("GLEAMUNISON_SYNC_TOKEN") of

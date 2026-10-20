@@ -30,9 +30,57 @@ stop_server() ->
 init(Port) ->
     application:ensure_all_started(crypto),
     ensure_counter(),
+    case bind_gate() of
+        {ok, BindIp} -> listen(Port, BindIp);
+        {error, _} = Refusal -> {stop, Refusal}
+    end.
+
+%% Loopback is the default and needs no contract. Any other bind address
+%% requires the authenticated-remote profile plus an auth contract; the
+%% decision lives in gleamunison@auth:bind_decision/1 (one policy owner).
+bind_gate() ->
+    Address = case os:getenv("GLEAMUNISON_BIND_ADDRESS") of
+        false -> <<"127.0.0.1">>;
+        "" -> <<"127.0.0.1">>;
+        Value -> list_to_binary(Value)
+    end,
+    Profile = case os:getenv("GLEAMUNISON_PROFILE") of
+        false -> <<"local">>;
+        P -> list_to_binary(P)
+    end,
+    Input = {bind_input, Address, Profile, http_token_present(), sync_token_present()},
+    case gleamunison@auth:bind_decision(Input) of
+        allow -> parse_bind_ip(Address);
+        {refuse, Reason} -> {error, Reason}
+    end.
+
+http_token_present() ->
+    case os:getenv("GLEAMUNISON_HTTP_TOKEN") of
+        false -> false;
+        "" -> false;
+        _ -> true
+    end.
+
+sync_token_present() ->
+    case os:getenv("GLEAMUNISON_SYNC_TOKEN") of
+        false -> false;
+        "" -> false;
+        _ -> true
+    end.
+
+parse_bind_ip(<<"127.0.0.1">>) -> {ok, {127, 0, 0, 1}};
+parse_bind_ip(<<"0.0.0.0">>) -> {ok, {0, 0, 0, 0}};
+parse_bind_ip(<<"::1">>) -> {ok, {0, 0, 0, 0, 0, 0, 0, 1}};
+parse_bind_ip(Other) ->
+    case inet:parse_address(binary_to_list(Other)) of
+        {ok, Ip} -> {ok, Ip};
+        {error, _} -> {error, <<"invalid_bind_address">>}
+    end.
+
+listen(Port, BindIp) ->
     case gen_tcp:listen(Port, [binary, {active, false}, {reuseaddr, true},
                                {packet, http_bin}, {backlog, 100},
-                               {ip, {127, 0, 0, 1}}]) of
+                               {ip, BindIp}]) of
         {ok, ListenSocket} ->
             Owner = self(),
             Acceptor = spawn_link(fun() -> accept_loop(Owner, ListenSocket) end),

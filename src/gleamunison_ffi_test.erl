@@ -307,21 +307,80 @@ tcp_auth_probe(Mode) when is_integer(Mode) ->
                 3 ->
                     ok = gen_tcp:send(Socket, <<1048577:32>>),
                     receive_raw_reply(Socket);
+                4 ->
+                    %% Replay: reuse one captured proof frame on a second
+                    %% connection — the server nonce differs, so auth must fail.
+                    Frame = v2_auth_frame(<<"server-secret">>),
+                    ok = gen_tcp:send(Socket, Frame),
+                    _Challenge1 = receive_raw_reply_keep(Socket),
+                    _First = receive_raw_reply_keep(Socket),
+                    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+                        {ok, Socket2} ->
+                            ok = gen_tcp:send(Socket2, Frame),
+                            _Challenge2 = receive_raw_reply_keep(Socket2),
+                            receive_raw_reply(Socket2);
+                        {error, Reason2} -> {error, Reason2}
+                    end;
                 _ ->
                     Message = {<<"test-peer">>, {connect, <<"test-peer">>}},
-                    Request = case Mode of
-                        0 -> Message;
-                        1 -> {auth, <<"server-secret">>, Message};
-                        2 -> {auth, <<"wrong-secret">>, Message}
-                    end,
-                    Bin = term_to_binary(Request),
-                    ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>),
-                    receive_raw_reply(Socket)
+                    case Mode of
+                        0 ->
+                            Bin = term_to_binary(Message),
+                            ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>),
+                            receive_raw_reply(Socket);
+                        1 -> v2_handshake(Socket, <<"server-secret">>, Message);
+                        2 -> v2_handshake(Socket, <<"wrong-secret">>, Message)
+                    end
             end;
         {error, Reason} -> {error, Reason}
     end,
     true = os:unsetenv("GLEAMUNISON_SYNC_TOKEN"),
     list_to_binary(io_lib:format("~tp", [SocketResult])).
+
+v2_handshake(Socket, Token, Message) ->
+    ClientNonce = crypto:strong_rand_bytes(16),
+    send_term(Socket, {hello, ClientNonce}),
+    case receive_raw_reply_keep(Socket) of
+        {challenge, ServerNonce} ->
+            Digest = crypto:hash(sha256, term_to_binary(Message)),
+            Proof = crypto:mac(hmac, sha256, Token,
+                               <<ClientNonce/binary, ServerNonce/binary, Digest/binary>>),
+            send_term(Socket, {auth2, ClientNonce, Proof, Message}),
+            receive_raw_reply(Socket);
+        Other -> Other
+    end.
+
+v2_auth_frame(Token) ->
+    %% Fixed nonces make the frame replayable by construction; the server must
+    %% still reject it because its challenge nonce is fresh per connection.
+    ClientNonce = <<"fixed-client-nonce">>,
+    ServerNonce = <<"fixed-server-nonce">>,
+    Message = {<<"test-peer">>, {connect, <<"test-peer">>}},
+    Digest = crypto:hash(sha256, term_to_binary(Message)),
+    Proof = crypto:mac(hmac, sha256, Token,
+                       <<ClientNonce/binary, ServerNonce/binary, Digest/binary>>),
+    Hello = term_to_binary_with_len({hello, ClientNonce}),
+    Auth = term_to_binary_with_len({auth2, ClientNonce, Proof, Message}),
+    <<Hello/binary, Auth/binary>>.
+
+send_term(Socket, Term) ->
+    Bin = term_to_binary(Term),
+    ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>).
+
+term_to_binary_with_len(Term) ->
+    Bin = term_to_binary(Term),
+    <<(byte_size(Bin)):32, Bin/binary>>.
+
+receive_raw_reply_keep(Socket) ->
+    case gen_tcp:recv(Socket, 4, 2000) of
+        {ok, <<Len:32>>} ->
+            case gen_tcp:recv(Socket, Len, 2000) of
+                {ok, Bin} ->
+                    try binary_to_term(Bin, [safe]) catch _:_ -> invalid_reply end;
+                {error, Reason} -> {error, Reason}
+            end;
+        {error, Reason} -> {error, Reason}
+    end.
 
 ensure_tcp_sync_server() ->
     case whereis(gleamunison_tcp_sync) of
