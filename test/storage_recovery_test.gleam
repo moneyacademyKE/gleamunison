@@ -10,7 +10,10 @@ import gleeunit/should
 import simplifile
 
 fn temp_path(name: String) -> String {
-  "/tmp/gleamunison-storage-recovery-" <> name <> "-" <> int.to_string(erlang_unique_integer())
+  "/tmp/gleamunison-storage-recovery-"
+  <> name
+  <> "-"
+  <> int.to_string(erlang_unique_integer())
 }
 
 @external(erlang, "erlang", "unique_integer")
@@ -59,8 +62,7 @@ pub fn interrupted_publish_leaves_no_partial_manifest_test() {
 
 pub fn reopened_store_preserves_signed_evidence_test() {
   let path = temp_path("evidence")
-  let signer =
-    evidence.signer("key-a", bit_array.from_string("secret-a"))
+  let signer = evidence.signer("key-a", bit_array.from_string("secret-a"))
   let subject_hex = string.repeat("cd", 32)
   let assert Ok(adapter) = storage.dets(path)
   let assert Ok(#(ref, _)) =

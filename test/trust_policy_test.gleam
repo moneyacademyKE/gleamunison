@@ -3,7 +3,8 @@ import gleamunison/evidence.{Test}
 import gleamunison/trust
 import gleeunit/should
 
-const subject = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const subject =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 fn key_a() -> evidence.Signer {
   evidence.signer("key-a", bit_array.from_string("secret-a"))

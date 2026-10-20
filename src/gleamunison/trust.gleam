@@ -57,7 +57,11 @@ pub fn refusal_name(refusal: TrustRefusal) -> String {
 }
 
 /// Pure key-state decision: does this signer id admit a record at `ts`?
-pub fn key_admits(policy: TrustPolicy, signer_id: String, ts: Int) -> Result(TrustedKey, TrustRefusal) {
+pub fn key_admits(
+  policy: TrustPolicy,
+  signer_id: String,
+  ts: Int,
+) -> Result(TrustedKey, TrustRefusal) {
   case list.find(policy.keys, fn(k) { k.signer.id == signer_id }) {
     Error(_) -> Error(UnknownSigner(signer_id))
     Ok(key) ->
@@ -91,8 +95,17 @@ pub fn admit(
         Error(refusal) -> Error(refusal)
         Ok(key) -> {
           let expected =
-            evidence.sign(key.signer, record.subject, record.kind, record.verdict, record.payload, record.ts)
-          case evidence.secure_compare_hex(record.signature, expected.signature) {
+            evidence.sign(
+              key.signer,
+              record.subject,
+              record.kind,
+              record.verdict,
+              record.payload,
+              record.ts,
+            )
+          case
+            evidence.secure_compare_hex(record.signature, expected.signature)
+          {
             True -> Ok(record)
             False -> Error(SignatureMismatch(record.signer))
           }
