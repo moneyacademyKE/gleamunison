@@ -40,7 +40,18 @@ jobs:
           otp-version: "29"
           gleam-version: "1.19.1"
           rebar3-version: "3"
-      - uses: borkdude/setup-babashka@v5
+      - name: Install Babashka (pinned static build, sha256-verified)
+        # borkdude/setup-babashka does not exist ("repository not found") —
+        # a pinned release asset with an in-workflow checksum has no
+        # third-action supply chain at all (bk-19fe).
+        run: |
+          set -euo pipefail
+          BB_VERSION=1.13.226
+          curl -fsSL -o bb.tar.gz "https://github.com/babashka/babashka/releases/download/v${BB_VERSION}/babashka-${BB_VERSION}-linux-amd64-static.tar.gz"
+          echo "bf89e909c4025edf2d669921c81107435b7244840d8f4306f58439c328a342f9  bb.tar.gz" | sha256sum -c -
+          tar -xzf bb.tar.gz bb
+          sudo install -m 755 bb /usr/local/bin/bb
+          bb --version
       - run: gleam deps download
       - run: ./build_escript.sh
       - run: bb scripts/test_release_contract.clj
