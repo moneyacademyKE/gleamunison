@@ -86,11 +86,14 @@ compile_source(Source) when is_binary(Source) ->
                             {error, <<"compiler failed without errors info">>}
                     end;
                 {error, {parse_error, Line, Err}} ->
+                    io:format("Failed Source:~n~s~n", [Source]),
                     {error, list_to_binary(io_lib:format("parse error at line ~p: ~p", [Line, Err]))};
                 {error, Err} ->
+                    io:format("Failed Source:~n~s~n", [Source]),
                     {error, list_to_binary(io_lib:format("parse error: ~p", [Err]))}
             end;
         {error, ErrorInfo, _} ->
+            io:format("Failed Source:~n~s~n", [Source]),
             {error, list_to_binary(io_lib:format("scan error: ~p", [ErrorInfo]))}
     end;
 compile_source(_) -> {error, <<"source must be binary">>}.
