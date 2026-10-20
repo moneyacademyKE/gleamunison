@@ -100,4 +100,16 @@
                  (str/includes? (:out blocked) "cannot write manifest")
                  (not (str/includes? (:out blocked) "published:"))) blocked)))
 
+;; bk-a8e7: help is routed explicitly; unknown commands must not exit zero.
+(let [{:keys [exit out] :as result} (cli "--help")]
+  (check! "--help prints usage and exits zero"
+          (and (zero? exit)
+               (str/includes? out "Usage:")
+               (not (str/includes? out "Unknown command"))) result))
+
+(let [{:keys [exit out] :as result} (cli "definitely-not-a-command")]
+  (check! "unknown command exits non-zero"
+          (and (not (zero? exit))
+               (str/includes? out "Unknown command")) result))
+
 (println (str @checks " CLI truth checks passed; workspace: " work))
