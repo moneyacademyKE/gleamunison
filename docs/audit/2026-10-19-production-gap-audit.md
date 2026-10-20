@@ -245,3 +245,22 @@ The findings above are the historical baseline captured at `b9267ec`. The implem
 The rebuilt `gleamunison_escript` is intentionally left uncommitted. Release remains frozen: **no tag, no Hex publish, and no merge** were performed.
 
 **Rich Hickey closure check:** each gap now has one boundary owner and one receipt trail. The fix is composition — parse, validate, supervise, verify — not a new orchestration layer wearing a larger hat.
+
+## Boundary contract — 2026-10-20 (EAT)
+
+The ten audited v3.23.0 findings remain closed at their recorded commits. They are not the whole production contract. The next hardening plan (`bk-c7bb`, GitHub issue #25) separates the remaining claims into explicit profiles and refuses to call the runtime more trusted than its evidence allows.
+
+| Profile | Honest classification | Required refusal boundary | Proof index |
+|---|---|---|---|
+| `local` | Safe local research runtime | Non-loopback binding without the remote contract; invalid local limits or failed required readiness | `docs/operations/deployment-profiles.md`, `docs/operations/verification-matrix.md` |
+| `authenticated-remote` | Authenticated single-node service | Missing TLS/mTLS or authenticated proxy, route scopes, peer identity, replay binding, or bounded frames | `docs/operations/deployment-profiles.md`, `docs/operations/verification-matrix.md` |
+| `untrusted-execution` | Not yet claimable | Missing approved OS/container executor, enforceable resource policy, cancellation, cleanup, or redaction | `docs/operations/deployment-profiles.md`, `docs/operations/verification-matrix.md` |
+
+### Remaining risks, deliberately not marked closed
+
+- A BEAM process scope and capability handler are containment layers, not an OS/container sandbox.
+- The current project still needs an explicit remote authentication/encryption contract and complete route scopes.
+- Signed package/evidence provenance, key rotation/revocation, resource/export limits, compatibility/rollback proof, and LLM privacy/budget controls remain implementation work.
+- The final witness must distinguish automated passes from manual or environment-dependent checks and must not publish, tag, merge, deploy, or make a public production claim.
+
+This update is documentation-only for task 1. It records the boundary contract; it does not claim that the later controls already exist.
