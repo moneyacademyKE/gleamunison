@@ -47,14 +47,14 @@ build_json(false) -> <<"false">>;
 build_json(null) -> <<"null">>;
 build_json(Value) when is_list(Value) ->
     Parts = [build_json(V) || V <- Value],
-    <<$[, (binary:join(Parts, <<",">>))/binary, $]>>;
+    <<$[, (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, $]>>;
 build_json(Value) when is_map(Value) ->
     Parts = [begin
         KJson = <<$", (escape_json_string(K))/binary, $">>,
         VJson = build_json(V),
         <<KJson/binary, $:, VJson/binary>>
     end || {K, V} <- maps:to_list(Value)],
-    <<${, (binary:join(Parts, <<",">>))/binary, $}>>.
+    <<${, (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, $}>>.
 
 escape_json_string(Bin) when is_binary(Bin) ->
     escape_json_char(Bin, <<>>).
