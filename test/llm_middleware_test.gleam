@@ -2,8 +2,9 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/effects.{type OpHandler}
-import gleamunison/llm.{Completion}
+import gleamunison/llm
 import gleamunison/llm_middleware.{RetryPolicy}
+import gleamunison/llm_types.{Completion}
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn cast(a: anything) -> Dynamic

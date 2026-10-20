@@ -11,9 +11,11 @@ import gleam/dynamic/decode
 import gleam/result
 import gleamunison/effects.{type OpHandler}
 import gleamunison/json
-import gleamunison/llm.{type Completion}
+import gleamunison/llm
 import gleamunison/llm_budget
 import gleamunison/llm_controls
+import gleamunison/llm_types.{type Completion, type Provider}
+import gleamunison/llm_wire
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn to_dynamic(val: a) -> Dynamic
@@ -52,7 +54,7 @@ fn budget_report_failure(provider: String) -> Result(Nil, Nil)
 /// handler error; the inner handler never runs.
 pub fn budget_handler(
   inner: OpHandler,
-  provider: llm.Provider,
+  provider: llm_types.Provider,
   model: String,
 ) -> OpHandler {
   let name = llm.provider_name(provider)
@@ -90,7 +92,7 @@ pub fn budget_handler(
 }
 
 fn meter_completion(
-  provider: llm.Provider,
+  provider: llm_types.Provider,
   json_bin: BitArray,
 ) -> Result(#(Int, Int), Nil) {
   case bit_array.to_string(json_bin) {
@@ -100,7 +102,7 @@ fn meter_completion(
       case parse_house_completion(json_bin) {
         Ok(c) -> Ok(metered(c))
         Error(_) ->
-          case llm.parse_response(provider, 200, text) {
+          case llm_wire.parse_response(provider, 200, text) {
             Error(_) -> Error(Nil)
             Ok(c) -> Ok(metered(c))
           }
@@ -112,7 +114,8 @@ fn parse_house_completion(json_bin: BitArray) -> Result(Completion, Nil) {
   case json.decode(json_bin) {
     Error(_) -> Error(Nil)
     Ok(dyn) ->
-      decode.run(dyn, llm.completion_decoder()) |> result.replace_error(Nil)
+      decode.run(dyn, llm_wire.completion_decoder())
+      |> result.replace_error(Nil)
   }
 }
 
@@ -192,6 +195,6 @@ pub fn recording_mock(
       [messages_dyn, ..] -> record(as_bit_array(messages_dyn))
       [] -> Nil
     }
-    cont(to_dynamic(Ok(llm.completion_json(response))))
+    cont(to_dynamic(Ok(llm_wire.completion_json(response))))
   }
 }

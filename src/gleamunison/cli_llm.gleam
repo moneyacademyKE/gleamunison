@@ -11,11 +11,13 @@ import gleam/int
 import gleam/result
 import gleamunison/effects.{type OpHandler}
 import gleamunison/json
-import gleamunison/llm.{
+import gleamunison/llm
+import gleamunison/llm_middleware.{RetryPolicy}
+import gleamunison/llm_types.{
   type Completion, type Provider, type ProviderConfig, Anthropic, Completion,
   Message, OpenAI, User,
 }
-import gleamunison/llm_middleware.{RetryPolicy}
+import gleamunison/llm_wire
 
 @external(erlang, "gleamunison_config", "get_env")
 fn ffi_get_env(key: String) -> Result(String, Nil)
@@ -129,7 +131,7 @@ pub fn complete_with(
   handler: OpHandler,
   prompt: String,
 ) -> Result(Completion, String) {
-  let body = llm.messages_json([Message(User, prompt)])
+  let body = llm_wire.messages_json([Message(User, prompt)])
   let arg = cast(bit_array.from_string(body))
   let result: Result(BitArray, BitArray) = uncast(handler([arg], identity))
   case result {

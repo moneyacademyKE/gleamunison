@@ -2,7 +2,8 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/cli_llm
-import gleamunison/llm.{Completion}
+import gleamunison/llm
+import gleamunison/llm_types.{Anthropic, Completion, OpenAI}
 
 fn fake_env(
   pairs: List(#(String, String)),
@@ -31,7 +32,7 @@ fn list_find(
 
 pub fn resolve_config_openai_defaults_test() {
   let env = fake_env([#("OPENAI_API_KEY", "sk-live")])
-  let assert Ok(cfg) = cli_llm.resolve_config(llm.OpenAI, env)
+  let assert Ok(cfg) = cli_llm.resolve_config(OpenAI, env)
   let assert True = cfg.api_key == "sk-live"
   let assert True = cfg.base_url == "https://api.openai.com/v1"
   let assert True = cfg.model == "gpt-4o-mini"
@@ -45,23 +46,23 @@ pub fn resolve_config_honours_env_overrides_test() {
       #("OPENAI_MODEL", "gpt-5"),
       #("OPENAI_BASE_URL", "http://localhost:11434/v1"),
     ])
-  let assert Ok(cfg) = cli_llm.resolve_config(llm.OpenAI, env)
+  let assert Ok(cfg) = cli_llm.resolve_config(OpenAI, env)
   let assert True = cfg.model == "gpt-5"
   let assert True = cfg.base_url == "http://localhost:11434/v1"
 }
 
 pub fn resolve_config_missing_key_is_clear_error_test() {
   let env = fake_env([])
-  let assert Error(msg) = cli_llm.resolve_config(llm.Anthropic, env)
+  let assert Error(msg) = cli_llm.resolve_config(Anthropic, env)
   let assert True = string.contains(msg, "ANTHROPIC_API_KEY")
 }
 
 pub fn default_provider_prefers_anthropic_when_key_present_test() {
   let env =
     fake_env([#("OPENAI_API_KEY", "sk"), #("ANTHROPIC_API_KEY", "sk-ant")])
-  let assert True = cli_llm.default_provider(env) == llm.Anthropic
+  let assert True = cli_llm.default_provider(env) == Anthropic
   let env2 = fake_env([#("OPENAI_API_KEY", "sk")])
-  let assert True = cli_llm.default_provider(env2) == llm.OpenAI
+  let assert True = cli_llm.default_provider(env2) == OpenAI
 }
 
 pub fn complete_with_mock_returns_completion_test() {

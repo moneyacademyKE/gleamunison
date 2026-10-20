@@ -5,12 +5,14 @@ import gleam/option
 import gleam/string
 import gleamunison/cancellation
 import gleamunison/effects.{type OpHandler, HandlerFrame}
-import gleamunison/llm.{type Completion, Completion, OpenAI}
+import gleamunison/llm
 import gleamunison/llm_budget.{
   type Budget, Budget, CircuitOpen, Closed, ConcurrencyExceeded,
   CostBudgetExceeded, ModelNotPinned, Open, TokenBudgetExceeded,
 }
 import gleamunison/llm_middleware
+import gleamunison/llm_types.{type Completion, Completion, OpenAI}
+import gleamunison/llm_wire
 import gleamunison/transcript
 import gleeunit/should
 
@@ -226,7 +228,7 @@ pub fn transcript_never_captures_llm_payloads_test() {
 pub fn provider_error_bodies_are_omitted_from_errors_test() {
   // A provider error body could echo request content; it is never surfaced.
   let assert Error(err) =
-    llm.parse_response(OpenAI, 500, "{\"echo\":\"sk-live-secret\"}")
+    llm_wire.parse_response(OpenAI, 500, "{\"echo\":\"sk-live-secret\"}")
   llm.error_string(err)
   |> string.contains("sk-live-secret")
   |> should.be_false
@@ -235,7 +237,7 @@ pub fn provider_error_bodies_are_omitted_from_errors_test() {
 pub fn cancelled_token_refuses_before_transport_test() {
   // No network: a pre-cancelled token must refuse before a byte is sent.
   let cfg =
-    llm.ProviderConfig(
+    llm_types.ProviderConfig(
       provider: OpenAI,
       base_url: "http://127.0.0.1:1",
       api_key: "test-key",
