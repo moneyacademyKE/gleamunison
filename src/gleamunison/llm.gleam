@@ -20,6 +20,7 @@ import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/http_client
 import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/json
+import gleamunison/llm_budget
 import gleamunison/llm_controls
 
 @external(erlang, "gleamunison_config", "get_env")
@@ -82,6 +83,13 @@ pub fn ability_ref() -> DefinitionRef {
   Ref(identity.hash_bytes(<<"LLM">>))
 }
 
+pub fn provider_name(provider: Provider) -> String {
+  case provider {
+    Anthropic -> "anthropic"
+    OpenAI -> "openai"
+  }
+}
+
 /// One-shot completion from environment config: the default live handler
 /// body. Reads OPENAI_API_KEY/OPENAI_BASE_URL/OPENAI_MODEL (or ANTHROPIC_*
 /// when its key is set). Kept dependency-free so the Erlang runtime can
@@ -94,6 +102,10 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
   case resolve_config(provider, get_env) {
     Error(error) -> Error(error)
     Ok(cfg) -> {
+      let provider_name = provider_name(provider)
+      // Budget/circuit gate: admission, concurrency slot, and metering are
+      // owned by gleamunison_llm_budget; refusal names are typed policy.
+      use Nil <- result.try(budget_admit(provider_name, cfg.model))
       let body = messages_json([Message(User, prompt)])
       let result: Result(BitArray, BitArray) =
         unsafe_coerce(
@@ -102,7 +114,7 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
             fn(d) { d },
           ),
         )
-      case result {
+      let completion = case result {
         Error(e) ->
           Error(
             "llm: "
@@ -116,12 +128,70 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
             Error(_) -> Error("llm: undecodable completion payload")
             Ok(dyn) ->
               case decode.run(dyn, env_completion_decoder()) {
-                Ok(c) -> Ok(c.content)
+                Ok(c) -> Ok(c)
                 Error(_) -> Error("llm: completion shape mismatch")
               }
           }
       }
+      // Release the concurrency slot exactly once, then meter and report.
+      let assert Ok(Nil) = budget_release(provider_name)
+      case completion {
+        Ok(c) -> {
+          let rates = rate_config(get_env)
+          let cost =
+            llm_budget.cost_micro_usd(
+              c.input_tokens,
+              c.output_tokens,
+              rates.0,
+              rates.1,
+            )
+          let assert Ok(Nil) =
+            budget_spend(provider_name, c.input_tokens + c.output_tokens, cost)
+          let assert Ok(Nil) = budget_report_success(provider_name)
+          Ok(c.content)
+        }
+        Error(msg) -> {
+          let assert Ok(Nil) = budget_report_failure(provider_name)
+          Error(msg)
+        }
+      }
     }
+  }
+}
+
+@external(erlang, "gleamunison_llm_budget", "admit")
+fn budget_admit(provider: String, model: String) -> Result(Nil, String)
+
+@external(erlang, "gleamunison_llm_budget", "release")
+fn budget_release(provider: String) -> Result(Nil, Nil)
+
+@external(erlang, "gleamunison_llm_budget", "spend")
+fn budget_spend(
+  provider: String,
+  tokens: Int,
+  cost_micro_usd: Int,
+) -> Result(Nil, Nil)
+
+@external(erlang, "gleamunison_llm_budget", "report_success")
+fn budget_report_success(provider: String) -> Result(Nil, Nil)
+
+@external(erlang, "gleamunison_llm_budget", "report_failure")
+fn budget_report_failure(provider: String) -> Result(Nil, Nil)
+
+/// Rates are data, not policy: micro-USD per 1M tokens from the environment,
+/// defaulting to zero (metering on, cost accounting estimate-only).
+fn rate_config(env: llm_controls.EnvLookup) -> #(Int, Int) {
+  let prompt_rate =
+    llm_controls.env_or(env, "GLEAMUNISON_LLM_PROMPT_RATE_MICRO_USD", "0")
+  let completion_rate =
+    llm_controls.env_or(env, "GLEAMUNISON_LLM_COMPLETION_RATE_MICRO_USD", "0")
+  #(parse_non_negative(prompt_rate), parse_non_negative(completion_rate))
+}
+
+fn parse_non_negative(text: String) -> Int {
+  case int.parse(text) {
+    Ok(n) if n >= 0 -> n
+    _ -> 0
   }
 }
 
@@ -346,6 +416,16 @@ pub fn mock_handler(response: Completion) -> OpHandler {
   fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
     cont(to_dynamic(Ok(completion_json(response))))
   }
+}
+
+/// Decoder for the house completion shape — what completion_json emits and
+/// mocks return. Provider wire bodies go through parse_response instead.
+pub fn completion_decoder() -> decode.Decoder(Completion) {
+  use content <- decode.field("content", decode.string)
+  use model <- decode.field("model", decode.string)
+  use input <- decode.field("input_tokens", decode.int)
+  use output <- decode.field("output_tokens", decode.int)
+  decode.success(Completion(content, model, input, output))
 }
 
 /// Live provider handler: performs the HTTP call via http_client.
