@@ -6,6 +6,8 @@
          clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
          clear_eval_timeout/0, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
+-export([metrics_restart_probe/0, http_drain_probe/0, observability_probe/1,
+         metrics_name_bound_probe/0]).
 -export([rescue/1]).
 
 %% Run a zero-arg fun and capture any raised reason as {error, Rendered}.
@@ -528,3 +530,84 @@ parse_http_response(Bin) ->
             end;
         _ -> {error, <<"bad response">>}
     end.
+
+%% Crash/restart proof for the metrics cache: the supervisor owns the
+%% gen_server with restart=permanent, so a kill must produce a NEW pid and
+%% the next record must land without the caller noticing.
+metrics_restart_probe() ->
+    ok = gleamunison_metrics_sup:ensure_started(),
+    Pid = whereis(gleamunison_metrics),
+    true = is_pid(Pid),
+    exit(Pid, kill),
+    NewPid = wait_for_metrics_pid(Pid, 100),
+    true = is_pid(NewPid),
+    true = NewPid =/= Pid,
+    nil = gleamunison_metrics:counter(<<"probe.restart">>, 1),
+    true.
+
+wait_for_metrics_pid(Old, 0) -> Old;
+wait_for_metrics_pid(Old, N) ->
+    case whereis(gleamunison_metrics) of
+        undefined -> timer:sleep(10), wait_for_metrics_pid(Old, N - 1);
+        Old -> timer:sleep(10), wait_for_metrics_pid(Old, N - 1);
+        New -> New
+    end.
+
+%% Drain proof: start a server, drain it, then the listener entry must be
+%% gone (readiness would report http_not_running) and stop must be clean.
+%% start_server blocks for the server's lifetime, so it runs in a spawned
+%% process and we poll for the listener registration. Port must be real:
+%% gleamunison_http_sup treats 0 as "start no children", and a crashed
+%% probe must never leave an empty sup registered behind it.
+http_drain_probe() ->
+    Port = free_port(),
+    _Server = spawn(fun() -> gleamunison_http:start_server(Port) end),
+    try
+        {HttpPid, _} = wait_for_listener(200),
+        drained = gleamunison_http:drain(500),
+        undefined = persistent_term:get({gleamunison_http, listener}, undefined),
+        true = is_process_alive(HttpPid),
+        true
+    after
+        catch gleamunison_http:stop_server()
+    end.
+
+free_port() ->
+    {ok, Listen} = gen_tcp:listen(0, []),
+    {ok, {_Addr, Port}} = inet:sockname(Listen),
+    gen_tcp:close(Listen),
+    Port.
+
+wait_for_listener(0) -> error(listener_timeout);
+wait_for_listener(N) ->
+    case persistent_term:get({gleamunison_http, listener}, undefined) of
+        undefined -> timer:sleep(10), wait_for_listener(N - 1);
+        Listener -> Listener
+    end.
+
+%% Probe the observability export: 1 = json shape, 2 = redaction.
+observability_probe(1) ->
+    gleamunison_observability:export_json();
+observability_probe(2) ->
+    Secret = <<"supersecret-probe-token">>,
+    {ok, Id} = gleamunison_trace:capture_request(
+        <<"GET">>, <<"/probe">>,
+        [{<<"authorization">>, Secret}, {<<"cookie">>, <<"session=abc">>}]),
+    {ok, {_TS, _Id, _M, _P, Headers}} = gleamunison_trace:get_trace(Id),
+    Export = gleamunison_observability:export_json(),
+    NoSecretInExport = binary:match(Export, Secret) =:= nomatch,
+    NoSecretInTrace = lists:all(
+        fun({_K, V}) -> V =/= Secret end, Headers),
+    RedactedPresent = lists:any(
+        fun({_K, V}) -> V =:= <<"[redacted]">> end, Headers),
+    NoSecretInExport andalso NoSecretInTrace andalso RedactedPresent.
+
+%% A metric name over 128 bytes is refused at the API edge and never lands
+%% in the registry.
+metrics_name_bound_probe() ->
+    ok = gleamunison_metrics_sup:ensure_started(),
+    Long = binary:copy(<<"x">>, 200),
+    nil = gleamunison_metrics:counter(Long, 1),
+    Entries = gleamunison_metrics:list_metrics(),
+    not lists:any(
+        fun({{counter, N}, _}) -> N =:= Long; (_) -> false end, Entries).

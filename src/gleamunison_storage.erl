@@ -1,7 +1,7 @@
 -module(gleamunison_storage).
 -export([
-    new/0, insert/3, lookup/2, list_refs/1,
-    dets_new/1, dets_insert/3, dets_lookup/2, dets_list_refs/1, dets_close/1,
+    new/0, insert/3, lookup/2, list_refs/1, list_refs_bounded/2,
+    dets_new/1, dets_insert/3, dets_lookup/2, dets_list_refs/1, dets_list_refs_bounded/2, dets_close/1,
     dets_delete_file/1,
     partitioned_dets_new/1, partitioned_dets_insert/3, partitioned_dets_lookup/2,
     partitioned_dets_list_refs/1, partitioned_dets_close/1, partitioned_dets_delete_file/1,
@@ -28,6 +28,18 @@ lookup(Tab, Ref) ->
     end.
 
 list_refs(Tab) -> {ok, [R || {R, _} <- ets:tab2list(Tab)]}.
+
+%% Bounded listing: a caller that only needs a page never pays for the whole
+%% table. Traversal is first/next, so the cap holds no matter the table size.
+list_refs_bounded(Tab, Limit) when is_integer(Limit), Limit > 0 ->
+    {ok, bounded_ets_keys(Tab, ets:first(Tab), Limit, [])}.
+
+bounded_ets_keys(_Tab, '$end_of_table', _Left, Acc) ->
+    lists:reverse(Acc);
+bounded_ets_keys(_Tab, _Key, 0, Acc) ->
+    lists:reverse(Acc);
+bounded_ets_keys(Tab, Key, Left, Acc) ->
+    bounded_ets_keys(Tab, ets:next(Tab, Key), Left - 1, [Key | Acc]).
 
 err(R) -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}.
 
@@ -64,6 +76,16 @@ dets_list_refs(Tab) ->
             L -> {ok, L}
         end
     end).
+
+dets_list_refs_bounded(Tab, Limit) when is_integer(Limit), Limit > 0 ->
+    guarded(fun() -> bounded_dets_keys(Tab, dets:first(Tab), Limit, []) end).
+
+bounded_dets_keys(_Tab, '$end_of_table', _Left, Acc) ->
+    {ok, lists:reverse(Acc)};
+bounded_dets_keys(_Tab, _Key, 0, Acc) ->
+    {ok, lists:reverse(Acc)};
+bounded_dets_keys(Tab, Key, Left, Acc) ->
+    bounded_dets_keys(Tab, dets:next(Tab, Key), Left - 1, [Key | Acc]).
 
 dets_close(Tab) ->
     guarded(fun() ->

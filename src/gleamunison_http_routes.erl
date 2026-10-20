@@ -3,8 +3,10 @@
 -export([handle_eval_route/2, handle_counter_route/1, handle_define_route/2, handle_browse_route/1,
          serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
          handle_processes_route/1, handle_sync_status_route/1, handle_redefinitions_route/1,
-         handle_logs_route/1, handle_enhanced_modules_route/1,
+         handle_logs_route/1, handle_enhanced_modules_route/1, handle_observability_route/1,
          handle_traces_route/1, handle_trace_detail_route/2]).
+
+-define(MAX_SSE_CLIENTS, 32).
 
 is_localhost(Socket) ->
     case inet:peername(Socket) of
@@ -140,16 +142,21 @@ handle_static_file(Socket, FilePath) ->
     end.
 
 handle_sse_route(Socket) ->
-    Headers = <<"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n">>,
-    gen_tcp:send(Socket, Headers),
-    Pid = self(),
     try ets:whereis(gleamunison_sse_clients) of
         undefined ->
             ets:new(gleamunison_sse_clients, [set, public, named_table])
     catch _:_ -> ok end,
-    ets:insert(gleamunison_sse_clients, {Pid, true}),
-    Ref = erlang:monitor(port, Socket),
-    sse_keepalive_loop(Socket, Pid, Ref).
+    case ets:info(gleamunison_sse_clients, size) < ?MAX_SSE_CLIENTS of
+        false ->
+            gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"sse client limit reached\"}">>);
+        true ->
+            Headers = <<"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n">>,
+            gen_tcp:send(Socket, Headers),
+            Pid = self(),
+            ets:insert(gleamunison_sse_clients, {Pid, true}),
+            Ref = erlang:monitor(port, Socket),
+            sse_keepalive_loop(Socket, Pid, Ref)
+    end.
 
 sse_keepalive_loop(Socket, Pid, Ref) ->
     receive
@@ -218,14 +225,17 @@ handle_redefinitions_route(Socket) ->
 handle_logs_route(Socket) ->
     Entries = case ets:whereis(gleamunison_logs) of
         undefined -> [];
-        _ -> lists:sublist(lists:reverse(ets:tab2list(gleamunison_logs)), 50)
+        _ -> lists:sublist(lists:reverse(lists:sort(ets:tab2list(gleamunison_logs))), 50)
     end,
     Parts = [iolist_to_binary(io_lib:format(
         "{\"timestamp\":\"~s\",\"level\":\"~s\",\"message\":~ts}",
         [gleamunison_http_util:escape_json(TS), Level, gleamunison_http_util:escape_json(Msg)]))
-        || {TS, Level, Msg} <- Entries],
+        || {_Seq, TS, Level, Msg, _Context} <- Entries],
     Json = <<"{\"entries\":[", (binary:join(Parts, <<",">>))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
+
+handle_observability_route(Socket) ->
+    gleamunison_http_util:send_json(Socket, 200, gleamunison_observability:export_json()).
 
 handle_enhanced_modules_route(Socket) ->
     Mods = [{atom_to_binary(M, utf8), 
