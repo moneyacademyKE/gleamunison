@@ -99,7 +99,7 @@ pub fn run_suite(
     let #(name, sd) = pair
     case sd {
       SurfaceTermDef(body) -> {
-        let rec = transcript.start()
+        let rec = transcript.start_with(transcript.CaptureAll)
         let frames = transcript.wrap_frames(rec, [expect_frame()])
         let outcome =
           effects.run(RuntimeConfig(ambient_handlers: frames), fn() {

@@ -33,7 +33,7 @@ fn llm_frame(handler: OpHandler) -> HandlerFrame {
 }
 
 pub fn record_captures_ops_in_order_test() {
-  let rec = transcript.start()
+  let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)
@@ -52,7 +52,7 @@ pub fn record_captures_ops_in_order_test() {
 }
 
 pub fn replay_returns_recorded_results_without_inner_test() {
-  let rec = transcript.start()
+  let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)
@@ -72,7 +72,7 @@ pub fn replay_returns_recorded_results_without_inner_test() {
 }
 
 pub fn json_roundtrip_preserves_entries_test() {
-  let rec = transcript.start()
+  let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)
@@ -106,7 +106,7 @@ pub fn diff_reports_first_divergence_test() {
 }
 
 pub fn json_round_trip_preserves_replay_test() {
-  let rec = transcript.start()
+  let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)

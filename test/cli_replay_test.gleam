@@ -39,7 +39,7 @@ pub fn replay_from_tape_file_matches_original_test() {
   let tape_path = "/tmp/cli_replay_test_tape.json"
 
   // Record: run the def under a wrapped mock handler.
-  let rec = transcript.start()
+  let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [console_frame()])
   let assert Ok(original) = cli_replay.run_definition(path, "main", frames)
   let tape = transcript.capture(rec)
@@ -64,7 +64,7 @@ pub fn replay_with_tampered_ability_key_fails_loudly_test() {
     )
   let tape_path = "/tmp/cli_replay_test2_tape.json"
 
-  let rec = transcript.start()
+  let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [console_frame()])
   let assert Ok(_) = cli_replay.run_definition(path, "main", frames)
   let tape = transcript.capture(rec)
