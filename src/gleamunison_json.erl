@@ -5,7 +5,11 @@ encode(Term) ->
     try
         {ok, iolist_to_binary(build_json(Term))}
     catch
-        error:_ -> {error, <<"encode error">>}
+        error:Reason:Stack ->
+            %% Name the real failure: a swallowed reason is a debugging
+            %% tax paid on every platform where encode misbehaves (bk-19fe).
+            {error, unicode:characters_to_binary(io_lib:format(
+                "encode error: ~p at ~p", [Reason, lists:sublist(Stack, 2)]))}
     end.
 
 decode(Bin) when is_binary(Bin) ->
