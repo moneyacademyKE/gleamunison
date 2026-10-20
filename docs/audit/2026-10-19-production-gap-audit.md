@@ -264,3 +264,11 @@ The ten audited v3.23.0 findings remain closed at their recorded commits. They a
 - The final witness must distinguish automated passes from manual or environment-dependent checks and must not publish, tag, merge, deploy, or make a public production claim.
 
 This update is documentation-only for task 1. It records the boundary contract; it does not claim that the later controls already exist.
+
+## Boundary implementation update — 2026-10-20 (EAT)
+
+Task 2 (`bk-8b8e`, issue #26) now has an explicit `sandbox_policy` data boundary and focused tests. The policy names `local`, `authenticated-remote`, and `untrusted-execution`, validates bounded deadline/process/memory/reduction/concurrency budgets, preserves deny-by-default capability checks, and refuses an untrusted profile without an approved external executor. The existing supervisor-owned evaluation scope continues to kill tracked descendants on timeout/cancellation; the implementation does not call that an OS sandbox.
+
+Receipt: `~/.opencrabs/projects/gleamunison/files/plans/production-boundaries/receipts/bk-8b8e-focused.log` and `bk-8b8e-full.log`; explicit-PATH `gleam test` exits 0 with **452 passed, no failures**, and `gleam format src test` plus `git diff --check` exit 0. The external executor and transport/trust/resource/LLM controls remain unresolved until their later tasks run.
+
+**Rich Hickey boundary check:** policy data and the existing scope are composed rather than hidden behind a universal sandbox claim; the missing OS boundary is recorded as a refusal, not painted green.
