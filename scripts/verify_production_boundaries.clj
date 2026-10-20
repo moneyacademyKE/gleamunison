@@ -117,7 +117,8 @@
                 "CI matrix (OTP 27/28/29 x ubuntu/macos) runs on push; local proof is OTP 29 / macOS arm64"
                 "LOC ceiling: src/gleamunison_ffi_test.erl (625 LOC, base 471) is a test-only probe module called exclusively from test/*.gleam, exempt under the test-file exemption; every production file touched by this branch is under 500 LOC"
                 "all gates execute behind /usr/bin/env with a pinned tool PATH (homebrew + ~/.local/bin) so results never depend on the caller environment; recorded commands are the logical ones"]
-   :unresolved_risks ["transient full-suite failure (507 passed/1 failed) seen sporadically: twice around the llm LOC split, then green on 6 consecutive re-runs; failing test never identified, suspected listener timing in the drain probe"
+   :unresolved_risks ["the 'transient full-suite flake' (507/1) recorded by earlier runs is identified and fixed: evaluation_timeout_test asserted the wall-clock timeout message while the 10ms budget tick could hit the reduction ceiling first on fast machines — reproduced on all seven CI matrix legs; the test now asserts containment under any named evaluation_* error (bk-19fe)"
+                      "first CI matrix run on PR #30 exposed two latent OTP-version defects pending root-cause: json.encode fails only on OTP 27, and the tape-to-test generated module fails erl_parse only on OTP 27/28. Neither reproduces on the local OTP 29 host and no older OTP is available locally, so the honest-error upgrades (encode surfaces reason+stack; compile_source dumps the offending source on parse/scan errors) make the next matrix run the diagnostic oracle (bk-19fe)"
                       "LLM cost metering is estimate-only until operator rates are configured"
                       "provider error bodies are omitted, so provider-side debugging needs the provider dashboard"]
    :side_effects "none: no tag, no Hex publish, no merge, no deploy"})
