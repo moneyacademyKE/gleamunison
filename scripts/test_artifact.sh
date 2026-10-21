@@ -22,5 +22,10 @@ if printf '%s\n' "$listing" | grep -v '^gleamunison@cli_test.beam$' | grep -E '(
   exit 1
 fi
 printf '%s\n' "$listing" | grep -qx gleamunison.app
+# The datalog engine is Lisp source: if it is not in the archive, the CLI and
+# the three MCP index tools cannot load it outside the repo root (bk-389b).
+engine_count=$(printf '%s\n' "$listing" | grep -c '^priv/datalog/.*\.lisp$' || true)
+printf 'artifact_engine_modules=%s\n' "$engine_count"
+test "$engine_count" -eq 13
 printf 'artifact_test_modules=0\n'
 ./gleamunison_escript --help > /dev/null

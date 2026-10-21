@@ -10,24 +10,24 @@ import gleamunison/types.{type TypeCache, empty_cache}
 import gleamunison/verify
 import simplifile
 
-/// The native datalog engine (ADR-0062) lives in userspace Lisp under
-/// gleamunison_datalog/src. This CLI loads it, then the user's script, and
-/// prints the value of every top-level expression. Paths are relative to
-/// the current working directory.
+/// The native datalog engine (ADR-0062) lives in userspace Lisp, shipped as
+/// priv/datalog (source of truth: gleamunison_datalog/src). This CLI loads
+/// it, then the user's script, and prints the value of every top-level
+/// expression. Engine resolution is handled by read_engine/0.
 const engine_files = [
-  "gleamunison_datalog/src/01_core.lisp",
-  "gleamunison_datalog/src/02_index.lisp",
-  "gleamunison_datalog/src/03_transact.lisp",
-  "gleamunison_datalog/src/04_schema.lisp",
-  "gleamunison_datalog/src/05_query.lisp",
-  "gleamunison_datalog/src/06_aggregate.lisp",
-  "gleamunison_datalog/src/07_pull.lisp",
-  "gleamunison_datalog/src/08_temporal.lisp",
-  "gleamunison_datalog/src/09_rules.lisp",
-  "gleamunison_datalog/src/10_graph.lisp",
-  "gleamunison_datalog/src/11_vector.lisp",
-  "gleamunison_datalog/src/12_bm25.lisp",
-  "gleamunison_datalog/src/13_actor.lisp",
+  "01_core.lisp",
+  "02_index.lisp",
+  "03_transact.lisp",
+  "04_schema.lisp",
+  "05_query.lisp",
+  "06_aggregate.lisp",
+  "07_pull.lisp",
+  "08_temporal.lisp",
+  "09_rules.lisp",
+  "10_graph.lisp",
+  "11_vector.lisp",
+  "12_bm25.lisp",
+  "13_actor.lisp",
 ]
 
 pub fn run(script_path: String) -> Result(String, String) {
@@ -39,16 +39,58 @@ pub fn run(script_path: String) -> Result(String, String) {
   eval_source(engine_src <> "\n" <> script_src)
 }
 
+@external(erlang, "gleamunison_engine_locator", "read_embedded")
+fn read_embedded(name: String) -> Result(String, Nil)
+
+@external(erlang, "gleamunison_engine_locator", "priv_datalog_dir")
+fn priv_datalog_dir() -> Result(String, Nil)
+
+/// Load the engine from the first carrier that has it: the escript archive
+/// (any working directory), the application priv dir (Hex consumers), then
+/// the repository (priv/datalog, then the source of truth).
 pub fn read_engine() -> Result(String, String) {
-  list.try_fold(engine_files, "", fn(acc, path) {
-    case simplifile.read(path) {
+  case read_embedded_engine() {
+    Ok(source) -> Ok(source)
+    Error(_) -> read_disk_engine(candidate_dirs())
+  }
+}
+
+fn read_embedded_engine() -> Result(String, Nil) {
+  list.try_fold(engine_files, "", fn(acc, name) {
+    case read_embedded("priv/datalog/" <> name) {
       Ok(content) -> Ok(acc <> "\n" <> content)
-      Error(_) ->
-        Error(
-          "engine source not found: "
-          <> path
-          <> " (run from the gleamunison repo root)",
-        )
+      Error(_) -> Error(Nil)
+    }
+  })
+}
+
+fn candidate_dirs() -> List(String) {
+  let app_dir = case priv_datalog_dir() {
+    Ok(dir) -> [dir]
+    Error(_) -> []
+  }
+  list.append(app_dir, ["priv/datalog", "gleamunison_datalog/src"])
+}
+
+fn read_disk_engine(dirs: List(String)) -> Result(String, String) {
+  case dirs {
+    [] ->
+      Error(
+        "datalog engine not found: tried the escript archive, the application priv dir, priv/datalog and gleamunison_datalog/src",
+      )
+    [dir, ..rest] ->
+      case read_engine_dir(dir) {
+        Ok(source) -> Ok(source)
+        Error(_) -> read_disk_engine(rest)
+      }
+  }
+}
+
+fn read_engine_dir(dir: String) -> Result(String, Nil) {
+  list.try_fold(engine_files, "", fn(acc, name) {
+    case simplifile.read(dir <> "/" <> name) {
+      Ok(content) -> Ok(acc <> "\n" <> content)
+      Error(_) -> Error(Nil)
     }
   })
 }

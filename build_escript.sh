@@ -30,6 +30,13 @@ trap 'rm -rf "$build_dir" "$app_beam_list"' EXIT
 printf 'Building gleamunison escript...\n'
 "$GLEAM_BIN" build
 
+# The datalog engine is Lisp source, so it cannot ride the code path. Sync
+# the shipped copy from its source of truth; the archive then carries it so
+# the engine loads from any working directory. test/datalog_engine_priv_test
+# fails if the committed copies drift.
+mkdir -p priv/datalog
+cp gleamunison_datalog/src/*.lisp priv/datalog/
+
 shopt -s nullglob
 # Record exactly which beams belong to the gleamunison application at copy
 # time; the regenerated .app's modules list is built from this, never from
@@ -112,13 +119,15 @@ fi
 printf '  Beams: %s\n' "$beam_count"
 
 zip_path="$build_dir/$SCRIPT.zip"
+mkdir -p "$build_dir/priv/datalog"
+cp priv/datalog/*.lisp "$build_dir/priv/datalog/"
 (
   cd "$build_dir"
   # Reproducibility gate: zip stores file mtimes, and this temp dir's mtimes
   # are "now". Pin every entry to the epoch so two clean builds of the same
   # source produce byte-identical archives. Glob order is already sorted.
   find . -type f -exec touch -t 198001010000.00 {} +
-  TZ=UTC0 zip -q -X "$zip_path" ./*.beam ./gleamunison.app
+  TZ=UTC0 zip -q -X "$zip_path" ./*.beam ./gleamunison.app ./priv/datalog/*.lisp
 )
 
 artifact_tmp="$build_dir/$SCRIPT"
