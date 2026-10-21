@@ -101,8 +101,12 @@ are proven rather than assumed.
 |---|---|
 | `generate_docs.sh` | generate the stdlib HTML docs into `docs/stdlib/` |
 | `generate_levels.clj` | data-driven dogfood level generation |
-| `refactor_dispatch.clj` | regenerate the `gleamunison.gleam` dispatch and split dogfood modules |
 | `run_coverage.clj` | BEAM code coverage over `build/dev/erlang/gleamunison/ebin` |
+
+`refactor_dispatch.clj` used to live here. It has been moved to
+`scripts/archive/refactor_dispatch.clj`: its template still contains three
+commands and calls a function that no longer exists, so running it would
+replace the current dispatch with a tree that does not compile.
 
 ## Loop and dogfood docs
 
