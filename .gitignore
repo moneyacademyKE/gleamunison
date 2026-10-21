@@ -15,3 +15,6 @@ website/.vite/
 
 # local secrets (never commit)
 .env
+
+# scratch workspace (created on demand by scripts/watch_scratch.clj)
+scratch.lisp
