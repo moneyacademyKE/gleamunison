@@ -110,29 +110,12 @@ cat > "$DOC_DIR/index.html" <<HTMLEND
 </div>
 
 <div class="module">
-<h3>gleamunison/filepath <span class="new">NEW</span></h3>
-<p>Typed path manipulation — never raw strings. Opaque Path type with absolute/relative tracking.</p>
-<div class="fn"><strong>from_string/1</strong> — Parse string to Path</div>
-<div class="fn"><strong>join/2</strong> — Join segment to Path</div>
-<div class="fn"><strong>parent/1</strong> — Get parent directory Path</div>
-<div class="fn"><strong>extension/1</strong> — Get file extension</div>
-<div class="fn"><strong>with_extension/2</strong> — Replace file extension</div>
-<div class="fn"><strong>is_absolute/1</strong> — Check if path is absolute</div>
-</div>
-
-<div class="module">
 <h3>gleamunison/crypto <span class="new">NEW</span></h3>
 <p>Typed cryptographic operations wrapping Erlang crypto module.</p>
 <div class="fn"><strong>hash/2</strong> — Compute hash (SHA256, SHA512, MD5)</div>
 <div class="fn"><strong>hmac/3</strong> — Compute HMAC with key</div>
 <div class="fn"><strong>random_bytes/1</strong> — Generate cryptographically strong random bytes</div>
 <div class="fn"><strong>hash_hex/2</strong> — Hash with hexadecimal output</div>
-</div>
-
-<div class="module">
-<h3>gleamunison/template <span class="new">NEW</span></h3>
-<p>Compile-time safe string interpolation with HTML escaping via <code>{{var}}</code> syntax.</p>
-<div class="fn"><strong>render/2</strong> — Interpolate variables into template string</div>
 </div>
 
 <h2>Operations</h2>
@@ -145,28 +128,11 @@ cat > "$DOC_DIR/index.html" <<HTMLEND
 </div>
 
 <div class="module">
-<h3>gleamunison/config <span class="new">NEW</span></h3>
-<p>Configuration management with env/TOML/CLI precedence.</p>
-<div class="fn"><strong>load/0</strong> — Load from environment variables</div>
-<div class="fn"><strong>with_cli/2</strong> — Override with CLI values (highest precedence)</div>
-<div class="fn"><strong>get/2</strong> — Get value by key (CLI > TOML > env)</div>
-<div class="fn"><strong>get_string/2, get_int/2, get_bool/2</strong> — Typed getters</div>
-</div>
-
-<div class="module">
 <h3>gleamunison/health <span class="new">NEW</span></h3>
 <p>Health checks and readiness probes for production operation.</p>
 <div class="fn"><strong>run_all/0</strong> — Run default memory and module checks</div>
 <div class="fn"><strong>run_checks/1</strong> — Run custom health check list</div>
 <div class="fn"><strong>readiness/0</strong> — Boolean: is node ready to serve?</div>
-</div>
-
-<div class="module">
-<h3>gleamunison/metrics <span class="new">NEW</span></h3>
-<p>Counter, gauge, and histogram operations with :telemetry integration.</p>
-<div class="fn"><strong>counter/2</strong> — Increment named counter</div>
-<div class="fn"><strong>gauge/2</strong> — Set named gauge value</div>
-<div class="fn"><strong>histogram/2</strong> — Record histogram observation</div>
 </div>
 
 <h2>HTTP API Reference</h2>
