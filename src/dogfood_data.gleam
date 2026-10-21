@@ -27,3 +27,8 @@ pub type LevelData {
 
 @external(erlang, "gleamunison_ffi", "load_dogfood_levels")
 pub fn load_levels(path: String) -> Result(List(LevelData), String)
+
+/// Load the level data from wherever it lives: the escript archive, the
+/// packaged priv dir, or the repository. Missing data is an error.
+@external(erlang, "gleamunison_ffi", "load_dogfood_levels_resolved")
+pub fn load_levels_resolved() -> Result(List(LevelData), String)

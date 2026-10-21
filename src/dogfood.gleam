@@ -2,24 +2,14 @@ import dogfood_bench as bench
 import dogfood_core as core
 import dogfood_meta as meta
 import gleam/dict.{type Dict}
-import gleam/int
 import gleam/list
-import gleamunison/util.{range}
 
-fn generic_computation(n: Int) -> fn() -> Nil {
-  fn() {
-    case n % 5 {
-      0 -> meta.generic_parse_level(n)
-      1 -> meta.generic_hash_level(n)
-      2 -> meta.generic_insert_level(n)
-      3 -> meta.generic_infer_level(n)
-      4 -> meta.generic_eval_level(n)
-      _ -> meta.generic_hash_level(n)
-    }
-  }
-}
-
-pub fn all_levels() -> Dict(String, fn() -> Nil) {
+/// Every implemented level, keyed by command name.
+///
+/// There are no synthetic entries: a level that has no implementation is
+/// absent, so dispatch reports "unknown command" instead of running a stub
+/// that prints "stub: parse" and exits zero.
+pub fn all_levels() -> Result(Dict(String, fn() -> Nil), String) {
   let hand_crafted = [
     #("level21", core.level21),
     #("level22", core.level22),
@@ -43,15 +33,8 @@ pub fn all_levels() -> Dict(String, fn() -> Nil) {
     #("level55", bench.level55),
     #("level70", meta.level70),
   ]
-  let real = list.append(meta.real_levels_list(), hand_crafted)
-  let real_keys = list.map(real, fn(p) { p.0 })
-  let stubs =
-    list.filter_map(range(1, 6697), fn(n) {
-      let key = "level" <> int.to_string(n)
-      case list.contains(real_keys, key) {
-        True -> Error(Nil)
-        False -> Ok(#(key, generic_computation(n)))
-      }
-    })
-  dict.from_list(list.append(real, stubs))
+  case meta.real_levels_list() {
+    Ok(real) -> Ok(dict.from_list(list.append(real, hand_crafted)))
+    Error(e) -> Error(e)
+  }
 }

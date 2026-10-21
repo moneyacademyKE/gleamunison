@@ -15,37 +15,9 @@
 
 %% Read one engine file out of the running escript's embedded archive.
 %% Outside an escript (gleam run, gleam test) this returns not-found.
-%%
-%% The archive is located by its zip magic rather than escript:extract/2:
-%% the documented `archive` section option is rejected as badarg on the OTP
-%% versions this project supports (verified on OTP 29), while the appended
-%% zip after the shebang line is plain and stable.
 -spec read_embedded(binary()) -> {ok, binary()} | {error, nil}.
 read_embedded(Name) ->
-    try
-        Script = escript:script_name(),
-        case file:read_file(Script) of
-            {ok, Bin} -> extract_from_archive(Bin, Name);
-            _ -> {error, nil}
-        end
-    catch
-        _:_ -> {error, nil}
-    end.
-
-extract_from_archive(Bin, Name) ->
-    case binary:match(Bin, <<"PK", 3, 4>>) of
-        {Pos, _} ->
-            <<_:Pos/binary, Zip/binary>> = Bin,
-            extract_entry(Zip, Name);
-        nomatch ->
-            {error, nil}
-    end.
-
-extract_entry(Zip, Name) ->
-    case zip:extract(Zip, [memory, {file_list, [binary_to_list(Name)]}]) of
-        {ok, [{_Entry, Data}]} -> {ok, Data};
-        _ -> {error, nil}
-    end.
+    gleamunison_archive:read_embedded(Name).
 
 %% Absolute priv/datalog directory of the loaded application. This is what
 %% makes the engine work for a Hex consumer, whose cwd is their own project.

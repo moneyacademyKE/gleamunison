@@ -105,32 +105,48 @@ fn dispatch(cmd: String, param: String) -> Nil {
 /// The level table is only built when a level command needs it. `--help`,
 /// `version`, `datalog` and every other command used to pay for 6,696 tuples
 /// and a full dict construction before dispatch even looked at argv.
-fn levels() -> dict.Dict(String, fn() -> Nil) {
+fn levels() -> Result(dict.Dict(String, fn() -> Nil), String) {
   dogfood.all_levels()
 }
 
 fn dispatch_level(cmd: String) -> Nil {
-  case dict.get(levels(), cmd) {
-    Ok(f) -> f()
-    Error(_) -> {
-      io.println("Unknown command: '" <> cmd <> "'. Run --help for the list.")
-      halt_failure()
-    }
+  case levels() {
+    Ok(table) ->
+      case dict.get(table, cmd) {
+        Ok(f) -> f()
+        Error(_) -> {
+          io.println(
+            "Unknown command: '" <> cmd <> "'. Run --help for the list.",
+          )
+          halt_failure()
+        }
+      }
+    Error(e) -> level_data_error(e)
   }
 }
 
 fn run_all_levels() -> Nil {
-  let table = levels()
-  let keys = dict.keys(table)
-  list.each(keys, fn(key) {
-    case dict.get(table, key) {
-      Ok(f) -> f()
-      Error(_) -> Nil
+  case levels() {
+    Ok(table) -> {
+      let keys = dict.keys(table)
+      list.each(keys, fn(key) {
+        case dict.get(table, key) {
+          Ok(f) -> f()
+          Error(_) -> Nil
+        }
+      })
+      io.println(
+        "=== " <> int.to_string(list.length(keys)) <> " levels complete ===",
+      )
     }
-  })
-  io.println(
-    "=== " <> int.to_string(list.length(keys)) <> " levels complete ===",
-  )
+    Error(e) -> level_data_error(e)
+  }
+}
+
+fn level_data_error(message: String) -> Nil {
+  io.println("ERROR: " <> message)
+  io.println("This build cannot run levels: the level data file is missing.")
+  halt_failure()
 }
 
 fn print_help() -> Nil {

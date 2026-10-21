@@ -119,15 +119,18 @@ fi
 printf '  Beams: %s\n' "$beam_count"
 
 zip_path="$build_dir/$SCRIPT.zip"
-mkdir -p "$build_dir/priv/datalog"
+mkdir -p "$build_dir/priv/datalog" "$build_dir/priv/dogfood"
 cp priv/datalog/*.lisp "$build_dir/priv/datalog/"
+# Level data is a file, not a BEAM module. Without it every levelN command
+# degrades to a stub and exits 0, which is a false pass.
+cp src/dogfood_data.json "$build_dir/priv/dogfood/dogfood_data.json"
 (
   cd "$build_dir"
   # Reproducibility gate: zip stores file mtimes, and this temp dir's mtimes
   # are "now". Pin every entry to the epoch so two clean builds of the same
   # source produce byte-identical archives. Glob order is already sorted.
   find . -type f -exec touch -t 198001010000.00 {} +
-  TZ=UTC0 zip -q -X "$zip_path" ./*.beam ./gleamunison.app ./priv/datalog/*.lisp
+  TZ=UTC0 zip -q -X "$zip_path" ./*.beam ./gleamunison.app ./priv/datalog/*.lisp ./priv/dogfood/dogfood_data.json
 )
 
 artifact_tmp="$build_dir/$SCRIPT"

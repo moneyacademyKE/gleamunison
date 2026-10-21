@@ -16,7 +16,7 @@
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
     test_soft_purge_scenario/0,
     eval_expression/1,
-    load_dogfood_levels/1
+    load_dogfood_levels/1, load_dogfood_levels_resolved/0
 ]).
 
 hash_bytes(Bytes) when is_binary(Bytes) ->
@@ -220,14 +220,36 @@ eval_expression(Expr) ->
 
 load_dogfood_levels(Path) ->
     case file:read_file(Path) of
-        {ok, Bin} ->
-            try json:decode(Bin) of
-                List -> {ok, [map_to_level(M) || M <- List]}
-            catch
-                Class:Reason ->
-                    {error, list_to_binary(io_lib:format("JSON error: ~p:~p", [Class, Reason]))}
-            end;
+        {ok, Bin} -> parse_dogfood_levels(Bin);
         {error, Reason} -> {error, list_to_binary(io_lib:format("File error: ~p", [Reason]))}
+    end.
+
+%% Resolution order: the escript archive, the packaged priv dir, then the
+%% repository copy. A missing file is an error, never an empty level list:
+%% a CLI that reports success for zero levels is worse than one that fails.
+load_dogfood_levels_resolved() ->
+    case gleamunison_archive:read_embedded(<<"priv/dogfood/dogfood_data.json">>) of
+        {ok, Bin} -> parse_dogfood_levels(Bin);
+        {error, _} -> load_dogfood_levels_from_disk("priv/dogfood/dogfood_data.json", "src/dogfood_data.json")
+    end.
+
+load_dogfood_levels_from_disk(Packaged, Repo) ->
+    case file:read_file(Packaged) of
+        {ok, Bin} -> parse_dogfood_levels(Bin);
+        {error, _} ->
+            case file:read_file(Repo) of
+                {ok, Bin} -> parse_dogfood_levels(Bin);
+                {error, Reason} ->
+                    {error, list_to_binary(io_lib:format("level data not found: ~p", [Reason]))}
+            end
+    end.
+
+parse_dogfood_levels(Bin) ->
+    try json:decode(Bin) of
+        List -> {ok, [map_to_level(M) || M <- List]}
+    catch
+        Class:Reason ->
+            {error, list_to_binary(io_lib:format("JSON error: ~p:~p", [Class, Reason]))}
     end.
 
 map_to_level(#{<<"n">> := N, <<"t">> := T, <<"args">> := Args}) ->
