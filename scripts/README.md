@@ -30,6 +30,10 @@ pre-merge check.
 | release-contract | `scripts/test_release_contract.clj` | two clean builds are byte-identical |
 | upgrade-rollback | `scripts/test_upgrade_rollback.clj` | upgrade and rollback paths, corrupt artifact handling |
 | playbook-default | `scripts/run_playbook_tests.clj` | end-to-end playbook conformance |
+| cli-errors | `scripts/test_cli_errors.clj` | CLI error contract: every bad invocation fails loudly and cleanly |
+| dashboard-safety | `scripts/test_dashboard_safety.mjs` | hostile names/expressions stay text, never markup or code |
+| parser | `scripts/test_parser.clj` | every playbook file parses |
+| playbook-runner | `scripts/test_playbook_runner.clj` | the runner fails closed on crash, nonzero child, timeout, stale exclusion |
 | loc-ceiling | `wc -l` over touched files | no agent-written file over 500 LOC |
 
 Individual gates can be run on their own — the table above is the whole list.
@@ -100,13 +104,15 @@ are proven rather than assumed.
 | `refactor_dispatch.clj` | regenerate the `gleamunison.gleam` dispatch and split dogfood modules |
 | `run_coverage.clj` | BEAM code coverage over `build/dev/erlang/gleamunison/ebin` |
 
-## Probes not in the battery
+## Loop and dogfood docs
 
-| Script | Purpose |
+The `bb dogfood-*` tasks above are documented in two files that live in `docs/`
+rather than here, because they describe the loop rather than a script:
+
+| Doc | Covers |
 |---|---|
-| `test_cli_errors.clj` | CLI error-path probe (invalid file, bad arguments) against the escript |
-| `test_dashboard_safety.mjs` | dashboard XSS safety probe (`node`/`bun`) |
-| `test_parser.clj` | parse every playbook S-expression, report syntax errors |
+| [`docs/DOGFOOD_LOOP.md`](../docs/DOGFOOD_LOOP.md) | how the playbook-driven loop works, iteration structure, handoff |
+| [`docs/ROADMAP_ITEMS.md`](../docs/ROADMAP_ITEMS.md) | the improvement list that came out of the v2 generator and loop work |
 
 ## `bb` tasks (from `bb.edn`)
 
