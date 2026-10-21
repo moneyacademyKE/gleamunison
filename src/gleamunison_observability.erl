@@ -1,4 +1,5 @@
 -module(gleamunison_observability).
+-compile(nowarn_deprecated_catch).
 -export([export/0, export_json/0, saturation/0]).
 
 %% Redaction is by construction: this module never reads raw trace headers,

@@ -14,7 +14,7 @@ import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/evidence
-import gleamunison/identity.{Ref, hash_to_debug_string}
+import gleamunison/identity.{hash_to_debug_string}
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleamunison/test_runner

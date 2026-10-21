@@ -1,6 +1,6 @@
 import gleam/bit_array
 import gleam/int
-import gleam/option.{None, Some}
+import gleam/option.{Some}
 import gleam/string
 import gleamunison/evidence.{Test}
 import gleamunison/identity.{Ref, hash_bytes}

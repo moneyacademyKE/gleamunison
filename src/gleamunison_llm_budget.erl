@@ -81,7 +81,7 @@ handle_call({admit, Provider, Model, Caller}, _From, State) ->
             end
     end;
 handle_call({release, Provider, Caller}, _From, State) ->
-    #{rows := Rows, monitors := Mons} = State,
+    #{monitors := Mons} = State,
     case find_monitor(Mons, Provider, Caller) of
         none -> {reply, {ok, nil}, State};
         {ok, Mon} ->
@@ -137,7 +137,7 @@ handle_cast(_, State) -> {noreply, State}.
 handle_info({'DOWN', Mon, process, _Pid, _}, #{monitors := Mons} = State) ->
     case maps:find(Mon, Mons) of
         error -> {noreply, State};
-        {ok, {Provider, _Pid}} ->
+        {ok, {Provider, _Pid2}} ->
             {noreply, update_row(State#{monitors := maps:remove(Mon, Mons)},
                 Provider, fun(R) -> R#row{in_flight = max(0, R#row.in_flight - 1)} end)}
     end;

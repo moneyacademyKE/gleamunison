@@ -1,4 +1,5 @@
 -module(gleamunison_http_client).
+-compile(nowarn_deprecated_catch).
 -export([request/4, request_with_options/6, get/1, post/2, put/2, delete/1]).
 
 request(Method, Url, Headers, Body) ->
@@ -65,7 +66,7 @@ cancel_request(RequestId, Reason) ->
     {error, Reason}.
 
 cancelled(none) -> false;
-cancelled({some, Token}) -> gleamunison_cancellation:cancelled(Token).
+cancelled({some, Token}) -> 'gleamunison@cancellation':is_cancelled(Token).
 
 error_binary(timeout) -> <<"request_timeout">>;
 error_binary({failed_connect, _}) -> <<"connect_failed">>;

@@ -6,12 +6,10 @@ import gleam/set
 import gleam/string
 import gleamunison/codebase.{type Codebase, list_refs}
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
-import gleamunison/storage.{type StorageAdapter}
 import gleamunison/sync_types.{
   type PeerId, type SyncError, type SyncState, Connected, ConnectionFailed,
   HashConflict, PeerId, PeerNotFound, PeerState, SyncState, TransferFailed,
-  sync_connect, sync_push_defs, sync_receive_diff, sync_request_defs,
-  sync_send_refs,
+  sync_connect, sync_receive_diff, sync_request_defs, sync_send_refs,
 }
 import gleamy/priority_queue
 

@@ -2,7 +2,6 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
-import gleam/string
 import gleamunison/cli_datalog
 import gleamunison/elab_types.{
   type SCase, type SurfaceDef, type SurfaceTerm, SApply, SConstruct, SDo, SFloat,

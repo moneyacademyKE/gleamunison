@@ -14,11 +14,7 @@ import gleam/order
 import gleam/result
 import gleam/string
 import gleamunison/codebase_index
-import gleamunison/elab_types.{
-  type SurfaceDef, SurfaceAbilityDef, SurfacePubTypeAlias, SurfaceTermDef,
-  SurfaceTypeAlias, SurfaceTypeDef,
-}
-import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/elab_types.{type SurfaceDef, SurfaceTermDef}
 import gleamunison/lexer
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/parser
@@ -452,9 +448,4 @@ fn def_json(name: String, def: SurfaceDef) -> String {
   <> ",\"ref\":"
   <> mcp.json_string(codebase_index.ref_hex(name, def))
   <> "}"
-}
-
-fn ref_to_hex(r: DefinitionRef) -> String {
-  let Ref(h) = r
-  hash_to_debug_string(h)
 }

@@ -155,7 +155,7 @@ fn tool_schema(name: String) -> String {
 fn tools_call(server: Server, req: Request) -> String {
   case dict.get(req.params, "name"), dict.get(req.params, "arguments") {
     Error(_), _ -> error_body(req.id, -32_602, "Invalid params")
-    Ok(name_dyn), Error(_) -> error_body(req.id, -32_602, "Invalid params")
+    Ok(_), Error(_) -> error_body(req.id, -32_602, "Invalid params")
     Ok(name_dyn), Ok(args_dyn) ->
       case
         decode.run(name_dyn, decode.string),

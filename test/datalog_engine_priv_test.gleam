@@ -44,6 +44,9 @@ pub fn shipped_engine_carries_every_module_test() {
 fn read_or_fail(path: String) -> String {
   case simplifile.read(path) {
     Ok(content) -> content
-    Error(_) -> panic as "cannot read " <> path
+    Error(_) -> {
+      let message = "cannot read " <> path
+      panic as message
+    }
   }
 }

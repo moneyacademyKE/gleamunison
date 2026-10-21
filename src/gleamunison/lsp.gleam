@@ -11,7 +11,6 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleamunison/ast
 import gleamunison/elab_types
 import gleamunison/elaborate as elab
 import gleamunison/json
@@ -19,7 +18,6 @@ import gleamunison/lexer
 import gleamunison/lsp_features
 import gleamunison/lsp_types
 import gleamunison/repl_eval
-import gleamunison/type_pretty
 import gleamunison/types.{empty_cache}
 import gleamunison/verify
 import gleamunison/version

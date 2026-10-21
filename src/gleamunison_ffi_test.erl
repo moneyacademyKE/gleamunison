@@ -1,4 +1,5 @@
 -module(gleamunison_ffi_test).
+-compile(nowarn_deprecated_catch).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
 -export([start_echo_server/0, start_slow_server/0]).
 -export([start_http_server/1, stop_http_server/0, http_post/3, http_post_auth/4,

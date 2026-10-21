@@ -6,7 +6,7 @@ import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
-import gleam/option.{type Option, None, Some}
+import gleam/option.{type Option}
 import gleam/string
 
 /// Server state: the open documents. Stateless services can't answer

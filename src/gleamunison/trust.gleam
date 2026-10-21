@@ -49,8 +49,8 @@ pub fn refusal_name(refusal: TrustRefusal) -> String {
   case refusal {
     UnknownSigner(id) -> "unknown_signer:" <> id
     KeyRevoked(id) -> "key_revoked:" <> id
-    KeyNotYetValid(id, since) -> "key_not_yet_valid:" <> id
-    KeyExpired(id, until) -> "key_expired:" <> id
+    KeyNotYetValid(id, _since) -> "key_not_yet_valid:" <> id
+    KeyExpired(id, _until) -> "key_expired:" <> id
     SignatureMismatch(id) -> "signature_mismatch:" <> id
     UnsignedRecord -> "unsigned_record"
   }

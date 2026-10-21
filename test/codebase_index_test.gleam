@@ -1,10 +1,7 @@
 import gleam/list
 import gleam/string
 import gleamunison/codebase_index
-import gleamunison/elab_types.{
-  SApply, SInt, SLambda, SLet, SText, SVar, SurfaceTermDef,
-}
-import gleamunison/mcp_session
+import gleamunison/elab_types.{SApply, SInt, SLambda, SLet, SVar, SurfaceTermDef}
 import gleeunit/should
 
 fn sample_defs() -> List(#(String, elab_types.SurfaceDef)) {

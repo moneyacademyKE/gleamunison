@@ -25,9 +25,8 @@ import gleamunison/json
 import gleamunison/llm_budget
 import gleamunison/llm_controls
 import gleamunison/llm_types.{
-  type Completion, type LlmError, type Message, type Provider,
-  type ProviderConfig, type Role, Anthropic, Assistant, Completion, DecodeError,
-  HttpError, Message, OpenAI, ProviderConfig, System, TransportError, User,
+  type Completion, type LlmError, type Provider, type ProviderConfig, Anthropic,
+  DecodeError, HttpError, Message, OpenAI, ProviderConfig, TransportError, User,
 }
 import gleamunison/llm_wire
 

@@ -14,7 +14,7 @@ import gleamunison/json
 import gleamunison/llm
 import gleamunison/llm_budget
 import gleamunison/llm_controls
-import gleamunison/llm_types.{type Completion, type Provider}
+import gleamunison/llm_types.{type Completion}
 import gleamunison/llm_wire
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")

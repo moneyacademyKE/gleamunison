@@ -1,4 +1,5 @@
 -module(gleamunison_readiness).
+-compile(nowarn_deprecated_catch).
 -export([report/0, ready/0, http_response/0]).
 
 %% Readiness observes required resources; it never executes stored code,
