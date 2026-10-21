@@ -101,7 +101,7 @@ So the honest comparison is twofold: **(a)** BAML-the-LLM-toolkit vs gleamunison
 
 ## 4. Actionable Path
 
-1. **`gleamunison/llm` ability**: `complete`, plus jets for OpenAI/Anthropic-shaped HTTP via existing `http_client`; provider config through existing `gleamunison/config`.
+1. **`gleamunison/llm` ability**: `complete`, plus jets for OpenAI/Anthropic-shaped HTTP via existing `http_client`; provider config through environment variables (there is no config module).
 2. **Retry/fallback handlers**: handler composition, not a client registry — prove the decomplected design on two providers.
 3. **`gleamunison/sap`**: tolerant parser → validate against core `Type`; property tests via dogfood runner.
 4. **Prompt definitions**: template-backed prompt terms in the codebase DAG; hash-pinned deployment; extend trace inspector to record LLM call/response by prompt hash.

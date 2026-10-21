@@ -162,12 +162,14 @@ let now = datetime.now()
 let iso = datetime.to_iso8601(now)
 ```
 
-### 7.4 Filepath
+### 7.4 File paths
+
+There is no `gleamunison/filepath` module. Use the `filepath` Hex package:
+
 ```gleam
-import gleamunison/filepath
+import filepath
 
 let p = filepath.from_string("/home/user/file.txt")
-let ext = filepath.extension(p)
 ```
 
 ### 7.5 Crypto
@@ -179,11 +181,8 @@ let key = crypto.random_bytes(32)
 ```
 
 ### 7.6 Template
-```gleam
-import gleamunison/template
 
-let html = template.render("Hello {{name}}!", [#("name", "World")])
-```
+There is no `gleamunison/template` module; the local wrapper was removed.
 
 ### 7.7 Structured Logging
 
@@ -195,26 +194,17 @@ ring that `/api/logs` serves. There is no Gleam wrapper module.
 Configuration is read from the environment at the point of use — there is no
 config file loader and no typed getter module.
 
-let port = config.get_int(cfg, "PORT") |> result.unwrap(8080)
-```
-
 ### 7.9 Health Checks
-```gleam
-import gleamunison/health
 
-case health.run_all() {
-  Healthy(msg) -> log.info(msg)
-  Unhealthy(err) -> log.error(err)
-}
-```
+Readiness is `gleamunison_readiness.erl`: `report/0`, `ready/0` and
+`http_response/0`, served at `/api/health` and `/api/ready`. There is no Gleam
+health module.
 
 ### 7.10 Metrics
-```gleam
-import gleamunison/metrics
 
-metrics.counter("requests", 1)
-metrics.gauge("memory_mb", 256.0)
-```
+Metrics are Erlang-side: `gleamunison_metrics:counter/2`, `gauge/2` and
+`histogram/2`, recorded at the HTTP response boundary by
+`gleamunison_http_metrics`. There is no Gleam metrics module.
 
 ---
 
@@ -267,17 +257,10 @@ Redefining a name in the REPL automatically purges old BEAM modules (`code:delet
 
 ---
 
-## 11. Property-Based Testing (v1.1.0)
-```erlang
-% From Erlang FFI:
-gleamunison_property:check(Generator, Property).
+## 11. Property-Based Testing
 
-% Example: all reversed lists have same length as original
-IntListGen = gleamunison_property:list_gen(gleamunison_property:int_gen()),
-gleamunison_property:check(IntListGen, fun(L) ->
-    length(L) =:= length(lists:reverse(L))
-end).
-```
+Not implemented. `gleamunison_property` was removed; tests use `gleeunit`
+assertions and the playbook conformance levels.
 
 ---
 

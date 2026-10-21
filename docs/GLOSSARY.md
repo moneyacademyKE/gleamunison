@@ -118,15 +118,15 @@ Terms specific to the gleamunison project.
 
 ## M (continued)
 
-**Metrics** — `gleamunison/metrics` — counter, gauge, and histogram operations emitting `:telemetry` events for Prometheus/StatsD integration.
+**Metrics** — `gleamunison_metrics.erl` — counter, gauge, and histogram operations emitting `:telemetry` events for Prometheus/StatsD integration. Recorded at the HTTP response boundary by `gleamunison_http_metrics`.
 
 ## P (continued)
 
-**Property-Based Testing** — Random input generation with property verification. `gleamunison_property.erl` provides `check/2` with generators (`int_gen`, `bool_gen`, `list_gen`).
+**Property-Based Testing** — Not implemented. `gleamunison_property` was removed; tests use `gleeunit` assertions.
 
 ## T (continued)
 
-**Template** — `gleamunison/template` — `{{var}}` string interpolation with HTML-safe escaping against XSS.
+**Template** — Not implemented. `gleamunison/template` was removed; there is no `{{var}}` interpolation module.
 
 **Trace Inspector** — Darklang-style live request capture. `gleamunison_trace.erl` stores HTTP request traces in ETS, exposed via `/api/traces` dashboard endpoints with SSE push.
 

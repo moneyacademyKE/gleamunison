@@ -120,16 +120,18 @@ cat > "$DOC_DIR/index.html" <<HTMLEND
 <h2>Operations</h2>
 
 <div class="module">
-<h3>gleamunison/log <span class="new">NEW</span></h3>
-<p>Structured logging with debug/info/warn/error levels, context dictionaries, and ETS-backed persistence.</p>
-<div class="fn"><strong>debug/1, info/1, warn/1, error/1</strong> — Level-logged messages</div>
+<h3>gleamunison_log (Erlang)</h3>
+<p>Structured logging: <code>gleamunison_log:log_entry/4</code> writes into a bounded ETS ring that <code>/api/logs</code> serves. There is no Gleam wrapper module.</p>
 </div>
 
 <div class="module">
-<h3>gleamunison/health <span class="new">NEW</span></h3>
-<p>Health checks and readiness probes for production operation.</p>
-<div class="fn"><strong>run_checks/1</strong> — Run custom health check list</div>
-<div class="fn"><strong>readiness/0</strong> — Boolean: is node ready to serve?</div>
+<h3>gleamunison_readiness (Erlang)</h3>
+<p>Health checks and readiness probes. <code>report/0</code>, <code>ready/0</code>, <code>http_response/0</code>; required vs observational checks.</p>
+</div>
+
+<div class="module">
+<h3>gleamunison_metrics (Erlang)</h3>
+<p>Counter, gauge, and histogram storage with <code>:telemetry</code> events, fed by <code>gleamunison_http_metrics</code> at the HTTP response boundary.</p>
 </div>
 
 <h2>HTTP API Reference</h2>

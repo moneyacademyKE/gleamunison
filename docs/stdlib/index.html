@@ -95,19 +95,7 @@
 <div class="fn"><strong>now/0</strong> — Current timestamp as DateTime</div>
 <div class="fn"><strong>now_iso8601/0</strong> — Current time as ISO 8601 string</div>
 <div class="fn"><strong>from_iso8601/1</strong> — Parse ISO 8601 string to DateTime</div>
-<div class="fn"><strong>to_iso8601/1</strong> — Format DateTime to ISO 8601 string</div>
 <div class="fn"><strong>add_seconds/2, diff_seconds/2</strong> — DateTime arithmetic</div>
-</div>
-
-<div class="module">
-<h3>gleamunison/filepath <span class="new">NEW</span></h3>
-<p>Typed path manipulation — never raw strings. Opaque Path type with absolute/relative tracking.</p>
-<div class="fn"><strong>from_string/1</strong> — Parse string to Path</div>
-<div class="fn"><strong>join/2</strong> — Join segment to Path</div>
-<div class="fn"><strong>parent/1</strong> — Get parent directory Path</div>
-<div class="fn"><strong>extension/1</strong> — Get file extension</div>
-<div class="fn"><strong>with_extension/2</strong> — Replace file extension</div>
-<div class="fn"><strong>is_absolute/1</strong> — Check if path is absolute</div>
 </div>
 
 <div class="module">
@@ -119,44 +107,21 @@
 <div class="fn"><strong>hash_hex/2</strong> — Hash with hexadecimal output</div>
 </div>
 
-<div class="module">
-<h3>gleamunison/template <span class="new">NEW</span></h3>
-<p>Compile-time safe string interpolation with HTML escaping via <code>{{var}}</code> syntax.</p>
-<div class="fn"><strong>render/2</strong> — Interpolate variables into template string</div>
-</div>
-
 <h2>Operations</h2>
 
 <div class="module">
-<h3>gleamunison/log <span class="new">NEW</span></h3>
-<p>Structured logging with debug/info/warn/error levels, context dictionaries, and ETS-backed persistence.</p>
-<div class="fn"><strong>debug/1, info/1, warn/1, error/1</strong> — Level-logged messages</div>
-<div class="fn"><strong>debug_context/2, info_context/2, warn_context/2, error_context/2</strong> — Log with context dict</div>
+<h3>gleamunison_log (Erlang)</h3>
+<p>Structured logging: <code>gleamunison_log:log_entry/4</code> writes into a bounded ETS ring that <code>/api/logs</code> serves. There is no Gleam wrapper module.</p>
 </div>
 
 <div class="module">
-<h3>gleamunison/config <span class="new">NEW</span></h3>
-<p>Configuration management with env/TOML/CLI precedence.</p>
-<div class="fn"><strong>load/0</strong> — Load from environment variables</div>
-<div class="fn"><strong>with_cli/2</strong> — Override with CLI values (highest precedence)</div>
-<div class="fn"><strong>get/2</strong> — Get value by key (CLI > TOML > env)</div>
-<div class="fn"><strong>get_string/2, get_int/2, get_bool/2</strong> — Typed getters</div>
+<h3>gleamunison_readiness (Erlang)</h3>
+<p>Health checks and readiness probes. <code>report/0</code>, <code>ready/0</code>, <code>http_response/0</code>; required vs observational checks.</p>
 </div>
 
 <div class="module">
-<h3>gleamunison/health <span class="new">NEW</span></h3>
-<p>Health checks and readiness probes for production operation.</p>
-<div class="fn"><strong>run_all/0</strong> — Run default memory and module checks</div>
-<div class="fn"><strong>run_checks/1</strong> — Run custom health check list</div>
-<div class="fn"><strong>readiness/0</strong> — Boolean: is node ready to serve?</div>
-</div>
-
-<div class="module">
-<h3>gleamunison/metrics <span class="new">NEW</span></h3>
-<p>Counter, gauge, and histogram operations with :telemetry integration.</p>
-<div class="fn"><strong>counter/2</strong> — Increment named counter</div>
-<div class="fn"><strong>gauge/2</strong> — Set named gauge value</div>
-<div class="fn"><strong>histogram/2</strong> — Record histogram observation</div>
+<h3>gleamunison_metrics (Erlang)</h3>
+<p>Counter, gauge, and histogram storage with <code>:telemetry</code> events, fed by <code>gleamunison_http_metrics</code> at the HTTP response boundary.</p>
 </div>
 
 <h2>HTTP API Reference</h2>

@@ -55,7 +55,7 @@ levels, updates documentation, and hands off to the next iteration.
 │  6. HANDOFF: Signal completion, loop back to step 1      │
 │     - Print summary: batch, levels, verifications        │
 │     - Output next batch command for bootstrap            │
-│     - Invoke `scripts/next_batch.sh`                     │
+│     - Invoke `bb dogfood-register`                        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -117,7 +117,7 @@ When a batch completes, the handoff produces:
 # Print handoff command
 echo "=== HANDOFF ==="
 echo "Batch $batch complete. Next: batch $((batch + 1)), levels $start-$end"
-echo "scripts/next_batch.sh to bootstrap"
+echo "bb dogfood-register to bootstrap"
 ```
 
 The next agent invocation receives:
@@ -130,10 +130,11 @@ The next agent invocation receives:
 
 The loop uses these files:
 
-### `scripts/next_batch.sh`
-Shell script that computes the next batch number and level range,
-creates skeleton playbook and implementation files, bumps ranges,
-and prints the handoff context. Run at the START of each iteration.
+### `scripts/dogfood_loop.clj`
+Registers new levels and verifies the playbook ranges. Run as
+`bb dogfood-register` to add a batch, `bb dogfood-verify` to check it.
+`scripts/loop_infinite.clj` (`bb dogfood-loop`) is the outer loop that drives
+it, with zombie cleanup and retry detection.
 
 ### `.commandcode/skills/gleamunison.md`
 The canonical state file. The agent reads this to understand current

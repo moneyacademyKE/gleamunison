@@ -75,9 +75,8 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - **HTTP Client**: `gleamunison/http_client` — get/post/put/delete, opaque `HttpResponse`.
 - **JSON**: `gleamunison/json` — encode/decode wrapping Erlang `json`.
 - **DateTime**: `gleamunison/datetime` — opaque `DateTime`, ISO 8601, arithmetic.
-- **Filepath**: `gleamunison/filepath` — opaque `Path`, join, parent, extension.
 - **Crypto**: `gleamunison/crypto` — SHA256/512, HMAC, random bytes.
-- **Template**: `gleamunison/template` — `{{var}}` interpolation with HTML escaping.
+- **File paths**: the `filepath` Hex package (the local `gleamunison/filepath` wrapper was removed).
 
 ### 9. Native Datalog Database Engine (`gleamunison_datalog/`)
 Pure S-expression immutable database engine running entirely in GleamUnison user-space (ADR-0062):
@@ -98,7 +97,8 @@ Pure S-expression immutable database engine running entirely in GleamUnison user
 
 ### Scripts
 - `scripts/run_playbook_tests.clj` — Executes all conformance levels against the runtime.
-- `scripts/demo.clj` & `scripts/test_runner.clj` — Automated execution of the native Datalog engine.
+- `scripts/verify_production_boundaries.clj` — The integrated gate; produces the witness in `docs/verification/`.
+- `scripts/test_cli_errors.clj` and `scripts/test_artifact.sh` — CLI error contract and the shipped-artifact contract, including the Datalog engine's presence in the escript.
 - All scripts are pure Clojure/Babashka (`bb`) — zero Python or npm dependencies.
 
 ### Conformance Coverage

@@ -65,9 +65,9 @@ From architectural specification to production-grade content-addressed runtime.
 | 8.1 | `gleamunison/http` client | ✓ DONE (v1.1.0) | Typed HTTP client (`get`, `post`, `put`, `delete`) wrapping Erlang `httpc`. Opaque `HttpResponse` type. |
 | 8.2 | `gleamunison/json` codec | ✓ DONE (v1.1.0) | JSON encode/decode wrapping Erlang `json`. Free-standing FFI for dynamic deserialization. |
 | 8.3 | `gleamunison/datetime` | ✓ DONE (v1.1.0) | Opaque `DateTime` type, ISO 8601 parse/format, arithmetic (`add_seconds`, `diff_seconds`). |
-| 8.4 | `gleamunison/filepath` | ✓ DONE (v1.1.0) | Opaque `Path` type, `join`, `parent`, `extension`, `with_extension`, `is_absolute`. |
+| 8.4 | `gleamunison/filepath` | REMOVED | Local wrapper deleted; use the `filepath` Hex package instead. |
 | 8.5 | `gleamunison/crypto` | ✓ DONE (v1.1.0) | `hash` (SHA256/512/MD5), `hmac`, `random_bytes`, `hash_hex` wrapping Erlang `crypto`. |
-| 8.6 | `gleamunison/template` | ✓ DONE (v1.1.0) | `{{var}}` string interpolation with HTML-safe escaping. |
+| 8.6 | `gleamunison/template` | REMOVED | Deleted; no interpolation module exists. |
 | 8.7 | Stdlib documentation generation | ✓ DONE (v1.1.0) | `scripts/generate_docs.sh` → `docs/stdlib/index.html`. Module/function-level HTML docs. |
 
 ---
@@ -81,7 +81,7 @@ From architectural specification to production-grade content-addressed runtime.
 | 9.1 | LSP: completion, hover, go-to-def | ✓ DONE (v3.17.0) | stdio server: hover with inferred types, goto-def by line scan, completion from namespace. |
 | 9.2 | `gleam format` | ✓ DONE (v3.20.0) | M | `gleam run -- fmt <file>`: one-rule formatter (flat-if-fits, 72 cols), idempotent by construction. |
 | 9.3 | Debugger integration | PENDING | L | BEAM debugger via `:debugger`, step through Gleam source |
-| 9.4 | Property-based testing | ✓ DONE (v1.1.0) | `gleamunison_property.erl` — `check/2`, `int_gen/0`, `bool_gen/0`, `list_gen/1`, `tuple_gen/2`. |
+| 9.4 | Property-based testing | REMOVED | `gleamunison_property` was deleted; tests use `gleeunit` and the playbook levels. |
 | 9.5 | `gleam watch` | ✓ DONE (v1.1.0) | `scripts/watch.sh` — file watcher, auto-rebuild on change, optional `--test` mode. |
 | 9.6 | Error message improvement | ✓ DONE (v1.1.0) | Elm/Rust-style: `[P001]`–`[P004]` parse errors, `[E001]`–`[E005]` type errors with suggested fixes. |
 | 9.7 | Scratch-file watcher loop | ✓ DONE (v3.14.0) | S | `gleam run -- watch <file.lisp>`: mtime-polled re-verify on save (foreground). |
@@ -95,11 +95,11 @@ From architectural specification to production-grade content-addressed runtime.
 
 | # | Feature | Status | Effort | Description |
 |---|---|---|---|
-| 10.1 | Structured logging | ✓ DONE (v1.1.0) | `gleamunison/log`: `debug`/`info`/`warn`/`error` with context dict, ETS-backed persistence. |
-| 10.2 | Metrics & telemetry | ✓ DONE (v1.1.0) | `gleamunison/metrics`: `counter`/`gauge`/`histogram` with `:telemetry` events. ETS-backed storage. |
+| 10.1 | Structured logging | ✓ DONE (v1.1.0) | `gleamunison_log.erl`: `log_entry/4` into a bounded ETS ring, served by `/api/logs`. |
+| 10.2 | Metrics & telemetry | ✓ DONE (v1.1.0) | `gleamunison_metrics.erl`: `counter`/`gauge`/`histogram` with `:telemetry` events. Recorded at the HTTP response boundary. |
 | 10.3 | `gleam release` (replaces escript) | PENDING | L | Standalone tarball with ERTS, no Erlang pre-install required |
-| 10.4 | Configuration management | ✓ DONE (v1.1.0) | `gleamunison/config`: env/TOML/CLI with defined precedence. `get_string`, `get_int`, `get_bool`. |
-| 10.5 | Health checks & readiness probes | ✓ DONE (v1.1.0) | `gleamunison/health`: `run_all/0`, `readiness/0`. `/api/health` HTTP endpoint. |
+| 10.4 | Configuration management | REMOVED | Environment variables are read at the point of use; there is no config loader. |
+| 10.5 | Health checks & readiness probes | ✓ DONE (v1.1.0) | `gleamunison_readiness.erl`: `report/0`, `ready/0`, `http_response/0`. `/api/health` and `/api/ready`. |
 | 10.6 | Distributed tracing | PENDING | L | OpenTelemetry integration, typed span propagation |
 | 10.7 | Operations runbook | ✓ DONE (v1.1.0) | `docs/OPERATIONS.md`: deploy, configure, monitor, upgrade, troubleshoot, backup. |
 
