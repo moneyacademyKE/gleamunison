@@ -12,3 +12,6 @@ website/.wrangler/
 website/.vite/
 .bankai/
 .gleamunison/
+
+# local secrets (never commit)
+.env
