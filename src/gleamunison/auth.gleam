@@ -2,7 +2,8 @@
 ////
 //// Data over dispatch: routes map to scopes, identities carry scopes, and
 //// authorization is a pure decision. The Erlang HTTP/sync servers call
-//// required_scope/1 and bind_decision/3; they do not re-implement policy.
+//// required_scope/1, authorize_scopes/2 and bind_decision/1; they do not
+//// re-implement policy.
 
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -18,7 +19,7 @@ pub type Scope {
 pub type Identity {
   Anonymous
   LocalPeer
-  Bearer(token_hash: String)
+  Bearer(token_hash: String, scopes: List(Scope))
   ProxyPrincipal(name: String, scopes: List(Scope))
 }
 
@@ -87,30 +88,43 @@ pub fn identity_scopes(identity: Identity) -> List(Scope) {
   case identity {
     Anonymous -> [Public]
     LocalPeer -> [Public, DataRead, DataWrite, Admin]
-    Bearer(_) -> [Public, DataRead, DataWrite, Admin]
+    // A bearer token carries exactly the scopes its issuer granted. Treating
+    // every token as admin is what let a read-only token reach /api/*.
+    Bearer(_, scopes) -> scopes
     ProxyPrincipal(_, scopes) -> scopes
   }
 }
 
-pub fn authorize(identity: Identity, path: String) -> Result(Identity, String) {
+/// The whole authorization decision, over scopes rather than an identity.
+/// Transport adapters resolve a credential to its scopes and ask this; they
+/// do not decide policy themselves.
+pub fn authorize_scopes(
+  scopes: List(Scope),
+  path: String,
+) -> Result(Nil, String) {
   let need = required_scope(path)
   case need {
-    Public -> Ok(identity)
+    Public -> Ok(Nil)
     _ ->
-      case
-        list.any(identity_scopes(identity), fn(s) { scope_at_least(s, need) })
-      {
-        True -> Ok(identity)
+      case list.any(scopes, fn(s) { scope_at_least(s, need) }) {
+        True -> Ok(Nil)
         False -> Error("insufficient_scope:" <> scope_name(need))
       }
   }
 }
 
-pub fn bearer_identity(token: Option(String)) -> Identity {
+pub fn authorize(identity: Identity, path: String) -> Result(Identity, String) {
+  case authorize_scopes(identity_scopes(identity), path) {
+    Ok(_) -> Ok(identity)
+    Error(e) -> Error(e)
+  }
+}
+
+pub fn bearer_identity(token: Option(String), scopes: List(Scope)) -> Identity {
   case token {
     None -> Anonymous
     Some("") -> Anonymous
-    Some(_) -> Bearer("bearer:present")
+    Some(_) -> Bearer("bearer:present", scopes)
   }
 }
 

@@ -297,35 +297,57 @@ parse_content_length(Value) ->
         _:_ -> error
     end.
 
+%% Authorization: the route's required scope comes from gleamunison@auth (the
+%% one policy owner), and the credential is resolved to the scopes its token
+%% was issued for. There is no second copy of the route table here.
+%%
+%% Tokens are configured per scope class:
+%%   GLEAMUNISON_HTTP_TOKEN        admin      (everything)
+%%   GLEAMUNISON_HTTP_WRITE_TOKEN  data-write (/eval, /define, /mcp, defaults)
+%%   GLEAMUNISON_HTTP_READ_TOKEN   data-read  (read routes only)
+%%
+%% With no token configured at all the server runs in local mode and allows
+%% protected routes: bind_gate/0 refuses a non-loopback bind without a token,
+%% so this branch is only reachable on loopback.
 authorized(Path, Headers) ->
-    case os:getenv("GLEAMUNISON_HTTP_TOKEN") of
-        false -> true;
-        "" -> true;
-        Expected ->
-            case protected_path(Path) of
-                false -> true;
-                true ->
-                    ExpectedBin = list_to_binary(Expected),
-                    Provided = case lists:keyfind(<<"authorization">>, 1, Headers) of
-                        {_, Value} -> Value;
-                        false -> <<>>
-                    end,
-                    case Provided of
-                        <<"Bearer ", Token/binary>> -> constant_time_equal(ExpectedBin, Token);
+    BinPath = header_binary(Path),
+    case gleamunison@auth:required_scope(BinPath) of
+        public -> true;
+        _ ->
+            case token_scopes(Headers) of
+                none_configured -> true;
+                {ok, Scopes} ->
+                    case gleamunison@auth:authorize_scopes(Scopes, BinPath) of
+                        {ok, _} -> true;
                         _ -> false
-                    end
+                    end;
+                error -> false
             end
     end.
 
-%% Public: the UI shell/assets and bounded operational probes. Every data
-%% and mutation route (including unknown future routes) requires the token.
-protected_path(<<"/">>) -> false;
-protected_path(<<"/index.html">>) -> false;
-protected_path(<<"/static/", _/binary>>) -> false;
-protected_path(<<"/api/live">>) -> false;
-protected_path(<<"/api/ready">>) -> false;
-protected_path(<<"/api/health">>) -> false;
-protected_path(_) -> true.
+%% Compare the presented bearer against every configured token without an
+%% early exit, so the response does not reveal which token class matched.
+token_scopes(Headers) ->
+    Provided = case lists:keyfind(<<"authorization">>, 1, Headers) of
+        {_, <<"Bearer ", Token/binary>>} -> Token;
+        _ -> <<>>
+    end,
+    Candidates = [
+        {os:getenv("GLEAMUNISON_HTTP_TOKEN"), [admin]},
+        {os:getenv("GLEAMUNISON_HTTP_WRITE_TOKEN"), [public, data_read, data_write]},
+        {os:getenv("GLEAMUNISON_HTTP_READ_TOKEN"), [public, data_read]}
+    ],
+    Configured = [{list_to_binary(V), S} || {V, S} <- Candidates, is_list(V), V =/= ""],
+    case Configured of
+        [] -> none_configured;
+        _ ->
+            Matches = [S || {Expected, S} <- Configured,
+                            constant_time_equal(Expected, Provided)],
+            case Matches of
+                [] -> error;
+                [Scopes | _] -> {ok, Scopes}
+            end
+    end.
 
 constant_time_equal(Expected, Provided) when is_binary(Expected), is_binary(Provided) ->
     constant_time_hash_compare(crypto:hash(sha256, Expected), crypto:hash(sha256, Provided), 0).

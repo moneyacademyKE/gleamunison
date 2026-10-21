@@ -24,16 +24,45 @@ pub fn api_routes_require_admin_test() {
 }
 
 pub fn bearer_identity_authorizes_write_routes_test() {
-  let identity = auth.bearer_identity(Some("server-secret"))
+  let identity = auth.bearer_identity(Some("server-secret"), [auth.Admin])
   auth.authorize(identity, "/eval") |> should.be_ok
   auth.authorize(identity, "/mcp") |> should.be_ok
   auth.authorize(identity, "/api/status") |> should.be_ok
 }
 
+pub fn read_scoped_bearer_cannot_reach_admin_routes_test() {
+  let reader =
+    auth.bearer_identity(Some("read-token"), [auth.Public, auth.DataRead])
+  auth.authorize(reader, "/api/live") |> should.be_ok
+  auth.authorize(reader, "/api/status") |> should.be_error
+  auth.authorize(reader, "/eval") |> should.be_error
+}
+
+pub fn write_scoped_bearer_cannot_reach_admin_routes_test() {
+  let writer =
+    auth.bearer_identity(Some("write-token"), [
+      auth.Public,
+      auth.DataRead,
+      auth.DataWrite,
+    ])
+  auth.authorize(writer, "/eval") |> should.be_ok
+  auth.authorize(writer, "/define") |> should.be_ok
+  auth.authorize(writer, "/api/traces") |> should.be_error
+}
+
 pub fn empty_bearer_token_is_anonymous_test() {
-  auth.bearer_identity(None) |> should.equal(auth.Anonymous)
-  auth.bearer_identity(Some("")) |> should.equal(auth.Anonymous)
-  auth.authorize(auth.bearer_identity(None), "/define") |> should.be_error
+  auth.bearer_identity(None, [auth.Admin]) |> should.equal(auth.Anonymous)
+  auth.bearer_identity(Some(""), [auth.Admin]) |> should.equal(auth.Anonymous)
+  auth.authorize(auth.bearer_identity(None, [auth.Admin]), "/define")
+  |> should.be_error
+}
+
+pub fn authorize_scopes_is_the_whole_decision_test() {
+  auth.authorize_scopes([auth.Public], "/api/ready") |> should.be_ok
+  auth.authorize_scopes([auth.Public], "/api/status") |> should.be_error
+  auth.authorize_scopes([auth.DataWrite], "/api/status") |> should.be_error
+  auth.authorize_scopes([auth.Admin], "/api/status") |> should.be_ok
+  auth.authorize_scopes([], "/") |> should.be_ok
 }
 
 pub fn proxy_principal_scopes_are_enforced_test() {
