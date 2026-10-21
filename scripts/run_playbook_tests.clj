@@ -115,17 +115,21 @@
                 (if (= (:status res) :pass) (recur (next cases))
                   {:status :fail :reason (:reason res) :expr expr :outputs outputs :expected exp-val})))))))))
 
-(defn selected-levels []
+(defn selected-levels
+  "Every parsed level by default. The previous fixed (range 1 1001) ceiling
+   silently skipped every level above it; an explicit comma-separated list
+   still overrides."
+  [levels]
   (if-let [arg (first (remove #{"--strict"} *command-line-args*))]
     (mapv parse-long (str/split arg #","))
-    (range 1 1001)))
+    (sort (keys levels))))
 
 (defn -main []
   (println "=== Playbook Conformance Test Runner (strict) ===")
   (let [levels (parse-playbooks) policy (playbook-policy/read-policy) session (atom nil)
         summary (atom {:passed 0 :failed 0 :skipped 0 :timed-out 0 :excluded 0})]
     (try
-      (doseq [n (selected-levels)]
+      (doseq [n (selected-levels levels)]
         (when (and (contains? #{71 101} n) @session)
           (let [stopped (playbook-session/stop @session)]
             (when-not (= :pass (:status stopped))
