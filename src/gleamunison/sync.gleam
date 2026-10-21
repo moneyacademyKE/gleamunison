@@ -192,31 +192,3 @@ pub fn pull_sync(
     Error(_) -> Error(ConnectionFailed(peer, PeerNotFound(peer)))
   }
 }
-
-pub fn push_sync(
-  state: SyncState,
-  peer: PeerId,
-  refs: List(DefinitionRef),
-  adapter: StorageAdapter,
-) -> Result(#(SyncState, Int), SyncError) {
-  let PeerId(name) = peer
-  case sync_connect(name) {
-    Ok(_) -> {
-      let blobs =
-        list.filter_map(refs, fn(r) {
-          case adapter.lookup(r) {
-            Ok(Some(bytes)) -> {
-              let Ref(h) = r
-              Ok(#(hash_to_debug_string(h), bytes))
-            }
-            _ -> Error(Nil)
-          }
-        })
-      case sync_push_defs(name, blobs) {
-        Ok(_) -> Ok(#(state, list.length(blobs)))
-        Error(msg) -> Error(TransferFailed(peer, msg))
-      }
-    }
-    Error(_) -> Error(ConnectionFailed(peer, PeerNotFound(peer)))
-  }
-}

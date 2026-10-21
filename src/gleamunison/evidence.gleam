@@ -54,10 +54,6 @@ pub type VerificationPolicy {
   RequireTrusted(List(Signer))
 }
 
-pub fn allow_unsigned() -> VerificationPolicy {
-  AllowUnsigned
-}
-
 pub fn require_signer(signer: Signer) -> VerificationPolicy {
   RequireTrusted([signer])
 }

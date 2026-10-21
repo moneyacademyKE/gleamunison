@@ -8,14 +8,6 @@ pub fn builtin_io_read_line() -> DefinitionRef {
   Ref(identity.hash_from_bytes(<<2:256>>))
 }
 
-pub fn builtin_state_get() -> DefinitionRef {
-  Ref(identity.hash_from_bytes(<<3:256>>))
-}
-
-pub fn builtin_state_put() -> DefinitionRef {
-  Ref(identity.hash_from_bytes(<<4:256>>))
-}
-
 pub fn builtin_process_spawn() -> DefinitionRef {
   Ref(identity.hash_from_bytes(<<5:256>>))
 }
@@ -221,14 +213,5 @@ pub fn builtin_file_read() -> DefinitionRef {
 pub fn builtin_dict_keys() -> DefinitionRef {
   Ref(identity.hash_from_bytes(<<56:256>>))
 }
-
-// Abilities (54+): the ability definition itself carries the hash; its
-// operations are positional indices handled via effects.run handler frames.
-pub fn builtin_ability_llm() -> DefinitionRef {
-  Ref(identity.hash_from_bytes(<<54:256>>))
-}
-
-// Reserved: streaming LLM op (gap-analysis concept G, deferred).
-pub fn builtin_ability_llm_stream() -> DefinitionRef {
-  Ref(identity.hash_from_bytes(<<55:256>>))
-}
+// Ordinals 54/55 stay reserved for ability refs. Abilities resolve by name
+// hash (see llm.ability_ref), not by ordinal, so no accessor lives here.

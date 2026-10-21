@@ -2,6 +2,27 @@
 
 ---
 
+## Unreleased
+
+### Dead code removed
+
+- Six modules had no importer and are gone: `gleamunison/filepath`, `gleamunison/config`,
+  `gleamunison/template`, `gleamunison/metrics`, `gleamunison_property` and
+  `gleamunison_adapters`, plus the Erlang twins that only they called.
+  `gleamunison_config.erl` and `gleamunison_metrics.erl` stay: those have real callers.
+- Sixteen public functions had no caller. Two are worth naming:
+  - `genesis.builtin_state_get/put` and `builtin_ability_llm/stream` returned ordinal
+    refs 3/4/54/55 that no body module, jet or bootstrap entry consumed. Abilities
+    resolve by name hash (`llm.ability_ref`), so the ordinal accessors were the
+    abandoned design rather than a missing registration.
+  - `capability.run_scoped` was described in the v3.14.0 notes as the sandbox
+    guarantee. It shipped, but no execution path ever called it. The enforced
+    primitives are `guard_frames` and `check`; the untrusted-execution profile
+    (`sandbox_policy`) still has no production caller. Removing the function makes
+    the record match the code — wiring that profile remains open work, not a claim.
+
+---
+
 ## What's New in v3.24.0 (2026-10-21)
 
 The production-boundaries release, second half: every boundary is now a policy module with an owner and a proof, the CI matrix runs ubuntu+macOS × OTP 27/28/29, and a single gate produces a machine-readable witness.

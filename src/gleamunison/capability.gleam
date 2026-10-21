@@ -26,9 +26,6 @@ pub fn allows(policy: Policy, key: String) -> Bool {
 @external(erlang, "gleamunison_ffi", "deny_capability")
 fn deny_capability(key: String, op: Int) -> Dynamic
 
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
 /// Pre-flight: which abilities in these frames does the policy deny?
 /// Ok(Nil) means every frame is allowed.
 pub fn check(
@@ -82,23 +79,3 @@ pub fn catch_all() -> fn(Int, List(Dynamic), fn(Dynamic) -> Dynamic) -> Dynamic 
     deny_capability("m_unhandled", op_idx)
   }
 }
-
-/// Run an entry thunk under a policy: allowed frames execute, denied
-/// frames raise structured denials, and the catch-all sits innermost so
-/// ambient authority (any ability without an explicit allowed frame) is
-/// impossible by construction.
-pub fn run_scoped(
-  policy: Policy,
-  frames: List(HandlerFrame),
-  entry: fn() -> Dynamic,
-) -> Dynamic {
-  let guarded = guard_frames(policy, frames)
-  let innermost = fn() { handle_any(to_dynamic(catch_all()), entry) }
-  list.fold_right(guarded, innermost, fn(thunk, frame) {
-    let key = frame_key(frame)
-    fn() { handle_any(to_dynamic(#(key, frame.ops)), thunk) }
-  })()
-}
-
-@external(erlang, "gleamunison_effets", "handle_comp")
-fn handle_any(handler: Dynamic, thunk: fn() -> Dynamic) -> Dynamic

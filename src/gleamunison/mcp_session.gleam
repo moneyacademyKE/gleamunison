@@ -96,12 +96,6 @@ fn eval_terms(
   }
 }
 
-/// The session's definition set (name + surface def). Read-only view for
-/// index tooling and diagnostics.
-pub fn session_defs(state: SessionState) -> List(#(String, SurfaceDef)) {
-  state.defs
-}
-
 /// Route one JSON-RPC body through the protocol layer with the session's
 /// real tools attached.
 pub fn handle_rpc(state: SessionState, body: String) -> Response {

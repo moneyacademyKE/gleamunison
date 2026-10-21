@@ -62,12 +62,6 @@ pub fn hash_bytes(contents: BitArray) -> Hash {
   Hash(ffi_hash_bytes(contents))
 }
 
-/// Extract the index from a LocalVar (de Bruijn index).
-pub fn local_var_index(lv: LocalVar) -> Int {
-  let Local(index) = lv
-  index
-}
-
 /// Produce a hex string for display/debugging.
 pub fn hash_to_debug_string(h: Hash) -> String {
   let parts = ffi_hash_to_hex(hash_to_bytes(h))

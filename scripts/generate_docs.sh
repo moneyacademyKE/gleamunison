@@ -105,7 +105,6 @@ cat > "$DOC_DIR/index.html" <<HTMLEND
 <div class="fn"><strong>now/0</strong> — Current timestamp as DateTime</div>
 <div class="fn"><strong>now_iso8601/0</strong> — Current time as ISO 8601 string</div>
 <div class="fn"><strong>from_iso8601/1</strong> — Parse ISO 8601 string to DateTime</div>
-<div class="fn"><strong>to_iso8601/1</strong> — Format DateTime to ISO 8601 string</div>
 <div class="fn"><strong>add_seconds/2, diff_seconds/2</strong> — DateTime arithmetic</div>
 </div>
 
@@ -124,13 +123,11 @@ cat > "$DOC_DIR/index.html" <<HTMLEND
 <h3>gleamunison/log <span class="new">NEW</span></h3>
 <p>Structured logging with debug/info/warn/error levels, context dictionaries, and ETS-backed persistence.</p>
 <div class="fn"><strong>debug/1, info/1, warn/1, error/1</strong> — Level-logged messages</div>
-<div class="fn"><strong>debug_context/2, info_context/2, warn_context/2, error_context/2</strong> — Log with context dict</div>
 </div>
 
 <div class="module">
 <h3>gleamunison/health <span class="new">NEW</span></h3>
 <p>Health checks and readiness probes for production operation.</p>
-<div class="fn"><strong>run_all/0</strong> — Run default memory and module checks</div>
 <div class="fn"><strong>run_checks/1</strong> — Run custom health check list</div>
 <div class="fn"><strong>readiness/0</strong> — Boolean: is node ready to serve?</div>
 </div>

@@ -173,14 +173,6 @@ pub fn refusal_name(refusal: Refusal) -> String {
   }
 }
 
-pub fn refusal_retryable(refusal: Refusal) -> Bool {
-  case refusal {
-    CircuitOpen(_) -> True
-    ConcurrencyExceeded(_) -> True
-    _ -> False
-  }
-}
-
 /// Parse the operator-facing allowlist: comma-separated, trimmed.
 pub fn parse_allowed_models(text: String) -> List(String) {
   case string.trim(text) {

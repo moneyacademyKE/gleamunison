@@ -55,19 +55,3 @@ pub fn warn(message: String) -> Nil {
 pub fn error(message: String) -> Nil {
   emit(Error, message, dict.new())
 }
-
-pub fn debug_context(message: String, context: Dict(String, String)) -> Nil {
-  emit(Debug, message, context)
-}
-
-pub fn info_context(message: String, context: Dict(String, String)) -> Nil {
-  emit(Info, message, context)
-}
-
-pub fn warn_context(message: String, context: Dict(String, String)) -> Nil {
-  emit(Warn, message, context)
-}
-
-pub fn error_context(message: String, context: Dict(String, String)) -> Nil {
-  emit(Error, message, context)
-}

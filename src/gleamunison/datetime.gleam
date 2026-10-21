@@ -14,9 +14,6 @@ fn ffi_now() -> Int
 @external(erlang, "gleamunison_datetime", "now_iso8601")
 fn ffi_now_iso8601() -> BitArray
 
-@external(erlang, "gleamunison_datetime", "format_iso8601")
-fn ffi_format_iso8601(ts: Int) -> BitArray
-
 @external(erlang, "gleamunison_datetime", "from_iso8601")
 fn ffi_from_iso8601(iso: BitArray) -> Result(Int, BitArray)
 
@@ -52,10 +49,6 @@ pub fn from_iso8601(iso: String) -> Result(DateTime, DateTimeError) {
     Ok(ts) -> Ok(DateTime(ts))
     Error(e) -> Error(ParseError(unpack(e)))
   }
-}
-
-pub fn to_iso8601(dt: DateTime) -> String {
-  unpack(ffi_format_iso8601(dt.timestamp))
 }
 
 pub fn add_seconds(dt: DateTime, n: Int) -> DateTime {

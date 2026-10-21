@@ -16,27 +16,6 @@ pub type HealthCheck {
 @external(erlang, "gleamunison_health", "node_status")
 fn ffi_node_status() -> #(String, Int, Int)
 
-fn check_memory() -> Bool {
-  let #(_, _, mem_mb) = ffi_node_status()
-  mem_mb < 4096
-}
-
-fn check_loaded_modules() -> Bool {
-  let #(_, mods, _) = ffi_node_status()
-  mods > 0
-}
-
-fn default_checks() -> List(HealthCheck) {
-  [
-    HealthCheck("memory", check_memory, "Memory usage under 4GB"),
-    HealthCheck("modules", check_loaded_modules, "At least one module loaded"),
-  ]
-}
-
-pub fn run_all() -> HealthStatus {
-  run_checks(default_checks())
-}
-
 pub fn run_checks(checks: List(HealthCheck)) -> HealthStatus {
   let total = list.length(checks)
   let results =
