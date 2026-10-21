@@ -119,18 +119,23 @@ fi
 printf '  Beams: %s\n' "$beam_count"
 
 zip_path="$build_dir/$SCRIPT.zip"
-mkdir -p "$build_dir/priv/datalog" "$build_dir/priv/dogfood"
+mkdir -p "$build_dir/priv/datalog" "$build_dir/priv/dogfood" "$build_dir/priv/static/css" "$build_dir/priv/static/js"
 cp priv/datalog/*.lisp "$build_dir/priv/datalog/"
 # Level data is a file, not a BEAM module. Without it every levelN command
 # degrades to a stub and exits 0, which is a false pass.
 cp src/dogfood_data.json "$build_dir/priv/dogfood/dogfood_data.json"
+# The dashboard shell is served from priv/static. An escript has no repo tree
+# next to it, so the assets ride in the archive and gleamunison_static:read/1
+# falls through to it when no on-disk root exists.
+cp priv/static/css/* "$build_dir/priv/static/css/"
+cp priv/static/js/* "$build_dir/priv/static/js/"
 (
   cd "$build_dir"
   # Reproducibility gate: zip stores file mtimes, and this temp dir's mtimes
   # are "now". Pin every entry to the epoch so two clean builds of the same
   # source produce byte-identical archives. Glob order is already sorted.
   find . -type f -exec touch -t 198001010000.00 {} +
-  TZ=UTC0 zip -q -X "$zip_path" ./*.beam ./gleamunison.app ./priv/datalog/*.lisp ./priv/dogfood/dogfood_data.json
+  TZ=UTC0 zip -q -X "$zip_path" ./*.beam ./gleamunison.app ./priv/datalog/*.lisp ./priv/dogfood/dogfood_data.json ./priv/static/css/* ./priv/static/js/*
 )
 
 artifact_tmp="$build_dir/$SCRIPT"

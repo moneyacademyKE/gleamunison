@@ -128,17 +128,14 @@ handle_status_route(Socket) ->
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_static_file(Socket, FilePath) ->
-    case gleamunison_static:resolve(FilePath) of
-        {ok, FullPath} ->
-            case file:read_file(FullPath) of
-                {ok, Content} ->
-                    Mime = gleamunison_http_util:mime_type(FilePath),
-                    gleamunison_http_util:send_file_response(Socket, 200, Mime, Content);
-                {error, _} ->
-                    gleamunison_http_util:send_response(Socket, 404, <<"Not Found">>)
-            end;
-        _ ->
-            gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
+    case gleamunison_static:read(FilePath) of
+        {ok, Content} ->
+            Mime = gleamunison_http_util:mime_type(FilePath),
+            gleamunison_http_util:send_file_response(Socket, 200, Mime, Content);
+        {error, forbidden} ->
+            gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>);
+        {error, _} ->
+            gleamunison_http_util:send_response(Socket, 404, <<"Not Found">>)
     end.
 
 handle_sse_route(Socket) ->
