@@ -63,3 +63,50 @@ jobs:
         run: bb scripts/run_playbook_tests.clj
       - run: bb scripts/test_release_contract.clj
       - run: bb scripts/test_upgrade_rollback.clj
+
+  # The batteries below ran only in `bb scripts/verify_production_boundaries.clj`
+  # on a developer's machine, so six of them could rot unnoticed while CI stayed
+  # green (bk-f912). scripts/verify_production_boundaries.clj remains the owner of
+  # the full battery list; this job runs the ones the other jobs do not cover.
+  # Keep the two lists in step: a battery in the gate that is missing here is a
+  # battery nobody runs on a pull request.
+  gate-batteries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          gleam-version: "1.19.1"
+          rebar3-version: "3"
+      - name: Install Babashka (pinned static build, sha256-verified)
+        run: |
+          set -euo pipefail
+          BB_VERSION=1.13.226
+          curl -fsSL -o bb.tar.gz "https://github.com/babashka/babashka/releases/download/v${BB_VERSION}/babashka-${BB_VERSION}-linux-amd64-static.tar.gz"
+          echo "bf89e909c4025edf2d669921c81107435b7244840d8f4306f58439c328a342f9  bb.tar.gz" | sha256sum -c -
+          tar -xzf bb.tar.gz bb
+          sudo install -m 755 bb /usr/local/bin/bb
+          bb --version
+      - name: Install Bun (dashboard-safety runs a Node-compatible test)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: gleam deps download
+      # cli-truth and cli-errors drive the shipped artifact; http-boundary
+      # starts a real listener from the compiled beams.
+      - run: ./build_escript.sh
+      - name: "diff-check: no whitespace damage in the patch"
+        run: git diff --check HEAD^ HEAD || git diff --check
+      - name: "cli-truth: process contract, not log text"
+        run: bb scripts/test_cli_truth.clj
+      - name: "http-boundary: traversal refusal, static serving"
+        run: bash scripts/test_http_boundary.sh
+      - name: "cli-errors: exit codes and messages"
+        run: bb scripts/test_cli_errors.clj
+      - name: "dashboard-safety: hostile markup stays inert"
+        run: bun scripts/test_dashboard_safety.mjs
+      - name: "parser: playbook structure"
+        run: bb scripts/test_parser.clj
+      - name: "playbook-runner: crash, timeout and success classification"
+        run: bb scripts/test_playbook_runner.clj
