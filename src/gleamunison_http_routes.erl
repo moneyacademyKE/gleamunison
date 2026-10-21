@@ -18,6 +18,34 @@ is_localhost(Socket) ->
 handle_eval_route(Socket, <<"?expr=", Expr/binary>>) ->
     handle_eval_route(Socket, Expr);
 handle_eval_route(Socket, Expr) when is_binary(Expr) ->
+    case sandbox_admits() of
+        {error, Refusal} ->
+            gleamunison_http_util:send_json(Socket, 403,
+                <<"{\"error\":\"sandbox_refused\",\"detail\":", (gleamunison_http_util:escape_json(Refusal))/binary, "}">>);
+        ok ->
+            handle_eval_admitted(Socket, Expr)
+    end;
+handle_eval_route(Socket, _) ->
+    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing expr parameter\"}">>).
+
+%% One admission gate for every route that evaluates caller-supplied code.
+%% The policy lives in gleamunison/sandbox_policy.gleam: this module only
+%% reads the profile name and reports the refusal.
+sandbox_admits() ->
+    Profile = case os:getenv("GLEAMUNISON_PROFILE") of
+        false -> <<"local">>;
+        "" -> <<"local">>;
+        Value -> list_to_binary(Value)
+    end,
+    try gleamunison@sandbox_policy:admit_profile(Profile) of
+        {ok, _} -> ok;
+        {error, Refusal} when is_binary(Refusal) -> {error, Refusal};
+        _ -> {error, <<"sandbox_admission_failed">>}
+    catch
+        _:_ -> {error, <<"sandbox_admission_failed">>}
+    end.
+
+handle_eval_admitted(Socket, Expr) ->
     case is_localhost(Socket) of
         true ->
             Decoded = gleamunison_http_util:url_decode(Expr),
@@ -32,9 +60,7 @@ handle_eval_route(Socket, Expr) when is_binary(Expr) ->
             end;
         false ->
             gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
-    end;
-handle_eval_route(Socket, _) ->
-    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing expr parameter\"}">>).
+    end.
 
 handle_counter_route(Socket) ->
     Val = try ets:update_counter(gleamunison_http_counter, count, {2, 1}, {count, 0}) catch _:_ -> 0 end,
@@ -42,6 +68,17 @@ handle_counter_route(Socket) ->
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_define_route(Socket, <<"?name=", Rest/binary>>) ->
+    case sandbox_admits() of
+        {error, Refusal} ->
+            gleamunison_http_util:send_json(Socket, 403,
+                <<"{\"error\":\"sandbox_refused\",\"detail\":", (gleamunison_http_util:escape_json(Refusal))/binary, "}">>);
+        ok ->
+            handle_define_admitted(Socket, Rest)
+    end;
+handle_define_route(Socket, _) ->
+    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>).
+
+handle_define_admitted(Socket, Rest) ->
     case is_localhost(Socket) of
         true ->
             case binary:split(Rest, <<"&expr=">>) of
@@ -74,9 +111,7 @@ handle_define_route(Socket, <<"?name=", Rest/binary>>) ->
             end;
         false ->
             gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
-    end;
-handle_define_route(Socket, _) ->
-    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>).
+    end.
 
 handle_browse_route(Socket) ->
     Keys = case persistent_term:get({gleamunison_notebook_keys}, []) of

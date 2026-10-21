@@ -201,6 +201,30 @@ pub fn require_no_host_authority(keys: List(String)) -> Result(Nil, String) {
   }
 }
 
+/// Transport-facing admission. An Erlang route knows the deployment profile
+/// name from the environment, not a Gleam record, so this builds the policy
+/// for that name and admits it. Ok means the profile may serve untrusted
+/// work; Error carries the refusal name.
+///
+/// This is the enforcement point the README claims: the untrusted-execution
+/// profile refuses until a real external executor exists, and it refuses host
+/// FFI and native jets by construction.
+pub fn admit_profile(profile: String) -> Result(Nil, String) {
+  let policy = case profile {
+    "untrusted-execution" -> untrusted(capability.allow([]), None)
+    "authenticated-remote" -> authenticated_remote(capability.allow([]))
+    _ -> local(capability.allow([]))
+  }
+  case admit(policy) {
+    Ok(_) -> Ok(Nil)
+    Error(refusal) -> Error(refusal_name(refusal))
+  }
+}
+
+pub fn denies_untrusted_execution(profile: String) -> Bool {
+  profile == "untrusted-execution"
+}
+
 fn is_host_authority_key(key: String) -> Bool {
   string.contains(key, "ffi") || string.contains(key, "jet")
 }

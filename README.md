@@ -29,7 +29,7 @@ a safe place to run arbitrary untrusted code, and it does not claim to be.
 | Pull-based sync: TCP protocol **v2** (HMAC handshake) + Erlang distribution | Implemented |
 | HTTP + MCP service with bind gate, request auth, readiness probes | Implemented, single node |
 | Evaluation budgets (wall clock, reductions, memory) | Implemented |
-| Evidence signing, trust policy, key rotation/revocation | Implemented |
+| Evidence signing, trust policy, key rotation/revocation | Implemented (library API: `evidence`, `trust`) |
 | LLM budgets, cancellation, transcript redaction | Implemented |
 | **OS/container isolation for untrusted code** | **Not implemented** — requires an external executor |
 | **TLS / mTLS transport encryption** | **Not implemented** — bind gate + token auth only |
@@ -218,13 +218,30 @@ and 13 self-hosted Datalog modules. Grouped by concern:
 | **Codebase & storage** | `codebase`, `codebase_index`, `storage`, `namespace` |
 | **Effects & capabilities** | `effects`, `capability`, `turnstile` |
 | **Policy & trust** | `auth`, `trust`, `sandbox_policy`, `cancellation`, `evidence` |
-| **Services** | `http`, `http_client`, `mcp`, `mcp_server`, `mcp_session`, `lsp`, `lsp_features`, `lsp_types`, `health`, `metrics` |
+| **Services** | `http`, `http_client`, `mcp`, `mcp_server`, `mcp_session`, `lsp`, `lsp_features`, `lsp_types`, `readiness` |
 | **LLM integration** | `llm`, `llm_types`, `llm_wire`, `llm_budget`, `llm_controls`, `llm_middleware` |
 | **Sync** | `sync`, `sync_types`, `gleamunison_tcp_sync.erl`, `gleamunison_peer.erl` |
 | **REPL & CLI** | `repl`, `repl_eval`, `repl_io`, `repl_graph`, and 16 `cli_*` modules |
-| **Testing & verification** | `test_runner`, `verify`, `transcript`, `prompt`, `rank`, `manifest` |
+| **Testing & verification** | `test_runner`, `verify`, `transcript`, `rank`, `manifest` |
 | **Genesis** | `genesis`, `bootstraps`, plus 53 `m_*.erl` modules |
 | **Datalog** | 13 self-hosted `.lisp` modules: core, index, transact, schema, query, aggregate, pull, temporal, rules, graph, vector, bm25, actor |
+
+### Library-only modules
+
+Five modules are published API but are **not wired into the CLI runtime**.
+They compile, they are tested, and a program that imports the package can call
+them; nothing in `gleamunison server`, the REPL or the CLI reaches them today.
+
+| Module | What it provides | Wired into the runtime? |
+|---|---|---|
+| `gleamunison/trust` | Key states (active/revoked/expired) and rotation windows | No — `evidence` verifies signatures against a configured signer; it does not consult a rotation policy |
+| `gleamunison/sap` | Schema-aligned parsing of near-miss model output (fences, trailing commas, Python literals) | No — the LLM CLI expects well-formed JSON |
+| `gleamunison/patch` | Named, content-addressed update propagation | No |
+| `gleamunison/prompt` | Content-addressed prompts as definitions | No |
+| `gleamunison/schema_printer` | Type → compact prompt schema | No |
+
+`sandbox_policy` **is** wired: `/eval` and `/define` admit through it, and the
+`untrusted-execution` profile refuses with `403 missing_external_executor`.
 
 ## Toolchain and CI
 

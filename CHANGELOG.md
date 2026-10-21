@@ -29,6 +29,8 @@ The production-boundaries release, second half: every boundary is now a policy m
 
 ### Trust boundaries are code, not convention
 - New pure policy modules own the decisions: `sandbox_policy.gleam` admits or refuses execution profiles against resource budgets, `trust.gleam` owns key states (active/revoked/expired) and rotation, and every refusal carries a named reason.
+  - `sandbox_policy` is enforced: `/eval` and `/define` admit through it, and the `untrusted-execution` profile refuses with `403 missing_external_executor`.
+  - `trust` is library API only: `evidence` verifies a signature against the configured signer and does not consult a rotation policy. See *Library-only modules* in the README.
 - The HTTP listener refuses non-loopback binds without explicit opt-in (`GLEAMUNISON_BIND_ADDRESS` / `GLEAMUNISON_PROFILE`).
 
 ### Authenticated transport

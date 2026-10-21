@@ -186,18 +186,15 @@ let html = template.render("Hello {{name}}!", [#("name", "World")])
 ```
 
 ### 7.7 Structured Logging
-```gleam
-import gleamunison/log
 
-log.info("Server started")
-log.error_context("Connection failed", dict.from_list([#("port", "8080")]))
-```
+Logging is Erlang-side: `gleamunison_log:log_entry/4` writes into a bounded ETS
+ring that `/api/logs` serves. There is no Gleam wrapper module.
 
 ### 7.8 Configuration
-```gleam
-import gleamunison/config
 
-let cfg = config.load()
+Configuration is read from the environment at the point of use — there is no
+config file loader and no typed getter module.
+
 let port = config.get_int(cfg, "PORT") |> result.unwrap(8080)
 ```
 

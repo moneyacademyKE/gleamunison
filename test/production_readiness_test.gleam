@@ -2,7 +2,6 @@ import gleam/bit_array
 import gleam/dynamic/decode
 import gleam/list
 import gleam/result
-import gleamunison/health
 import gleamunison/json
 import gleeunit/should
 
@@ -47,9 +46,12 @@ pub fn unknown_required_service_fails_closed_test() {
   readiness_fixture(6) |> should.be_false
 }
 
-pub fn custom_health_check_api_still_works_test() {
-  let assert health.Healthy(_) =
-    health.run_checks([health.HealthCheck("passing", fn() { True }, "test")])
+pub fn readiness_is_the_single_owner_test() {
+  // The Gleam health module used to wrap gleamunison_readiness with its own
+  // check list. Production readiness is the Erlang module; there is one
+  // owner, so the wrapper is gone and this asserts the endpoint contract.
+  let assert Ok(#(status, _body)) = http_fixture(0, "/api/live")
+  status |> should.equal(200)
 }
 
 /// A server started through the production entry point acquires storage at

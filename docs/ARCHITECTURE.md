@@ -65,10 +65,10 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - **Serializable Continuations**: Erlang `term_to_binary/1` and `binary_to_term/1` enable cross-node closure serialization. Content-addressed module naming (`m_<hash>`) guarantees identical module versions across nodes.
 
 ### 7. Production Operations (v1.1.0)
-- **Structured Logging**: `gleamunison/log` — debug/info/warn/error with context dict, ETS-backed.
-- **Metrics**: `gleamunison/metrics` — counter/gauge/histogram with `:telemetry` events.
-- **Health Checks**: `gleamunison/health` — `/api/health` endpoint, memory/module monitoring.
-- **Configuration**: `gleamunison/config` — env/TOML/CLI precedence with typed getters.
+- **Structured Logging**: `gleamunison_log.erl` — debug/info/warn/error entries in a bounded ETS ring, served by `/api/logs`.
+- **Metrics**: `gleamunison_metrics.erl` — counter/gauge/histogram with `:telemetry` events, fed by `gleamunison_http_metrics` at the response boundary.
+- **Health Checks**: `gleamunison_readiness.erl` — `/api/health` and `/api/ready`, required vs observational checks.
+- **Configuration**: environment variables read at the point of use (`GLEAMUNISON_PROFILE`, `GLEAMUNISON_BIND_ADDRESS`, `GLEAMUNISON_HTTP_TOKEN`, `GLEAMUNISON_REQUIRED_SERVICES`).
 - **Trace Inspector**: `gleamunison_trace.erl` — DETS-backed HTTP request capture, SSE push, `/api/traces` endpoint.
 
 ### 8. Standard Library (v1.1.0)
