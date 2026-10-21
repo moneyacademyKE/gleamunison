@@ -25,9 +25,6 @@
        (System/getProperty "user.home") "/.local/bin:"
        (System/getenv "PATH")))
 (def env-prefix ["/usr/bin/env" (str "PATH=" path-str)])
-(def witness-date "2026-10-20")
-(def witness-path
-  (str repo "/docs/verification/production-boundaries-" witness-date ".md"))
 (def base "e1abf1bd06b17074e8002992aef284519d131aad") ;; v3.23.0 merge-base
 
 (def results (atom []))
@@ -55,6 +52,12 @@
 
 (defn sh-out [& args]
   (str/trim (:out (apply shell {:out :string :dir repo} args))))
+
+;; The witness is dated by the run, not by a constant: a witness file whose name
+;; says one day while the gates ran on another is a lie in the filename.
+(def witness-date (sh-out "date" "+%Y-%m-%d"))
+(def witness-path
+  (str repo "/docs/verification/production-boundaries-" witness-date ".md"))
 
 (defn test-file?
   "Test files are exempt from the 500-LOC ceiling (house rule): the test/
