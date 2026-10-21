@@ -97,6 +97,13 @@
 ;; (bk-389b). Run it directly when auditing coverage:
 ;;   bb scripts/run_playbook_tests.clj --strict
 (run-gate "playbook-default" ["bb" "scripts/run_playbook_tests.clj"])
+;; Four probes that used to be manual-only. Each passed when run by hand and
+;; none was reachable from a gate or a CI job, which is exactly how working
+;; coverage rots unnoticed. They cost about six seconds together.
+(run-gate "cli-errors" ["bb" "scripts/test_cli_errors.clj"])
+(run-gate "dashboard-safety" ["bun" "scripts/test_dashboard_safety.mjs"])
+(run-gate "parser" ["bb" "scripts/test_parser.clj"])
+(run-gate "playbook-runner" ["bb" "scripts/test_playbook_runner.clj"])
 (let [loc (loc-gate)]
   (swap! results conj loc)
   (println (format "  -> exit=%d %s" (:exit loc) (:tail loc))))
