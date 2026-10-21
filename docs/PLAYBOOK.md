@@ -124,7 +124,7 @@ The REPL bootstraps `"Console"`, `"add"`, and `"read_line"`, and supports:
 ### LOC Constraints
 All Gleam/Erlang source files MUST be strictly under 250 LOC, and all Lisp/script files strictly under 500 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
 
-Current conformance: 5696 playbook conformance levels and 54 unit test suites (all passing green). Includes the native content-addressed Datalog database engine with temporal querying, graph algorithms, and BM25/vector search.
+Current conformance: 1172 playbook levels are defined, of which 934 have executable cases and pass. The other 238 are prose-only and are recorded as explicit, sha-pinned exclusions (`scripts/playbook_exclusions.edn`) rather than counted as passing. The suite also runs 54 unit test suites, all green. Includes the native content-addressed Datalog database engine with temporal querying, graph algorithms, and BM25/vector search.
 
 
 

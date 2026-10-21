@@ -104,7 +104,7 @@ Pure S-expression immutable database engine running entirely in GleamUnison user
 ### Conformance Coverage
 
 - **Unit tests**: 54 Erlang/Gleam unit test suites covering hashing, codebase, inference, elaboration, typechecking, compilation, storage, sync, effects, jets, and native Datalog.
-- **Playbook conformance levels**: 5696 conformance levels executed via the dynamic JSON VM test runner (`dogfood_runner.gleam` + `dogfood_data.json`).
+- **Playbook conformance levels**: 1172 levels are defined across `docs/playbook/`; 934 execute and pass through the playbook runner (`scripts/run_playbook_tests.clj`), and the remaining 238 are prose-only levels recorded as explicit exclusions in `scripts/playbook_exclusions.edn`, sha-pinned so they self-invalidate when a level gains executable cases.
 - **File constraints**: All files strictly conform to the `<500 LOC` constraint (all Gleam core files $< 250$ LOC).
 
 ## Invariants

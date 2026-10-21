@@ -35,4 +35,4 @@ We will proceed with implementing these five capabilities:
 1. Register `Math` and `Show` abilities inside `repl.gleam`.
 2. Add FFI handlers `MathHandler` and `ShowHandler` composed in the evaluation environment.
 3. Write FFI bindings for `json_parse`, `http_get`, and `file_read` in `m_00000033.erl`, `m_00000034.erl`, `m_00000035.erl` respectively, mapping to the appropriate genesis hashes.
-4. Remove these levels from `make_placeholders.clj` and run tests.
+4. Remove these levels from the playbook markdown and run the runner (`bb scripts/run_playbook_tests.clj`); the placeholder generator that used to write stubs is retired to `scripts/archive/`.

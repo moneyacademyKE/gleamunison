@@ -2,7 +2,7 @@
 
 From architectural specification to production-grade content-addressed runtime.
 
-**Current State:** Fully certified Lisp-style surface parser, typechecker, compiler, and VM runner. Certified against 5696 playbook conformance levels (all passed). **v3.10.0**: Safe FFI deserialization, local HTTP bind checks, Cowboy port monitoring socket safeguards, builtin constant extraction for strict <250 LOC compliance, and fully data-driven test runner framework — all implemented.
+**Current State:** Fully certified Lisp-style surface parser, typechecker, compiler, and VM runner. Certified against 934 executable playbook conformance levels (all passed; 238 further levels are prose-only and recorded as exclusions). **v3.10.0**: Safe FFI deserialization, local HTTP bind checks, Cowboy port monitoring socket safeguards, builtin constant extraction for strict <250 LOC compliance, and fully data-driven test runner framework — all implemented.
 
 ---
 

@@ -2,6 +2,8 @@
 
 This log catalogs all architectural decision records (ADRs) for the `gleamunison` codebase in chronological order.
 
+For paths that were considered and *declined*, with the reasoning, see [`unimplemented-architectural-paths.md`](../unimplemented-architectural-paths.md) — an index of proposals that never became ADRs.
+
 | ID | Title | Status |
 |---|---|---|
 | [ADR-0001](0001-content-addressed-identity.md) | Content-addressed identity separation | Proposed |

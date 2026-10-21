@@ -11,7 +11,7 @@ not a module path, not a package — the hash *is* the identity.
 - **Suite:** 508 tests, 0 failures
 - **CI:** Erlang/OTP 27, 28, 29 × Ubuntu, macOS — all legs green
 - **Classification:** `authenticated-single-node-service`
-  ([verification witness](docs/verification/production-boundaries-2026-10-20.md))
+  ([verification witness](docs/verification/production-boundaries-2026-10-21.md))
 
 ## Status: what this is, and what it is not
 
@@ -326,11 +326,12 @@ runtime.
 - [Compatibility](docs/operations/compatibility.md) — schema versions and migration
 - [Upgrade and rollback](docs/operations/upgrade-and-rollback.md) — artifact gates
 - [Verification matrix](docs/operations/verification-matrix.md) — what each gate proves
-- [Verification witness](docs/verification/production-boundaries-2026-10-20.md) — the machine-readable proof
+- [Verification witness](docs/verification/production-boundaries-2026-10-21.md) — the machine-readable proof
 - [ADRs](docs/adr/) — 68 Architecture Decision Records
 - [Learnings](docs/LEARNINGS.md) — architectural insights discovered
 - [Patterns](docs/PATTERNS.md) — design patterns used
 - [Reference Manual](docs/MANUAL.md) — complete user guide
+- [Archive](docs/archive/README.md) — superseded analyses and walkthroughs, kept for the record
 
 ## License
 
