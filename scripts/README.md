@@ -1,98 +1,124 @@
 # Utility Scripts
 
-Clojure/Babashka scripts for gleamunison development automation.
+Babashka (`bb`) and shell scripts for gleamunison development, verification and
+release.
 
-**Requirements:** [Babashka](https://babashka.org/) (`bb`) installed.
+**Requirements:** [Babashka](https://babashka.org/) (`bb`), Gleam, Erlang/OTP 27+.
+Gates pin their own tool PATH, so run them from the repo root.
 
-## Scripts
+```sh
+bb scripts/verify_production_boundaries.clj   # the whole battery, in one command
+```
+
+## The gate battery
+
+`verify_production_boundaries.clj` runs every release gate in sequence, times
+each one, and writes a witness to `docs/verification/production-boundaries-<date>.md`
+(gate table + machine-readable JSON + exclusions + unresolved risks). It exits
+non-zero if any non-informational gate fails, so it is safe to use as a single
+pre-merge check.
+
+| Gate | Command it runs | What it proves |
+|---|---|---|
+| format | `gleam format --check src test` | formatting is canonical |
+| diff-check | `git diff --check` | no whitespace damage |
+| suite | `gleam test` | unit tests |
+| build-escript | `./build_escript.sh` | the artifact builds |
+| artifact-contract | `scripts/test_artifact.sh` | version, datalog engine modules and test modules in the archive |
+| cli-truth | `scripts/test_cli_truth.clj` | CLI surface, help, exit codes |
+| http-boundary | `scripts/test_http_boundary.sh` | dashboard routes, static assets, clean shutdown |
+| release-contract | `scripts/test_release_contract.clj` | two clean builds are byte-identical |
+| upgrade-rollback | `scripts/test_upgrade_rollback.clj` | upgrade and rollback paths, corrupt artifact handling |
+| playbook-default | `scripts/run_playbook_tests.clj` | end-to-end playbook conformance |
+| loc-ceiling | `wc -l` over touched files | no agent-written file over 500 LOC |
+
+Individual gates can be run on their own — the table above is the whole list.
+
+## Playbook runner
 
 ### `run_playbook_tests.clj`
-**Purpose**: Run the 1000-level dogfood playbook conformance suite with timeout management.
 
-Parses playbook markdown files from `docs/playbook/`, extracts S-expression test cases, spawns `gleam run -- levelN` per level, and reports pass/skip/fail results. Wraps each execution in a Clojure future with 30-second timeout to prevent hanging processes. Inherits stderr stream to avoid pipe buffer deadlocks.
-
-```sh
-bb scripts/run_playbook_tests.clj
-```
-
-### `make_placeholders.clj`
-**Purpose**: Generate placeholder test bodies for dogfood levels that don't have implementations yet.
-
-Scans the playbook files for levels that lack `gleam` code blocks and generates stub `todo` expressions. Operates on a predefined set of target levels. Modifies playbook markdown files in-place with generated stubs.
+Parses playbook markdown from `docs/playbook/`, extracts the S-expression cases
+from each `gleam` code block, and runs every parsed level through the escript
+(one `levelN` invocation per level) inside a future with a per-level timeout, so
+a hung level cannot wedge the run. Levels with no executable cases are reported
+as `:excluded` with a reason, never as passes.
 
 ```sh
-bb scripts/make_placeholders.clj
+bb scripts/run_playbook_tests.clj            # gate mode: fails on regression, skip, or stale exclusion
+bb scripts/run_playbook_tests.clj --strict   # completeness report (see below)
 ```
 
-### `add_level_placeholders.clj`
-**Purpose**: Add placeholder entries to `src/dogfood.gleam` for new playbook levels.
+Default mode is the gate. It fails on a real failure, on a skip, and on an
+exclusion whose recorded fingerprint no longer matches the level's cases.
 
-Generates `levelXXX()` function stubs that delegate to `todo` in the main dogfood dispatch module. Ensures new levels are callable from `gleam run` without manual boilerplate.
+`--strict` is **not** a gate. It uses an empty exclusion policy, so it rejects
+every exclusion by design and cannot pass while prose-only levels exist. Run it
+when auditing coverage, not as a pass/fail signal — a permanently-red battery
+trains people to ignore red.
 
-```sh
-bb scripts/add_level_placeholders.clj
-```
+### `playbook_exclusions.edn`
 
-### `refactor_playbooks.clj`
-**Purpose**: Refactor playbook markdown files across structural changes.
+The exclusion policy: level number → reason plus a SHA-256 fingerprint of that
+level's cases. If the playbook text changes, the fingerprint stops matching and
+the default-mode gate fails until the entry is re-reviewed. This is what keeps
+the exclusion list from silently rotting.
 
-Used when the playbook format or level numbering changes. Applies transformations across all 10 playbook files consistently.
+### `playbook_policy.clj`
 
-```sh
-bb scripts/refactor_playbooks.clj
-```
+Reads the exclusion policy, computes fingerprints, and classifies each level's
+disposition (`:pass`, `:excluded`, `:stale-exclusion`, `:fail`). `--strict`
+selects the empty policy.
 
-### `refactor_dispatch.clj`
-**Purpose**: Regenerate dispatch logic in `src/dogfood.gleam`.
+### `playbook_session.clj`
 
-When new levels are added, this script regenerates the match/case dispatch in the main dogfood entry point to include all level handlers.
+Process layer for a single level: spawn the escript with a timeout, classify the
+outcome, and detect crashes from stderr (`escript:`, `internal error`, crash
+dumps). Shared by the runner and its own test.
 
-```sh
-bb scripts/refactor_dispatch.clj
-```
+### `test_playbook_runner.clj`
 
-### `test_parser.clj`
-**Purpose**: Test the gleamunison S-expression parser against the full playbook.
+Tests `playbook_session.clj` against deliberately hostile fake executables — a
+crashing one, a hanging one — so the runner's timeout and crash classification
+are proven rather than assumed.
 
-Parses all playbook files, extracts S-expression test cases from `gleam` code blocks, feeds them through the parser, and reports any parse errors or syntax issues.
+## Development loop
 
-```sh
-bb scripts/test_parser.clj
-```
-
-### `dogfood_loop.clj`
-**Purpose**: Automate the mechanical parts of each dogfood batch iteration.
-
-Handles registration (import + level entries in `dogfood_meta.gleam`), range bumping
-(`dogfood.gleam` + `gleamunison.gleam`), build verification, level execution,
-unit test confirmation, temp file cleanup, and doc badge updates.
-
-**Usage pattern (after AI writes level implementations):**
-```sh
-bb dogfood-loop           # Full cycle: register, bump, build, run, test, cleanup
-bb dogfood-loop --commit  # Same + git commit
-bb dogfood-register       # Only register levels + bump ranges
-bb dogfood-verify         # Only run verification
-```
-
-**Gap analysis**: This script handles ALL mechanical bookkeeping that was previously
-done by fragile python/sed scripts. The AI still handles:
-- Writing the 50 level functions in `dogfood_v{N}.gleam`
-- Writing the playbook `docs/playbook/PLAYBOOK_DOGFOOD_XXXX-YYYY.md`
-- Updating `.commandcode/skills/gleamunison.md` with findings
-- Designing the gap analysis and level content
-
-## Babashka Tasks (from `bb.edn`)
-
-| Task | What it does |
+| Script | Purpose |
 |---|---|
-| `bb conformance` | Run all playbook conformance tests |
-| `bb dogfood-loop` | Full dogfood loop automation |
-| `bb dogfood-register` | Register levels + bump ranges only |
-| `bb dogfood-verify` | Verify levels only |
-| `bb coverage` | Run BEAM code coverage |
-| `bb parse-check` | Validate all playbook S-expressions |
+| `watch.sh` | rebuild on source change (`./scripts/watch.sh [--test]`) |
+| `watch_scratch.clj` | watch `scratch.lisp` and verify it on save; creates the file if missing (gitignored) |
+| `loop_infinite.clj` | infinite dogfooding loop: zombie cleanup, retry detection |
+| `dogfood_loop.clj` | register new levels in `dogfood_meta.gleam`, bump ranges, verify |
 
-## Common Patterns
+## Generation and docs
 
-All scripts use Babashka's process management (`babashka.process`) for spawning Gleam subprocesses and `babashka.fs` for file system operations. Playbook files follow the format in `docs/playbook/PLAYBOOK_DOGFOOD_XXXX-YYYY.md` — see `docs/PLAYBOOK.md` for the format specification.
+| Script | Purpose |
+|---|---|
+| `generate_docs.sh` | generate the stdlib HTML docs into `docs/stdlib/` |
+| `generate_levels.clj` | data-driven dogfood level generation |
+| `refactor_dispatch.clj` | regenerate the `gleamunison.gleam` dispatch and split dogfood modules |
+| `run_coverage.clj` | BEAM code coverage over `build/dev/erlang/gleamunison/ebin` |
+
+## Probes not in the battery
+
+| Script | Purpose |
+|---|---|
+| `test_cli_errors.clj` | CLI error-path probe (invalid file, bad arguments) against the escript |
+| `test_dashboard_safety.mjs` | dashboard XSS safety probe (`node`/`bun`) |
+| `test_parser.clj` | parse every playbook S-expression, report syntax errors |
+
+## `bb` tasks (from `bb.edn`)
+
+| Task | Runs |
+|---|---|
+| `bb dogfood-loop` | `scripts/loop_infinite.clj` |
+| `bb dogfood-register` | `scripts/dogfood_loop.clj --register` |
+| `bb dogfood-verify` | `scripts/dogfood_loop.clj --verify` |
+| `bb watch-scratch` | `scripts/watch_scratch.clj` |
+
+## `scripts/archive/`
+
+Scripts whose work is done, kept for reference and removed from the live
+surface. See `scripts/archive/README.md` — do not run them against the current
+playbook.
