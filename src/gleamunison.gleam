@@ -38,7 +38,6 @@ fn halt_failure() -> Nil
 fn definition_codec_version() -> Int
 
 pub fn run(args: List(String)) -> Nil {
-  let levels = dogfood.all_levels()
   case args {
     [] -> print_help()
     ["llm", ..rest] -> cli_result.print(cli_llm.command_result(rest))
@@ -71,17 +70,13 @@ pub fn run(args: List(String)) -> Nil {
     ["schema-version"] -> io.println(int.to_string(definition_codec_version()))
     ["--help"] -> print_help()
     ["help"] -> print_help()
-    [cmd] -> dispatch(cmd, "8080", levels)
-    [cmd, param] -> dispatch(cmd, param, levels)
-    [cmd, ..] -> dispatch(cmd, "8080", levels)
+    [cmd] -> dispatch(cmd, "8080")
+    [cmd, param] -> dispatch(cmd, param)
+    [cmd, ..] -> dispatch(cmd, "8080")
   }
 }
 
-fn dispatch(
-  cmd: String,
-  param: String,
-  levels: dict.Dict(String, fn() -> Nil),
-) -> Nil {
+fn dispatch(cmd: String, param: String) -> Nil {
   case cmd {
     "server" -> {
       let port = case int.parse(param) {
@@ -92,7 +87,7 @@ fn dispatch(
     }
     "demo" -> print_help()
     "repl" -> repl.start_repl_loading([])
-    "all" -> run_all_levels(levels)
+    "all" -> run_all_levels()
     "level70" -> meta.level70()
     "verify" -> {
       case verify.verify_file(param) {
@@ -103,55 +98,86 @@ fn dispatch(
         }
       }
     }
-    _ ->
-      case dict.get(levels, cmd) {
-        Ok(f) -> f()
-        Error(_) -> {
-          io.println(
-            "Unknown command: '"
-            <> cmd
-            <> "'. Try: server, repl, all, verify, level1..level6697",
-          )
-          halt_failure()
-        }
-      }
+    _ -> dispatch_level(cmd)
   }
 }
 
-fn range(start: Int, end: Int) -> List(Int) {
-  case start > end {
-    True -> []
-    False -> [start, ..range(start + 1, end)]
+/// The level table is only built when a level command needs it. `--help`,
+/// `version`, `datalog` and every other command used to pay for 6,696 tuples
+/// and a full dict construction before dispatch even looked at argv.
+fn levels() -> dict.Dict(String, fn() -> Nil) {
+  dogfood.all_levels()
+}
+
+fn dispatch_level(cmd: String) -> Nil {
+  case dict.get(levels(), cmd) {
+    Ok(f) -> f()
+    Error(_) -> {
+      io.println("Unknown command: '" <> cmd <> "'. Run --help for the list.")
+      halt_failure()
+    }
   }
 }
 
-fn run_all_levels(levels: dict.Dict(String, fn() -> Nil)) -> Nil {
-  let r = range(1, 6697)
-  list.each(r, fn(n) {
-    let key = "level" <> int.to_string(n)
-    case dict.get(levels, key) {
+fn run_all_levels() -> Nil {
+  let table = levels()
+  let keys = dict.keys(table)
+  list.each(keys, fn(key) {
+    case dict.get(table, key) {
       Ok(f) -> f()
       Error(_) -> Nil
     }
   })
-  io.println("=== All available levels complete ===")
+  io.println(
+    "=== " <> int.to_string(list.length(keys)) <> " levels complete ===",
+  )
 }
 
 fn print_help() -> Nil {
   io.println("Gleamunison — content-addressed language runtime on the BEAM")
-  io.println("Usage: gleam run -- <command>")
-  io.println("  server [port]   — start web server (default port 8080)")
+  io.println("Usage: gleamunison <command> [args]")
+  io.println("")
+  io.println("Runtime")
+  io.println("  server [port]          start the web server (default 8080)")
   io.println(
-    "  repl            — interactive REPL (optional: file.lisp to preload)",
+    "  repl [file.lisp ...]   interactive REPL, optionally preloading files",
   )
-  io.println("  verify [file]   — verify a scratch.lisp file")
+  io.println("  verify [file]          verify a scratch.lisp file")
+  io.println("  datalog <file.lisp>    run a datalog program")
+  io.println("  fmt <file>             rewrite a file in place")
+  io.println("  all                    run every implemented level")
+  io.println("  levelN                 run level N")
+  io.println("  version                print the runtime version")
+  io.println("  schema-version         print the storage/codec schema version")
+  io.println("")
+  io.println("Definitions and evidence")
   io.println(
-    "  llm [provider] <prompt> — call an LLM (openai|anthropic, env keys)",
+    "  publish <file.lisp>    publish a definition behind the evidence gate",
   )
+  io.println("  evidence <hash>        list attestations for a content hash")
   io.println(
-    "  mcp [port] [--load f] — MCP server for agents (default port 8099)",
+    "  evidence attest <hash> io <note...>   record a human attestation",
   )
-  io.println("  all             — run all available levels")
-  io.println("  schema-version  — print the storage/codec schema version")
-  io.println("  levelN          — run level N")
+  io.println("  test <file.lisp>       run the test forms in a file")
+  io.println("  replay <file.lisp> <def> <tape.json>  replay a recorded tape")
+  io.println(
+    "  tape-to-test <file.lisp> <def> <tape.json>  turn a tape into a test",
+  )
+  io.println("")
+  io.println("Discovery and agents")
+  io.println(
+    "  find <intent> [--load f] [--limit N]  search definitions by intent",
+  )
+  io.println("  llm [openai|anthropic] <prompt>       call an LLM")
+  io.println("  mcp [port] [--load f]  MCP server for agents (default 8099)")
+  io.println("  lsp                    language server on stdio")
+  io.println("")
+  io.println("Distribution")
+  io.println(
+    "  sync <host:port> [--store path] [--branch name]  sync with a peer",
+  )
+  io.println("  pkg install <manifest-hash> [--peer host:port]")
+  io.println("  pkg publish <file.lisp> --name <pkg> --version <v>")
+  io.println("  watch <file.lisp>      watch a file and re-run it on change")
+  io.println("  help, --help, demo     this list")
 }
