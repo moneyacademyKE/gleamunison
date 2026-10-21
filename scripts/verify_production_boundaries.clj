@@ -87,11 +87,13 @@
 (run-gate "http-boundary" ["bash" "scripts/test_http_boundary.sh"])
 (run-gate "release-contract" ["bb" "scripts/test_release_contract.clj"])
 (run-gate "upgrade-rollback" ["bb" "scripts/test_upgrade_rollback.clj"])
+;; Default mode is a gate: it fails on a real regression, on a skip, or on a
+;; stale exclusion. Strict mode is a completeness report, not a battery - it
+;; rejects every exclusion by design, so it cannot pass while prose-only
+;; levels exist, and a permanently-red battery trains people to ignore red
+;; (bk-389b). Run it directly when auditing coverage:
+;;   bb scripts/run_playbook_tests.clj --strict
 (run-gate "playbook-default" ["bb" "scripts/run_playbook_tests.clj"])
-;; Strict mode exits non-zero by policy when manual skips exist; that is an
-;; exclusion record, never a gate failure.
-(run-gate "playbook-strict" ["bb" "scripts/run_playbook_tests.clj" "--strict"]
-          {:informational true})
 (let [loc (loc-gate)]
   (swap! results conj loc)
   (println (format "  -> exit=%d %s" (:exit loc) (:tail loc))))
@@ -101,20 +103,20 @@
     (first (str/split (sh-out "shasum" "-a" "256" "gleamunison_escript") #"\s+"))
     "missing"))
 (def head-sha (sh-out "git" "rev-parse" "--short" "HEAD"))
+(def branch (sh-out "git" "rev-parse" "--abbrev-ref" "HEAD"))
 
 (def gate-failures
   (filter #(and (not (:informational %)) (not (zero? (:exit %)))) @results))
 
 (def witness
   {:date witness-date
-   :branch "fix/production-boundaries"
+   :branch branch
    :head head-sha
    :artifact_sha256 artifact-sha
    :classification "authenticated-single-node-service"
    :classification_note "untrusted-execution profile remains disabled: external OS/container isolation is required and not claimed"
    :gates @results
-   :exclusions ["playbook strict mode: manual-skip exits are policy, recorded informationally"
-                "CI matrix (OTP 27/28/29 x ubuntu/macos) runs on push; local proof is OTP 29 / macOS arm64"
+   :exclusions ["CI matrix (OTP 27/28/29 x ubuntu/macos) runs on push; local proof is OTP 29 / macOS arm64"
                 "LOC ceiling: src/gleamunison_ffi_test.erl (625 LOC, base 471) is a test-only probe module called exclusively from test/*.gleam, exempt under the test-file exemption; every production file touched by this branch is under 500 LOC"
                 "all gates execute behind /usr/bin/env with a pinned tool PATH (homebrew + ~/.local/bin) so results never depend on the caller environment; recorded commands are the logical ones"]
    :unresolved_risks ["the 'transient full-suite flake' (507/1) recorded by earlier runs is identified and fixed: evaluation_timeout_test asserted the wall-clock timeout message while the 10ms budget tick could hit the reduction ceiling first on fast machines — reproduced on all seven CI matrix legs; the test now asserts containment under any named evaluation_* error (bk-19fe)"
@@ -126,7 +128,7 @@
 (fs/create-dirs (fs/parent witness-path))
 (spit witness-path
       (str "# Production-boundary witness — " witness-date "\n\n"
-           "Branch `fix/production-boundaries` @ `" head-sha "`\n\n"
+           "Branch `" branch "` @ `" head-sha "`\n\n"
            "| Gate | Exit | ms | Command |\n|---|---|---|---|\n"
            (str/join "\n"
              (map #(str "| " (:name %) " | " (:exit %) " | " (:duration_ms %)
