@@ -2,7 +2,7 @@
 -export([readiness_fixture/1, http_fixture/2]).
 
 readiness_fixture(Mode) ->
-    with_mode(Mode, fun() -> gleamunison@health:readiness() end).
+    with_mode(Mode, fun() -> gleamunison_readiness:ready() end).
 
 with_mode(Mode, Fun) ->
     Old = persistent_term:get({gleamunison, active_storage}, undefined),
