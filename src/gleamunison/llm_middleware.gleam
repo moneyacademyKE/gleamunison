@@ -7,9 +7,15 @@
 
 import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
+import gleam/result
 import gleamunison/effects.{type OpHandler}
-import gleamunison/llm.{type Completion}
+import gleamunison/json
+import gleamunison/llm
+import gleamunison/llm_budget
 import gleamunison/llm_controls
+import gleamunison/llm_types.{type Completion, type Provider}
+import gleamunison/llm_wire
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn to_dynamic(val: a) -> Dynamic
@@ -22,6 +28,101 @@ fn as_bit_array(d: Dynamic) -> BitArray
 
 @external(erlang, "timer", "sleep")
 fn sleep(ms: Int) -> Nil
+
+@external(erlang, "gleamunison_llm_budget", "admit")
+fn budget_admit(provider: String, model: String) -> Result(Nil, String)
+
+@external(erlang, "gleamunison_llm_budget", "release")
+fn budget_release(provider: String) -> Result(Nil, Nil)
+
+@external(erlang, "gleamunison_llm_budget", "spend")
+fn budget_spend(
+  provider: String,
+  tokens: Int,
+  cost_micro_usd: Int,
+) -> Result(Nil, Nil)
+
+@external(erlang, "gleamunison_llm_budget", "report_success")
+fn budget_report_success(provider: String) -> Result(Nil, Nil)
+
+@external(erlang, "gleamunison_llm_budget", "report_failure")
+fn budget_report_failure(provider: String) -> Result(Nil, Nil)
+
+/// Budget/circuit gate as handler composition. Admit before the call,
+/// release the concurrency slot exactly once, then meter actuals and
+/// report the outcome. Refusals return the typed refusal name as the
+/// handler error; the inner handler never runs.
+pub fn budget_handler(
+  inner: OpHandler,
+  provider: llm_types.Provider,
+  model: String,
+) -> OpHandler {
+  let name = llm.provider_name(provider)
+  fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
+    case budget_admit(name, model) {
+      Error(refusal) -> cont(to_dynamic(Error(bit_array.from_string(refusal))))
+      Ok(Nil) -> {
+        let result = inner(args, fn(d) { d })
+        let assert Ok(Nil) = budget_release(name)
+        case as_result(result) {
+          Ok(json_bin) -> {
+            case meter_completion(provider, json_bin) {
+              Ok(#(tokens, cost)) -> {
+                let assert Ok(Nil) = budget_spend(name, tokens, cost)
+                let assert Ok(Nil) = budget_report_success(name)
+                Nil
+              }
+              // An unparseable completion cannot be metered; it still
+              // counts as a failure for the circuit.
+              Error(_) -> {
+                let assert Ok(Nil) = budget_report_failure(name)
+                Nil
+              }
+            }
+            cont(result)
+          }
+          Error(_) -> {
+            let assert Ok(Nil) = budget_report_failure(name)
+            cont(result)
+          }
+        }
+      }
+    }
+  }
+}
+
+fn meter_completion(
+  provider: llm_types.Provider,
+  json_bin: BitArray,
+) -> Result(#(Int, Int), Nil) {
+  case bit_array.to_string(json_bin) {
+    Error(_) -> Error(Nil)
+    Ok(text) ->
+      // House shape first (mocks and fixtures), provider wire shape second.
+      case parse_house_completion(json_bin) {
+        Ok(c) -> Ok(metered(c))
+        Error(_) ->
+          case llm_wire.parse_response(provider, 200, text) {
+            Error(_) -> Error(Nil)
+            Ok(c) -> Ok(metered(c))
+          }
+      }
+  }
+}
+
+fn parse_house_completion(json_bin: BitArray) -> Result(Completion, Nil) {
+  case json.decode(json_bin) {
+    Error(_) -> Error(Nil)
+    Ok(dyn) ->
+      decode.run(dyn, llm_wire.completion_decoder())
+      |> result.replace_error(Nil)
+  }
+}
+
+fn metered(c: Completion) -> #(Int, Int) {
+  let tokens = c.input_tokens + c.output_tokens
+  #(tokens, llm_budget.cost_micro_usd(c.input_tokens, c.output_tokens, 0, 0))
+}
 
 pub type RetryPolicy {
   RetryPolicy(max_attempts: Int, base_delay_ms: Int)
@@ -94,6 +195,6 @@ pub fn recording_mock(
       [messages_dyn, ..] -> record(as_bit_array(messages_dyn))
       [] -> Nil
     }
-    cont(to_dynamic(Ok(llm.completion_json(response))))
+    cont(to_dynamic(Ok(llm_wire.completion_json(response))))
   }
 }

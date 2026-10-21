@@ -44,7 +44,7 @@ fn write_subject() -> Nil {
 
 fn record_tape() -> String {
   write_subject()
-  let rec = transcript.start()
+  let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [console_frame()])
   let assert Ok(_) = cli_replay.run_definition(subject_path(), "main", frames)
   let tape = transcript.capture(rec)

@@ -6,6 +6,8 @@
          clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
          clear_eval_timeout/0, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
+-export([metrics_restart_probe/0, http_drain_probe/0, observability_probe/1,
+         metrics_name_bound_probe/0, llm_budget_snapshot_json/0, set_env/2, unset_env/1]).
 -export([rescue/1]).
 
 %% Run a zero-arg fun and capture any raised reason as {error, Rendered}.
@@ -307,21 +309,80 @@ tcp_auth_probe(Mode) when is_integer(Mode) ->
                 3 ->
                     ok = gen_tcp:send(Socket, <<1048577:32>>),
                     receive_raw_reply(Socket);
+                4 ->
+                    %% Replay: reuse one captured proof frame on a second
+                    %% connection — the server nonce differs, so auth must fail.
+                    Frame = v2_auth_frame(<<"server-secret">>),
+                    ok = gen_tcp:send(Socket, Frame),
+                    _Challenge1 = receive_raw_reply_keep(Socket),
+                    _First = receive_raw_reply_keep(Socket),
+                    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+                        {ok, Socket2} ->
+                            ok = gen_tcp:send(Socket2, Frame),
+                            _Challenge2 = receive_raw_reply_keep(Socket2),
+                            receive_raw_reply(Socket2);
+                        {error, Reason2} -> {error, Reason2}
+                    end;
                 _ ->
                     Message = {<<"test-peer">>, {connect, <<"test-peer">>}},
-                    Request = case Mode of
-                        0 -> Message;
-                        1 -> {auth, <<"server-secret">>, Message};
-                        2 -> {auth, <<"wrong-secret">>, Message}
-                    end,
-                    Bin = term_to_binary(Request),
-                    ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>),
-                    receive_raw_reply(Socket)
+                    case Mode of
+                        0 ->
+                            Bin = term_to_binary(Message),
+                            ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>),
+                            receive_raw_reply(Socket);
+                        1 -> v2_handshake(Socket, <<"server-secret">>, Message);
+                        2 -> v2_handshake(Socket, <<"wrong-secret">>, Message)
+                    end
             end;
         {error, Reason} -> {error, Reason}
     end,
     true = os:unsetenv("GLEAMUNISON_SYNC_TOKEN"),
     list_to_binary(io_lib:format("~tp", [SocketResult])).
+
+v2_handshake(Socket, Token, Message) ->
+    ClientNonce = crypto:strong_rand_bytes(16),
+    send_term(Socket, {hello, ClientNonce}),
+    case receive_raw_reply_keep(Socket) of
+        {challenge, ServerNonce} ->
+            Digest = crypto:hash(sha256, term_to_binary(Message)),
+            Proof = crypto:mac(hmac, sha256, Token,
+                               <<ClientNonce/binary, ServerNonce/binary, Digest/binary>>),
+            send_term(Socket, {auth2, ClientNonce, Proof, Message}),
+            receive_raw_reply(Socket);
+        Other -> Other
+    end.
+
+v2_auth_frame(Token) ->
+    %% Fixed nonces make the frame replayable by construction; the server must
+    %% still reject it because its challenge nonce is fresh per connection.
+    ClientNonce = <<"fixed-client-nonce">>,
+    ServerNonce = <<"fixed-server-nonce">>,
+    Message = {<<"test-peer">>, {connect, <<"test-peer">>}},
+    Digest = crypto:hash(sha256, term_to_binary(Message)),
+    Proof = crypto:mac(hmac, sha256, Token,
+                       <<ClientNonce/binary, ServerNonce/binary, Digest/binary>>),
+    Hello = term_to_binary_with_len({hello, ClientNonce}),
+    Auth = term_to_binary_with_len({auth2, ClientNonce, Proof, Message}),
+    <<Hello/binary, Auth/binary>>.
+
+send_term(Socket, Term) ->
+    Bin = term_to_binary(Term),
+    ok = gen_tcp:send(Socket, <<(byte_size(Bin)):32, Bin/binary>>).
+
+term_to_binary_with_len(Term) ->
+    Bin = term_to_binary(Term),
+    <<(byte_size(Bin)):32, Bin/binary>>.
+
+receive_raw_reply_keep(Socket) ->
+    case gen_tcp:recv(Socket, 4, 2000) of
+        {ok, <<Len:32>>} ->
+            case gen_tcp:recv(Socket, Len, 2000) of
+                {ok, Bin} ->
+                    try binary_to_term(Bin, [safe]) catch _:_ -> invalid_reply end;
+                {error, Reason} -> {error, Reason}
+            end;
+        {error, Reason} -> {error, Reason}
+    end.
 
 ensure_tcp_sync_server() ->
     case whereis(gleamunison_tcp_sync) of
@@ -469,3 +530,96 @@ parse_http_response(Bin) ->
             end;
         _ -> {error, <<"bad response">>}
     end.
+
+%% Crash/restart proof for the metrics cache: the supervisor owns the
+%% gen_server with restart=permanent, so a kill must produce a NEW pid and
+%% the next record must land without the caller noticing.
+metrics_restart_probe() ->
+    ok = gleamunison_metrics_sup:ensure_started(),
+    Pid = whereis(gleamunison_metrics),
+    true = is_pid(Pid),
+    exit(Pid, kill),
+    NewPid = wait_for_metrics_pid(Pid, 100),
+    true = is_pid(NewPid),
+    true = NewPid =/= Pid,
+    nil = gleamunison_metrics:counter(<<"probe.restart">>, 1),
+    true.
+
+wait_for_metrics_pid(Old, 0) -> Old;
+wait_for_metrics_pid(Old, N) ->
+    case whereis(gleamunison_metrics) of
+        undefined -> timer:sleep(10), wait_for_metrics_pid(Old, N - 1);
+        Old -> timer:sleep(10), wait_for_metrics_pid(Old, N - 1);
+        New -> New
+    end.
+
+%% Drain proof: start a server, drain it, then the listener entry must be
+%% gone (readiness would report http_not_running) and stop must be clean.
+%% start_server blocks for the server's lifetime, so it runs in a spawned
+%% process and we poll for the listener registration. Port must be real:
+%% gleamunison_http_sup treats 0 as "start no children", and a crashed
+%% probe must never leave an empty sup registered behind it.
+http_drain_probe() ->
+    Port = free_port(),
+    _Server = spawn(fun() -> gleamunison_http:start_server(Port) end),
+    try
+        {HttpPid, _} = wait_for_listener(200),
+        drained = gleamunison_http:drain(500),
+        undefined = persistent_term:get({gleamunison_http, listener}, undefined),
+        true = is_process_alive(HttpPid),
+        true
+    after
+        catch gleamunison_http:stop_server()
+    end.
+
+free_port() ->
+    {ok, Listen} = gen_tcp:listen(0, []),
+    {ok, {_Addr, Port}} = inet:sockname(Listen),
+    gen_tcp:close(Listen),
+    Port.
+
+wait_for_listener(0) -> error(listener_timeout);
+wait_for_listener(N) ->
+    case persistent_term:get({gleamunison_http, listener}, undefined) of
+        undefined -> timer:sleep(10), wait_for_listener(N - 1);
+        Listener -> Listener
+    end.
+
+%% Probe the observability export: 1 = json shape, 2 = redaction.
+observability_probe(1) ->
+    gleamunison_observability:export_json();
+observability_probe(2) ->
+    Secret = <<"supersecret-probe-token">>,
+    {ok, Id} = gleamunison_trace:capture_request(
+        <<"GET">>, <<"/probe">>,
+        [{<<"authorization">>, Secret}, {<<"cookie">>, <<"session=abc">>}]),
+    {ok, {_TS, _Id, _M, _P, Headers}} = gleamunison_trace:get_trace(Id),
+    Export = gleamunison_observability:export_json(),
+    NoSecretInExport = binary:match(Export, Secret) =:= nomatch,
+    NoSecretInTrace = lists:all(
+        fun({_K, V}) -> V =/= Secret end, Headers),
+    RedactedPresent = lists:any(
+        fun({_K, V}) -> V =:= <<"[redacted]">> end, Headers),
+    NoSecretInExport andalso NoSecretInTrace andalso RedactedPresent.
+
+%% A metric name over 128 bytes is refused at the API edge and never lands
+%% in the registry.
+metrics_name_bound_probe() ->
+    ok = gleamunison_metrics_sup:ensure_started(),
+    Long = binary:copy(<<"x">>, 200),
+    nil = gleamunison_metrics:counter(Long, 1),
+    Entries = gleamunison_metrics:list_metrics(),
+    not lists:any(
+        fun({{counter, N}, _}) -> N =:= Long; (_) -> false end, Entries).
+
+%% Budget registry snapshot as JSON, for asserting metering from Gleam.
+llm_budget_snapshot_json() ->
+    iolist_to_binary(json:encode(gleamunison_llm_budget:snapshot())).
+
+set_env(Key, Value) when is_binary(Key), is_binary(Value) ->
+    true = os:putenv(binary_to_list(Key), binary_to_list(Value)),
+    nil.
+
+unset_env(Key) when is_binary(Key) ->
+    true = os:unsetenv(binary_to_list(Key)),
+    nil.

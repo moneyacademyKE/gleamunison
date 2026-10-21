@@ -80,6 +80,20 @@ Always pre-verify all remote transfers:
 2. Run standard pushes (`env -u GITHUB_TOKEN git push`).
 3. Never use standard `--force`. If history rewriting is required, use `--force-with-lease --force-if-includes`.
 
+### Production profiles and release claims
+
+- Use the `local`, `authenticated-remote`, and `untrusted-execution` contracts in
+  [ADR 0067](adr/0067-production-boundaries.md). They are independent boundaries,
+  not one universal production switch. Implementation status and required probes
+  live in the [verification matrix](operations/verification-matrix.md).
+- Never call an evaluation process scope an OS sandbox. An untrusted profile
+  requires an approved external executor and enforceable limits; absence refuses.
+- Separate content refs, mutable pointers, signer identity, deployment identity,
+  and request authorization. A hash or signature cannot substitute for the others.
+- A contract document is not an implemented capability. Record actual refusal and
+  success receipts before claiming a profile; never hide manual or skipped gates.
+- Boundary work does not authorize a tag, Hex publish, merge, or deployment.
+
 ### Content admission and persistence
 
 - Keep definition identity separate from storage encoding: use the versioned

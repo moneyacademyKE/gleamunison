@@ -319,6 +319,11 @@ pub fn verified_with_policy(
   })
 }
 
+/// Constant-time hex comparison for signature checks outside this module.
+pub fn secure_compare_hex(a: String, b: String) -> Bool {
+  crypto.secure_compare(bit_array.from_string(a), bit_array.from_string(b))
+}
+
 /// Compatibility helper for local fixtures. Production/package gates should
 /// call verified_with_policy with RequireTrusted.
 pub fn verified(adapter: StorageAdapter, subject: String, kind: Kind) -> Bool {

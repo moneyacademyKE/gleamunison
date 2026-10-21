@@ -3,8 +3,10 @@
 -export([handle_eval_route/2, handle_counter_route/1, handle_define_route/2, handle_browse_route/1,
          serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
          handle_processes_route/1, handle_sync_status_route/1, handle_redefinitions_route/1,
-         handle_logs_route/1, handle_enhanced_modules_route/1,
+         handle_logs_route/1, handle_enhanced_modules_route/1, handle_observability_route/1,
          handle_traces_route/1, handle_trace_detail_route/2]).
+
+-define(MAX_SSE_CLIENTS, 32).
 
 is_localhost(Socket) ->
     case inet:peername(Socket) of
@@ -93,7 +95,7 @@ handle_browse_route(Socket) ->
         EscExpr = gleamunison_http_util:escape_json(Expr),
         <<"{\"name\":", EscName/binary, ",\"expr\":", EscExpr/binary, "}">>
     end, Entries),
-    Json = <<"{\"defs\":[", (binary:join(JsonParts, <<",">>))/binary, "]}">>,
+    Json = <<"{\"defs\":[", (iolist_to_binary(lists:join(<<",">>, JsonParts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 serve_static(Socket, <<"/">>) ->
@@ -118,7 +120,7 @@ handle_status_route(Socket) ->
     LoadedMods = [atom_to_binary(M, utf8) || {M, _} <- code:all_loaded(),
                     lists:prefix("m_", atom_to_list(M))],
     EscapedMods = [<< "\"", M/binary, "\"" >> || M <- LoadedMods],
-    ModsJson = <<"[", (binary:join(EscapedMods, <<",">>))/binary, "]">>,
+    ModsJson = <<"[", (iolist_to_binary(lists:join(<<",">>, EscapedMods)))/binary, "]">>,
     Json = iolist_to_binary(io_lib:format(
         "{\"node\":\"~s\",\"os\":\"~s\",\"memory_mb\":~p,\"uptime_sec\":~p,\"loaded_modules\":~s}",
         [NodeName, OS, MemoryMB, UptimeSec, ModsJson]
@@ -140,16 +142,21 @@ handle_static_file(Socket, FilePath) ->
     end.
 
 handle_sse_route(Socket) ->
-    Headers = <<"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n">>,
-    gen_tcp:send(Socket, Headers),
-    Pid = self(),
     try ets:whereis(gleamunison_sse_clients) of
         undefined ->
             ets:new(gleamunison_sse_clients, [set, public, named_table])
     catch _:_ -> ok end,
-    ets:insert(gleamunison_sse_clients, {Pid, true}),
-    Ref = erlang:monitor(port, Socket),
-    sse_keepalive_loop(Socket, Pid, Ref).
+    case ets:info(gleamunison_sse_clients, size) < ?MAX_SSE_CLIENTS of
+        false ->
+            gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"sse client limit reached\"}">>);
+        true ->
+            Headers = <<"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n">>,
+            gen_tcp:send(Socket, Headers),
+            Pid = self(),
+            ets:insert(gleamunison_sse_clients, {Pid, true}),
+            Ref = erlang:monitor(port, Socket),
+            sse_keepalive_loop(Socket, Pid, Ref)
+    end.
 
 sse_keepalive_loop(Socket, Pid, Ref) ->
     receive
@@ -185,7 +192,7 @@ handle_processes_route(Socket) ->
     end || {Pid, Name, Red, Mem, Q, Status} <- Procs],
     Json = iolist_to_binary(io_lib:format(
         "{\"processes\":[~s],\"total_count\":~p,\"total_memory_kb\":~p}",
-        [binary:join(Parts, <<",">>), length(Procs), TotalMem])),
+        [iolist_to_binary(lists:join(<<",">>, Parts)), length(Procs), TotalMem])),
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 pid_to_binary(Pid) ->
@@ -212,20 +219,23 @@ handle_redefinitions_route(Socket) ->
         "{\"timestamp\":\"~s\",\"name\":\"~s\",\"old_hash\":\"~s\",\"new_hash\":\"~s\",\"elapsed_ms\":~p}",
         [gleamunison_http_util:escape_json(TS), Name, OH, NH, Elapsed]))
         || {TS, Name, OH, NH, Elapsed} <- Events],
-    Json = <<"{\"events\":[", (binary:join(Parts, <<",">>))/binary, "]}">>,
+    Json = <<"{\"events\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_logs_route(Socket) ->
     Entries = case ets:whereis(gleamunison_logs) of
         undefined -> [];
-        _ -> lists:sublist(lists:reverse(ets:tab2list(gleamunison_logs)), 50)
+        _ -> lists:sublist(lists:reverse(lists:sort(ets:tab2list(gleamunison_logs))), 50)
     end,
     Parts = [iolist_to_binary(io_lib:format(
         "{\"timestamp\":\"~s\",\"level\":\"~s\",\"message\":~ts}",
         [gleamunison_http_util:escape_json(TS), Level, gleamunison_http_util:escape_json(Msg)]))
-        || {TS, Level, Msg} <- Entries],
-    Json = <<"{\"entries\":[", (binary:join(Parts, <<",">>))/binary, "]}">>,
+        || {_Seq, TS, Level, Msg, _Context} <- Entries],
+    Json = <<"{\"entries\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
+
+handle_observability_route(Socket) ->
+    gleamunison_http_util:send_json(Socket, 200, gleamunison_observability:export_json()).
 
 handle_enhanced_modules_route(Socket) ->
     Mods = [{atom_to_binary(M, utf8), 
@@ -237,7 +247,7 @@ handle_enhanced_modules_route(Socket) ->
         "{\"name\":\"~s\",\"hash\":\"~s\",\"beam_size_bytes\":~p,\"compiled_at\":\"~s\",\"diagnostics\":\"ok\"}",
         [M, M, Size, TS]))
         || {M, Size, TS, _} <- Mods],
-    Json = <<"{\"modules\":[", (binary:join(Parts, <<",">>))/binary, "]}">>,
+    Json = <<"{\"modules\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 safe_beam_size(Path) ->
@@ -257,7 +267,7 @@ handle_traces_route(Socket) ->
     gleamunison_trace:start_trace(),
     Traces = gleamunison_trace:list_traces(),
     Parts = [format_trace(T) || T <- Traces],
-    Json = <<"{\"traces\":[", (binary:join(Parts, <<",">>))/binary, "]}">>,
+    Json = <<"{\"traces\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_trace_detail_route(Socket, Id) ->
@@ -283,5 +293,5 @@ encode_headers(Headers) ->
         {K, V} = H,
         iolist_to_binary(io_lib:format("\"~s\":\"~s\"", [K, V]))
     end || H <- Headers],
-    <<"{", (binary:join(Parts, <<",">>))/binary, "}">>.
+    <<"{", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "}">>.
 

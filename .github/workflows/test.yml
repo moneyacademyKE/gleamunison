@@ -9,17 +9,50 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        otp: ["27", "28", "29"]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "29"
+          otp-version: ${{ matrix.otp }}
           gleam-version: "1.19.1"
           rebar3-version: "3"
-          # elixir-version: "1"
       - run: gleam deps download
       - run: gleam test
       - run: gleam format --check src test
       - run: ./build_escript.sh
       - run: bash scripts/test_artifact.sh
+
+  release-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # the upgrade/rollback gate builds the previous tag in a worktree
+          fetch-depth: 0
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          gleam-version: "1.19.1"
+          rebar3-version: "3"
+      - name: Install Babashka (pinned static build, sha256-verified)
+        # borkdude/setup-babashka does not exist ("repository not found") —
+        # a pinned release asset with an in-workflow checksum has no
+        # third-action supply chain at all (bk-19fe).
+        run: |
+          set -euo pipefail
+          BB_VERSION=1.13.226
+          curl -fsSL -o bb.tar.gz "https://github.com/babashka/babashka/releases/download/v${BB_VERSION}/babashka-${BB_VERSION}-linux-amd64-static.tar.gz"
+          echo "bf89e909c4025edf2d669921c81107435b7244840d8f4306f58439c328a342f9  bb.tar.gz" | sha256sum -c -
+          tar -xzf bb.tar.gz bb
+          sudo install -m 755 bb /usr/local/bin/bb
+          bb --version
+      - run: gleam deps download
+      - run: ./build_escript.sh
+      - run: bb scripts/test_release_contract.clj
+      - run: bb scripts/test_upgrade_rollback.clj

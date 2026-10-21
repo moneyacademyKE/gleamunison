@@ -245,3 +245,30 @@ The findings above are the historical baseline captured at `b9267ec`. The implem
 The rebuilt `gleamunison_escript` is intentionally left uncommitted. Release remains frozen: **no tag, no Hex publish, and no merge** were performed.
 
 **Rich Hickey closure check:** each gap now has one boundary owner and one receipt trail. The fix is composition — parse, validate, supervise, verify — not a new orchestration layer wearing a larger hat.
+
+## Boundary contract — 2026-10-20 (EAT)
+
+The ten audited v3.23.0 findings remain closed at their recorded commits. They are not the whole production contract. The next hardening plan (`bk-c7bb`, GitHub issue #25) separates the remaining claims into explicit profiles and refuses to call the runtime more trusted than its evidence allows.
+
+| Profile | Honest classification | Required refusal boundary | Proof index |
+|---|---|---|---|
+| `local` | Safe local research runtime | Non-loopback binding without the remote contract; invalid local limits or failed required readiness | `docs/operations/deployment-profiles.md`, `docs/operations/verification-matrix.md` |
+| `authenticated-remote` | Authenticated single-node service | Missing TLS/mTLS or authenticated proxy, route scopes, peer identity, replay binding, or bounded frames | `docs/operations/deployment-profiles.md`, `docs/operations/verification-matrix.md` |
+| `untrusted-execution` | Not yet claimable | Missing approved OS/container executor, enforceable resource policy, cancellation, cleanup, or redaction | `docs/operations/deployment-profiles.md`, `docs/operations/verification-matrix.md` |
+
+### Remaining risks, deliberately not marked closed
+
+- A BEAM process scope and capability handler are containment layers, not an OS/container sandbox.
+- The current project still needs an explicit remote authentication/encryption contract and complete route scopes.
+- Signed package/evidence provenance, key rotation/revocation, resource/export limits, compatibility/rollback proof, and LLM privacy/budget controls remain implementation work.
+- The final witness must distinguish automated passes from manual or environment-dependent checks and must not publish, tag, merge, deploy, or make a public production claim.
+
+This update is documentation-only for task 1. It records the boundary contract; it does not claim that the later controls already exist.
+
+## Boundary implementation update — 2026-10-20 (EAT)
+
+Task 2 (`bk-8b8e`, issue #26) now has an explicit `sandbox_policy` data boundary and focused tests. The policy names `local`, `authenticated-remote`, and `untrusted-execution`, validates bounded deadline/process/memory/reduction/concurrency budgets, preserves deny-by-default capability checks, and refuses an untrusted profile without an approved external executor. The existing supervisor-owned evaluation scope continues to kill tracked descendants on timeout/cancellation; the implementation does not call that an OS sandbox.
+
+Receipt: `~/.opencrabs/projects/gleamunison/files/plans/production-boundaries/receipts/bk-8b8e-focused.log` and `bk-8b8e-full.log`; explicit-PATH `gleam test` exits 0 with **452 passed, no failures**, and `gleam format src test` plus `git diff --check` exit 0. The external executor and transport/trust/resource/LLM controls remain unresolved until their later tasks run.
+
+**Rich Hickey boundary check:** policy data and the existing scope are composed rather than hidden behind a universal sandbox claim; the missing OS boundary is recorded as a refusal, not painted green.

@@ -10,6 +10,13 @@ report() ->
         run(<<"version">>, true, fun version_check/0),
         run(<<"schema">>, true, fun schema_check/0),
         run(<<"memory">>, true, fun memory_check/0),
+        %% Observational checks: reported but never gate readiness. If the
+        %% supervisor tree dies nobody answers this report at all, and an
+        %% unconfigured LLM provider is a valid deployment shape.
+        run(<<"supervisors">>, false, fun supervisors_check/0),
+        run(<<"queues">>, false, fun queues_check/0),
+        run(<<"codebase">>, false, fun codebase_check/0),
+        run(<<"provider">>, false, fun provider_check/0),
         #{name => <<"configuration">>, required => true, ok => ConfigOk,
           detail => case ConfigOk of true -> <<"valid">>; false -> <<"invalid_required_services">> end}
     ],
@@ -137,3 +144,33 @@ service_check(sync) ->
 
 listener_open(Socket) ->
     case inet:sockname(Socket) of {ok, _} -> true; _ -> false end.
+
+supervisors_check() ->
+    Names = [gleamunison_sup, gleamunison_runtime_sup, gleamunison_metrics_sup],
+    Alive = [N || N <- Names, is_pid(whereis(N))],
+    {length(Alive) > 0, iolist_to_binary(
+        io_lib:format("~p_of_~p_running", [length(Alive), length(Names)]))}.
+
+queues_check() ->
+    Sat = gleamunison_observability:saturation(),
+    Pairs = [{http_workers, http_worker_limit},
+             {mcp_active, mcp_request_limit},
+             {sse_clients, sse_client_limit}],
+    Saturated = [K || {K, L} <- Pairs,
+                      maps:get(K, Sat) >= maps:get(L, Sat)],
+    case Saturated of
+        [] -> {true, <<"within_limits">>};
+        _ -> {false, iolist_to_binary(io_lib:format("saturated:~p", [Saturated]))}
+    end.
+
+codebase_check() ->
+    Loaded = length([M || {M, _} <- code:all_loaded(),
+                          lists:prefix("m_", atom_to_list(M))]),
+    {true, iolist_to_binary(io_lib:format("~p_modules_loaded", [Loaded]))}.
+
+provider_check() ->
+    case {os:getenv("ANTHROPIC_API_KEY"), os:getenv("OPENAI_API_KEY")} of
+        {false, false} -> {true, <<"not_configured">>};
+        {A, false} when A =/= false -> {true, <<"anthropic_configured">>};
+        _ -> {true, <<"openai_configured">>}
+    end.

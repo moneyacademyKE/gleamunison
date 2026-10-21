@@ -34,6 +34,9 @@ fn get_plain_args() -> List(String)
 @external(erlang, "gleamunison_ffi", "halt_failure")
 fn halt_failure() -> Nil
 
+@external(erlang, "gleamunison_definition_codec", "version")
+fn definition_codec_version() -> Int
+
 pub fn run(args: List(String)) -> Nil {
   let levels = dogfood.all_levels()
   case args {
@@ -63,6 +66,9 @@ pub fn run(args: List(String)) -> Nil {
     ["watch"] -> cli_result.fail("usage: gleam run -- watch <file.lisp>")
     ["repl", ..paths] -> repl.start_repl_loading(paths)
     ["version"] -> io.println(version.current())
+    // Storage/schema compatibility gate: upgrade tooling compares this
+    // across releases; a bump means stores need an explicit migration.
+    ["schema-version"] -> io.println(int.to_string(definition_codec_version()))
     ["--help"] -> print_help()
     ["help"] -> print_help()
     [cmd] -> dispatch(cmd, "8080", levels)
@@ -146,5 +152,6 @@ fn print_help() -> Nil {
     "  mcp [port] [--load f] — MCP server for agents (default port 8099)",
   )
   io.println("  all             — run all available levels")
+  io.println("  schema-version  — print the storage/codec schema version")
   io.println("  levelN          — run level N")
 }

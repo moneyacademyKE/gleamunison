@@ -1,6 +1,6 @@
 -module(gleamunison_http).
 -behaviour(gen_server).
--export([start_link/1, start_server/1, stop_server/0, init/1, handle_call/3,
+-export([start_link/1, start_server/1, stop_server/0, drain/1, init/1, handle_call/3,
          handle_cast/2, handle_info/2, terminate/2, worker_count/1]).
 
 -define(MAX_BODY_BYTES, 1048576).
@@ -27,12 +27,70 @@ wait_for_server(Pid) when is_pid(Pid) ->
 stop_server() ->
     gleamunison_runtime_sup:stop_http().
 
+%% Graceful drain: stop accepting new connections, then wait for in-flight
+%% workers to finish up to Timeout ms. Returns drained | {timeout, Remaining}.
+%% The server process stays alive afterwards; stop_server/0 finishes the job.
+drain(Timeout) when is_integer(Timeout), Timeout >= 0 ->
+    case persistent_term:get({gleamunison_http, listener}, undefined) of
+        {Pid, _Socket} when is_pid(Pid) ->
+            gen_server:call(Pid, {drain, Timeout}, Timeout + 1000);
+        _ -> {error, <<"http_not_running">>}
+    end.
+
 init(Port) ->
     application:ensure_all_started(crypto),
     ensure_counter(),
+    case bind_gate() of
+        {ok, BindIp} -> listen(Port, BindIp);
+        {error, _} = Refusal -> {stop, Refusal}
+    end.
+
+%% Loopback is the default and needs no contract. Any other bind address
+%% requires the authenticated-remote profile plus an auth contract; the
+%% decision lives in gleamunison@auth:bind_decision/1 (one policy owner).
+bind_gate() ->
+    Address = case os:getenv("GLEAMUNISON_BIND_ADDRESS") of
+        false -> <<"127.0.0.1">>;
+        "" -> <<"127.0.0.1">>;
+        Value -> list_to_binary(Value)
+    end,
+    Profile = case os:getenv("GLEAMUNISON_PROFILE") of
+        false -> <<"local">>;
+        P -> list_to_binary(P)
+    end,
+    Input = {bind_input, Address, Profile, http_token_present(), sync_token_present()},
+    case gleamunison@auth:bind_decision(Input) of
+        allow -> parse_bind_ip(Address);
+        {refuse, Reason} -> {error, Reason}
+    end.
+
+http_token_present() ->
+    case os:getenv("GLEAMUNISON_HTTP_TOKEN") of
+        false -> false;
+        "" -> false;
+        _ -> true
+    end.
+
+sync_token_present() ->
+    case os:getenv("GLEAMUNISON_SYNC_TOKEN") of
+        false -> false;
+        "" -> false;
+        _ -> true
+    end.
+
+parse_bind_ip(<<"127.0.0.1">>) -> {ok, {127, 0, 0, 1}};
+parse_bind_ip(<<"0.0.0.0">>) -> {ok, {0, 0, 0, 0}};
+parse_bind_ip(<<"::1">>) -> {ok, {0, 0, 0, 0, 0, 0, 0, 1}};
+parse_bind_ip(Other) ->
+    case inet:parse_address(binary_to_list(Other)) of
+        {ok, Ip} -> {ok, Ip};
+        {error, _} -> {error, <<"invalid_bind_address">>}
+    end.
+
+listen(Port, BindIp) ->
     case gen_tcp:listen(Port, [binary, {active, false}, {reuseaddr, true},
                                {packet, http_bin}, {backlog, 100},
-                               {ip, {127, 0, 0, 1}}]) of
+                               {ip, BindIp}]) of
         {ok, ListenSocket} ->
             Owner = self(),
             Acceptor = spawn_link(fun() -> accept_loop(Owner, ListenSocket) end),
@@ -55,6 +113,23 @@ worker_count(Pid) when is_pid(Pid) ->
     end.
 
 handle_call(stop, _From, State) -> {stop, normal, ok, State};
+handle_call({drain, Timeout}, _From, #{socket := Socket, acceptor := Acceptor, workers := Workers} = State) ->
+    %% Close the listener and stop the acceptor first: no new work arrives
+    %% while we wait. Unlink BEFORE the shutdown: the acceptor is linked to
+    %% this server, so the shutdown reason backfires through the link and
+    %% kills the server before it replies whenever the acceptor has not yet
+    %% noticed the closed socket — the race CI caught on macos-28 (PR #30):
+    %% the drain caller crashed with {shutdown, {gen_server, call, ...}}.
+    %% unlink/1 also discards an exit signal already in flight.
+    %% Worker DOWNs are consumed here so the wait observes real progress
+    %% instead of a frozen map.
+    unlink(Acceptor),
+    catch gen_tcp:close(Socket),
+    exit(Acceptor, shutdown),
+    persistent_term:erase({gleamunison_http, listener}),
+    Deadline = erlang:monotonic_time(millisecond) + Timeout,
+    Result = wait_drained(Workers, Deadline),
+    {reply, Result, State};
 handle_call(_Request, _From, State) -> {reply, {error, unsupported}, State}.
 handle_cast(_, State) -> {noreply, State}.
 
@@ -76,11 +151,30 @@ handle_info({'DOWN', Mon, process, Pid, _Reason}, #{workers := Workers} = State)
 handle_info(_, State) -> {noreply, State}.
 
 terminate(_, #{socket := Socket, acceptor := Acceptor, workers := Workers}) ->
+    %% Same unlink as in drain: the acceptor's shutdown must not backfire
+    %% through the link and rewrite the reason this server terminates with.
+    unlink(Acceptor),
     catch gen_tcp:close(Socket),
     exit(Acceptor, shutdown),
     maps:foreach(fun(Pid, _) -> exit(Pid, shutdown) end, Workers),
     persistent_term:erase({gleamunison_http, listener}),
     ok.
+
+wait_drained(Workers, Deadline) ->
+    case map_size(Workers) of
+        0 -> drained;
+        N ->
+            Remaining = Deadline - erlang:monotonic_time(millisecond),
+            if Remaining =< 0 -> {timeout, N};
+               true ->
+                   receive
+                       {'DOWN', _Mon, process, Pid, _} ->
+                           wait_drained(maps:remove(Pid, Workers), Deadline)
+                   after 25 ->
+                       wait_drained(Workers, Deadline)
+                   end
+            end
+    end.
 
 accept_loop(Owner, ListenSocket) ->
     case gen_tcp:accept(ListenSocket) of
@@ -283,6 +377,8 @@ handle_route(Socket, <<"/api/traces/", Id/binary>>) ->
     gleamunison_http_routes:handle_trace_detail_route(Socket, Id);
 handle_route(Socket, <<"/api/health">>) ->
     handle_health_route(Socket);
+handle_route(Socket, <<"/api/observability">>) ->
+    gleamunison_http_routes:handle_observability_route(Socket);
 handle_route(Socket, <<"/api/ready">>) ->
     handle_health_route(Socket);
 handle_route(Socket, <<"/api/live">>) ->

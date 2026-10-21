@@ -24,15 +24,22 @@ if ! command -v zip >/dev/null 2>&1; then
 fi
 
 build_dir=$(mktemp -d)
-trap 'rm -rf "$build_dir"' EXIT
+app_beam_list=$(mktemp)
+trap 'rm -rf "$build_dir" "$app_beam_list"' EXIT
 
 printf 'Building gleamunison escript...\n'
 "$GLEAM_BIN" build
 
 shopt -s nullglob
+# Record exactly which beams belong to the gleamunison application at copy
+# time; the regenerated .app's modules list is built from this, never from
+# a name-prefix guess that rots when dependencies change their modules.
 for dir in build/dev/erlang/*/ebin; do
   if [[ -d "$dir" ]]; then
     find "$dir" -type f -name '*.beam' -exec cp {} "$build_dir"/ \;
+    if [[ "$dir" == "build/dev/erlang/gleamunison/ebin" ]]; then
+      (cd "$dir" && ls *.beam) >> "$app_beam_list"
+    fi
   fi
 done
 shopt -u nullglob
@@ -51,15 +58,51 @@ find "$build_dir" -maxdepth 1 -type f \( \
   -name 'gleeunit*.beam' -o -name 'birdie*.beam' \
 \) -delete
 
-# The compiler derives this metadata from gleam.toml. Load it at escript
-# startup rather than maintaining another version literal.
-cp build/dev/erlang/gleamunison/ebin/gleamunison.app "$build_dir/"
-
-# Compile raw Erlang genesis modules. Any failure aborts the build.
+# The compiler-generated .app is a dev-mode file: it lists dev-only
+# applications (birdie, gleeunit) and every *_test module. The release
+# artifact carries a regenerated .app whose applications are exactly
+# gleam.toml [dependencies] plus the OTP base, and whose modules are exactly
+# the beams this script packages. Declared = contained.
 for source in src/m_*.erl; do
   [[ -f "$source" ]] || continue
   "$ERLC_BIN" -o "$build_dir" "$source"
 done
+
+version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' gleam.toml)
+description=$(sed -n 's/^description = "\([^"]*\)"/\1/p' gleam.toml)
+runtime_deps=$(awk '/^\[dependencies\]/{f=1;next} /^\[/{f=0} f && /^[a-z]/{print $1}' gleam.toml)
+
+app_modules=""
+module_names=$(
+  {
+    while IFS= read -r beamfile; do
+      [[ -f "$build_dir/$beamfile" ]] && printf '%s\n' "${beamfile%.beam}"
+    done < "$app_beam_list"
+    for source in src/m_*.erl; do
+      [[ -f "$source" ]] || continue
+      m=$(basename "$source" .erl)
+      [[ -f "$build_dir/$m.beam" ]] && printf '%s\n' "$m"
+    done
+  } | sort -u
+)
+for m in $module_names; do
+  app_modules="$app_modules '$m',"
+done
+app_modules=${app_modules%,}
+
+dep_apps=""
+for dep in $runtime_deps; do
+  dep_apps="$dep_apps, $dep"
+done
+
+cat > "$build_dir/gleamunison.app" <<EOF
+{application, gleamunison, [
+    {vsn, "$version"},
+    {applications, [kernel, stdlib, crypto$dep_apps]},
+    {description, "$description"},
+    {modules, [$app_modules]}
+]}.
+EOF
 
 beam_count=$(find "$build_dir" -maxdepth 1 -type f -name '*.beam' | wc -l | tr -d ' ')
 if [[ "$beam_count" -eq 0 ]]; then
@@ -71,7 +114,11 @@ printf '  Beams: %s\n' "$beam_count"
 zip_path="$build_dir/$SCRIPT.zip"
 (
   cd "$build_dir"
-  zip -q "$zip_path" ./*.beam ./gleamunison.app
+  # Reproducibility gate: zip stores file mtimes, and this temp dir's mtimes
+  # are "now". Pin every entry to the epoch so two clean builds of the same
+  # source produce byte-identical archives. Glob order is already sorted.
+  find . -type f -exec touch -t 198001010000.00 {} +
+  TZ=UTC0 zip -q -X "$zip_path" ./*.beam ./gleamunison.app
 )
 
 artifact_tmp="$build_dir/$SCRIPT"

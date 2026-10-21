@@ -70,6 +70,7 @@ This log catalogs all architectural decision records (ADRs) for the `gleamunison
 | [ADR-0064](0064-s-expression-syntax-rationale.md) | S-expression syntax rationale — why Lisp, its costs, and the front-end escape hatch | Accepted |
 | [ADR-0065](0065-verified-cas-admission.md) | Verified CAS admission and recoverable definition payloads | Accepted |
 | [ADR-0066](0066-bounded-readiness-and-metrics.md) | Bounded readiness and supervised in-process metrics | Accepted |
+| [ADR-0067](0067-production-boundaries.md) | Production boundaries and execution profiles | Accepted contract; enforcement pending |
 
 
 

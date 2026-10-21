@@ -6,6 +6,7 @@ import gleam/option.{type Option}
 import gleam/result
 import gleam/string
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
+import gleamunison/llm
 
 /// One recorded effect call. args/result are inspect-renderings: faithful
 /// for the JSON-at-the-boundary abilities (LLM, HTTP), best-effort for
@@ -30,9 +31,17 @@ pub opaque type Tape {
   Tape(entries: List(OpRecord), raw: Dynamic)
 }
 
+/// Capture policy: the default redacts privacy-sensitive ability payloads
+/// at capture time; CaptureAll is the explicit opt-in for deliberate
+/// fixture recording (tape-to-test), whose artifacts are committed by hand.
+pub type CapturePolicy {
+  RedactPrivate
+  CaptureAll
+}
+
 /// Opaque handle to the process-local recording log.
 pub opaque type Recorder {
-  Recorder
+  Recorder(policy: CapturePolicy)
 }
 
 /// Opaque handle to a playback cursor over raw captured values.
@@ -72,7 +81,15 @@ fn pb_stop() -> Nil
 
 pub fn start() -> Recorder {
   log_start()
-  Recorder
+  Recorder(RedactPrivate)
+}
+
+/// Deliberate full capture: fixture recording (tape-to-test) and replay
+/// auditing. Artifacts contain whatever the recorded code sent — never run
+/// this against prompts or sources you would not commit.
+pub fn start_with(policy: CapturePolicy) -> Recorder {
+  log_start()
+  Recorder(policy)
 }
 
 pub fn stop(_rec: Recorder) -> Nil {
@@ -98,17 +115,35 @@ pub fn wrap_frames(
 }
 
 fn wrap_op(
-  _rec: Recorder,
+  rec: Recorder,
   key: String,
   op_idx: Int,
   inner: OpHandler,
 ) -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
     inner(args, fn(result) {
-      log_append(key, op_idx, to_dynamic(args), result)
+      // Redaction boundary at capture: under the default policy,
+      // privacy-sensitive abilities record that the call happened (ability,
+      // op, sequence) but never their payload — prompts and completions
+      // never reach a durable artifact.
+      case rec.policy, is_private_ability(key) {
+        RedactPrivate, True ->
+          log_append(key, op_idx, redacted_marker(), redacted_marker())
+        _, _ -> log_append(key, op_idx, to_dynamic(args), result)
+      }
       cont(result)
     })
   }
+}
+
+/// The privacy set is named ability refs, computed the same way the runtime
+/// keys frames. Today: exactly the LLM ability.
+fn is_private_ability(key: String) -> Bool {
+  key == effects.ability_key(llm.ability_ref())
+}
+
+fn redacted_marker() -> Dynamic {
+  to_dynamic("[redacted:private-ability-payload]")
 }
 
 /// Entries recorded so far, in call order (inspect-rendered view).
@@ -264,9 +299,16 @@ fn raw_index(raw: Dynamic) -> dict.Dict(Int, #(Dynamic, Dynamic)) {
 }
 
 /// True when the tape carries raw values and can drive a real replay.
+/// A tape containing redacted entries is NOT replayable: their payloads
+/// were removed at capture, so replay would return markers instead of
+/// completions. Run those live. (CaptureAll tapes carry real payloads and
+/// stay replayable.)
 pub fn is_replayable(tape: Tape) -> Bool {
   let raw: List(Dynamic) = from_dynamic(tape.raw)
   raw != []
+  && !list.any(tape_entries(tape), fn(e) {
+    string.contains(e.args_repr, "redacted:private-ability-payload")
+  })
 }
 
 /// Run a thunk under playback of the tape. Divergence from the recorded

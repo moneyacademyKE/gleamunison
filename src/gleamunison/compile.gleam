@@ -88,9 +88,9 @@ fn emit_term(t: ast.Term) -> String {
       "gleamunison_effets:handle_comp({'"
       <> module_name_for(ability)
       <> "', "
-      <> "fun(Val, Cont) -> ("
+      <> "fun(Val, Cont) -> erlang:apply(erlang:apply("
       <> emit_term(handler)
-      <> "(Val))(Cont) end}, fun() -> "
+      <> ", [Val]), [Cont]) end}, fun() -> "
       <> emit_term(computation)
       <> " end)"
     ast.Construct(ctor_ref:, args:) ->
