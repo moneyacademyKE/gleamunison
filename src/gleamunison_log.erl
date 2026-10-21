@@ -1,5 +1,5 @@
 -module(gleamunison_log).
--export([log_entry/4, log_count/0, clear_logs/0]).
+-export([log_entry/4, log_count/0, clear_logs/0, ensure_table/0]).
 
 -define(ETS_TABLE, gleamunison_logs).
 %% Bounded cache, same contract as traces: at most MAX_LOG_ENTRIES,

@@ -187,6 +187,7 @@ escape_json(Bin) when is_binary(Bin) ->
     <<"\"", B3/binary, "\"">>.
 
 send_json(Socket, StatusCode, Body) ->
+    gleamunison_http_metrics:observe(StatusCode),
     Response = iolist_to_binary(io_lib:format(
         "HTTP/1.1 ~p ~s\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
         [StatusCode, status_text(StatusCode), byte_size(Body), Body]
@@ -195,6 +196,7 @@ send_json(Socket, StatusCode, Body) ->
     gen_tcp:close(Socket).
 
 send_response(Socket, StatusCode, Body) ->
+    gleamunison_http_metrics:observe(StatusCode),
     Response = iolist_to_binary(io_lib:format(
         "HTTP/1.1 ~p ~s\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
         [StatusCode, status_text(StatusCode), byte_size(Body), Body]
@@ -227,6 +229,7 @@ mime_type(Path) when is_binary(Path) ->
     end.
 
 send_file_response(Socket, StatusCode, Mime, Body) ->
+    gleamunison_http_metrics:observe(StatusCode),
     Response = iolist_to_binary(io_lib:format(
         "HTTP/1.1 ~p ~s\r\nContent-Type: ~s; charset=utf-8\r\nContent-Length: ~p\r\nConnection: close\r\n\r\n~s",
         [StatusCode, status_text(StatusCode), Mime, byte_size(Body), Body]

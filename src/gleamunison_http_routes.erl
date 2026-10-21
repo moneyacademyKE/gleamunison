@@ -224,9 +224,12 @@ handle_logs_route(Socket) ->
         undefined -> [];
         _ -> lists:sublist(lists:reverse(lists:sort(ets:tab2list(gleamunison_logs))), 50)
     end,
+    %% escape_json/1 already returns a quoted, escaped string: wrapping it in
+    %% another pair of quotes produced "timestamp":""2026-..."", which no
+    %% JSON parser accepts.
     Parts = [iolist_to_binary(io_lib:format(
-        "{\"timestamp\":\"~s\",\"level\":\"~s\",\"message\":~ts}",
-        [gleamunison_http_util:escape_json(TS), Level, gleamunison_http_util:escape_json(Msg)]))
+        "{\"timestamp\":~ts,\"level\":~ts,\"message\":~ts}",
+        [gleamunison_http_util:escape_json(TS), gleamunison_http_util:escape_json(Level), gleamunison_http_util:escape_json(Msg)]))
         || {_Seq, TS, Level, Msg, _Context} <- Entries],
     Json = <<"{\"entries\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).

@@ -57,6 +57,10 @@ drain(Timeout) when is_integer(Timeout), Timeout >= 0 ->
 init(Port) ->
     application:ensure_all_started(crypto),
     ensure_counter(),
+    %% The log table must outlive the request workers that write to it: an
+    %% entry created by a worker dies with that worker, which is why /api/logs
+    %% served an empty list while errors were being logged.
+    gleamunison_log:ensure_table(),
     case bind_gate() of
         {ok, BindIp} -> listen(Port, BindIp);
         {error, _} = Refusal -> {stop, Refusal}
@@ -203,8 +207,10 @@ accept_loop(Owner, ListenSocket) ->
 handle_request(Socket) ->
     case gen_tcp:recv(Socket, 0, 5000) of
         {ok, {http_request, 'GET', {abs_path, Path}, _Version}} ->
+            gleamunison_http_metrics:begin_request(header_binary(Path)),
             handle_get_headers(Socket, Path);
         {ok, {http_request, 'POST', {abs_path, Path}, _Version}} ->
+            gleamunison_http_metrics:begin_request(header_binary(Path)),
             handle_post_headers(Socket, Path);
         {ok, _Other} ->
             gleamunison_http_util:send_response(Socket, 501, <<"Not Implemented">>);
