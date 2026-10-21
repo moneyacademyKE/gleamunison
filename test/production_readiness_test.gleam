@@ -52,16 +52,19 @@ pub fn custom_health_check_api_still_works_test() {
     health.run_checks([health.HealthCheck("passing", fn() { True }, "test")])
 }
 
-pub fn readiness_endpoint_fails_with_503_test() {
+/// A server started through the production entry point acquires storage at
+/// boot, so a booted server is ready. This used to be a 503: the readiness
+/// check required storage that nothing in the runtime ever opened.
+pub fn booted_server_reports_storage_ready_test() {
   let assert Ok(#(status, body)) = http_fixture(0, "/api/ready")
-  status |> should.equal(503)
-  parse_json(body, decode.at(["ready"], decode.bool)) |> should.equal(Ok(False))
+  status |> should.equal(200)
+  parse_json(body, decode.at(["ready"], decode.bool)) |> should.equal(Ok(True))
 }
 
-pub fn health_endpoint_no_longer_returns_false_200_test() {
+pub fn health_endpoint_agrees_with_readiness_test() {
   let assert Ok(#(status, body)) = http_fixture(0, "/api/health")
-  status |> should.equal(503)
-  parse_json(body, decode.at(["ready"], decode.bool)) |> should.equal(Ok(False))
+  status |> should.equal(200)
+  parse_json(body, decode.at(["ready"], decode.bool)) |> should.equal(Ok(True))
 }
 
 pub fn healthy_http_report_is_structured_test() {

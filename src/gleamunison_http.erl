@@ -13,10 +13,26 @@ start_link(Port) when is_integer(Port) ->
     gen_server:start_link(?MODULE, Port, []).
 
 start_server(Port) when is_integer(Port) ->
+    ensure_storage(),
     case gleamunison_runtime_sup:start_http(Port) of
         {ok, Pid} -> wait_for_server(Pid), ok;
         {error, {already_started, Pid}} -> wait_for_server(Pid), ok;
         {error, Reason} -> {error, Reason}
+    end.
+
+%% Readiness marks storage as required, but nothing acquired it at boot: the
+%% persistent_term was written only by tests, so /api/ready could never pass
+%% in production. One boot, one storage handle, and the probe observes a
+%% resource the runtime actually holds.
+ensure_storage() ->
+    case persistent_term:get({gleamunison, active_storage}, undefined) of
+        undefined ->
+            try gleamunison_storage:new() of
+                _ -> ok
+            catch
+                _:_ -> ok
+            end;
+        _ -> ok
     end.
 
 wait_for_server(Pid) when is_pid(Pid) ->
