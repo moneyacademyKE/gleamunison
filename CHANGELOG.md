@@ -2,23 +2,64 @@
 
 ---
 
-## What's New in v3.23.0 (2026-10-18)
+## What's New in v3.24.0 (2026-10-21)
 
-The truth-at-the-boundary release: CLI failures now fail, evidence survives process boundaries, and protocol versions cannot drift from the package manifest.
+The production-boundaries release, second half: every boundary is now a policy module with an owner and a proof, the CI matrix runs ubuntu+macOS × OTP 27/28/29, and a single gate produces a machine-readable witness.
 
-### Verification and test commands fail honestly
-- Empty or comment-only source is rejected instead of reporting successful verification.
-- Malformed verification, failed tests, vacuous zero-assertion tests, and suites with no `test_` definitions return a nonzero process status.
-- Zero-assertion tests produce an error and attach no passing Test evidence.
+### Trust boundaries are code, not convention
+- New pure policy modules own the decisions: `sandbox_policy.gleam` admits or refuses execution profiles against resource budgets, `trust.gleam` owns key states (active/revoked/expired) and rotation, and every refusal carries a named reason.
+- The HTTP listener refuses non-loopback binds without explicit opt-in (`GLEAMUNISON_BIND_ADDRESS` / `GLEAMUNISON_PROFILE`).
 
-### Evidence and publish persistence
-- CLI-owned DETS adapters close before success is reported, so test evidence and IO attestations are visible to the next process.
-- Evidence insertion and publish manifest writes are propagated as failures instead of being silently discarded.
+### Authenticated transport
+- TCP sync moved to a v2 handshake: HMAC challenge-response with a replay table; raw tokens no longer cross the wire. **Breaking: v1 peers are rejected.**
 
-### Build and protocol integrity
-- `build_escript.sh` validates the Gleam compiler, uses `pipefail`, and preserves the previous artifact when a build fails.
-- MCP and LSP advertise the compiled application version, removing stale hardcoded protocol versions.
-- A subprocess truth suite covers exit codes, evidence persistence, publish admission, manifest-write failure, and failed compiler builds.
+### Bounded everything
+- Requests, evaluation concurrency, mailboxes, trace retention, and store listing now run under explicit limits, with drain + crash/restart proofs.
+- Evaluation workers run under wall-clock, reduction-count, and memory budgets; whichever fires first stops a runaway evaluation.
+
+### LLM controls
+- Provider calls run under a budget gate with token ceilings, bounded retries, and cancellation; transcripts are redacted by default so prompts and responses never leak into logs.
+
+### Reproducible artifact and upgrade safety
+- The escript builds byte-reproducibly, reports its version and schema-version as commands, and the release contract verifies version↔metadata↔changelog agreement.
+- An upgrade/rollback battery proves the v3.23.0 ↔ v3.24.0 path; a corrupt or mismatched artifact fails loudly.
+- One integrated gate (`scripts/verify_production_boundaries.clj`) runs every battery and emits a machine-readable witness under `docs/verification/`.
+
+### Cross-platform hardening (surfaced by the new CI matrix)
+- Removed OTP-28-only `binary:join/2` from JSON encoding and eight HTTP route handlers (OTP 27 compatibility).
+- The compiler emitter no longer emits paren-less remote-application syntax that only OTP 29 accepts.
+- Fixed an HTTP drain race where killing the linked acceptor could terminate the server mid-reply.
+- The timeout test now asserts the containment invariant (any `evaluation_*` budget stop) instead of betting on which budget fires first.
+
+---
+
+## What's New in v3.23.0 (2026-10-20)
+
+The production-boundaries release: failures stay failures, untrusted inputs stay outside the system, and long-lived processes now have explicit owners, limits, and shutdown paths.
+
+### CLI and verification fail closed
+- Empty or comment-only source, malformed verification, failed tests, vacuous zero-assertion tests, and suites with no `test_` definitions now return a nonzero exit status instead of producing false success.
+- Typed CLI failures propagate to one process-level exit boundary, so callers and automation can trust the status code.
+- Playbook process verification fails closed when a runner exits unexpectedly; the subprocess truth suite exercises exit codes, evidence persistence, publish admission, manifest-write failure, and compiler/build failures.
+
+### Evidence, identity, and storage integrity
+- CLI-owned DETS adapters close before acknowledgement, making test evidence and IO attestations visible to the next process.
+- Evidence insertion, publish-manifest writes, and production signer requirements are propagated and enforced instead of being silently discarded.
+- CAS admission verifies content bindings before storage; malformed references and peer addresses are rejected.
+- Imports re-verify namespace and branch identity, preventing metadata from being accepted on the strength of an untrusted claim.
+
+### Network and process boundaries
+- HTTP requests and bodies are authenticated and bounded, including rejection of negative body lengths; static assets are confined to their root and default data routes require authentication.
+- TCP sync peers require authentication, while evaluation workers own and drain their process trees instead of leaking descendants.
+- Provider settings are validated, retries are bounded, and provider transports can be cancelled rather than hanging indefinitely.
+- HTTP and MCP servers are supervised with bounded workers, truthful readiness probes, and deterministic stop/start cleanup.
+- Metric retention is bounded and supervised so observability cannot become an unbounded memory sink.
+
+### Build, artifact, and protocol truth
+- `build_escript.sh` validates the Gleam toolchain, uses `pipefail`, and preserves the previous artifact when a build fails.
+- The escript embeds truthful version metadata and excludes test-only BEAM files.
+- MCP and LSP advertise the compiled application version rather than stale hardcoded values.
+- The artifact and CLI batteries cover the supported toolchain matrix and exercise the release boundary in subprocesses, not only in-process tests.
 
 ## What's New in v3.22.0 (2026-10-17)
 
