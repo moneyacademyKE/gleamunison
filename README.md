@@ -2,13 +2,51 @@
 
 **Content-addressed language runtime on the BEAM, built in Gleam.**
 
-A running prototype of a Unison-style content-addressed programming language
-that compiles to BEAM bytecode and loads dynamically into the Erlang VM.
+A working implementation of a Unison-style content-addressed programming
+language: a definition is identified by the hash of its structure, compiled on
+demand to BEAM bytecode, and loaded into a running VM by hash. Not a filename,
+not a module path, not a package — the hash *is* the identity.
+
+- **Version:** 3.24.0
+- **Suite:** 508 tests, 0 failures
+- **CI:** Erlang/OTP 27, 28, 29 × Ubuntu, macOS — all legs green
+- **Classification:** `authenticated-single-node-service`
+  ([verification witness](docs/verification/production-boundaries-2026-10-20.md))
+
+## Status: what this is, and what it is not
+
+The honest framing matters more than the marketing. This runtime is a serious
+content-addressed execution platform with a strong identity model. It is **not**
+a safe place to run arbitrary untrusted code, and it does not claim to be.
+
+| Capability | State |
+|---|---|
+| Content-addressed identity (SHA256 of term + type) | Implemented, verified |
+| Hash → compile → load → execute pipeline | Implemented, verified |
+| Hindley-Milner type inference, two-phase elaboration | Implemented |
+| Algebraic effects (stack-based handler frames) | Implemented |
+| Content-addressed store (DETS / ETS / Mnesia) | Implemented |
+| Pull-based sync: TCP protocol **v2** (HMAC handshake) + Erlang distribution | Implemented |
+| HTTP + MCP service with bind gate, request auth, readiness probes | Implemented, single node |
+| Evaluation budgets (wall clock, reductions, memory) | Implemented |
+| Evidence signing, trust policy, key rotation/revocation | Implemented |
+| LLM budgets, cancellation, transcript redaction | Implemented |
+| **OS/container isolation for untrusted code** | **Not implemented** — requires an external executor |
+| **TLS / mTLS transport encryption** | **Not implemented** — bind gate + token auth only |
+| **Signed packages / attestations with revocation** | Partial — evidence signing only |
+| **Live process migration** | Design only |
+| **Multi-node clustering in production** | Not claimed — single authenticated node |
+
+The `untrusted-execution` deployment profile is deliberately **disabled** in the
+codebase: it refuses to admit work until a real OS-level sandbox exists.
 
 ## Rationale & Gap Analysis
 
 ### Why Gleamunison?
-Gleamunison combines the type-safe concurrency of the BEAM (via Gleam) with Unison's content-addressed codebase and algebraic effects, enabling zero-downtime hot upgrades and dynamic sandboxing.
+
+Gleamunison combines the type-safe concurrency of the BEAM (via Gleam) with
+Unison's content-addressed codebase and algebraic effects, enabling zero-downtime
+hot upgrades and dynamic sandboxing.
 
 ### Feature Set Differences (Gleamunison vs Unison)
 
@@ -17,24 +55,29 @@ Gleamunison combines the type-safe concurrency of the BEAM (via Gleam) with Unis
 | **Identity** | SHA3-512 (Term+Type) | SHA256 (Term+Type) | SHA256 is native on BEAM; less hash size overhead. |
 | **Primitives** | `##` Prefix Namespace | Genesis Block (Hash space) | Genesis eliminates dual-identity complexity. |
 | **Effect Model** | Explicit continuation `k` | Implicit stack-based frame | Stack-based is simpler; lacks explicit `k` resume. |
-| **Codebase Store** | SQLite / Event Log | DETS / ETS Storage | DETS is native and lightweight on BEAM. |
+| **Codebase Store** | SQLite / Event Log | DETS / ETS / Mnesia | Native and lightweight on BEAM. |
 | **Namespaces** | Hierarchical Projects | Flat namespace mapping | Flat is simpler; hierarchy can be layered. |
 
 ### Complexity vs. Utility
 
 | Element | Complexity | Utility | Recommendation |
 |---|---|---|---|
-| Genesis Primitives | Low | High | **Adopted**: Kept hash-space uniform. |
-| Stack-based Effects | Medium | High | **Adopted**: Simpler runtime implementation. |
-| Unique Type GUIDs | Low | Medium | **Adopted**: Prevents structural hash collisions. |
-| Remote Ability | High | Low | **Out-of-Scope**: Rely on BEAM distribution instead. |
+| Genesis Primitives | Low | High | **Adopted**: kept hash-space uniform. |
+| Stack-based Effects | Medium | High | **Adopted**: simpler runtime implementation. |
+| Unique Type GUIDs | Low | Medium | **Adopted**: prevents structural hash collisions. |
+| Remote Ability | High | Low | **Out of scope**: rely on BEAM distribution instead. |
 
 ## How Hashes Act as Executables
 
-In `gleamunison`, a program is not a monolithic binary file. It is a **Merkle Directed Acyclic Graph (Merkle DAG)** of content-addressed AST definitions stored in a database.
+A program is not a monolithic binary. It is a **Merkle DAG** of
+content-addressed AST definitions stored in a codebase.
 
-### The Merkle DAG Code Structure
-Each function definition is parsed into an AST and hashed based on its structure, stripping variable names to ensure α-equivalence. If a function references other functions, it references them strictly by their hashes (`RefTo` AST node).
+### The Merkle DAG code structure
+
+Each definition is parsed into an AST and hashed on its structure, stripping
+variable names to ensure α-equivalence. References to other definitions are
+stored as hashes (`RefTo` nodes), so the graph is content-addressed all the way
+down.
 
 ```
                   ┌───────────────────────┐
@@ -56,205 +99,238 @@ Each function definition is parsed into an AST and hashed based on its structure
                                    └───────────────────────┘
 ```
 
-The entire application (CMS, database, or GUI) is represented by a single **root hash** (e.g. `#ff45e8`).
+### Step-by-step execution
 
-### Step-by-Step Execution
-When running a program by its hash:
-1. **DAG Resolution**: The runtime looks up the root hash in its database, transitively walks the dependency graph, and fetches any missing dependency hashes from peers via the **Pull Sync Protocol**.
-2. **On-the-Fly Compilation**: The compiler translates the resolved AST nodes into Erlang BEAM bytecode binary arrays named after their hashes (e.g. `m_ff45e8.beam`).
-3. **Dynamic Loading & Run**: The VM dynamically loads the bytecode (`code:load_binary/3`) and calls the module's entrypoint function `'m_ff45e8':'$eval'()`.
+1. **DAG resolution** — the runtime looks up the root hash, walks the dependency
+   graph transitively, and fetches missing dependencies from peers over the sync
+   protocol (TCP v2 with an HMAC challenge-response handshake, or Erlang
+   distribution).
+2. **On-the-fly compilation** — resolved AST nodes compile to BEAM bytecode in
+   modules named after their hashes (e.g. `m_ff45e8`).
+3. **Dynamic loading** — the VM loads the binary with `code:load_binary/3` and
+   calls the entrypoint `'m_ff45e8':'$eval'()`.
 
-This enables zero-downtime hot upgrades (running new logic by swapping to a new root hash) and conflict-free dependency resolution.
+This is what enables zero-downtime upgrades (swap to a new root hash) and
+conflict-free dependency resolution (identity is the hash, so there are no name
+collisions to resolve).
 
-## Unique Usecases (Impossible on Gleam or Unison Alone)
+## What works today
 
-Gleamunison combines the scheduling, distribution, and runtime efficiency of the BEAM with the content-addressing and algebraic effects constraints of Unison:
+These are implemented and exercised by the suite or the playbook — not
+aspirations.
 
-### Hot-Upgrades & Evolution
-1. **Zero-Downtime Stateful Actor Upgrades**: Hot-swapping active actor code on-the-fly without state loss. Standard Gleam module updates clash on name collisions; Gleamunison addresses this by compiling into hash-named modules.
-2. **Stateful Chatbot Hot-Upgrades**: Preserve active user conversation states in Erlang actors. Swaps the actor message-handling loop to a new hash definition on the fly without state or connection loss.
-3. **IoT Firmware Hot-Patching**: IoT devices download modular function hashes instead of heavy firmware images, updating local logic dynamically without device resets.
-4. **Dynamic API Gateways**: Route HTTP requests based on endpoint definition hashes, dynamically compiling and loading handlers on demand.
+- **Zero-downtime hot upgrades.** Compile new logic to a new hash-named module
+  and swap the root hash; existing processes keep their state. Hash-named
+  modules mean no `code:purge` collisions with the old version.
+- **Content-addressed distribution.** Nodes exchange root hashes and pull only
+  missing definitions, so patching is incremental by construction.
+- **Effects as authority.** File, network, time, and randomness operations go
+  through abilities; the host decides what a handler is allowed to do. This is
+  how evaluation is sandboxed today — at the effect layer, in a bounded process.
+- **Bounded evaluation.** Every evaluation runs in a scope process with a wall
+  clock deadline, a reduction ceiling, and a memory ceiling. Descendant process
+  trees are owned and drained on timeout rather than leaked.
+- **Supervised services.** HTTP and MCP run under supervisors with graceful
+  drain; readiness reports storage, supervisors, and queues, and returns 503
+  when any of them is unhealthy.
+- **Reproducible verification.** Tests, evidence, and trace capture are
+  content-addressed: evidence binds to definition hashes, so a claim of "this
+  passed" names exactly which code passed.
+- **Self-hosted Datalog.** The database engine is written in Gleamunison's own
+  language (13 `.lisp` modules under `gleamunison_datalog/src/`), not in Gleam —
+  the runtime dogfoods itself.
+- **Agent interfaces.** MCP server, LSP server, and an HTTP API for eval,
+  definitions, traces, modules, and observability.
 
-### Secure Sandboxing & Multitenancy
-5. **Decoupled Multi-tenant Sandboxing**: Run untrusted plugins concurrently. Process boundaries isolate resource usage, while algebraic effects intercept and sandbox system actions (file, network).
-6. **Zero-Trust Serverless Executions**: Execute third-party thunks securely. The host caps execution time via process CPU schedulers and restricts access using custom effect handlers.
-7. **Capabilities-as-Code**: Database and network handles are represented strictly as abilities. User code only typechecks if the required abilities match their group access privileges.
-8. **Sandbox Game Modding**: Run game modding scripts in isolated BEAM processes. Mod APIs are exposed as abilities, preventing malicious access to the host filesystem.
+### Designed, not implemented
 
-### Distributed Compute & Edge topographies
-9. **Resilient P2P Job Stealing**: Edge nodes dynamically pull, structurally verify, locally compile, and run job definitions by hash.
-10. **Live Process Migration**: Serialize a running actor's continuation closure, ship it to a remote node, sync missing code dependencies via pull protocol, and resume execution.
-11. **Zero-Config Clustered Map-Reduce**: Parallelize map-reduce workflows. Code dependencies are automatically resolved and shipped by the runtime on target locations using Merkle sync.
-12. **Edge-Cloud Compute Offloading**: IoT devices offload heavy compute thunks to BEAM cloud nodes, verifying code integrity by hash to prevent remote exploits.
-13. **Content-Addressable CDN Handlers**: CDNs compile custom request handlers, push them to edge nodes by hash, and process CDN requests concurrently on edge processes.
-14. **P2P Software Distribution**: Sync codebases incrementally. Nodes exchange root hashes and request only missing modules, reducing patching bandwidth.
+Named here so nobody plans around them by accident:
 
-### Determinism, Auditing & Tools
-15. **Time-Traveling Replay Debugging**: Capture trace logs of execution. Replay the exact execution path deterministically using mock clock/random effect handlers.
-16. **Distributed Event Sourcing with Code Auditing**: Event stores record event payloads alongside the handler's hash, allowing historic events to be replayed with the exact code version.
-17. **Smart Contract Workflows**: Execute decentralized workflows. All state mutations and payments are modeled as abilities, sandboxed by host-defined contract handlers.
-18. **Multi-Tenant Concurrent Parsers**: Compile user-provided parser grammar thunks. Preemptive BEAM scheduling prevents a single bad parsing loop from blocking others.
-19. **Self-Documenting Code Registries**: Code definitions are hashed and immutable. Documentation and tests are linked directly to hashes; renaming never breaks documentation.
-20. **Immutable Cloud Shell**: Run interactive REPL sessions where every expression is compiled and stored. Keeps old module versions in memory for historic comparisons.
-21. **Content-Addressable Microservices**: Services call others by passing function hashes over RPC. The runtime resolves, syncs, and loads the code dynamically.
-22. **Decentralized Knowledge Graph**: A wiki-like graph where nodes are content-addressed definitions and links are type-safe references forming a Merkle DAG.
-23. **Reproducible Monte Carlo Simulations**: Replay complex stochastic simulations by mock-handling random generator and timer abilities using fixed seeds.
+- Live process migration (serialize a continuation, ship it, resume remotely).
+- OS-level sandbox for third-party code (`untrusted-execution` profile).
+- Signed package distribution with identity and revocation.
+- Multi-tenant isolation across trust domains.
 
+## Production boundaries
 
-## Project State
+v3.24.0 closed the operational gaps that separated "implemented" from
+"operable". Each boundary has one policy module, one owner, and a proof.
 
-**Production-grade runtime (Phases 0–14 complete).** All components are implemented and verified. The runtime is **fully playbook-certified**, passing all 5696 playbook conformance levels and 54 unit test suites (all passed). **v3.11.0** includes native content-addressed Datalog database engine with temporal indexing, graph algorithms, BM25, and vector search, alongside safe FFI deserialization, localhost endpoint restrictions, Ranch port monitoring safeguards, modular genesis builtin extraction, and a data-driven test runner framework.
+| Boundary | Enforcement | Documentation |
+|---|---|---|
+| **Bind / profile** | `GLEAMUNISON_BIND_ADDRESS` + `GLEAMUNISON_PROFILE`; non-loopback binds require an explicit profile | [deployment profiles](docs/operations/deployment-profiles.md) |
+| **Request auth** | `GLEAMUNISON_HTTP_TOKEN` gates data routes; constant-time compare | [deployment profiles](docs/operations/deployment-profiles.md) |
+| **Sync transport** | TCP protocol **v2**: HMAC challenge-response, replay table, per-peer token | [deployment profiles](docs/operations/deployment-profiles.md) |
+| **Execution budget** | Wall clock (`GLEAMUNISON_EVAL_TIMEOUT_MS`), reductions, memory (`GLEAMUNISON_MAX_MEMORY_MB`) | [ADR-0067](docs/adr/0067-production-boundaries.md) |
+| **Trust / keys** | Key state (active/revoked), trust policy, evidence signing (`GLEAMUNISON_EVIDENCE_SIGNING_KEY`) | [trust and key rotation](docs/operations/trust-and-key-rotation.md) |
+| **Resources / observability** | Bounded HTTP/MCP/SSE concurrency, mailboxes, trace retention; `/api/ready`, `/api/live`, `/api/observability` | [observability](docs/operations/observability.md) |
+| **LLM calls** | Token/cost budgets, concurrency cap, circuit breaker, cancellation, transcript redaction | [LLM policy](docs/operations/llm-policy.md) |
+| **Compatibility** | Schema version (`schema-version`), upgrade and rollback gates | [compatibility](docs/operations/compatibility.md), [upgrade and rollback](docs/operations/upgrade-and-rollback.md) |
 
-| Step | Status |
+Everything above is verified by `scripts/verify_production_boundaries.clj`, which
+runs the full battery and writes a machine-readable witness to
+`docs/verification/`.
+
+**Explicitly not claimed:** transport encryption (no TLS), OS-level isolation,
+package signing, and multi-node trust. Deployments that need those must supply
+them at the infrastructure layer.
+
+## Project state
+
+Measured, not asserted — the numbers below come from the tree and the suite at
+v3.24.0.
+
+| Metric | Value |
 |---|---|
-| AST → Hash (SHA256) | ✓ Content-addressed identity |
-| Codebase insert with hash verification | ✓ DETS/ETS persistence, dedup |
-| Compile to BEAM binary (all Term variants) | ✓ Int/Float/Text/List/Lambda/Apply/Let/Match |
-| Load into VM (`code:load_binary/3`) | ✓ OTP 29 compatible |
-| Type inference (Int/Float/Text/List) | ✓ Hindley-Milner style |
-| Elaboration (Surface → Core) | ✓ Two-phase with name resolution |
-| Effects runtime (process dict stack) | ✓ do_/handle_/push_frame/pop_frame |
-| Sync protocol (pull-based) | ✓ Types + Erlang distribution FFI + TCP sync |
-| Native Datalog Engine | ✓ Pure S-expression EAVT/AVET, temporal, rules, BM25, vector |
-| escript standalone binary | ✓ ~1.2 MB, no Gleam dependency at runtime |
+| Tests | 508 passing, 0 failures |
+| Test suites | 85 files under `test/` |
+| Playbook levels defined | 1,172 across 40 playbook docs |
+| Gleam modules | 100 (93 in `src/gleamunison/`, 7 top-level) |
+| Erlang modules | 43 production (plus 53 genesis `m_*.erl`) |
+| Datalog engine | 13 self-hosted `.lisp` modules |
+| ADRs | 68 |
+| Escript | ~1.3 MB standalone |
 
-## Conformance Tests
+| Pipeline step | Status |
+|---|---|
+| AST → hash (SHA256) | ✓ Content-addressed identity |
+| Codebase insert with hash verification | ✓ DETS/ETS/Mnesia, dedup |
+| Compile to BEAM (all Term variants) | ✓ Int/Float/Text/List/Lambda/Apply/Let/Match |
+| Load into VM (`code:load_binary/3`) | ✓ OTP 27–29 |
+| Type inference | ✓ Hindley-Milner style |
+| Elaboration (surface → core) | ✓ Two-phase with name resolution |
+| Effects runtime (process-dict stack) | ✓ do / handle / push / pop |
+| Sync | ✓ TCP v2 (HMAC) + Erlang distribution |
+| Native Datalog | ✓ Self-hosted, temporal, rules, BM25, vector |
+| Escript | ✓ ~1.3 MB, Erlang/OTP only at runtime |
 
-Supported toolchain matrix (kept in lockstep with CI): Erlang/OTP **29**, Gleam **1.19.1**, rebar3 **3**. Both test and publish workflows run `gleam test`, `gleam format --check src test`, and `./build_escript.sh`; the test workflow also executes `./gleamunison_escript version` as the artifact smoke test.
+## Modules
 
-To execute the unit and integration test suites:
+100 Gleam modules, 43 production Erlang modules, 53 genesis `m_*.erl` modules,
+and 13 self-hosted Datalog modules. Grouped by concern:
+
+| Area | Key modules |
+|---|---|
+| **Identity & AST** | `identity`, `ast`, `types`, `definition_codec` |
+| **Parsing & elaboration** | `lexer`, `parser`, `elaborate`, `elab_def`, `elab_term`, `elab_types`, `elab_pat`, `elab_ctx`, `lower` |
+| **Types** | `inference`, `infer_helper`, `typecheck`, `type_pretty` |
+| **Compilation & loading** | `compile`, `loader`, `pipeline`, `jets` |
+| **Codebase & storage** | `codebase`, `codebase_index`, `storage`, `namespace` |
+| **Effects & capabilities** | `effects`, `capability`, `turnstile` |
+| **Policy & trust** | `auth`, `trust`, `sandbox_policy`, `cancellation`, `evidence` |
+| **Services** | `http`, `http_client`, `mcp`, `mcp_server`, `mcp_session`, `lsp`, `lsp_features`, `lsp_types`, `health`, `metrics` |
+| **LLM integration** | `llm`, `llm_types`, `llm_wire`, `llm_budget`, `llm_controls`, `llm_middleware` |
+| **Sync** | `sync`, `sync_types`, `gleamunison_tcp_sync.erl`, `gleamunison_peer.erl` |
+| **REPL & CLI** | `repl`, `repl_eval`, `repl_io`, `repl_graph`, and 16 `cli_*` modules |
+| **Testing & verification** | `test_runner`, `verify`, `transcript`, `prompt`, `rank`, `manifest` |
+| **Genesis** | `genesis`, `bootstraps`, plus 53 `m_*.erl` modules |
+| **Datalog** | 13 self-hosted `.lisp` modules: core, index, transact, schema, query, aggregate, pull, temporal, rules, graph, vector, bm25, actor |
+
+## Toolchain and CI
+
+Kept in lockstep with the CI matrix:
+
+| Component | Version |
+|---|---|
+| Gleam | 1.19.1 |
+| Erlang/OTP | 27, 28, 29 (all tested) |
+| rebar3 | 3 |
+
+Every push runs the full matrix on Ubuntu and macOS for each OTP version:
+`gleam deps download`, `gleam test`, `gleam format --check src test`, plus a
+release-gates job that builds the escript and checks the artifact contract.
+
 ```sh
-gleam test                          # Runs all 54 unit test suites including native Datalog
-bb scripts/run_playbook_tests.clj   # Runs playbook conformance suite
+gleam test                                    # 508 tests
+gleam format --check src test                 # formatting gate
+./build_escript.sh                            # standalone artifact
+bb scripts/run_playbook_tests.clj             # playbook conformance (1,172 levels)
+bb scripts/verify_production_boundaries.clj   # full boundary gate + witness
 ```
-
-## Why the escript is only 1.2 MB
-
-The standalone binary (`gleamunison_escript`) contains the full content-addressed runtime — parser, elaborator, typechecker, compiler, loader, codebase, effects system, web server, REPL, 52 genesis modules, and all stdlib dependencies. At ~1.2 MB, it's compact because:
-
-**BEAM bytecode is dense.** The compiled `.beam` files are ~2.4 MB uncompressed; zip compression brings that to ~1.2 MB.
-
-**No VM bundled.** Unlike Go or Rust binaries that statically link a runtime, the escript relies on the system's Erlang/OTP installation (~150 MB, installed once). The escript itself is just a zip archive with a 50-byte launcher header.
-
-| Format | Size | Dependencies |
-|---|---|---|
-| gleamunison escript | **1.2 MB** | Erlang/OTP |
-| Go binary | 10–20 MB | None |
-| Rust binary | 5–15 MB | None |
-| Node.js app + deps | 100–500 MB | Node.js |
-
-If you already have Erlang installed, this is as close to a zero-install language runtime as it gets.
-
-## Modules (44 Gleam source modules, Erlang FFI, 52 genesis modules, 13 Datalog engine modules)
-
-| Module | Concern | Status |
-|---|---|---|
-| `gleamunison/identity` | Opaque Hash, DefinitionRef, LocalVar | Real |
-| `gleamunison/ast` | Core AST: Term (15 variants), Type, Definition, Unit | Real |
-| `gleamunison/types` | Core type definitions | Real |
-| `gleamunison/typecheck` | Type checker | Real |
-| `gleamunison/inference` | Type inference engine (Hindley-Milner) | Real |
-| `gleamunison/infer_helper` | Type inference helpers (alpha-equivalence, substitution) | Real |
-| `gleamunison/codebase` | Content-addressed Merkle store | Real |
-| `gleamunison/elaborate` | Surface → Core elaboration orchestration | Real |
-| `gleamunison/elab_def` | Definition elaboration (term, type, ability) | Real |
-| `gleamunison/elab_pat` | Pattern elaboration | Real |
-| `gleamunison/elab_term` | Term elaboration | Real |
-| `gleamunison/elab_types` | Type elaboration | Real |
-| `gleamunison/elab_ctx` | Elaboration context | Real |
-| `gleamunison/lower` | AST lowering / IR transformations | Real |
-| `gleamunison/parser` | S-expression parser & tokenizer | Real |
-| `gleamunison/lexer` | Lexer / tokenizer | Real |
-| `gleamunison/type_pretty` | Pretty-printer for types | Real |
-| `gleamunison/compile` | AST → Erlang source → BEAM binary | Real |
-| `gleamunison/loader` | Dynamic module loading into VM | Real |
-| `gleamunison/effects` | Algebraic effect types + Erlang runtime | Real |
-| `gleamunison/storage` | ETS, DETS, Partitioned DETS, and Mnesia storage adapters | Real |
-| `gleamunison/repl` | REPL entry point and loop orchestrator | Real |
-| `gleamunison/repl_eval` | REPL evaluation and definition compiler pipeline | Real |
-| `gleamunison/repl_io` | REPL bracket counter and line accumulator | Real |
-| `gleamunison/sync` | Pull-based sync protocol | Real |
-| `gleamunison/sync_types` | Sync protocol type definitions | Real |
-| `gleamunison/http` | Web server entry point | Real |
-| `gleamunison/http_client` | Typed HTTP client (get/post/put/delete) | Real |
-| `gleamunison/json` | JSON encode/decode | Real |
-| `gleamunison/datetime` | Opaque DateTime, ISO 8601, arithmetic | Real |
-| `gleamunison/filepath` | Opaque Path manipulation | Real |
-| `gleamunison/crypto` | Hash, HMAC, random bytes | Real |
-| `gleamunison/template` | {{var}} string interpolation | Real |
-| `gleamunison/log` | Structured logging (debug/info/warn/error) | Real |
-| `gleamunison/config` | Configuration management (env/TOML/CLI) | Real |
-| `gleamunison/health` | Health checks and readiness probes | Real |
-| `gleamunison/metrics` | Counter/gauge/histogram with telemetry | Real |
-| `gleamunison/pipeline` | Factored pipeline phases (parse_only, elaborate_only, compile_only, load_and_eval) | Real |
-| `gleamunison/jets` | FFI Jet compiler interception registry | Real |
-| `gleamunison/bootstraps` | Cycle-free genesis bootstrap definitions | Real |
-| `gleamunison/genesis` | Genesis block constants and hashes | Real |
-| `gleamunison/util` | Shared utilities (e.g. range helper) | Real |
-| `gleamunison/verify` | Interactive and file-based verification runner | Real |
-| `gleamunison/dogfood_runner` | Data-driven dynamic VM test runner | Real |
-| `gleamunison_datalog/src/` | 13-module S-expression Datalog database engine | Real |
-| `gleamunison_ffi.erl` | FFI: hashing, compilation, loading, process dict | Real |
-| `gleamunison_effets.erl` | Effects runtime: push/pop/find_frame, do_op/handle_comp | Real |
-| `gleamunison_storage.erl` | ETS/DETS/Mnesia storage backend with SHA256 atom safety | Real |
-| `gleamunison_tcp_sync.erl` | TCP sync server with safe deserialization & length limit | Real |
-| `gleamunison_http.erl` | HTTP server with trace capture, SSE, and health routes | Real |
-| `gleamunison_http_routes.erl` | Route handlers: eval, define, browse, traces, logs, modules | Real |
-| `gleamunison_http_util.erl` | HTTP utilities: JSON, MIME, URL decode, SSE broadcast | Real |
-| `gleamunison_sup.erl` | OTP Supervisor tree | Real |
-| `gleamunison_repl_ffi.erl` | REPL FFI bridge | Real |
-| `gleamunison_trace.erl` | Request trace capture (DETS) for Darklang-style development | Real |
-| `gleamunison_adapters.erl` | Lazy CAS type adapters for schema migration | Real |
-| `gleamunison_log.erl` | Structured log ETS backend | Real |
-| `gleamunison_config.erl` | Environment variable config loader | Real |
-| `gleamunison_health.erl` | Node health status (memory, modules) | Real |
-| `gleamunison_metrics.erl` | Counter/gauge/histogram with telemetry | Real |
-| `gleamunison_crypto.erl` | SHA256/512, HMAC, random bytes backend | Real |
-| `gleamunison_datetime.erl` | ISO 8601 parse/format backend | Real |
-| `gleamunison_template.erl` | String interpolation with HTML escaping | Real |
-| `gleamunison_json.erl` | JSON encode/decode backend | Real |
-| `gleamunison_http_client.erl` | HTTP client wrapping httpc | Real |
-| `gleamunison_property.erl` | Property-based testing framework | Real |
-| `m_*.erl` (52 files) | Content-addressed genesis modules | Real |
 
 ## Quick start
 
 ```sh
-cd ~/Desktop/gleamunison_dogfood/gleamunison_repo
-gleam run -- all             # Run all dogfooding levels via dynamic VM runner
-gleam test                  # Run unit tests (54 test suites)
-./gleamunison_escript repl   # Start interactive REPL via standalone escript (after ./build_escript.sh)
+git clone https://github.com/moneyacademyKE/gleamunison.git
+cd gleamunison
+gleam deps download
+./build_escript.sh
+./gleamunison_escript repl        # interactive REPL
+./gleamunison_escript server 8080 # HTTP API
+gleam test                        # run the suite
 ```
+
+## CLI
+
+```
+gleamunison <command>
+
+  server [port]          start the web server (default 8080)
+  repl                   interactive REPL (optionally preload a .lisp file)
+  verify [file]          verify a scratch file
+  llm <provider> <prompt> call an LLM (openai | anthropic)
+  mcp [port] [--load f]  MCP server for agents (default 8099)
+  all                    run all available levels
+  schema-version         print the storage/codec schema version
+  levelN                 run playbook level N
+```
+
+## HTTP API
+
+Data routes are gated by `GLEAMUNISON_HTTP_TOKEN` when set. Readiness and
+liveness are always available for orchestrators.
+
+| Route | Purpose |
+|---|---|
+| `POST /eval`, `POST /define` | Evaluate or install a definition |
+| `GET /browse`, `GET /counter` | Inspect the codebase |
+| `POST /mcp` | MCP over HTTP |
+| `GET /api/status`, `/api/events`, `/api/processes`, `/api/sync-status` | Runtime state |
+| `GET /api/logs`, `/api/modules`, `/api/traces`, `/api/traces/:id` | Observability |
+| `GET /api/health`, `/api/observability` | Detailed health and resource report |
+| `GET /api/ready`, `/api/live` | Readiness (503 when unhealthy) and liveness |
+
+## Why the escript is only ~1.3 MB
+
+The standalone binary contains the full runtime — parser, elaborator,
+typechecker, compiler, loader, codebase, effects system, web server, REPL, 53
+genesis modules, and dependencies — in about 1.3 MB, because:
+
+**BEAM bytecode is dense.** The compiled `.beam` files are a few MB
+uncompressed; zip compression brings the artifact to ~1.3 MB.
+
+**No VM bundled.** Unlike Go or Rust binaries that statically link a runtime, the
+escript relies on the system Erlang/OTP installation. The artifact itself is a
+zip archive with a small launcher header.
+
+| Format | Size | Dependencies |
+|---|---|---|
+| gleamunison escript | **1.3 MB** | Erlang/OTP |
+| Go binary | 10–20 MB | None |
+| Rust binary | 5–15 MB | None |
+| Node.js app + deps | 100–500 MB | Node.js |
+
+If Erlang/OTP is already installed, this is close to a zero-install language
+runtime.
 
 ## Documentation
 
 - [Playbook](docs/PLAYBOOK.md) — how to work on this project
-- [Architecture](docs/ARCHITECTURE.md) — deep dive into the design
-- [Roadmap](docs/ROADMAP.md) — 14-phase plan from spec to production
-- [Operations Runbook](docs/OPERATIONS.md) — deploy, configure, monitor, upgrade, troubleshoot
+- [Architecture](docs/ARCHITECTURE.md) — design deep dive
+- [Roadmap](docs/ROADMAP.md) — phase plan from spec to production
+- [Operations Runbook](docs/OPERATIONS.md) — deploy, configure, monitor, upgrade
+- [Deployment profiles](docs/operations/deployment-profiles.md) — bind gate, auth, trust levels
+- [Observability](docs/operations/observability.md) — readiness, metrics, trace retention
+- [Trust and key rotation](docs/operations/trust-and-key-rotation.md) — evidence keys, revocation
+- [LLM policy](docs/operations/llm-policy.md) — budgets, cancellation, redaction
+- [Compatibility](docs/operations/compatibility.md) — schema versions and migration
+- [Upgrade and rollback](docs/operations/upgrade-and-rollback.md) — artifact gates
+- [Verification matrix](docs/operations/verification-matrix.md) — what each gate proves
+- [Verification witness](docs/verification/production-boundaries-2026-10-20.md) — the machine-readable proof
+- [ADRs](docs/adr/) — 68 Architecture Decision Records
 - [Learnings](docs/LEARNINGS.md) — architectural insights discovered
 - [Patterns](docs/PATTERNS.md) — design patterns used
-- [Reference Manual](docs/MANUAL.md) — complete reference user guide
-- [ADRs](docs/adr/) — Architecture Decision Records (62 records)
-- [Standard Library](docs/stdlib/index.html) — module reference
-
-## Runtime output
-
-```
-=== Gleamunison ===
-Int(42)           ✓ Hash → Compile → Load
-Lambda(id)        ✓ Hash → Compile → Load
-Apply(id, 99)     ✓ Hash → Compile → Load
-Let(V0=42, V0)    ✓ Hash → Compile → Load
-Text(hello)       ✓ Hash → Compile → Load
-List([1,2,3])     ✓ Hash → Compile → Load
-Match(42, cases)  ✓ Hash → Compile → Load
-Type Inference    ✓ Int/Float/Text/List
-Elaboration       ✓ Surface → typed
-Effects           ✓ RuntimeConfig
-Sync              ✓ PeerId/SyncState
-```
+- [Reference Manual](docs/MANUAL.md) — complete user guide
 
 ## License
 
