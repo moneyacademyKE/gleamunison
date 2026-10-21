@@ -54,5 +54,12 @@ jobs:
           bb --version
       - run: gleam deps download
       - run: ./build_escript.sh
+      - name: Playbook conformance (default mode)
+        # 946 documented examples driven through a live REPL in ~11s. This is
+        # the only broad end-to-end conformance signal the project has, and
+        # it previously ran only in the local gate, so conformance
+        # regressions could land on main green (bk-389b). Strict mode is a
+        # completeness report, not a gate: see scripts/README.md.
+        run: bb scripts/run_playbook_tests.clj
       - run: bb scripts/test_release_contract.clj
       - run: bb scripts/test_upgrade_rollback.clj
