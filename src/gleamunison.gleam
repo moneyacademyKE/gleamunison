@@ -15,6 +15,7 @@ import gleamunison/cli_pkg
 import gleamunison/cli_publish
 import gleamunison/cli_replay
 import gleamunison/cli_result
+import gleamunison/cli_run
 import gleamunison/cli_sync
 import gleamunison/cli_tape_to_test
 import gleamunison/cli_test
@@ -53,6 +54,7 @@ pub fn run(args: List(String)) -> Nil {
     ["mcp", ..rest] -> cli_result.finish(cli_mcp.command(rest))
     ["find", ..rest] -> cli_result.finish(cli_find.command(rest))
     ["fmt", ..rest] -> cli_result.finish(cli_fmt.run(rest))
+    ["run", ..rest] -> cli_result.finish(cli_run.command(rest))
     ["replay", ..rest] -> cli_result.finish(cli_replay.command(rest))
     ["tape-to-test", ..rest] -> cli_tape_to_test.command(rest)
     ["test", ..rest] -> cli_test.command(rest)
@@ -159,6 +161,7 @@ fn print_help() -> Nil {
     "  repl [file.lisp ...]   interactive REPL, optionally preloading files",
   )
   io.println("  verify [file]          verify a scratch.lisp file")
+  io.println("  run <content-hash>     run a definition from the store by hash")
   io.println("  datalog <file.lisp>    run a datalog program")
   io.println("  fmt <file>             rewrite a file in place")
   io.println("  all                    run every implemented level")
