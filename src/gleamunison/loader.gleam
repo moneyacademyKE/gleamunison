@@ -68,6 +68,16 @@ pub fn module_available(ref: DefinitionRef) -> Bool {
   module_available_ffi(module_name_for(ref))
 }
 
+@external(erlang, "gleamunison_ffi", "module_exports")
+fn module_exports_ffi(mod_name: String) -> Result(List(#(String, Int)), String)
+
+/// Export table of the ref's loaded module, sorted. Locks the compiler's
+/// export contract (every definition exports `'$eval'/0`, plus ability op
+/// stubs) and backs introspection such as `run --json` on a function.
+pub fn exports(ref: DefinitionRef) -> Result(List(#(String, Int)), String) {
+  module_exports_ffi(module_name_for(ref))
+}
+
 /// Load a ref whose body lives in the jet table rather than the store.
 /// compile_definition consults the jet table before the definition argument,
 /// so the argument here is inert; it exists so there is one load path.
