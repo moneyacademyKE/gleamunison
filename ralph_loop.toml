@@ -1,0 +1,43 @@
+# Ralph verification gate for gleamunison.
+#
+# The plan tool runs these before accepting a task completion that claims
+# success. A project-local ralph_loop.toml wins over ~/.opencrabs/safety/
+# ralph_loop.toml, so this file is the only place gleamunison's gate is
+# configured.
+#
+# Every command sets PATH itself: the gate runs in a non-login shell that does
+# not source the user's profile, so a bare `gleam` exits 127 and blocks every
+# completion it is asked to verify. An absolute PATH prefix is what makes these
+# commands actually runnable, which is the difference between a gate and
+# decoration.
+
+[verification]
+enabled = true
+require_all_pass = true
+criteria_policy = "downgrade"
+
+[[verification.task_type_commands]]
+task_type = "test"
+commands = [
+  "export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH && gleam test",
+]
+
+[[verification.task_type_commands]]
+task_type = "refactor"
+commands = [
+  "export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH && gleam format --check src test",
+  "export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH && gleam test",
+]
+
+[[verification.task_type_commands]]
+task_type = "edit"
+commands = [
+  "export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH && gleam build",
+  "export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH && gleam test",
+]
+
+[[verification.task_type_commands]]
+task_type = "build"
+commands = [
+  "export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH && gleam build",
+]
