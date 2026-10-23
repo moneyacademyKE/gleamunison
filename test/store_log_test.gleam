@@ -57,7 +57,7 @@ pub fn an_empty_log_is_empty_not_an_error_test() {
 
 pub fn an_execution_entry_carries_its_outcome_and_reason_test() {
   let dir = temp_dir("exec-entry")
-  store_log.record_exec(dir, "bbbb", "refused", "wrong arity")
+  store_log.record_exec(dir, "bbbb", "refused", "wrong arity", "cli")
   |> should.equal(Ok(Nil))
   let assert Ok(entries) = store_log.exec_tail(dir, 5)
   case entries {
@@ -73,7 +73,8 @@ pub fn an_execution_entry_carries_its_outcome_and_reason_test() {
 pub fn the_two_logs_are_separate_test() {
   let dir = temp_dir("two-logs")
   store_log.record_content(dir, "content-ref", "term") |> should.equal(Ok(Nil))
-  store_log.record_exec(dir, "exec-ref", "ok", "") |> should.equal(Ok(Nil))
+  store_log.record_exec(dir, "exec-ref", "ok", "", "cli")
+  |> should.equal(Ok(Nil))
   let assert Ok(content) = store_log.content_tail(dir, 5)
   let assert Ok(exec) = store_log.exec_tail(dir, 5)
   refs(content) |> should.equal(["content-ref"])
@@ -106,5 +107,46 @@ fn exec_refs(entries: List(store_log.ExecEntry)) -> List(String) {
   case entries {
     [] -> []
     [first, ..rest] -> [first.ref_hex, ..exec_refs(rest)]
+  }
+}
+
+pub fn the_merged_view_orders_both_logs_by_time_test() {
+  let dir = temp_dir("merged-order")
+  store_log.record_content(dir, "content-ref", "term") |> should.equal(Ok(Nil))
+  store_log.record_exec(dir, "exec-ref", "ok", "", "cli")
+  |> should.equal(Ok(Nil))
+  let assert Ok(rows) = store_log.merged_tail(dir, 10)
+  merged_kinds(rows) |> should.equal(["content", "exec"])
+}
+
+pub fn the_merged_view_carries_the_label_and_detail_test() {
+  let dir = temp_dir("merged-detail")
+  store_log.record_exec(dir, "cccc", "refused", "wrong arity", "cli")
+  |> should.equal(Ok(Nil))
+  let assert Ok(rows) = store_log.merged_tail(dir, 10)
+  case rows {
+    [row] -> {
+      row.kind |> should.equal("exec")
+      row.label |> should.equal("refused")
+      row.detail |> should.equal("wrong arity")
+    }
+    _ -> should.fail()
+  }
+}
+
+pub fn an_execution_entry_carries_its_caller_test() {
+  let dir = temp_dir("exec-caller")
+  store_log.record_exec(dir, "dddd", "ok", "", "cli") |> should.equal(Ok(Nil))
+  let assert Ok(entries) = store_log.exec_tail(dir, 5)
+  case entries {
+    [entry] -> entry.caller |> should.equal("cli")
+    _ -> should.fail()
+  }
+}
+
+fn merged_kinds(rows: List(store_log.MergedEntry)) -> List(String) {
+  case rows {
+    [] -> []
+    [first, ..rest] -> [first.kind, ..merged_kinds(rest)]
   }
 }

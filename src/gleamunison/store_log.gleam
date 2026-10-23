@@ -16,7 +16,24 @@ pub type ContentEntry {
 }
 
 pub type ExecEntry {
-  ExecEntry(ref_hex: String, outcome: String, reason: String, at: Int)
+  ExecEntry(
+    ref_hex: String,
+    outcome: String,
+    reason: String,
+    caller: String,
+    at: Int,
+  )
+}
+
+/// One row of the merged view: either kind of entry, in chronological order.
+pub type MergedEntry {
+  MergedEntry(
+    kind: String,
+    ref_hex: String,
+    label: String,
+    detail: String,
+    at: Int,
+  )
 }
 
 @external(erlang, "gleamunison_store_log", "append_content")
@@ -39,14 +56,21 @@ fn append_exec_ffi(
   ref_hex: String,
   outcome: String,
   reason: String,
+  caller: String,
   at: Int,
 ) -> Result(Int, String)
+
+@external(erlang, "gleamunison_store_log", "merged_tail")
+fn merged_tail_ffi(
+  dir: String,
+  n: Int,
+) -> Result(List(#(String, String, String, String, Int)), String)
 
 @external(erlang, "gleamunison_store_log", "tail_exec")
 fn tail_exec_ffi(
   dir: String,
   n: Int,
-) -> Result(List(#(String, String, String, Int)), String)
+) -> Result(List(#(String, String, String, String, Int)), String)
 
 @external(erlang, "gleamunison_datetime", "now")
 fn now() -> Int
@@ -70,8 +94,10 @@ pub fn record_exec(
   ref_hex: String,
   outcome: String,
   reason: String,
+  caller: String,
 ) -> Result(Nil, String) {
-  append_exec_ffi(dir, ref_hex, outcome, reason, now()) |> result_map_nil
+  append_exec_ffi(dir, ref_hex, outcome, reason, caller, now())
+  |> result_map_nil
 }
 
 pub fn content_tail(dir: String, n: Int) -> Result(List(ContentEntry), String) {
@@ -87,7 +113,30 @@ pub fn exec_tail(dir: String, n: Int) -> Result(List(ExecEntry), String) {
   tail_exec_ffi(dir, n)
   |> map_result(fn(rows) {
     list.map(rows, fn(row) {
-      ExecEntry(ref_hex: row.0, outcome: row.1, reason: row.2, at: row.3)
+      ExecEntry(
+        ref_hex: row.0,
+        outcome: row.1,
+        reason: row.2,
+        caller: row.3,
+        at: row.4,
+      )
+    })
+  })
+}
+
+/// Both logs as one chronological view. Every row carries its kind, so a reader
+/// can tell an admission from an execution without consulting two commands.
+pub fn merged_tail(dir: String, n: Int) -> Result(List(MergedEntry), String) {
+  merged_tail_ffi(dir, n)
+  |> map_result(fn(rows) {
+    list.map(rows, fn(row) {
+      MergedEntry(
+        kind: row.0,
+        ref_hex: row.1,
+        label: row.2,
+        detail: row.3,
+        at: row.4,
+      )
     })
   })
 }

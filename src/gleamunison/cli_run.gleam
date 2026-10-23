@@ -156,7 +156,7 @@ fn record(
     Ok(_) -> #("ok", "")
     Error(error) -> #("refused", run_ref.describe(error))
   }
-  case store_log.record_exec(dir, run_ref.hex(ref), kind, reason) {
+  case store_log.record_exec(dir, run_ref.hex(ref), kind, reason, "cli") {
     Ok(_) -> Nil
     Error(problem) ->
       io.println_error("run: cannot write the exec log: " <> problem)

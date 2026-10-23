@@ -288,7 +288,7 @@ gleamunison <command>
   publish <file.lisp>    publish definitions behind the evidence gate
   unpublish <name>       retract a name: index line, binding, and bytes
   purge <hash> [--yes]   remove a definition and the deps only it kept alive
-  log [content|exec]     what the store has seen (--tail N)
+  log [content|exec|all]  what the store has seen (--tail N)
   test <file.lisp>       run the test forms in a file
   run <content-hash>     run a definition from the store, by hash
                          [args...] [--json] [--store path]
@@ -318,6 +318,7 @@ gleam run -- purge <hash>          # dry run: what would go, and why
 gleam run -- purge <hash> --yes    # remove it and its exclusive deps
 gleam run -- log content           # what entered the store, oldest first
 gleam run -- log exec --tail 50    # execution attempts and their outcomes
+gleam run -- log all               # both, in one chronological view
 ```
 
 `run` resolves the dependency closure before executing, so a stored definition
@@ -346,10 +347,10 @@ Two append-only logs sit beside the store file, both durable across restarts:
 | Log | Written by | Records |
 |---|---|---|
 | `content_log.dets` | admission: `publish` and `sync` | what entered the store, and when |
-| `exec_log.dets` | execution: `run` | every attempt: `ok` or `refused`, with the reason |
+| `exec_log.dets` | execution: `run` | every attempt: `ok` or `refused`, the reason, the caller |
 
-`pkg install` adds no content — it installs what the store already holds — so it
-writes no content entry.
+`log all` merges them into one chronological view. `pkg install` adds no content
+— it installs what the store already holds — so it writes no content entry.
 
 They are separate from the store on purpose. The store is content-addressed and
 immutable; a log is time-ordered. Writing a changing fact into the store would

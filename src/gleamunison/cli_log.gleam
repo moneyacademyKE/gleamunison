@@ -36,10 +36,11 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
   case which {
     "content" -> render_content(dir, count)
     "exec" -> render_exec(dir, count)
+    "all" -> render_all(dir, count)
     other ->
       Error(#(
         cli_result.refused,
-        "log: unknown log '" <> other <> "' (content | exec)\n" <> usage(),
+        "log: unknown log '" <> other <> "' (content | exec | all)\n" <> usage(),
       ))
   }
 }
@@ -83,6 +84,8 @@ fn render_exec(dir: String, count: Int) -> Result(String, #(Int, String)) {
             <> string.slice(entry.ref_hex, 0, 12)
             <> "  "
             <> entry.outcome
+            <> "  "
+            <> entry.caller
           case entry.reason {
             "" -> base
             reason -> base <> "  (" <> reason <> ")"
@@ -90,6 +93,46 @@ fn render_exec(dir: String, count: Int) -> Result(String, #(Int, String)) {
         })
         |> string.join("\n"),
       )
+  }
+}
+
+/// Both logs in one chronological view: an admission and an execution sit in
+/// the same list, ordered by when they happened.
+fn render_all(dir: String, count: Int) -> Result(String, #(Int, String)) {
+  use entries <- result.try(
+    store_log.merged_tail(dir, count)
+    |> result.map_error(fn(reason) { #(cli_result.unresolvable, reason) }),
+  )
+  case entries {
+    [] -> Ok("log: nothing recorded yet")
+    _ ->
+      Ok(
+        entries
+        |> list.map(fn(entry) {
+          let base =
+            format_iso8601(entry.at)
+            <> "  "
+            <> pad(entry.kind)
+            <> "  "
+            <> string.slice(entry.ref_hex, 0, 12)
+            <> "  "
+            <> entry.label
+          case entry.detail {
+            "" -> base
+            detail -> base <> "  (" <> detail <> ")"
+          }
+        })
+        |> string.join("\n"),
+      )
+  }
+}
+
+/// Column padding so the merged view lines up: "content" and "exec" differ in
+/// width, and a ragged list is harder to scan than a fixed one.
+fn pad(kind: String) -> String {
+  case string.length(kind) {
+    7 -> kind
+    shorter -> kind <> string.repeat(" ", 7 - shorter)
   }
 }
 
@@ -113,7 +156,7 @@ fn parse_args(
       Error(#(cli_result.refused, "log: --tail needs a count\n" <> usage()))
     [value, ..rest] ->
       case value {
-        "content" | "exec" -> parse_args(rest, value, count)
+        "content" | "exec" | "all" -> parse_args(rest, value, count)
         _ ->
           Error(#(
             cli_result.refused,
@@ -128,6 +171,7 @@ fn usage() -> String {
   <> "\n"
   <> "content  definitions that entered the store (default)\n"
   <> "exec     execution attempts, with outcome and reason\n"
+  <> "all      both, in one chronological view\n"
   <> "Default count: "
   <> int.to_string(default_tail)
 }
