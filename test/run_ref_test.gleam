@@ -1,6 +1,7 @@
 //// Run by hash: resolve the closure, load it, execute it. These tests use an
 //// in-memory store, which is the same adapter contract dets satisfies.
 
+import gleam/string
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/genesis
@@ -141,4 +142,29 @@ pub fn the_escape_hatch_runs_stored_content_test() {
   let #(cb, ref) = insert(codebase.empty(), definition)
   run_ref.run_verified(codebase.get_adapter(cb), ref, [], True)
   |> should.equal(Ok("11"))
+}
+
+// --- the run gate reports WHY it refused ------------------------------------
+
+fn int_value(n: Int) -> ast.Definition {
+  ast.TermDef(term: ast.Int(n), typ: ast.Builtin(ast.IntType))
+}
+
+/// The gate refuses before executing, and says what is missing. With no signing
+/// key configured there is no policy to enforce, and the message names the
+/// variable an operator has to set rather than a bare "not verified".
+pub fn run_gate_refuses_and_names_the_reason_test() {
+  let #(cb, ref) = insert(codebase.empty(), int_value(7))
+  let assert Error(error) =
+    run_ref.run_verified(codebase.get_adapter(cb), ref, [], False)
+  run_ref.describe(error)
+  |> string.contains("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  |> should.be_true
+}
+
+/// The escape hatch is explicit, and only then does unevidenced content run.
+pub fn run_gate_is_skipped_only_when_explicitly_allowed_test() {
+  let #(cb, ref) = insert(codebase.empty(), int_value(7))
+  run_ref.run_verified(codebase.get_adapter(cb), ref, [], True)
+  |> should.equal(Ok("7"))
 }
