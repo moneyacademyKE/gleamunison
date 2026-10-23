@@ -54,8 +54,8 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
 }
 
 fn execute(args: List(String)) -> Result(String, #(Int, String)) {
-  use #(hash, call_args, store_override, json) <- result.try(
-    parse_args(args, None, [], None, False)
+  use #(hash, call_args, store_override, json, inspect) <- result.try(
+    parse_args(args, None, [], None, False, False)
     |> result.map_error(fn(message) { #(cli_result.refused, message) }),
   )
   use ref <- result.try(
@@ -86,6 +86,7 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
           call_args,
           allow_unverified,
           json,
+          inspect,
         )
       },
       fn(message) { #(cli_result.unresolvable, message) },
@@ -94,9 +95,11 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
   Ok(output)
 }
 
-/// Text or JSON, from one execution path. A function with no arguments is
-/// reported rather than called: `run --json <hash>` answers "what is this"
-/// without running it, which is what an inspection flag is for.
+/// Text or JSON, from one execution path. `--inspect` is the only mode that
+/// does not execute: it loads the module (dependencies first) to read the
+/// export table but never applies `'$eval'`. `--json` always executes and
+/// changes only how the result is rendered, so one flag cannot mean two
+/// things.
 fn render_output(
   adapter: storage.StorageAdapter,
   dir: String,
@@ -104,32 +107,29 @@ fn render_output(
   call_args: List(Dynamic),
   allow_unverified: Bool,
   json: Bool,
+  inspect: Bool,
 ) -> Result(String, #(Int, String)) {
-  case json {
-    False -> {
-      let outcome =
-        run_ref.run_verified(adapter, ref, call_args, allow_unverified)
-      record(dir, ref, outcome)
-      outcome |> result.map_error(classify)
-    }
-    True -> {
-      let inspecting = {
-        use arity <- result.try(run_ref.declared_arity(adapter, ref))
-        Ok(arity > 0 && list.is_empty(call_args))
-      }
-      case inspecting {
-        Ok(True) ->
-          run_ref.inspect_function(adapter, ref)
-          |> result.map(fn(info) {
-            cli_output.function_json(
-              run_ref.hex(ref),
-              info.module,
-              info.arity,
-              info.exports,
-            )
-          })
-          |> result.map_error(classify)
-        _ -> {
+  case inspect {
+    True ->
+      run_ref.inspect_function(adapter, ref)
+      |> result.map(fn(info) {
+        cli_output.function_json(
+          run_ref.hex(ref),
+          info.module,
+          info.arity,
+          info.exports,
+        )
+      })
+      |> result.map_error(classify)
+    False ->
+      case json {
+        False -> {
+          let outcome =
+            run_ref.run_verified(adapter, ref, call_args, allow_unverified)
+          record(dir, ref, outcome)
+          outcome |> result.map_error(classify)
+        }
+        True -> {
           let outcome =
             run_ref.run_verified_raw(adapter, ref, call_args, allow_unverified)
           record(dir, ref, outcome)
@@ -140,7 +140,6 @@ fn render_output(
           |> result.map_error(classify)
         }
       }
-    }
   }
 }
 
@@ -203,7 +202,8 @@ fn parse_args(
   call_args: List(String),
   store_override: Option(String),
   json: Bool,
-) -> Result(#(String, List(Dynamic), Option(String), Bool), String) {
+  inspect: Bool,
+) -> Result(#(String, List(Dynamic), Option(String), Bool, Bool), String) {
   case args {
     [] ->
       case hash {
@@ -213,25 +213,43 @@ fn parse_args(
             to_call_args(list.reverse(call_args)),
             store_override,
             json,
+            inspect,
           ))
         None -> Error(usage())
       }
     ["--json", ..rest] ->
-      parse_args(rest, hash, call_args, store_override, True)
+      parse_args(rest, hash, call_args, store_override, True, inspect)
+    ["--inspect", ..rest] ->
+      parse_args(rest, hash, call_args, store_override, json, True)
     ["--store", path, ..rest] ->
-      parse_args(rest, hash, call_args, Some(path), json)
+      parse_args(rest, hash, call_args, Some(path), json, inspect)
     ["--store"] -> Error("run: --store needs a path\n" <> usage())
     [value, ..rest] ->
       case hash {
         Some(_) ->
-          parse_args(rest, hash, [value, ..call_args], store_override, json)
-        None -> parse_args(rest, Some(value), call_args, store_override, json)
+          parse_args(
+            rest,
+            hash,
+            [value, ..call_args],
+            store_override,
+            json,
+            inspect,
+          )
+        None ->
+          parse_args(
+            rest,
+            Some(value),
+            call_args,
+            store_override,
+            json,
+            inspect,
+          )
       }
   }
 }
 
 fn usage() -> String {
-  "usage: gleam run -- run <content-hash> [args...] [--store path]\n"
+  "usage: gleam run -- run <content-hash> [args...] [--json] [--inspect] [--store path]\n"
   <> "\n"
   <> "Runs the definition the store holds under that hash, loading its\n"
   <> "dependencies first. The hash is the content hash printed by publish.\n"
@@ -239,6 +257,10 @@ fn usage() -> String {
   <> "A value takes no arguments. A function of arity N takes N: each is\n"
   <> "read as an Erlang term (42, 1.5, true, nil, \"text\") and passed as raw\n"
   <> "text when it does not parse as one.\n"
+  <> "\n"
+  <> "  --json     execute, and print the result as one JSON object\n"
+  <> "  --inspect  report the module, declared arity and export table WITHOUT\n"
+  <> "             calling it; this is the only mode that does not execute\n"
   <> "\n"
   <> "The store is verified content by default. Set GLEAMUNISON_STORE_DIR to\n"
   <> "use another store directory, and GLEAMUNISON_STORE_ALLOW_UNVERIFIED=1\n"

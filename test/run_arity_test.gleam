@@ -152,3 +152,25 @@ pub fn a_curried_two_parameter_definition_runs_test() {
   run_ref.run(codebase.get_adapter(cb), ref, [arg(40), arg(2)])
   |> should.equal(Ok("42"))
 }
+
+// --- inspection is not execution -------------------------------------------
+
+/// A function whose body would fail if applied still inspects cleanly: the
+/// module is loaded to read its export table, and `'$eval'` is never applied.
+/// This is the guarantee `--inspect` rests on.
+pub fn inspect_loads_without_executing_test() {
+  // fn x -> 1(2): calling an integer raises badfun if it is ever applied.
+  let body =
+    ast.Lambda(
+      binder: Local(0),
+      body: ast.Apply(function: ast.Int(1), arg: ast.Int(2)),
+    )
+  let #(cb, ref) = insert(codebase.empty(), int_fn(1, body))
+  let assert Ok(info) = run_ref.inspect_function(codebase.get_adapter(cb), ref)
+  info.arity |> should.equal(1)
+  // The export table is real, and it is the compiler's fixed shape.
+  info.exports |> should.equal([#("$eval", 0)])
+  // Calling the same definition does fail, which is what makes the above
+  // proof rather than a no-op.
+  run_ref.run(codebase.get_adapter(cb), ref, [arg(1)]) |> should.be_error
+}
