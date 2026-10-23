@@ -17,10 +17,12 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleamunison/cli_lifecycle
+import gleamunison/cli_output
 import gleamunison/cli_result
 import gleamunison/cli_store
-import gleamunison/identity
+import gleamunison/identity.{type DefinitionRef}
 import gleamunison/run_ref
+import gleamunison/storage
 
 @external(erlang, "gleamunison_ffi", "parse_term_arg")
 fn parse_term_arg(arg: String) -> Result(Dynamic, Nil)
@@ -50,8 +52,8 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
 }
 
 fn execute(args: List(String)) -> Result(String, #(Int, String)) {
-  use #(hash, call_args, store_override) <- result.try(
-    parse_args(args, None, [], None)
+  use #(hash, call_args, store_override, json) <- result.try(
+    parse_args(args, None, [], None, False)
     |> result.map_error(fn(message) { #(cli_result.refused, message) }),
   )
   use ref <- result.try(
@@ -75,13 +77,54 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
     cli_store.with_dets_mapped(
       store_path,
       fn(adapter) {
-        run_ref.run_verified(adapter, ref, call_args, allow_unverified)
-        |> result.map_error(classify)
+        render_output(adapter, ref, call_args, allow_unverified, json)
       },
       fn(message) { #(cli_result.unresolvable, message) },
     ),
   )
   Ok(output)
+}
+
+/// Text or JSON, from one execution path. A function with no arguments is
+/// reported rather than called: `run --json <hash>` answers "what is this"
+/// without running it, which is what an inspection flag is for.
+fn render_output(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  call_args: List(Dynamic),
+  allow_unverified: Bool,
+  json: Bool,
+) -> Result(String, #(Int, String)) {
+  case json {
+    False ->
+      run_ref.run_verified(adapter, ref, call_args, allow_unverified)
+      |> result.map_error(classify)
+    True -> {
+      let inspecting = {
+        use arity <- result.try(run_ref.declared_arity(adapter, ref))
+        Ok(arity > 0 && list.is_empty(call_args))
+      }
+      case inspecting {
+        Ok(True) ->
+          run_ref.inspect_function(adapter, ref)
+          |> result.map(fn(info) {
+            cli_output.function_json(
+              run_ref.hex(ref),
+              info.module,
+              info.arity,
+              info.exports,
+            )
+          })
+          |> result.map_error(classify)
+        _ ->
+          run_ref.run_verified_raw(adapter, ref, call_args, allow_unverified)
+          |> result.map(fn(term) {
+            cli_output.value_json(run_ref.hex(ref), term)
+          })
+          |> result.map_error(classify)
+      }
+    }
+  }
 }
 
 /// Refused vs could-not-resolve: the two failures a caller scripts against.
@@ -123,20 +166,30 @@ fn parse_args(
   hash: Option(String),
   call_args: List(String),
   store_override: Option(String),
-) -> Result(#(String, List(Dynamic), Option(String)), String) {
+  json: Bool,
+) -> Result(#(String, List(Dynamic), Option(String), Bool), String) {
   case args {
     [] ->
       case hash {
         Some(value) ->
-          Ok(#(value, to_call_args(list.reverse(call_args)), store_override))
+          Ok(#(
+            value,
+            to_call_args(list.reverse(call_args)),
+            store_override,
+            json,
+          ))
         None -> Error(usage())
       }
-    ["--store", path, ..rest] -> parse_args(rest, hash, call_args, Some(path))
+    ["--json", ..rest] ->
+      parse_args(rest, hash, call_args, store_override, True)
+    ["--store", path, ..rest] ->
+      parse_args(rest, hash, call_args, Some(path), json)
     ["--store"] -> Error("run: --store needs a path\n" <> usage())
     [value, ..rest] ->
       case hash {
-        Some(_) -> parse_args(rest, hash, [value, ..call_args], store_override)
-        None -> parse_args(rest, Some(value), call_args, store_override)
+        Some(_) ->
+          parse_args(rest, hash, [value, ..call_args], store_override, json)
+        None -> parse_args(rest, Some(value), call_args, store_override, json)
       }
   }
 }

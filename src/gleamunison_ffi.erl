@@ -14,7 +14,7 @@
     stdio_binary_mode/0, stdio_read_line/0, stdio_read_chars/1, stdio_write/1,
     deny_capability/2,
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
-    render_term/1, parse_term_arg/1,
+    render_term/1, parse_term_arg/1, term_to_json/2, json_quote/1,
     test_soft_purge_scenario/0,
     eval_expression/1,
     load_dogfood_levels/1, load_dogfood_levels_resolved/0
@@ -227,6 +227,102 @@ test_soft_purge_scenario() ->
 %% CLI text path and the log, so a value never has two spellings.
 render_term(Term) ->
     list_to_binary(io_lib:format("~tp", [Term])).
+
+%% A runtime value as JSON, for `run --json`. Native where the shape is
+%% unambiguous (numbers, text, booleans, nil, lists), tagged where the language
+%% has a constructor ({tag, data}) and opaque where JSON has no honest
+%% representation (functions, pids, non-UTF8 binaries, maps). Depth is capped
+%% so a cyclic or huge term cannot hang a CLI.
+-define(JSON_MAX_DEPTH, 16).
+
+term_to_json(Term, Depth) ->
+    iolist_to_binary(term_to_json_iolist(Term, Depth)).
+
+term_to_json_iolist(_Term, Depth) when Depth > ?JSON_MAX_DEPTH ->
+    ["{\"truncated\":", integer_to_list(Depth), "}"];
+term_to_json_iolist(Term, _Depth) when is_integer(Term) ->
+    integer_to_binary(Term);
+term_to_json_iolist(Term, _Depth) when is_float(Term) ->
+    float_to_binary(Term, [short]);
+term_to_json_iolist(true, _Depth) -> <<"true">>;
+term_to_json_iolist(false, _Depth) -> <<"false">>;
+term_to_json_iolist(nil, _Depth) -> <<"null">>;
+term_to_json_iolist(Term, _Depth) when is_binary(Term) ->
+    case unicode:characters_to_binary(Term) of
+        Term -> json_string(Term);
+        _ -> opaque(Term)
+    end;
+term_to_json_iolist(Term, _Depth) when is_atom(Term) ->
+    json_string(atom_to_binary(Term, utf8));
+term_to_json_iolist(Term, Depth) when is_list(Term) ->
+    case is_proper_list(Term) of
+        true ->
+            [ "["
+            , lists:join(",", [term_to_json_iolist(E, Depth + 1) || E <- Term])
+            , "]" ];
+        false ->
+            %% An improper list has no JSON shape; name it rather than lie.
+            opaque(Term)
+    end;
+term_to_json_iolist(Term, Depth) when is_tuple(Term) ->
+    case tuple_to_list(Term) of
+        [Tag | Args] when is_atom(Tag), Args =/= [] ->
+            [ "{\"tag\":", json_string(atom_to_binary(Tag, utf8))
+            , ",\"data\":["
+            , lists:join(",", [term_to_json_iolist(A, Depth + 1) || A <- Args])
+            , "]}"
+            ];
+        Elements ->
+            [ "{\"tuple\":["
+            , lists:join(",", [term_to_json_iolist(E, Depth + 1) || E <- Elements])
+            , "]}"
+            ]
+    end;
+term_to_json_iolist(Term, Depth) when is_map(Term) ->
+    Pairs = lists:sort(maps:to_list(Term)),
+    [ "{\"map\":["
+    , lists:join(",", [
+        ["{\"key\":", term_to_json_iolist(K, Depth + 1),
+         ",\"value\":", term_to_json_iolist(V, Depth + 1), "}"]
+        || {K, V} <- Pairs
+      ])
+    , "]}"
+    ];
+term_to_json_iolist(Term, _Depth) ->
+    opaque(Term).
+
+is_proper_list([]) -> true;
+is_proper_list([_ | Rest]) -> is_proper_list(Rest);
+is_proper_list(_) -> false.
+
+opaque(Term) ->
+    [ "{\"opaque\":"
+    , json_string(list_to_binary(io_lib:format("~tp", [Term])))
+    , "}"
+    ].
+
+json_quote(Bin) when is_binary(Bin) ->
+    %% Gleam String is a binary: flatten the escaped iolist at the boundary.
+    iolist_to_binary(json_string(Bin)).
+
+json_string(Bin) when is_binary(Bin) ->
+    [ "\""
+    , [escape_char(C) || <<C>> <= Bin]
+    , "\""
+    ].
+
+escape_char($") -> "\\\"";
+escape_char($\\) -> "\\\\";
+escape_char($\n) -> "\\n";
+escape_char($\r) -> "\\r";
+escape_char($\t) -> "\\t";
+escape_char(C) when C < 16#20 ->
+    io_lib:format("\\u~4.16.0b", [C]);
+escape_char(C) when C < 16#80 ->
+    <<C>>;
+escape_char(C) ->
+    %% Pass multi-byte UTF-8 through untouched; JSON is UTF-8.
+    <<C>>.
 
 %% Parse one CLI argument into an Erlang term. The language's Text is a
 %% BitArray, so a double-quoted string becomes a binary rather than an Erlang
