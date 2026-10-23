@@ -1,15 +1,20 @@
 import gleam/dict.{type Dict}
 import gleam/list
+import gleam/option
 import gleam/set.{type Set}
-import gleamunison/ast.{type Definition}
+import gleamunison/ast
 import gleamunison/compile.{
   type Compiler, compile_definition, module_name_for, new as new_compiler,
 }
 import gleamunison/identity.{type DefinitionRef}
+import gleamunison/jets
 import gleamy/bimap
 
 @external(erlang, "gleamunison_ffi", "load_binary")
 fn load_binary(mod_name: String, beam: BitArray) -> Result(Nil, String)
+
+@external(erlang, "gleamunison_ffi", "module_available")
+fn module_available_ffi(mod_name: String) -> Bool
 
 @external(erlang, "gleamunison_ffi", "soft_purge_binary")
 fn soft_purge_binary(mod_name: String) -> Result(Bool, String)
@@ -56,6 +61,31 @@ pub fn is_loaded(ld: Loader, ref: DefinitionRef) -> Bool {
   bimap.has_key(ld.module_names, ref)
 }
 
+/// True when the ref's compiled module is already present in this runtime, so
+/// loading it is a no-op and the store need not hold it. Genesis builtins ship
+/// as m_*.erl sources compiled into the build and the escript archive.
+pub fn module_available(ref: DefinitionRef) -> Bool {
+  module_available_ffi(module_name_for(ref))
+}
+
+/// Load a ref whose body lives in the jet table rather than the store.
+/// compile_definition consults the jet table before the definition argument,
+/// so the argument here is inert; it exists so there is one load path.
+pub fn ensure_loaded_jet(
+  ld: Loader,
+  ref: DefinitionRef,
+) -> Result(Loader, #(Loader, LoaderError)) {
+  case jets.get_jet(ref) {
+    option.None -> Error(#(ld, CompileFailed(ref, "no jet registered")))
+    option.Some(_) ->
+      ensure_loaded(
+        ld,
+        ref,
+        ast.TermDef(term: ast.Int(0), typ: ast.Builtin(ast.IntType)),
+      )
+  }
+}
+
 fn retry_pending_purges(ld: Loader) -> Loader {
   let #(still_pending, successful_purges) =
     set.fold(ld.pending_purge, #(set.new(), set.new()), fn(acc, ref) {
@@ -75,7 +105,7 @@ fn retry_pending_purges(ld: Loader) -> Loader {
 
 fn compile_and_load(
   ref: DefinitionRef,
-  def: Definition,
+  def: ast.Definition,
   compiler: Compiler,
 ) -> Result(BitArray, String) {
   case compile_definition(compiler, def, ref) {
@@ -87,7 +117,7 @@ fn compile_and_load(
 pub fn ensure_loaded(
   ld: Loader,
   ref: DefinitionRef,
-  def: Definition,
+  def: ast.Definition,
 ) -> Result(Loader, #(Loader, LoaderError)) {
   let ld = retry_pending_purges(ld)
   case bimap.has_key(ld.module_names, ref) {

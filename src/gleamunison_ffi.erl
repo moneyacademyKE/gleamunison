@@ -1,7 +1,7 @@
 -module(gleamunison_ffi).
 -export([
     hash_bytes/1, hash_equal/2, hash_to_hex/1,
-    compile_source/1, load_binary/2, string_to_binary/1,
+    compile_source/1, load_binary/2, module_available/1, string_to_binary/1,
     hex_to_bytes/1,
     unload_binary/1, soft_purge_binary/1,
     binary_to_erl_literal/1,
@@ -130,6 +130,20 @@ load_binary(Mod, Binary) ->
     catch
         exit:Reason -> {error, list_to_binary(io_lib:format("~p", [Reason]))};
         _:Reason -> {error, list_to_binary(io_lib:format("~p", [Reason]))}
+    end.
+
+%% Is a compiled module already present in this runtime? Genesis builtins ship
+%% as m_*.erl sources compiled into the build and the escript archive, so a
+%% definition that references one needs no store lookup.
+module_available(Mod) ->
+    ModuleAtom = case is_binary(Mod) of
+        true -> erlang:binary_to_atom(Mod, utf8);
+        false when is_list(Mod) -> erlang:list_to_atom(Mod);
+        false -> erlang:binary_to_atom(erlang:iolist_to_binary(Mod), utf8)
+    end,
+    case code:ensure_loaded(ModuleAtom) of
+        {module, ModuleAtom} -> true;
+        _ -> false
     end.
 
 hex_to_bytes(Hex) when is_binary(Hex) ->
