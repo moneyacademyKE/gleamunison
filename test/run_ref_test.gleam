@@ -137,6 +137,18 @@ pub fn absence_is_reported_before_evidence_test() {
   got |> should.equal(absent)
 }
 
+pub fn raw_absence_is_reported_before_evidence_test() {
+  let absent = Ref(hash_bytes(<<"absent-before-evidence-raw">>))
+  let assert Error(run_ref.Missing(got)) =
+    run_ref.run_verified_raw(
+      codebase.get_adapter(codebase.empty()),
+      absent,
+      [],
+      False,
+    )
+  got |> should.equal(absent)
+}
+
 pub fn the_escape_hatch_runs_stored_content_test() {
   let definition = ast.TermDef(term: ast.Int(11), typ: ast.Builtin(ast.IntType))
   let #(cb, ref) = insert(codebase.empty(), definition)

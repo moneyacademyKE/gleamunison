@@ -62,11 +62,7 @@ pub fn run_verified(
   args: List(Dynamic),
   allow_unverified: Bool,
 ) -> Result(String, RunError) {
-  let cb = codebase.with_adapter(adapter)
-  use _ <- result.try(
-    codebase.get(cb, ref)
-    |> result.map_error(fn(error) { read_error(ref, error) }),
-  )
+  use _ <- result.try(preflight(adapter, ref))
   use _ <- result.try(evidence_gate(adapter, ref, allow_unverified))
   run(adapter, ref, args)
 }
@@ -78,8 +74,19 @@ pub fn run_verified_raw(
   args: List(Dynamic),
   allow_unverified: Bool,
 ) -> Result(Dynamic, RunError) {
+  use _ <- result.try(preflight(adapter, ref))
   use _ <- result.try(evidence_gate(adapter, ref, allow_unverified))
   execute(adapter, ref, args)
+}
+
+fn preflight(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+) -> Result(Nil, RunError) {
+  let cb = codebase.with_adapter(adapter)
+  codebase.get(cb, ref)
+  |> result.map(fn(_) { Nil })
+  |> result.map_error(fn(error) { read_error(ref, error) })
 }
 
 fn evidence_gate(
