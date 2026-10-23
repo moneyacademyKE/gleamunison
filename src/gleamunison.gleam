@@ -9,6 +9,7 @@ import gleamunison/cli_evidence
 import gleamunison/cli_find
 import gleamunison/cli_fmt
 import gleamunison/cli_llm
+import gleamunison/cli_log
 import gleamunison/cli_lsp
 import gleamunison/cli_mcp
 import gleamunison/cli_pkg
@@ -65,6 +66,7 @@ pub fn run(args: List(String)) -> Nil {
     ["purge", ..rest] -> cli_purge.command(rest)
     ["evidence", ..rest] -> cli_result.finish(cli_evidence.command(rest))
     ["lsp", ..rest] -> cli_lsp.command(rest)
+    ["log", ..rest] -> cli_log.command(rest)
     ["sync", ..rest] -> cli_result.finish(cli_sync.command(rest))
     ["pkg", ..rest] -> cli_result.finish(cli_pkg.command(rest))
     ["watch", path] -> cli_watch.command(path)
@@ -183,6 +185,7 @@ fn print_help() -> Nil {
   io.println(
     "  purge <hash> [--yes]   remove a definition and its exclusive deps",
   )
+  io.println("  log [content|exec]     what the store has seen (--tail N)")
   io.println("  evidence <hash>        list attestations for a content hash")
   io.println(
     "  evidence attest <hash> io <note...>   record a human attestation",

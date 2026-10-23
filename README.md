@@ -288,6 +288,7 @@ gleamunison <command>
   publish <file.lisp>    publish definitions behind the evidence gate
   unpublish <name>       retract a name: index line, binding, and bytes
   purge <hash> [--yes]   remove a definition and the deps only it kept alive
+  log [content|exec]     what the store has seen (--tail N)
   test <file.lisp>       run the test forms in a file
   run <content-hash>     run a definition from the store, by hash
                          [args...] [--json] [--store path]
@@ -315,6 +316,8 @@ gleam run -- run --json <hash> 40 2 # {"ref":"…","value":42}
 gleam run -- unpublish <name>      # retract the name (refuses if in use)
 gleam run -- purge <hash>          # dry run: what would go, and why
 gleam run -- purge <hash> --yes    # remove it and its exclusive deps
+gleam run -- log content           # what entered the store, oldest first
+gleam run -- log exec --tail 50    # execution attempts and their outcomes
 ```
 
 `run` resolves the dependency closure before executing, so a stored definition
@@ -335,6 +338,23 @@ names what stands in the way.
 that nothing outside the set uses) and changes nothing. Both commands refuse
 when something outside the set depends on the ref, because a store that loses
 the thing its definitions call is a store that lies about being runnable.
+
+### The store keeps its own logs
+
+Two append-only logs sit beside the store file, both durable across restarts:
+
+| Log | Written by | Records |
+|---|---|---|
+| `content_log.dets` | admission: `publish` and `sync` | what entered the store, and when |
+| `exec_log.dets` | execution: `run` | every attempt: `ok` or `refused`, with the reason |
+
+`pkg install` adds no content — it installs what the store already holds — so it
+writes no content entry.
+
+They are separate from the store on purpose. The store is content-addressed and
+immutable; a log is time-ordered. Writing a changing fact into the store would
+put it behind a hash that cannot change. The execution log records refusals
+too, because the attempt you need to see is the one that did not happen.
 
 | Exit | Meaning |
 |---|---|

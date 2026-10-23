@@ -21,6 +21,7 @@ import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex}
 import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
+import gleamunison/store_log
 import gleamunison/test_runner
 import gleamunison/turnstile
 import gleamunison/types
@@ -109,6 +110,7 @@ fn publish_with_store(path: String, store_path: String) -> Nil {
                   let prepared = {
                     use _ <- result.try(store_definitions(
                       adapter,
+                      store_dir(store_path),
                       term_names,
                       defs,
                       cache,
@@ -153,6 +155,7 @@ fn publish_with_store(path: String, store_path: String) -> Nil {
 /// ever be fed by peers.
 fn store_definitions(
   adapter: storage.StorageAdapter,
+  dir: String,
   names: List(String),
   defs: List(#(String, elab_types.SurfaceDef)),
   cache: types.TypeCache,
@@ -164,10 +167,20 @@ fn store_definitions(
         Error(e) -> Error("cannot elaborate " <> name <> ": " <> e)
         Ok(definition) -> {
           let ref = Ref(codebase.hash_of_definition(definition))
-          codebase.insert(cb, ast.Unit(root: ref, defs: [#(ref, definition)]))
-          |> result.map_error(fn(error) {
-            "cannot store " <> name <> ": " <> string.inspect(error)
+          use _ <- result.try(
+            codebase.insert(cb, ast.Unit(root: ref, defs: [#(ref, definition)]))
+            |> result.map_error(fn(error) {
+              "cannot store " <> name <> ": " <> string.inspect(error)
+            }),
+          )
+          // Admission is the moment content enters the store, so it is the
+          // moment the content log records it. A log that cannot be written is
+          // reported, not swallowed: the store must be able to say what it holds.
+          store_log.record_content(dir, ref_hex(ref), "term")
+          |> result.map_error(fn(reason) {
+            "cannot record " <> name <> ": " <> reason
           })
+          |> result.replace(cb)
         }
       }
     }),

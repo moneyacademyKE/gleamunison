@@ -16,6 +16,7 @@ import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_output
 import gleamunison/cli_result
@@ -23,6 +24,7 @@ import gleamunison/cli_store
 import gleamunison/identity.{type DefinitionRef}
 import gleamunison/run_ref
 import gleamunison/storage
+import gleamunison/store_log
 
 @external(erlang, "gleamunison_ffi", "parse_term_arg")
 fn parse_term_arg(arg: String) -> Result(Dynamic, Nil)
@@ -77,7 +79,14 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
     cli_store.with_dets_mapped(
       store_path,
       fn(adapter) {
-        render_output(adapter, ref, call_args, allow_unverified, json)
+        render_output(
+          adapter,
+          store_dir(store_path),
+          ref,
+          call_args,
+          allow_unverified,
+          json,
+        )
       },
       fn(message) { #(cli_result.unresolvable, message) },
     ),
@@ -90,15 +99,19 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
 /// without running it, which is what an inspection flag is for.
 fn render_output(
   adapter: storage.StorageAdapter,
+  dir: String,
   ref: DefinitionRef,
   call_args: List(Dynamic),
   allow_unverified: Bool,
   json: Bool,
 ) -> Result(String, #(Int, String)) {
   case json {
-    False ->
-      run_ref.run_verified(adapter, ref, call_args, allow_unverified)
-      |> result.map_error(classify)
+    False -> {
+      let outcome =
+        run_ref.run_verified(adapter, ref, call_args, allow_unverified)
+      record(dir, ref, outcome)
+      outcome |> result.map_error(classify)
+    }
     True -> {
       let inspecting = {
         use arity <- result.try(run_ref.declared_arity(adapter, ref))
@@ -116,14 +129,37 @@ fn render_output(
             )
           })
           |> result.map_error(classify)
-        _ ->
-          run_ref.run_verified_raw(adapter, ref, call_args, allow_unverified)
+        _ -> {
+          let outcome =
+            run_ref.run_verified_raw(adapter, ref, call_args, allow_unverified)
+          record(dir, ref, outcome)
+          outcome
           |> result.map(fn(term) {
             cli_output.value_json(run_ref.hex(ref), term)
           })
           |> result.map_error(classify)
+        }
       }
     }
+  }
+}
+
+/// Best-effort log write. The log records the run; it is not a precondition for
+/// it, so a store that cannot append still executes what it holds — the failure
+/// goes to stderr rather than swallowing the result.
+fn record(
+  dir: String,
+  ref: DefinitionRef,
+  outcome: Result(a, run_ref.RunError),
+) -> Nil {
+  let #(kind, reason) = case outcome {
+    Ok(_) -> #("ok", "")
+    Error(error) -> #("refused", run_ref.describe(error))
+  }
+  case store_log.record_exec(dir, run_ref.hex(ref), kind, reason) {
+    Ok(_) -> Nil
+    Error(problem) ->
+      io.println_error("run: cannot write the exec log: " <> problem)
   }
 }
 
@@ -210,4 +246,16 @@ fn usage() -> String {
   <> "Default store: "
   <> cli_lifecycle.default_store_dir()
   <> "/store.dets"
+}
+
+/// The directory a store file lives in: the logs sit beside it.
+fn store_dir(path: String) -> String {
+  case list.reverse(string.split(path, "/")) {
+    [_, ..parent] ->
+      case list.reverse(parent) |> string.join("/") {
+        "" -> "/"
+        dir -> dir
+      }
+    [] -> "."
+  }
 }

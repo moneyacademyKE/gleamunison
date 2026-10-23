@@ -8,23 +8,25 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/codebase
+import gleamunison/identity
 import gleamunison/namespace
 import gleamunison/storage
+import gleamunison/store_log
 import gleamunison/sync
 import gleamunison/sync_types.{PeerId}
 
-const default_store = ".gleamunison/store.dets"
-
 pub fn command(args: List(String)) -> Result(Nil, String) {
-  use #(peer, store_path, branch) <- result.try(parse_args(
+  use #(peer, store_override, branch) <- result.try(parse_args(
     args,
     None,
-    default_store,
+    None,
     None,
   ))
+  use store_path <- result.try(resolve_store_path(store_override))
   use output <- result.try(
     cli_store.with_dets(store_path, fn(adapter) {
       let cb = codebase.with_adapter(adapter)
@@ -33,6 +35,13 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
         sync.pull_sync(state, PeerId(peer), cb)
         |> result.map_error(fn(e) { "sync: pull failed: " <> string.inspect(e) }),
       )
+      // Pulled content is admitted content: it entered this store just now, so
+      // it belongs in the content log beside the definitions `publish` admits.
+      list.each(new_refs, fn(ref) {
+        let _ =
+          store_log.record_content(store_dir(store_path), ref_hex(ref), "sync")
+        Nil
+      })
       use _ <- result.try(case branch {
         None -> Ok(Nil)
         Some(name) -> pull_branch(peer, name, adapter)
@@ -53,12 +62,36 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
   cli_result.success(output)
 }
 
+fn resolve_store_path(override: Option(String)) -> Result(String, String) {
+  case override {
+    Some(path) -> Ok(path)
+    None -> cli_lifecycle.resolve_store_path()
+  }
+}
+
+/// The directory a store file lives in: the logs sit beside it.
+fn store_dir(path: String) -> String {
+  case list.reverse(string.split(path, "/")) {
+    [_, ..parent] ->
+      case list.reverse(parent) |> string.join("/") {
+        "" -> "/"
+        dir -> dir
+      }
+    [] -> "."
+  }
+}
+
+fn ref_hex(ref: identity.DefinitionRef) -> String {
+  let identity.Ref(hash) = ref
+  identity.hash_to_debug_string(hash)
+}
+
 fn parse_args(
   args: List(String),
   peer: Option(String),
-  store: String,
+  store: Option(String),
   branch: Option(String),
-) -> Result(#(String, String, Option(String)), String) {
+) -> Result(#(String, Option(String), Option(String)), String) {
   case args {
     [] ->
       case peer {
@@ -68,7 +101,7 @@ fn parse_args(
             "usage: gleam run -- sync <peer-host:port> [--store path] [--branch name]",
           )
       }
-    ["--store", path, ..rest] -> parse_args(rest, peer, path, branch)
+    ["--store", path, ..rest] -> parse_args(rest, peer, Some(path), branch)
     ["--store"] -> Error("--store needs a path")
     ["--branch", name, ..rest] -> parse_args(rest, peer, store, Some(name))
     ["--branch"] -> Error("--branch needs a name")
