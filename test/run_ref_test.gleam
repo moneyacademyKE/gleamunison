@@ -5,6 +5,8 @@ import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Local, Ref, hash_bytes}
+import gleamunison/namespace
+import gleamunison/repl_eval
 import gleamunison/run_ref
 import gleeunit/should
 
@@ -67,6 +69,41 @@ pub fn a_missing_dependency_names_the_ref_test() {
   let assert Error(run_ref.Missing(got)) =
     run_ref.run(codebase.get_adapter(cb), main_ref)
   got |> should.equal(absent)
+}
+
+pub fn a_name_reference_resolves_through_the_namespace_test() {
+  // Elaborated terms reference dependencies by ref_for_name(name), not by
+  // content hash. The namespace binds the name to the content ref; the module
+  // is then loaded under the name ref so the caller's module name matches.
+  let #(cb, dep_ref) = insert(codebase.empty(), int_fn_returning(9))
+  let name_ref = repl_eval.ref_for_name("dep")
+  let main =
+    ast.TermDef(
+      term: ast.Apply(function: ast.RefTo(name_ref), arg: ast.Int(0)),
+      typ: ast.Builtin(ast.IntType),
+    )
+  let #(cb, main_ref) = insert(cb, main)
+  let adapter = codebase.get_adapter(cb)
+  let assert Ok(_) =
+    namespace.commit(
+      adapter,
+      "main",
+      namespace.set(namespace.empty(), "dep", dep_ref),
+    )
+  run_ref.run(adapter, main_ref) |> should.equal(Ok("9"))
+}
+
+pub fn a_name_reference_without_a_binding_is_missing_test() {
+  let name_ref = repl_eval.ref_for_name("unbound")
+  let main =
+    ast.TermDef(
+      term: ast.Apply(function: ast.RefTo(name_ref), arg: ast.Int(1)),
+      typ: ast.Builtin(ast.IntType),
+    )
+  let #(cb, main_ref) = insert(codebase.empty(), main)
+  let assert Error(run_ref.Missing(got)) =
+    run_ref.run(codebase.get_adapter(cb), main_ref)
+  got |> should.equal(name_ref)
 }
 
 pub fn an_absent_root_ref_is_missing_test() {
