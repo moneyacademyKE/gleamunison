@@ -16,10 +16,16 @@ import gleamunison/definition_refs
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/jets
 import gleamunison/loader
+import gleamunison/namespace
+import gleamunison/repl_eval
 import gleamunison/storage
+import gleamunison/types
+import gleamunison/verify
 
 @external(erlang, "gleamunison_repl_ffi", "eval_module_bare")
 fn eval_module_bare(mod_name: String) -> Result(String, String)
+
+const run_branch = "main"
 
 pub type RunError {
   Missing(ref: DefinitionRef)
@@ -41,6 +47,13 @@ pub fn run(
   )
   case definition {
     ast.TermDef(..) -> {
+      // The baseline environment first: ability declarations and the builtin
+      // names (`+`, `eq?`, ...) are forwarding modules the elaborator
+      // references by name, exactly as the REPL and `verify` establish them.
+      // Without it a stored definition that adds two numbers looks like it
+      // depends on a missing definition.
+      let _ =
+        repl_eval.bootstrap_defs(verify.get_init_defs(), types.empty_cache())
       use ld <- result.try(
         resolve_definition(loader.new_loader(), cb, ref, definition, []),
       )
@@ -67,13 +80,26 @@ fn resolve(
       case jets.get_jet(ref) {
         option.Some(_) ->
           loader.ensure_loaded_jet(ld, ref)
-          |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
+          |> result.map_error(fn(pair) {
+            LoadFailed(ref, describe_load(pair.1))
+          })
         option.None -> {
-          use definition <- result.try(
-            codebase.get(cb, ref)
-            |> result.map_error(fn(error) { read_error(ref, error) }),
-          )
-          resolve_definition(ld, cb, ref, definition, visiting)
+          case codebase.get(cb, ref) {
+            Ok(definition) ->
+              resolve_definition(ld, cb, ref, definition, visiting)
+            Error(codebase.NotFound(_)) ->
+              // An elaborated term references its dependencies by
+              // ref_for_name(name), not by content hash. Those refs live in the
+              // branch namespace (name → content ref), the same table
+              // `publish` and `pkg install` commit. The module is loaded under
+              // the NAME ref so its module name matches what the caller emits.
+              case resolve_name_ref(cb, ref) {
+                Ok(definition) ->
+                  resolve_definition(ld, cb, ref, definition, visiting)
+                Error(_) -> Error(Missing(ref))
+              }
+            Error(other) -> Error(read_error(ref, other))
+          }
         }
       }
   }
@@ -93,14 +119,41 @@ fn resolve_definition(
     True -> Error(Cycle(ref))
     False -> {
       let visiting = [ref, ..visiting]
-      use ld <- result.try(list.try_fold(
-        definition_refs.refs_of_definition(definition),
-        ld,
-        fn(ld, dependency) { resolve(ld, cb, dependency, visiting) },
-      ))
+      use ld <- result.try(
+        list.try_fold(
+          definition_refs.refs_of_definition(definition),
+          ld,
+          fn(ld, dependency) { resolve(ld, cb, dependency, visiting) },
+        ),
+      )
       loader.ensure_loaded(ld, ref, definition)
       |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
     }
+  }
+}
+
+/// A name reference is sha256(name); the namespace binds that name to a content
+/// ref. Finding the name means scanning the binding table, which is small and
+/// loaded once per run.
+fn resolve_name_ref(
+  cb: codebase.Codebase,
+  ref: DefinitionRef,
+) -> Result(ast.Definition, Nil) {
+  case namespace.load_current(codebase.get_adapter(cb), run_branch) {
+    Error(_) -> Error(Nil)
+    Ok(ns) ->
+      list.find_map(namespace.names(ns), fn(name) {
+        case repl_eval.ref_for_name(name) == ref {
+          False -> Error(Nil)
+          True ->
+            case namespace.get(ns, name) {
+              Error(_) -> Error(Nil)
+              Ok(content_ref) ->
+                codebase.get(cb, content_ref)
+                |> result.map_error(fn(_) { Nil })
+            }
+        }
+      })
   }
 }
 
@@ -136,7 +189,9 @@ pub fn describe(error: RunError) -> String {
       hex(ref) <> " is " <> kind <> ", not a runnable term"
     LoadFailed(ref, reason) -> "cannot load " <> hex(ref) <> ": " <> reason
     Cycle(ref) ->
-      "dependency cycle at " <> hex(ref) <> "; the store disagrees with its refs"
+      "dependency cycle at "
+      <> hex(ref)
+      <> "; the store disagrees with its refs"
     EvaluationFailed(reason) -> "evaluation failed: " <> reason
   }
 }
