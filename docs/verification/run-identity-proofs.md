@@ -79,8 +79,9 @@ escript (`./build_escript.sh`, then the commands below from any directory):
 | Hash malformed | 2 | stderr: `invalid reference: expected 64 hexadecimal SHA-256 digits` | `./gleamunison_escript run nothex` |
 | Store override is not absolute | 2 | stderr: `GLEAMUNISON_STORE_DIR must be an absolute path, got: …` | `GLEAMUNISON_STORE_DIR=relative/dir ./gleamunison_escript run <hash>` |
 | Usage error | 1 | stderr: usage block | `./gleamunison_escript run` |
-| `--json` on a value | 0 | stdout: one JSON line | `./gleamunison_escript run --json <hash> 40 2` |
-| `--json` on a function | 0 | stdout: one JSON line, no execution | `./gleamunison_escript run --json <hash>` |
+| `--json` on a function with correct arguments | 0 | stdout: one JSON line with the executed value | `./gleamunison_escript run --json <hash> 40 2` |
+| `--inspect` on a function | 0 | stdout: one JSON line, no execution | `./gleamunison_escript run --inspect <hash>` |
+| `--json` on a function with no arguments | 1 | stderr: arity refusal | `./gleamunison_escript run --json <hash>` |
 
 Assert them all at once:
 

@@ -60,11 +60,13 @@ $ echo $?
 $ /tmp/gleamunison_escript run --json 7f012d9282b6… 21
 {"ref":"7f012d9282b609359c16fe34a918a881ce2bc73087f81e19d2b267e1e6a3881e","value":42}
 
-$ /tmp/gleamunison_escript run --json 7f012d9282b6…
+$ /tmp/gleamunison_escript run --inspect 7f012d9282b6…
 {"ref":"7f012d9282b6…","module":"m_e6a3881e","function":{"name":"$eval","export_arity":0,"arity":1}}
 ```
 
-The second form does **not** execute: `--json` on a function reports what it is.
+`--json` always executes and changes only the rendering. `--inspect` is the
+sole non-executing mode; it loads the closure to read the export table but
+never applies `'$eval'`.
 
 ## 4. Exit codes
 
@@ -74,7 +76,8 @@ The second form does **not** execute: `--json` on a function reports what it is.
 | `run <hash>` (function, no args) | 1 | empty | the arity message |
 | `run <zero-hash>` | 2 | empty | `not in the store: 0000…` |
 | `run --json <hash> 21` | 0 | one JSON line | empty |
-| `run --json <hash>` | 0 | one JSON line | empty |
+| `run --inspect <hash>` (function) | 0 | one JSON line | empty |
+| `run --json <hash>` (function, no args) | 1 | empty | the arity message |
 
 Verified as a block:
 
@@ -157,5 +160,7 @@ integrated-gate: PASS        (15/15 gates)
   evidence gate; `run` re-checks the record at execution, which is why that
   second gate exists, but it checks the record and not the claim's current
   truth.
-- **Inspection is not execution.** `run --json <hash>` on a function loads the
-  closure to read its export table and never applies `'$eval'`.
+- **Inspection is not execution.** `run --inspect <hash>` on a function loads the
+  closure to read its export table and never applies `'$eval'`. `--json` is the
+  execution path with a different renderer; a function with no supplied
+  arguments is refused by the arity gate.
