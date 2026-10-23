@@ -47,17 +47,6 @@ pub fn signer(id: String, secret: BitArray) -> Signer {
   Signer(id, secret)
 }
 
-pub type VerificationPolicy {
-  /// Compatibility mode for in-memory/unit fixtures only.
-  AllowUnsigned
-  /// Production mode: only a matching signer id and HMAC can admit evidence.
-  RequireTrusted(List(Signer))
-}
-
-pub fn require_signer(signer: Signer) -> VerificationPolicy {
-  RequireTrusted([signer])
-}
-
 pub type AttachError {
   StoreFailed(String)
 }
@@ -74,10 +63,6 @@ pub fn production_signer() -> Result(Signer, String) {
         "evidence: GLEAMUNISON_EVIDENCE_SIGNING_KEY is required for production verification",
       )
   }
-}
-
-pub fn production_policy() -> Result(VerificationPolicy, String) {
-  production_signer() |> result.map(require_signer)
 }
 
 fn kind_tag(k: Kind) -> String {
@@ -219,21 +204,6 @@ pub fn sign(
   )
 }
 
-fn trusted(e: Evidence, policy: VerificationPolicy) -> Bool {
-  case policy {
-    AllowUnsigned -> e.signer == "" && e.signature == ""
-    RequireTrusted(signers) ->
-      list.any(signers, fn(signer) {
-        signer_id(signer) == e.signer
-        && e.signature != ""
-        && crypto.secure_compare(
-          bit_array.from_string(e.signature),
-          bit_array.from_string(signature_for(signer, e)),
-        )
-      })
-  }
-}
-
 fn ref_hash(ref: DefinitionRef) {
   let Ref(h) = ref
   h
@@ -301,27 +271,7 @@ pub fn for_subject(adapter: StorageAdapter, subject: String) -> List(Evidence) {
   }
 }
 
-pub fn verified_with_policy(
-  adapter: StorageAdapter,
-  subject: String,
-  kind: Kind,
-  policy: VerificationPolicy,
-) -> Bool {
-  for_subject(adapter, subject)
-  |> list.any(fn(e) {
-    e.kind == kind
-    && { e.verdict == "pass" || e.verdict == "approved" }
-    && trusted(e, policy)
-  })
-}
-
 /// Constant-time hex comparison for signature checks outside this module.
 pub fn secure_compare_hex(a: String, b: String) -> Bool {
   crypto.secure_compare(bit_array.from_string(a), bit_array.from_string(b))
-}
-
-/// Compatibility helper for local fixtures. Production/package gates should
-/// call verified_with_policy with RequireTrusted.
-pub fn verified(adapter: StorageAdapter, subject: String, kind: Kind) -> Bool {
-  verified_with_policy(adapter, subject, kind, AllowUnsigned)
 }

@@ -1,11 +1,22 @@
 import gleam/bit_array
-import gleamunison/evidence.{PropertyCheck, Review, Test}
+import gleamunison/evidence
 import gleamunison/identity.{Ref}
 import gleamunison/storage
+import gleamunison/trust
 import gleeunit/should
 
 const subject_hex =
   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+/// Unsigned records are a fixture concern; production always passes a
+/// RequireKeys policy.
+fn fixtures() -> trust.TrustPolicy {
+  trust.FixturesOnly
+}
+
+fn admits(adapter: storage.StorageAdapter, kind: evidence.Kind) -> Bool {
+  trust.admits(adapter, subject_hex, kind, fixtures())
+}
 
 pub fn attach_then_for_subject_finds_record_test() {
   let adapter = storage.inmemory()
@@ -13,7 +24,7 @@ pub fn attach_then_for_subject_finds_record_test() {
     evidence.attach(
       adapter,
       subject: subject_hex,
-      kind: Test,
+      kind: evidence.Test,
       verdict: "pass",
       payload: "149 passed, 0 failed",
       ts: 1_760_000_000,
@@ -21,7 +32,7 @@ pub fn attach_then_for_subject_finds_record_test() {
   let found = evidence.for_subject(adapter, subject_hex)
   let assert [record] = found
   record.subject |> should.equal(subject_hex)
-  record.kind |> should.equal(Test)
+  record.kind |> should.equal(evidence.Test)
   record.verdict |> should.equal("pass")
   record.payload |> should.equal("149 passed, 0 failed")
   hash |> should.not_equal(subject_hex)
@@ -29,30 +40,44 @@ pub fn attach_then_for_subject_finds_record_test() {
 
 pub fn verified_flips_only_with_matching_kind_and_verdict_test() {
   let adapter = storage.inmemory()
-  evidence.verified(adapter, subject_hex, Test) |> should.be_false
+  admits(adapter, evidence.Test) |> should.be_false
   let assert Ok(_) =
-    evidence.attach(adapter, subject_hex, Review, "approved", "lgtm", 1)
+    evidence.attach(
+      adapter,
+      subject_hex,
+      evidence.Review,
+      "approved",
+      "lgtm",
+      1,
+    )
   // Review evidence must not verify Test.
-  evidence.verified(adapter, subject_hex, Test) |> should.be_false
-  evidence.verified(adapter, subject_hex, Review) |> should.be_true
+  admits(adapter, evidence.Test) |> should.be_false
+  admits(adapter, evidence.Review) |> should.be_true
   let assert Ok(_) =
-    evidence.attach(adapter, subject_hex, Test, "fail", "1 failed", 2)
+    evidence.attach(adapter, subject_hex, evidence.Test, "fail", "1 failed", 2)
   // A failing verdict is not verification.
-  evidence.verified(adapter, subject_hex, Test) |> should.be_false
+  admits(adapter, evidence.Test) |> should.be_false
   let assert Ok(_) =
-    evidence.attach(adapter, subject_hex, Test, "pass", "green", 3)
-  evidence.verified(adapter, subject_hex, Test) |> should.be_true
+    evidence.attach(adapter, subject_hex, evidence.Test, "pass", "green", 3)
+  admits(adapter, evidence.Test) |> should.be_true
 }
 
 pub fn tampered_chunk_is_rejected_by_hash_check_test() {
   let adapter = storage.inmemory()
   let assert Ok(#(ref, _)) =
-    evidence.attach(adapter, subject_hex, PropertyCheck, "pass", "holds", 1)
+    evidence.attach(
+      adapter,
+      subject_hex,
+      evidence.PropertyCheck,
+      "pass",
+      "holds",
+      1,
+    )
   // Attacker rewrites the stored bytes under the same ref.
   let assert Ok(Nil) =
     adapter.insert(ref, bit_array.from_string("evidence:1:forged"))
   evidence.for_subject(adapter, subject_hex) |> should.equal([])
-  evidence.verified(adapter, subject_hex, PropertyCheck) |> should.be_false
+  admits(adapter, evidence.PropertyCheck) |> should.be_false
 }
 
 pub fn non_evidence_chunks_are_ignored_test() {
@@ -62,18 +87,18 @@ pub fn non_evidence_chunks_are_ignored_test() {
   evidence.for_subject(adapter, subject_hex) |> should.equal([])
 }
 
-pub fn unsigned_evidence_is_rejected_by_trusted_policy_test() {
+pub fn unsigned_evidence_is_rejected_by_require_keys_policy_test() {
   let adapter = storage.inmemory()
   let trusted = evidence.signer("ci", <<"ci-secret">>)
   let assert Ok(_) =
-    evidence.attach(adapter, subject_hex, Test, "pass", "legacy", 1)
-  evidence.verified_with_policy(
+    evidence.attach(adapter, subject_hex, evidence.Test, "pass", "legacy", 1)
+  trust.verified(
     adapter,
     subject_hex,
-    Test,
-    evidence.require_signer(trusted),
+    evidence.Test,
+    trust.policy([trust.active(trusted, 0, trust.never)]),
   )
-  |> should.be_false
+  |> should.equal(Error(trust.UnsignedRecord))
 }
 
 pub fn signed_evidence_requires_matching_identity_and_secret_test() {
@@ -85,23 +110,23 @@ pub fn signed_evidence_requires_matching_identity_and_secret_test() {
       adapter,
       signer: trusted,
       subject: subject_hex,
-      kind: Test,
+      kind: evidence.Test,
       verdict: "pass",
       payload: "signed by ci",
       ts: 2,
     )
-  evidence.verified_with_policy(
+  trust.verified(
     adapter,
     subject_hex,
-    Test,
-    evidence.require_signer(trusted),
+    evidence.Test,
+    trust.policy([trust.active(trusted, 0, trust.never)]),
   )
-  |> should.be_true
-  evidence.verified_with_policy(
+  |> should.equal(Ok(Nil))
+  trust.verified(
     adapter,
     subject_hex,
-    Test,
-    evidence.require_signer(wrong_secret),
+    evidence.Test,
+    trust.policy([trust.active(wrong_secret, 0, trust.never)]),
   )
-  |> should.be_false
+  |> should.equal(Error(trust.SignatureMismatch("ci")))
 }

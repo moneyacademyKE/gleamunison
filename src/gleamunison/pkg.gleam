@@ -16,10 +16,10 @@ import gleam/option.{Some}
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
-import gleamunison/evidence
 import gleamunison/manifest
 import gleamunison/namespace
 import gleamunison/storage.{type StorageAdapter}
+import gleamunison/trust
 import gleamunison/turnstile
 
 /// The transitive ref set a package needs: every manifest in its dep
@@ -160,7 +160,7 @@ pub fn install_from_store(
     adapter,
     manifest_hex,
     branch,
-    evidence.AllowUnsigned,
+    trust.FixturesOnly,
   )
 }
 
@@ -169,7 +169,7 @@ pub fn install_from_store_production(
   manifest_hex: String,
   branch: String,
 ) -> Result(List(String), String) {
-  case evidence.production_policy() {
+  case trust.production_policy() {
     Error(reason) -> Error(reason)
     Ok(policy) ->
       install_from_store_with_policy(adapter, manifest_hex, branch, policy)
@@ -180,7 +180,7 @@ pub fn install_from_store_with_policy(
   adapter: StorageAdapter,
   manifest_hex: String,
   branch: String,
-  policy: evidence.VerificationPolicy,
+  policy: trust.TrustPolicy,
 ) -> Result(List(String), String) {
   use #(names, _visited) <- result.try(install_recursive(
     adapter,
@@ -197,7 +197,7 @@ fn install_recursive(
   manifest_hex: String,
   branch: String,
   visited: Set(String),
-  policy: evidence.VerificationPolicy,
+  policy: trust.TrustPolicy,
 ) -> Result(#(List(String), Set(String)), String) {
   case set.contains(visited, manifest_hex) {
     True -> Ok(#([], visited))
@@ -261,13 +261,7 @@ pub fn publish_to_store(
   name: String,
   version: String,
 ) -> Result(String, List(String)) {
-  publish_to_store_with_policy(
-    adapter,
-    defs,
-    name,
-    version,
-    evidence.AllowUnsigned,
-  )
+  publish_to_store_with_policy(adapter, defs, name, version, trust.FixturesOnly)
 }
 
 pub fn publish_to_store_production(
@@ -276,7 +270,7 @@ pub fn publish_to_store_production(
   name: String,
   version: String,
 ) -> Result(String, List(String)) {
-  case evidence.production_policy() {
+  case trust.production_policy() {
     Error(reason) -> Error([reason])
     Ok(policy) ->
       publish_to_store_with_policy(adapter, defs, name, version, policy)
@@ -288,7 +282,7 @@ pub fn publish_to_store_with_policy(
   defs: List(#(String, String, Bool)),
   name: String,
   version: String,
-  policy: evidence.VerificationPolicy,
+  policy: trust.TrustPolicy,
 ) -> Result(String, List(String)) {
   use _ <- result.try(turnstile.check_with_policy(adapter, defs, policy))
   let m =

@@ -4,6 +4,7 @@ import gleamunison/cli_evidence
 import gleamunison/cli_test
 import gleamunison/evidence
 import gleamunison/storage
+import gleamunison/trust
 import gleeunit/should
 import simplifile
 
@@ -33,7 +34,8 @@ pub fn test_runs_suite_and_attaches_evidence_test() {
   // The attestation is on the store, keyed to the subject's content hash.
   let stored = evidence.for_subject(adapter, subject_hex)
   list.length(stored) |> should.equal(1)
-  evidence.verified(adapter, subject_hex, evidence.Test) |> should.be_true
+  trust.admits(adapter, subject_hex, evidence.Test, trust.FixturesOnly)
+  |> should.be_true
 }
 
 /// evidence CLI renders attestations for a hash, integrity-checked.

@@ -9,11 +9,13 @@ import gleam/int
 import gleam/list
 import gleam/result
 import gleam/string
+import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/datetime
 import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
+import gleamunison/trust
 
 pub fn command(args: List(String)) -> Result(Nil, String) {
   case args {
@@ -36,8 +38,9 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
     "" -> Error("evidence attest: a note is required — say what you observed")
     _ -> {
       use signer <- result.try(evidence.production_signer())
+      use store_path <- result.try(cli_lifecycle.resolve_store_path())
       use output <- result.try(
-        cli_store.with_dets(".gleamunison/store.dets", fn(adapter) {
+        cli_store.with_dets(store_path, fn(adapter) {
           evidence.attach_signed(
             adapter,
             signer,
@@ -59,11 +62,14 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
 }
 
 fn run(hash: String) -> Result(Nil, String) {
+  use store_path <- result.try(cli_lifecycle.resolve_store_path())
   use output <- result.try(
-    cli_store.with_dets(".gleamunison/store.dets", fn(adapter) {
-      case evidence.production_policy() {
+    cli_store.with_dets(store_path, fn(adapter) {
+      case trust.production_policy() {
         Ok(policy) -> Ok(report_with_policy(adapter, hash, policy))
-        Error(_) -> Ok(report(adapter, hash))
+        // No signing key means no production policy exists to enforce. The
+        // report names that rather than implying the records were checked.
+        Error(_) -> Ok(report_with_policy(adapter, hash, trust.FixturesOnly))
       }
     }),
   )
@@ -74,13 +80,13 @@ fn run(hash: String) -> Result(Nil, String) {
 /// excluded upstream by for_subject (integrity re-verified on read), so
 /// everything rendered here is proof, not claims.
 pub fn report(adapter: StorageAdapter, subject: String) -> String {
-  report_with_policy(adapter, subject, evidence.AllowUnsigned)
+  report_with_policy(adapter, subject, trust.FixturesOnly)
 }
 
 pub fn report_with_policy(
   adapter: StorageAdapter,
   subject: String,
-  policy: evidence.VerificationPolicy,
+  policy: trust.TrustPolicy,
 ) -> String {
   let records = evidence.for_subject(adapter, subject)
   case records {
@@ -98,21 +104,24 @@ pub fn report_with_policy(
           <> ")"
         })
       let verified_line = case
-        evidence.verified_with_policy(adapter, subject, evidence.Test, policy)
+        trust.verified(adapter, subject, evidence.Test, policy)
       {
-        True -> "verified: test evidence with passing verdict exists"
-        False -> "verified: no passing test attestation"
+        Ok(_) -> "test: admitted by the policy"
+        Error(refusal) ->
+          "test: refused (" <> trust.refusal_name(refusal) <> ")"
       }
-      let io_line = case
-        evidence.verified_with_policy(adapter, subject, evidence.Io, policy)
-      {
-        True -> "io: human-approved attestation exists"
-        False -> "io: no io attestation"
+      let io_line = case trust.verified(adapter, subject, evidence.Io, policy) {
+        Ok(_) -> "io: admitted by the policy"
+        Error(refusal) -> "io: refused (" <> trust.refusal_name(refusal) <> ")"
       }
       string.join(
         [
           "evidence for " <> subject <> ":",
-          ..list.append(lines, [verified_line, io_line])
+          ..list.append(lines, [
+            "policy: " <> trust.describe(policy),
+            verified_line,
+            io_line,
+          ])
         ],
         "\n",
       )

@@ -1,5 +1,6 @@
 import gleam/bit_array
 import gleamunison/evidence.{Test}
+import gleamunison/storage
 import gleamunison/trust
 import gleeunit/should
 
@@ -99,4 +100,149 @@ pub fn unsigned_record_is_refused_in_production_policy_test() {
     )
   let assert Error(refusal) = trust.admit(policy, unsigned)
   trust.refusal_name(refusal) |> should.equal("unsigned_record")
+}
+
+// --- policy enforcement against a store -------------------------------------
+
+/// An expired key is a refusal with a name, not a bare false: an operator
+/// reading "key_expired" rotates the key, one reading "no_record" runs tests.
+pub fn verified_names_key_expiry_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      key_a(),
+      subject,
+      Test,
+      "pass",
+      "green",
+      1500,
+    )
+  trust.verified(
+    adapter,
+    subject,
+    Test,
+    trust.policy([trust.active(key_a(), 0, 1000)]),
+  )
+  |> should.equal(Error(trust.KeyExpired("key-a", 1000)))
+}
+
+pub fn verified_names_revocation_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      key_a(),
+      subject,
+      Test,
+      "pass",
+      "green",
+      500,
+    )
+  trust.verified(adapter, subject, Test, trust.policy([trust.revoked(key_a())]))
+  |> should.equal(Error(trust.KeyRevoked("key-a")))
+}
+
+pub fn verified_admits_within_the_window_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      key_a(),
+      subject,
+      Test,
+      "pass",
+      "green",
+      500,
+    )
+  trust.verified(
+    adapter,
+    subject,
+    Test,
+    trust.policy([trust.active(key_a(), 0, 1000)]),
+  )
+  |> should.equal(Ok(Nil))
+}
+
+/// Rotation overlap: the newest record is signed by the retiring key, whose
+/// window has closed, but an older record from the incoming key still admits.
+pub fn rotation_overlap_admits_the_older_record_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) =
+    evidence.attach_signed(adapter, key_a(), subject, Test, "pass", "old", 900)
+  let assert Ok(_) =
+    evidence.attach_signed(adapter, key_b(), subject, Test, "pass", "new", 850)
+  let policy =
+    trust.policy([
+      trust.active(key_a(), 0, 880),
+      trust.active(key_b(), 800, 2000),
+    ])
+  // key-a's 900 record is outside its window; key-b's 850 record is inside.
+  trust.verified_at(adapter, subject, Test, policy, 1000)
+  |> should.equal(Ok(Nil))
+}
+
+/// A stale attestation is refused even with a valid key: "tested once in 2019"
+/// is not evidence that today's binary works.
+pub fn stale_attestation_is_refused_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      key_a(),
+      subject,
+      Test,
+      "pass",
+      "green",
+      100,
+    )
+  let policy = trust.RequireKeys([trust.active(key_a(), 0, trust.never)], 1000)
+  trust.verified_at(adapter, subject, Test, policy, 5000)
+  |> should.equal(Error(trust.AttestationTooOld("test", 100, 1000)))
+}
+
+pub fn fresh_attestation_passes_the_age_limit_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      key_a(),
+      subject,
+      Test,
+      "pass",
+      "green",
+      100,
+    )
+  let policy = trust.RequireKeys([trust.active(key_a(), 0, trust.never)], 1000)
+  trust.verified_at(adapter, subject, Test, policy, 900)
+  |> should.equal(Ok(Nil))
+}
+
+/// A failing verdict is reported as such, never as "no evidence".
+pub fn failing_verdict_is_named_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      key_a(),
+      subject,
+      Test,
+      "fail",
+      "1 failed",
+      5,
+    )
+  trust.verified(
+    adapter,
+    subject,
+    Test,
+    trust.policy([trust.active(key_a(), 0, trust.never)]),
+  )
+  |> should.equal(Error(trust.NoPassingVerdict("test", "fail")))
+}
+
+pub fn describe_states_what_is_enforced_test() {
+  trust.describe(trust.policy([trust.active(key_a(), 0, trust.never)]))
+  |> should.equal("key-a: active since 0, no expiry; no attestation age limit")
+  trust.describe(trust.policy([trust.revoked(key_a())]))
+  |> should.equal("key-a: revoked; no attestation age limit")
 }

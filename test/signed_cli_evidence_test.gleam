@@ -3,6 +3,7 @@ import gleam/string
 import gleamunison/cli_evidence
 import gleamunison/evidence
 import gleamunison/storage
+import gleamunison/trust
 import gleeunit/should
 
 pub fn signed_report_uses_explicit_trust_policy_test() {
@@ -25,18 +26,24 @@ pub fn signed_report_uses_explicit_trust_policy_test() {
   cli_evidence.report_with_policy(
     adapter,
     subject,
-    evidence.require_signer(signer),
+    trust.policy([trust.active(signer, 0, trust.never)]),
   )
-  |> string.contains("verified: test evidence with passing verdict exists")
+  |> string.contains("test: admitted by the policy")
   |> should.be_true
   cli_evidence.report_with_policy(
     adapter,
     subject,
-    evidence.require_signer(stranger),
+    trust.policy([trust.active(stranger, 0, trust.never)]),
   )
-  |> string.contains("verified: no passing test attestation")
+  |> string.contains("test: refused (")
   |> should.be_true
-  cli_evidence.report(adapter, subject)
-  |> string.contains("verified: no passing test attestation")
+  // The fixtures helper is unsigned by construction, and it says so in the
+  // policy line rather than implying a signature was checked.
+  let fixture_report = cli_evidence.report(adapter, subject)
+  fixture_report
+  |> string.contains("policy: fixtures-only: signatures are not checked")
+  |> should.be_true
+  fixture_report
+  |> string.contains("test: admitted by the policy")
   |> should.be_true
 }

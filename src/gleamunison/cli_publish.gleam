@@ -16,13 +16,13 @@ import gleamunison/ast
 import gleamunison/cli_lifecycle
 import gleamunison/codebase
 import gleamunison/elab_types.{SurfaceTermDef}
-import gleamunison/evidence
 import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex}
 import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleamunison/store_log
 import gleamunison/test_runner
+import gleamunison/trust
 import gleamunison/turnstile
 import gleamunison/types
 import gleamunison/verify
@@ -88,7 +88,7 @@ fn publish_with_store(path: String, store_path: String) -> Nil {
               fail("publish: " <> err)
             }
             Ok(pairs) -> {
-              let decision = case evidence.production_policy() {
+              let decision = case trust.production_policy() {
                 Error(reason) -> Error([reason])
                 Ok(policy) ->
                   turnstile.check_with_policy(adapter, pairs, policy)

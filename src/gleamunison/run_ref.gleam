@@ -22,6 +22,7 @@ import gleamunison/loader
 import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
+import gleamunison/trust
 import gleamunison/types
 import gleamunison/verify
 
@@ -89,23 +90,13 @@ fn evidence_gate(
   case allow_unverified {
     True -> Ok(Nil)
     False ->
-      case evidence.production_policy() {
+      case trust.production_policy() {
         Error(reason) -> Error(NoEvidence(ref, reason))
         Ok(policy) ->
-          case
-            evidence.verified_with_policy(
-              adapter,
-              hex(ref),
-              evidence.Test,
-              policy,
-            )
-          {
-            True -> Ok(Nil)
-            False ->
-              Error(NoEvidence(
-                ref,
-                "no verified test evidence for this content hash",
-              ))
+          case trust.verified(adapter, hex(ref), evidence.Test, policy) {
+            Ok(_) -> Ok(Nil)
+            Error(refusal) ->
+              Error(NoEvidence(ref, trust.refusal_name(refusal)))
           }
       }
   }

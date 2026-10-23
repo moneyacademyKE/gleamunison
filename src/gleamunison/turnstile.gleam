@@ -12,23 +12,26 @@ import gleam/list
 import gleam/string
 import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
+import gleamunison/trust
 
 /// Check #(name, subject_hex, effectful) triples against the evidence
 /// store. Ok(all names) when every gated def is evidenced per the rule
 /// above; Error(just the unevidenced names) otherwise. `test_` defs
 /// produce evidence, they do not consume it — gating them would be a
 /// chicken-and-egg loop, so they pass by construction.
+///
+/// Unsigned fixtures only: every production path passes an explicit policy.
 pub fn check(
   adapter: StorageAdapter,
   defs: List(#(String, String, Bool)),
 ) -> Result(List(String), List(String)) {
-  check_with_policy(adapter, defs, evidence.AllowUnsigned)
+  check_with_policy(adapter, defs, trust.FixturesOnly)
 }
 
 pub fn check_with_policy(
   adapter: StorageAdapter,
   defs: List(#(String, String, Bool)),
-  policy: evidence.VerificationPolicy,
+  policy: trust.TrustPolicy,
 ) -> Result(List(String), List(String)) {
   let gated = list.filter(defs, fn(d) { !string.starts_with(d.0, "test_") })
   let missing =
@@ -50,11 +53,8 @@ fn admitted(
   adapter: StorageAdapter,
   subject: String,
   effectful: Bool,
-  policy: evidence.VerificationPolicy,
+  policy: trust.TrustPolicy,
 ) -> Bool {
-  evidence.verified_with_policy(adapter, subject, evidence.Test, policy)
-  || {
-    effectful
-    && evidence.verified_with_policy(adapter, subject, evidence.Io, policy)
-  }
+  trust.admits(adapter, subject, evidence.Test, policy)
+  || { effectful && trust.admits(adapter, subject, evidence.Io, policy) }
 }
