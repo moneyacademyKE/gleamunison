@@ -29,7 +29,7 @@ a safe place to run arbitrary untrusted code, and it does not claim to be.
 | Pull-based sync: TCP protocol **v2** (HMAC handshake) + Erlang distribution | Implemented |
 | HTTP + MCP service with bind gate, request auth, readiness probes | Implemented, single node |
 | Evaluation budgets (wall clock, reductions, memory) | Implemented |
-| Evidence signing, trust policy, key rotation/revocation | Implemented (library API: `evidence`, `trust`) |
+| Evidence signing, trust policy, key rotation/revocation | Implemented and enforced at `publish`, `pkg install` and `run` |
 | LLM budgets, cancellation, transcript redaction | Implemented |
 | **OS/container isolation for untrusted code** | **Not implemented** — requires an external executor |
 | **TLS / mTLS transport encryption** | **Not implemented** — bind gate + token auth only |
@@ -312,7 +312,8 @@ gleam run -- test lib.lisp         # evidence attaches to content hashes
 gleam run -- publish lib.lisp      # admitted: bytes stored, names bound
 gleam run -- run <hash>            # executes it, dependencies first
 gleam run -- run <hash> 40 2       # a function takes its declared arity
-gleam run -- run --json <hash> 40 2 # {"ref":"…","value":42}
+gleam run -- run <hash> 40 2 --json # {"ref":"…","value":42}
+gleam run -- run <hash> --inspect  # module, arity, exports: does NOT call
 gleam run -- unpublish <name>      # retract the name (refuses if in use)
 gleam run -- purge <hash>          # dry run: what would go, and why
 gleam run -- purge <hash> --yes    # remove it and its exclusive deps
@@ -320,6 +321,11 @@ gleam run -- log content           # what entered the store, oldest first
 gleam run -- log exec --tail 50    # execution attempts and their outcomes
 gleam run -- log all               # both, in one chronological view
 ```
+
+`--json` and `--inspect` are different questions. `--json` always executes and
+changes only how the result is rendered; `--inspect` is the only mode that does
+not execute — it loads the module to read its export table and never applies
+`'$eval'`. One flag cannot mean two things depending on arity.
 
 `run` resolves the dependency closure before executing, so a stored definition
 that calls another stored definition works with no source on disk. Dependencies

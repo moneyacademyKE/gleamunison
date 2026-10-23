@@ -16,6 +16,38 @@ Gleamunison evidence is HMAC-signed. This document owns the lifecycle of the key
 
 A signature proves the record came from a key. The trust policy proves the key was allowed to speak at that time. Both are required.
 
+## Configuration
+
+The policy is data, and the four environment variables below are how an
+operator sets it without recompiling. Absent means no limit, so an existing
+store keeps verifying until you say otherwise.
+
+| Variable | Effect | Default |
+|---|---|---|
+| `GLEAMUNISON_EVIDENCE_SIGNING_KEY` | the secret whose HMAC signs records | required for production |
+| `GLEAMUNISON_EVIDENCE_KEY_SINCE` | unix seconds the key becomes valid | `0` |
+| `GLEAMUNISON_EVIDENCE_KEY_UNTIL` | unix seconds the key stops being valid | no expiry |
+| `GLEAMUNISON_EVIDENCE_KEY_REVOKED` | `1`/`true`/`yes` revokes the key outright | unset |
+| `GLEAMUNISON_EVIDENCE_MAX_AGE_SECS` | refuse attestations older than this | `0` (no limit) |
+
+The signer id is `env:GLEAMUNISON_EVIDENCE_SIGNING_KEY`, which is what appears
+in a refusal: `key_expired:env:GLEAMUNISON_EVIDENCE_SIGNING_KEY`.
+
+Rotation with these variables is two settings, not a code change: raise
+`_KEY_SINCE` to the cutover time with the new secret, then set `_KEY_UNTIL` on
+the old one. Revocation is `_KEY_REVOKED=1`, effective immediately and without
+touching a single evidence record — which is the point, since records are
+content-addressed and cannot be edited.
+
+`evidence <hash>` prints the effective policy, so an operator can see what is
+being enforced rather than inferring it from an exit code:
+
+```
+policy: env:GLEAMUNISON_EVIDENCE_SIGNING_KEY: active since 0, no expiry; no attestation age limit
+test: admitted by the policy
+io: refused (no_record:io)
+```
+
 ## Rotation procedure
 
 1. Generate the new signer; distribute its secret out of band.
@@ -23,7 +55,9 @@ A signature proves the record came from a key. The trust policy proves the key w
 3. Update the old key's `until = rotation_time`. The overlap window lets in-flight records signed by either key verify.
 4. After the old key's `until` passes, remove it from the policy entirely.
 
-Rotation overlap is tested in `test/trust_policy_test.gleam`: both keys admit during the window, the old key refuses after.
+Rotation overlap is tested in `test/trust_policy_test.gleam`: both keys admit during the window, the old key refuses after. `trust.verified/4` keeps trying
+the remaining records of the same kind, so a store holding records from both
+keys admits through the overlap rather than refusing on the newest one.
 
 ## Revocation
 
@@ -43,6 +77,13 @@ Set the key's state to `Revoked`. All records signed by it refuse immediately, r
 | `key_expired:<id>` | Record timestamp at/after the key's window end |
 | `signature_mismatch:<id>` | Record bytes do not match the signer's secret |
 | `unsigned_record` | No signer/signature on the record at all |
+| `attestation_too_old:<kind>` | Record is older than `GLEAMUNISON_EVIDENCE_MAX_AGE_SECS` |
+| `no_record:<kind>` | Nothing of that kind was ever attested |
+| `no_passing_verdict:<kind>` | Records exist, but every verdict is a failure |
+
+A bool said "false" to all of these. The name is the point: `key_expired` means
+rotate, `no_record` means run the tests, `signature_mismatch` means something is
+wrong.
 
 ## What trust is not
 
