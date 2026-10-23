@@ -52,12 +52,20 @@ pub type RunError {
 /// checked again at the moment of execution because a store can be filled by
 /// `sync` or `pkg install` long after admission. `allow_unverified` is the
 /// explicit escape hatch for local stores; the caller warns on stderr.
+///
+/// Existence is settled first: an absent definition is absent, not unverified,
+/// and a caller reading exit codes must be able to tell the two apart.
 pub fn run_verified(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
   args: List(Dynamic),
   allow_unverified: Bool,
 ) -> Result(String, RunError) {
+  let cb = codebase.with_adapter(adapter)
+  use _ <- result.try(
+    codebase.get(cb, ref)
+    |> result.map_error(fn(error) { read_error(ref, error) }),
+  )
   case allow_unverified {
     True -> run(adapter, ref, args)
     False ->
@@ -267,11 +275,21 @@ pub fn describe(error: RunError) -> String {
       <> hex(ref)
       <> "; the store disagrees with its refs"
     ArityUnavailable(ref, expected, supplied) ->
-      hex(ref)
-      <> " expects "
-      <> int.to_string(expected)
-      <> " argument(s), got "
-      <> int.to_string(supplied)
+      case supplied == 0 {
+        True ->
+          hex(ref)
+          <> " is a function of arity "
+          <> int.to_string(expected)
+          <> "; pass "
+          <> int.to_string(expected)
+          <> " argument(s), or inspect it without calling"
+        False ->
+          hex(ref)
+          <> " expects "
+          <> int.to_string(expected)
+          <> " argument(s), got "
+          <> int.to_string(supplied)
+      }
     NoEvidence(ref, reason) -> hex(ref) <> " is not verified: " <> reason
     EvaluationFailed(ref, reason) ->
       "evaluation of " <> hex(ref) <> " failed: " <> reason

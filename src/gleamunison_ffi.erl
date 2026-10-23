@@ -6,7 +6,7 @@
     unload_binary/1, soft_purge_binary/1,
     binary_to_erl_literal/1,
     get_plain_args/0,
-    halt_failure/0,
+    halt_failure/0, halt_failure_code/1,
     application_version/0,
     to_dynamic/1,
     from_dynamic/1,
@@ -268,6 +268,11 @@ get_plain_args() ->
 
 halt_failure() ->
     erlang:halt(1).
+
+%% A CLI that distinguishes "refused" from "could not resolve" needs more than
+%% success/failure: the exit code is the contract a script reads.
+halt_failure_code(Code) when is_integer(Code) ->
+    erlang:halt(Code).
 
 application_version() ->
     case application:get_key(gleamunison, vsn) of

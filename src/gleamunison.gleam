@@ -54,7 +54,7 @@ pub fn run(args: List(String)) -> Nil {
     ["mcp", ..rest] -> cli_result.finish(cli_mcp.command(rest))
     ["find", ..rest] -> cli_result.finish(cli_find.command(rest))
     ["fmt", ..rest] -> cli_result.finish(cli_fmt.run(rest))
-    ["run", ..rest] -> cli_result.finish(cli_run.command(rest))
+    ["run", ..rest] -> cli_run.command(rest)
     ["replay", ..rest] -> cli_result.finish(cli_replay.command(rest))
     ["tape-to-test", ..rest] -> cli_tape_to_test.command(rest)
     ["test", ..rest] -> cli_test.command(rest)

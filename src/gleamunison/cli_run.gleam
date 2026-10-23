@@ -28,22 +28,40 @@ fn parse_term_arg(arg: String) -> Result(Dynamic, Nil)
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn text_arg(arg: String) -> Dynamic
 
-pub fn command(args: List(String)) -> Result(Nil, String) {
-  case args {
-    ["--help"] | ["help"] -> cli_result.success(usage())
-    _ -> run(args)
+pub fn command(args: List(String)) -> Nil {
+  case run(args) {
+    Ok(value) -> {
+      io.println(value)
+      Nil
+    }
+    Error(#(code, message)) -> cli_result.fail_with_code(code, message)
   }
 }
 
-fn run(args: List(String)) -> Result(Nil, String) {
-  use #(hash, call_args, store_override) <- result.try(parse_args(
-    args,
-    None,
-    [],
-    None,
-  ))
-  use ref <- result.try(identity.parse_ref_hex(hash))
-  use store_path <- result.try(resolve_store_path(store_override))
+/// The exit-code contract: 1 when the run gate refuses (the request was
+/// understood and declined), 2 when the target cannot be resolved (absent from
+/// the store, unreadable, or a store that disagrees with its own refs). A
+/// script can tell "no such definition" from "you called it wrong".
+fn run(args: List(String)) -> Result(String, #(Int, String)) {
+  case args {
+    ["--help"] | ["help"] -> Ok(usage())
+    _ -> execute(args)
+  }
+}
+
+fn execute(args: List(String)) -> Result(String, #(Int, String)) {
+  use #(hash, call_args, store_override) <- result.try(
+    parse_args(args, None, [], None)
+    |> result.map_error(fn(message) { #(cli_result.refused, message) }),
+  )
+  use ref <- result.try(
+    identity.parse_ref_hex(hash)
+    |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
+  )
+  use store_path <- result.try(
+    resolve_store_path(store_override)
+    |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
+  )
   let allow_unverified = cli_lifecycle.resolve_allow_unverified()
   case allow_unverified {
     True ->
@@ -54,12 +72,31 @@ fn run(args: List(String)) -> Result(Nil, String) {
     False -> Nil
   }
   use output <- result.try(
-    cli_store.with_dets(store_path, fn(adapter) {
-      run_ref.run_verified(adapter, ref, call_args, allow_unverified)
-      |> result.map_error(run_ref.describe)
-    }),
+    cli_store.with_dets_mapped(
+      store_path,
+      fn(adapter) {
+        run_ref.run_verified(adapter, ref, call_args, allow_unverified)
+        |> result.map_error(classify)
+      },
+      fn(message) { #(cli_result.unresolvable, message) },
+    ),
   )
-  cli_result.success(output)
+  Ok(output)
+}
+
+/// Refused vs could-not-resolve: the two failures a caller scripts against.
+fn classify(error: run_ref.RunError) -> #(Int, String) {
+  let message = run_ref.describe(error)
+  case error {
+    run_ref.Missing(_) -> #(cli_result.unresolvable, message)
+    run_ref.Unreadable(_, _) -> #(cli_result.unresolvable, message)
+    run_ref.Cycle(_) -> #(cli_result.unresolvable, message)
+    run_ref.ArityUnavailable(_, _, _) -> #(cli_result.refused, message)
+    run_ref.NoEvidence(_, _) -> #(cli_result.refused, message)
+    run_ref.NotExecutable(_, _) -> #(cli_result.refused, message)
+    run_ref.LoadFailed(_, _) -> #(cli_result.refused, message)
+    run_ref.EvaluationFailed(_, _) -> #(cli_result.refused, message)
+  }
 }
 
 fn resolve_store_path(override: Option(String)) -> Result(String, String) {

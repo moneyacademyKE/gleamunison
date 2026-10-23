@@ -120,3 +120,25 @@ pub fn a_type_definition_refuses_to_execute_test() {
     run_ref.run(codebase.get_adapter(cb), ref, [])
   got |> should.equal(ref)
 }
+
+pub fn absence_is_reported_before_evidence_test() {
+  // Ordering matters for exit codes: an absent definition is absent (2), not
+  // unverified (1). The gate must not mask a missing ref behind a policy
+  // failure, which it would if evidence were checked first.
+  let absent = Ref(hash_bytes(<<"absent-before-evidence">>))
+  let assert Error(run_ref.Missing(got)) =
+    run_ref.run_verified(
+      codebase.get_adapter(codebase.empty()),
+      absent,
+      [],
+      False,
+    )
+  got |> should.equal(absent)
+}
+
+pub fn the_escape_hatch_runs_stored_content_test() {
+  let definition = ast.TermDef(term: ast.Int(11), typ: ast.Builtin(ast.IntType))
+  let #(cb, ref) = insert(codebase.empty(), definition)
+  run_ref.run_verified(codebase.get_adapter(cb), ref, [], True)
+  |> should.equal(Ok("11"))
+}
