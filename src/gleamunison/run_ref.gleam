@@ -15,6 +15,7 @@ import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/compile
 import gleamunison/definition_refs
+import gleamunison/evidence
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/jets
 import gleamunison/loader
@@ -42,7 +43,44 @@ pub type RunError {
   LoadFailed(ref: DefinitionRef, reason: String)
   Cycle(ref: DefinitionRef)
   ArityUnavailable(ref: DefinitionRef, expected: Int, supplied: Int)
+  NoEvidence(ref: DefinitionRef, reason: String)
   EvaluationFailed(ref: DefinitionRef, reason: String)
+}
+
+/// Execute with the evidence gate on. A definition runs only when a verified
+/// Test record covers its content hash — the same turnstile `publish` passes,
+/// checked again at the moment of execution because a store can be filled by
+/// `sync` or `pkg install` long after admission. `allow_unverified` is the
+/// explicit escape hatch for local stores; the caller warns on stderr.
+pub fn run_verified(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  args: List(Dynamic),
+  allow_unverified: Bool,
+) -> Result(String, RunError) {
+  case allow_unverified {
+    True -> run(adapter, ref, args)
+    False ->
+      case evidence.production_policy() {
+        Error(reason) -> Error(NoEvidence(ref, reason))
+        Ok(policy) ->
+          case
+            evidence.verified_with_policy(
+              adapter,
+              hex(ref),
+              evidence.Test,
+              policy,
+            )
+          {
+            True -> run(adapter, ref, args)
+            False ->
+              Error(NoEvidence(
+                ref,
+                "no verified test evidence for this content hash",
+              ))
+          }
+      }
+  }
 }
 
 pub fn run(
@@ -234,6 +272,7 @@ pub fn describe(error: RunError) -> String {
       <> int.to_string(expected)
       <> " argument(s), got "
       <> int.to_string(supplied)
+    NoEvidence(ref, reason) -> hex(ref) <> " is not verified: " <> reason
     EvaluationFailed(ref, reason) ->
       "evaluation of " <> hex(ref) <> " failed: " <> reason
   }
