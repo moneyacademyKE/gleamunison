@@ -1,5 +1,5 @@
 -module(gleamunison_repl_ffi).
--export([eval_module/1, eval_module_bare/1, read_line/1]).
+-export([eval_module/1, eval_module_bare/1, call_eval/2, read_line/1]).
 
 eval_module(Mod) ->
     run_with_timeout(fun() -> eval_module_inner(Mod) end).
@@ -108,6 +108,28 @@ eval_module_inner(Mod) ->
 %% the bare variant leaves the stack exactly as the caller arranged it.
 eval_module_bare(Mod) ->
     run_with_timeout(fun() -> eval_module_bare_inner(Mod) end).
+
+%% Call a compiled definition with arguments. The compiler emits exactly
+%% '$eval'/0 (a function is a VALUE: arity-N is a curried fun), so application
+%% is one erlang:apply/2 per argument. Same timeout protection as
+%% eval_module_bare; the raw term goes back so the caller picks the rendering
+%% (text now, --json next). Args arrive as Erlang terms (see parse_term_arg).
+call_eval(Mod, Args) ->
+    run_with_timeout(fun() -> call_eval_inner(Mod, Args) end).
+
+call_eval_inner(Mod, Args) ->
+    ModuleAtom = case is_binary(Mod) of
+        true -> erlang:binary_to_atom(Mod, utf8);
+        false -> Mod
+    end,
+    try
+        V0 = ModuleAtom:'$eval'(),
+        Val = lists:foldl(fun(A, F) -> erlang:apply(F, [A]) end, V0, Args),
+        {ok, Val}
+    catch
+        Class:Reason:Stacktrace ->
+            {error, list_to_binary(io_lib:format("~p:~p at ~p", [Class, Reason, Stacktrace]))}
+    end.
 
 eval_module_bare_inner(Mod) ->
     ModuleAtom = case is_binary(Mod) of

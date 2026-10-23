@@ -39,7 +39,7 @@ pub fn a_stored_dependency_resolves_and_executes_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, main_ref) = insert(cb, main)
-  run_ref.run(codebase.get_adapter(cb), main_ref) |> should.equal(Ok("7"))
+  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("7"))
 }
 
 pub fn a_genesis_builtin_needs_no_store_entry_test() {
@@ -55,7 +55,7 @@ pub fn a_genesis_builtin_needs_no_store_entry_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
-  run_ref.run(codebase.get_adapter(cb), main_ref) |> should.equal(Ok("3"))
+  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("3"))
 }
 
 pub fn a_missing_dependency_names_the_ref_test() {
@@ -67,7 +67,7 @@ pub fn a_missing_dependency_names_the_ref_test() {
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
   let assert Error(run_ref.Missing(got)) =
-    run_ref.run(codebase.get_adapter(cb), main_ref)
+    run_ref.run(codebase.get_adapter(cb), main_ref, [])
   got |> should.equal(absent)
 }
 
@@ -90,7 +90,7 @@ pub fn a_name_reference_resolves_through_the_namespace_test() {
       "main",
       namespace.set(namespace.empty(), "dep", dep_ref),
     )
-  run_ref.run(adapter, main_ref) |> should.equal(Ok("9"))
+  run_ref.run(adapter, main_ref, []) |> should.equal(Ok("9"))
 }
 
 pub fn a_name_reference_without_a_binding_is_missing_test() {
@@ -102,14 +102,14 @@ pub fn a_name_reference_without_a_binding_is_missing_test() {
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
   let assert Error(run_ref.Missing(got)) =
-    run_ref.run(codebase.get_adapter(cb), main_ref)
+    run_ref.run(codebase.get_adapter(cb), main_ref, [])
   got |> should.equal(name_ref)
 }
 
 pub fn an_absent_root_ref_is_missing_test() {
   let absent = Ref(hash_bytes(<<"absent-root">>))
   let assert Error(run_ref.Missing(got)) =
-    run_ref.run(codebase.get_adapter(codebase.empty()), absent)
+    run_ref.run(codebase.get_adapter(codebase.empty()), absent, [])
   got |> should.equal(absent)
 }
 
@@ -117,6 +117,6 @@ pub fn a_type_definition_refuses_to_execute_test() {
   let definition = ast.TypeDef(ast.Structural(Local(0), [], []))
   let #(cb, ref) = insert(codebase.empty(), definition)
   let assert Error(run_ref.NotExecutable(got, _)) =
-    run_ref.run(codebase.get_adapter(cb), ref)
+    run_ref.run(codebase.get_adapter(cb), ref, [])
   got |> should.equal(ref)
 }

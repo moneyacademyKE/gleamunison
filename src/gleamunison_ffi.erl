@@ -14,6 +14,7 @@
     stdio_binary_mode/0, stdio_read_line/0, stdio_read_chars/1, stdio_write/1,
     deny_capability/2,
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
+    render_term/1, parse_term_arg/1,
     test_soft_purge_scenario/0,
     eval_expression/1,
     load_dogfood_levels/1, load_dogfood_levels_resolved/0
@@ -221,6 +222,42 @@ test_soft_purge_scenario() ->
     code:delete(m_purge_test),
     code:purge(m_purge_test),
     {ok, {PurgeRes1, PurgeRes2}}.
+
+%% Render a runtime value the way the REPL does (~tp). One renderer for the
+%% CLI text path and the log, so a value never has two spellings.
+render_term(Term) ->
+    list_to_binary(io_lib:format("~tp", [Term])).
+
+%% Parse one CLI argument into an Erlang term. The language's Text is a
+%% BitArray, so a double-quoted string becomes a binary rather than an Erlang
+%% charlist. Integers, floats, true/false/nil and quoted atoms parse as
+%% themselves; a bare word parses as an atom only when it is one of those three
+%% (anything else falls back to raw text at the call site, which is what a
+%% user typing `hello` means). erl_parse:parse_term/1 demands a terminating
+%% dot, so one is appended rather than required from the user.
+parse_term_arg(Arg) when is_binary(Arg) ->
+    try
+        case erl_scan:string(binary_to_list(Arg) ++ ".") of
+            {ok, [{string, _, Chars}, {dot, _}], _} ->
+                %% Quoted text: the language's Text type is a binary.
+                {ok, list_to_binary(Chars)};
+            {ok, Tokens, _} ->
+                case erl_parse:parse_term(Tokens) of
+                    {ok, Term} when is_atom(Term) ->
+                        case Term of
+                            true -> {ok, true};
+                            false -> {ok, false};
+                            nil -> {ok, nil};
+                            _ -> {error, nil}
+                        end;
+                    {ok, Term} -> {ok, Term};
+                    {error, _} -> {error, nil}
+                end;
+            {error, _, _} -> {error, nil}
+        end
+    catch
+        _:_ -> {error, nil}
+    end.
 
 binary_to_erl_literal(Bin) when is_binary(Bin) ->
     Segments = [integer_to_list(X) || <<X>> <= Bin],

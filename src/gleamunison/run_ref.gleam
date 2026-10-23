@@ -5,6 +5,8 @@
 //// no store entry, so a stored definition that adds two numbers does not have
 //// to carry the definition of `+`.
 
+import gleam/dynamic.{type Dynamic}
+import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
@@ -22,8 +24,14 @@ import gleamunison/storage
 import gleamunison/types
 import gleamunison/verify
 
-@external(erlang, "gleamunison_repl_ffi", "eval_module_bare")
-fn eval_module_bare(mod_name: String) -> Result(String, String)
+@external(erlang, "gleamunison_repl_ffi", "call_eval")
+fn call_eval_ffi(
+  mod_name: String,
+  args: List(Dynamic),
+) -> Result(Dynamic, String)
+
+@external(erlang, "gleamunison_ffi", "render_term")
+fn render_term_ffi(term: Dynamic) -> String
 
 const run_branch = "main"
 
@@ -33,12 +41,14 @@ pub type RunError {
   NotExecutable(ref: DefinitionRef, kind: String)
   LoadFailed(ref: DefinitionRef, reason: String)
   Cycle(ref: DefinitionRef)
-  EvaluationFailed(reason: String)
+  ArityUnavailable(ref: DefinitionRef, expected: Int, supplied: Int)
+  EvaluationFailed(ref: DefinitionRef, reason: String)
 }
 
 pub fn run(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
+  args: List(Dynamic),
 ) -> Result(String, RunError) {
   let cb = codebase.with_adapter(adapter)
   use definition <- result.try(
@@ -46,23 +56,49 @@ pub fn run(
     |> result.map_error(fn(error) { read_error(ref, error) }),
   )
   case definition {
-    ast.TermDef(..) -> {
-      // The baseline environment first: ability declarations and the builtin
-      // names (`+`, `eq?`, ...) are forwarding modules the elaborator
-      // references by name, exactly as the REPL and `verify` establish them.
-      // Without it a stored definition that adds two numbers looks like it
-      // depends on a missing definition.
-      let _ =
-        repl_eval.bootstrap_defs(verify.get_init_defs(), types.empty_cache())
-      use ld <- result.try(
-        resolve_definition(loader.new_loader(), cb, ref, definition, []),
-      )
-      let _ = ld
-      eval_module_bare(compile.module_name_for(ref))
-      |> result.map_error(EvaluationFailed)
+    ast.TermDef(term: _, typ: typ) -> {
+      // A function is a value: arity comes from the declared type, and calling
+      // it is one apply per argument. Supplying the wrong count is refused
+      // here, before any dependency work, so a value cannot be "called".
+      let expected = arity_of(typ)
+      let supplied = list.length(args)
+      case expected == supplied {
+        False -> Error(ArityUnavailable(ref, expected, supplied))
+        True -> {
+          // The baseline environment first: ability declarations and the
+          // builtin names (`+`, `eq?`, ...) are forwarding modules the
+          // elaborator references by name, exactly as the REPL and `verify`
+          // establish them. Without it a stored definition that adds two
+          // numbers looks like it depends on a missing definition.
+          let _ =
+            repl_eval.bootstrap_defs(
+              verify.get_init_defs(),
+              types.empty_cache(),
+            )
+          use ld <- result.try(
+            resolve_definition(loader.new_loader(), cb, ref, definition, []),
+          )
+          let _ = ld
+          call_eval_ffi(compile.module_name_for(ref), args)
+          |> result.map(render_term_ffi)
+          |> result.map_error(fn(reason) { EvaluationFailed(ref, reason) })
+        }
+      }
     }
     ast.TypeDef(_) -> Error(NotExecutable(ref, "a type definition"))
     ast.AbilityDecl(_) -> Error(NotExecutable(ref, "an ability declaration"))
+  }
+}
+
+/// A definition's declared arity: parameters along the curried function chain.
+/// The surface language curries `(define (f a b) ...)` into nested one-arg
+/// lambdas, so `fn a b -> ...` types as `Fn([Int], Fn([Int], Int))`: arity is
+/// the sum along the chain, not the top-level parameter count. Anything that
+/// is not a function is a value, which takes no arguments.
+pub fn arity_of(typ: ast.Type) -> Int {
+  case typ {
+    ast.Fn(params:, result:, ..) -> list.length(params) + arity_of(result)
+    _ -> 0
   }
 }
 
@@ -192,6 +228,13 @@ pub fn describe(error: RunError) -> String {
       "dependency cycle at "
       <> hex(ref)
       <> "; the store disagrees with its refs"
-    EvaluationFailed(reason) -> "evaluation failed: " <> reason
+    ArityUnavailable(ref, expected, supplied) ->
+      hex(ref)
+      <> " expects "
+      <> int.to_string(expected)
+      <> " argument(s), got "
+      <> int.to_string(supplied)
+    EvaluationFailed(ref, reason) ->
+      "evaluation of " <> hex(ref) <> " failed: " <> reason
   }
 }
