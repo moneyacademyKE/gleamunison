@@ -1,0 +1,142 @@
+//// Run a definition by content hash: the store is the program.
+////
+//// Resolve the dependency closure first, then load it, then execute. A ref
+//// whose module is already in the runtime (a genesis builtin, or a jet) needs
+//// no store entry, so a stored definition that adds two numbers does not have
+//// to carry the definition of `+`.
+
+import gleam/list
+import gleam/option
+import gleam/result
+import gleam/string
+import gleamunison/ast
+import gleamunison/codebase
+import gleamunison/compile
+import gleamunison/definition_refs
+import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/jets
+import gleamunison/loader
+import gleamunison/storage
+
+@external(erlang, "gleamunison_repl_ffi", "eval_module_bare")
+fn eval_module_bare(mod_name: String) -> Result(String, String)
+
+pub type RunError {
+  Missing(ref: DefinitionRef)
+  Unreadable(ref: DefinitionRef, reason: String)
+  NotExecutable(ref: DefinitionRef, kind: String)
+  LoadFailed(ref: DefinitionRef, reason: String)
+  Cycle(ref: DefinitionRef)
+  EvaluationFailed(reason: String)
+}
+
+pub fn run(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+) -> Result(String, RunError) {
+  let cb = codebase.with_adapter(adapter)
+  use definition <- result.try(
+    codebase.get(cb, ref)
+    |> result.map_error(fn(error) { read_error(ref, error) }),
+  )
+  case definition {
+    ast.TermDef(..) -> {
+      use ld <- result.try(
+        resolve_definition(loader.new_loader(), cb, ref, definition, []),
+      )
+      let _ = ld
+      eval_module_bare(compile.module_name_for(ref))
+      |> result.map_error(EvaluationFailed)
+    }
+    ast.TypeDef(_) -> Error(NotExecutable(ref, "a type definition"))
+    ast.AbilityDecl(_) -> Error(NotExecutable(ref, "an ability declaration"))
+  }
+}
+
+/// Load one ref and everything it points at, dependencies first: a compiled
+/// module calls its dependencies by module name at run time.
+fn resolve(
+  ld: loader.Loader,
+  cb: codebase.Codebase,
+  ref: DefinitionRef,
+  visiting: List(DefinitionRef),
+) -> Result(loader.Loader, RunError) {
+  case loader.is_loaded(ld, ref) || loader.module_available(ref) {
+    True -> Ok(ld)
+    False ->
+      case jets.get_jet(ref) {
+        option.Some(_) ->
+          loader.ensure_loaded_jet(ld, ref)
+          |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
+        option.None -> {
+          use definition <- result.try(
+            codebase.get(cb, ref)
+            |> result.map_error(fn(error) { read_error(ref, error) }),
+          )
+          resolve_definition(ld, cb, ref, definition, visiting)
+        }
+      }
+  }
+}
+
+fn resolve_definition(
+  ld: loader.Loader,
+  cb: codebase.Codebase,
+  ref: DefinitionRef,
+  definition: ast.Definition,
+  visiting: List(DefinitionRef),
+) -> Result(loader.Loader, RunError) {
+  case list.contains(visiting, ref) {
+    // Content addressing makes this unreachable by construction: a definition
+    // cannot hash its own hash. Reaching it means the store admitted content
+    // that does not match its key.
+    True -> Error(Cycle(ref))
+    False -> {
+      let visiting = [ref, ..visiting]
+      use ld <- result.try(list.try_fold(
+        definition_refs.refs_of_definition(definition),
+        ld,
+        fn(ld, dependency) { resolve(ld, cb, dependency, visiting) },
+      ))
+      loader.ensure_loaded(ld, ref, definition)
+      |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
+    }
+  }
+}
+
+fn read_error(ref: DefinitionRef, error: codebase.ReadError) -> RunError {
+  case error {
+    codebase.NotFound(_) -> Missing(ref)
+    codebase.StoreFailure(reason) -> Unreadable(ref, string.inspect(reason))
+    codebase.Corrupt(_, reason) ->
+      Unreadable(ref, "content does not match its ref: " <> reason)
+    codebase.DecodeFailed(_, reason) ->
+      Unreadable(ref, "payload is not a definition: " <> reason)
+  }
+}
+
+fn describe_load(error: loader.LoaderError) -> String {
+  case error {
+    loader.CompileFailed(_, message) -> "compile failed: " <> message
+    loader.LoadFailed(_, message) -> "load failed: " <> message
+  }
+}
+
+pub fn hex(ref: DefinitionRef) -> String {
+  let Ref(hash) = ref
+  hash_to_debug_string(hash)
+}
+
+pub fn describe(error: RunError) -> String {
+  case error {
+    Missing(ref) ->
+      "not in the store: " <> hex(ref) <> " (publish it or sync it first)"
+    Unreadable(ref, reason) -> "cannot read " <> hex(ref) <> ": " <> reason
+    NotExecutable(ref, kind) ->
+      hex(ref) <> " is " <> kind <> ", not a runnable term"
+    LoadFailed(ref, reason) -> "cannot load " <> hex(ref) <> ": " <> reason
+    Cycle(ref) ->
+      "dependency cycle at " <> hex(ref) <> "; the store disagrees with its refs"
+    EvaluationFailed(reason) -> "evaluation failed: " <> reason
+  }
+}
