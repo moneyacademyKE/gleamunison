@@ -357,6 +357,24 @@ immutable; a log is time-ordered. Writing a changing fact into the store would
 put it behind a hash that cannot change. The execution log records refusals
 too, because the attempt you need to see is the one that did not happen.
 
+### What admits content
+
+Three paths write to the store, and each has exactly one gate:
+
+| Path | Gate | What it proves |
+|---|---|---|
+| `publish` | evidence turnstile | every definition carries a passing attestation |
+| `sync` | content addressing | the bytes hash to the ref they arrived under |
+| `pkg install` | evidence turnstile | the manifest's definitions are attested |
+
+`sync` is not an unguarded door: `accept_chunk` refuses a chunk whose bytes do
+not hash to its ref, and refuses a conflicting chunk for a ref already held
+(`HashConflict`). A peer cannot name its bytes something they are not, because
+the name *is* the hash. What `sync` does not re-check is *evidence* — it moves
+content, not claims — which is why `run` re-checks the evidence gate at the
+moment of execution rather than trusting that admission happened. The gate you
+can rely on is the one at the point of use.
+
 | Exit | Meaning |
 |---|---|
 | 0 | the value rendered on stdout |
