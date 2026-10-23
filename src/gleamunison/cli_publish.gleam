@@ -1,20 +1,23 @@
 //// `gleamunison publish <file.lisp>` — the evidence turnstile as a command.
 //// Every term definition in the file must carry a passing Test attestation
 //// on its content hash (put there by `gleamunison test`). Refusal lists
-//// exactly the unevidenced definitions; success merges the defs into
-//// .gleamunison/published as name → hash lines. The hash is the identity:
+//// exactly the unevidenced definitions. Admission does two things: the def
+//// bytes enter the store (so `run <hash>` and peers can resolve them), and
+//// .gleamunison/published records name → hash. The hash is the identity:
 //// re-publishing a def replaces its old entry.
 
 import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option
+import gleam/result
 import gleam/string
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/evidence
-import gleamunison/identity.{hash_to_debug_string}
+import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex}
+import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleamunison/test_runner
@@ -22,6 +25,8 @@ import gleamunison/turnstile
 import gleamunison/types
 import gleamunison/verify
 import simplifile
+
+const publish_branch = "main"
 
 @external(erlang, "gleamunison_ffi", "halt_failure")
 fn halt_failure() -> Nil
@@ -72,13 +77,9 @@ fn run(path: String) -> Nil {
                 Ok(policy) ->
                   turnstile.check_with_policy(adapter, pairs, policy)
               }
-              case adapter.close() {
-                Error(e) ->
-                  fail("publish: cannot close store: " <> string.inspect(e))
-                Ok(_) -> Nil
-              }
               case decision {
-                Error(missing) ->
+                Error(missing) -> {
+                  let _ = adapter.close()
                   fail(
                     "publish: REFUSED — no evidence for: "
                     <> string.join(missing, ", ")
@@ -88,18 +89,41 @@ fn run(path: String) -> Nil {
                     <> " effectful defs may instead carry human attestation:"
                     <> " `gleam run -- evidence attest <hash> io <note>`",
                   )
+                }
                 Ok(passed) -> {
-                  write_manifest(pairs)
-                  list.each(pairs, fn(p) {
-                    io.println(
-                      "published: " <> p.0 <> "  #" <> string.slice(p.1, 0, 12),
-                    )
-                  })
-                  io.println(
-                    "publish: "
-                    <> int.to_string(list.length(passed))
-                    <> " definitions admitted by evidence",
-                  )
+                  let prepared = {
+                    use _ <- result.try(store_definitions(
+                      adapter,
+                      term_names,
+                      defs,
+                      cache,
+                    ))
+                    bind_names(adapter, pairs)
+                  }
+                  case adapter.close() {
+                    Error(e) ->
+                      fail("publish: cannot close store: " <> string.inspect(e))
+                    Ok(_) -> Nil
+                  }
+                  case prepared {
+                    Error(err) -> fail("publish: " <> err)
+                    Ok(_) -> {
+                      write_manifest(pairs)
+                      list.each(pairs, fn(p) {
+                        io.println(
+                          "published: "
+                          <> p.0
+                          <> "  #"
+                          <> string.slice(p.1, 0, 12),
+                        )
+                      })
+                      io.println(
+                        "publish: "
+                        <> int.to_string(list.length(passed))
+                        <> " definitions admitted by evidence",
+                      )
+                    }
+                  }
                 }
               }
             }
@@ -107,6 +131,58 @@ fn run(path: String) -> Nil {
         }
       }
   }
+}
+
+/// Admission is the moment a definition earns a place in the store. Publishing
+/// means fetchable by hash, not merely named; without this the store could only
+/// ever be fed by peers.
+fn store_definitions(
+  adapter: storage.StorageAdapter,
+  names: List(String),
+  defs: List(#(String, elab_types.SurfaceDef)),
+  cache: types.TypeCache,
+) -> Result(Nil, String) {
+  let cb = codebase.with_adapter(adapter)
+  use _ <- result.try(
+    list.try_fold(names, cb, fn(cb, name) {
+      case test_runner.elaborated_def_for(name, defs, cache) {
+        Error(e) -> Error("cannot elaborate " <> name <> ": " <> e)
+        Ok(definition) -> {
+          let ref = Ref(codebase.hash_of_definition(definition))
+          codebase.insert(cb, ast.Unit(root: ref, defs: [#(ref, definition)]))
+          |> result.map_error(fn(error) {
+            "cannot store " <> name <> ": " <> string.inspect(error)
+          })
+        }
+      }
+    }),
+  )
+  Ok(Nil)
+}
+
+/// Names are the runtime ABI: an elaborated term references its dependencies by
+/// ref_for_name, not by content hash. Binding name → content ref in the branch
+/// namespace is what lets `run <hash>` resolve those references later, and it is
+/// the same binding `pkg install` commits. One table, one owner.
+fn bind_names(
+  adapter: storage.StorageAdapter,
+  pairs: List(#(String, String, Bool)),
+) -> Result(Nil, String) {
+  let current = case namespace.load_current(adapter, publish_branch) {
+    Ok(ns) -> ns
+    Error(_) -> namespace.empty()
+  }
+  use next <- result.try(
+    list.try_fold(pairs, current, fn(ns, pair) {
+      case parse_ref_hex(pair.1) {
+        Error(e) -> Error("cannot bind " <> pair.0 <> ": " <> e)
+        Ok(ref) -> Ok(namespace.set(ns, pair.0, ref))
+      }
+    }),
+  )
+  namespace.commit(adapter, publish_branch, next)
+  |> result.map_error(fn(e) { "cannot commit namespace: " <> e })
+  |> result.map(fn(_) { Nil })
 }
 
 pub fn hash_defs(
