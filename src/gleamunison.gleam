@@ -19,6 +19,7 @@ import gleamunison/cli_run
 import gleamunison/cli_sync
 import gleamunison/cli_tape_to_test
 import gleamunison/cli_test
+import gleamunison/cli_unpublish
 import gleamunison/cli_watch
 import gleamunison/http
 import gleamunison/repl
@@ -59,6 +60,7 @@ pub fn run(args: List(String)) -> Nil {
     ["tape-to-test", ..rest] -> cli_tape_to_test.command(rest)
     ["test", ..rest] -> cli_test.command(rest)
     ["publish", ..rest] -> cli_publish.command(rest)
+    ["unpublish", ..rest] -> cli_unpublish.command(rest)
     ["evidence", ..rest] -> cli_result.finish(cli_evidence.command(rest))
     ["lsp", ..rest] -> cli_lsp.command(rest)
     ["sync", ..rest] -> cli_result.finish(cli_sync.command(rest))
@@ -172,6 +174,9 @@ fn print_help() -> Nil {
   io.println("Definitions and evidence")
   io.println(
     "  publish <file.lisp>    publish a definition behind the evidence gate",
+  )
+  io.println(
+    "  unpublish <name>       retract a name: index line, binding, and bytes",
   )
   io.println("  evidence <hash>        list attestations for a content hash")
   io.println(

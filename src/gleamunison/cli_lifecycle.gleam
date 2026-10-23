@@ -59,3 +59,15 @@ pub fn resolve_allow_unverified() -> Bool {
     Error(_) -> False
   }
 }
+
+const manifest_file = "published"
+
+/// The name → hash index, beside the store. Derived from the store directory
+/// so an overridden store never writes its manifest into the default one.
+pub fn resolve_manifest_path() -> Result(String, String) {
+  use dir <- result.try(resolve_store_dir())
+  case string.ends_with(dir, "/") {
+    True -> Ok(dir <> manifest_file)
+    False -> Ok(dir <> "/" <> manifest_file)
+  }
+}

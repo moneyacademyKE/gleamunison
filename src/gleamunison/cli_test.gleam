@@ -6,6 +6,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
+import gleamunison/cli_lifecycle
 import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/test_runner.{type TestResult}
@@ -47,10 +48,17 @@ fn run(path: String) -> Nil {
 }
 
 fn run_with_signer(path: String, signer: evidence.Signer) -> Nil {
-  case simplifile.create_directory_all(".gleamunison") {
+  let store_path = case cli_lifecycle.resolve_store_path() {
+    Ok(found) -> found
+    Error(reason) -> {
+      fail("test: " <> reason)
+      ""
+    }
+  }
+  case simplifile.create_directory_all(store_dir(store_path)) {
     Error(e) -> fail("test: cannot create store: " <> string.inspect(e))
     Ok(_) ->
-      case storage.dets(".gleamunison/store.dets") {
+      case storage.dets(store_path) {
         Error(e) -> fail("test: cannot open store: " <> string.inspect(e))
         Ok(adapter) -> {
           let outcome = run_file_with_signer(path, adapter, signer)
@@ -153,4 +161,17 @@ pub fn run_file_with_signer(
       #(subject_hex, payload)
     }),
   ))
+}
+
+/// The directory a store file lives in, so an overridden store creates its own
+/// directory rather than the default one.
+fn store_dir(path: String) -> String {
+  case list.reverse(string.split(path, "/")) {
+    [_, ..parent] ->
+      case list.reverse(parent) |> string.join("/") {
+        "" -> "/"
+        dir -> dir
+      }
+    [] -> "."
+  }
 }

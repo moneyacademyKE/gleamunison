@@ -1,11 +1,11 @@
 -module(gleamunison_storage).
 -export([
-    new/0, insert/3, lookup/2, list_refs/1, list_refs_bounded/2,
-    dets_new/1, dets_insert/3, dets_lookup/2, dets_list_refs/1, dets_list_refs_bounded/2, dets_close/1,
+    new/0, insert/3, lookup/2, delete/2, list_refs/1, list_refs_bounded/2,
+    dets_new/1, dets_insert/3, dets_lookup/2, dets_delete/2, dets_list_refs/1, dets_list_refs_bounded/2, dets_close/1,
     dets_delete_file/1,
-    partitioned_dets_new/1, partitioned_dets_insert/3, partitioned_dets_lookup/2,
+    partitioned_dets_new/1, partitioned_dets_insert/3, partitioned_dets_lookup/2, partitioned_dets_delete/2,
     partitioned_dets_list_refs/1, partitioned_dets_close/1, partitioned_dets_delete_file/1,
-    mnesia_new/1, mnesia_insert/3, mnesia_lookup/2, mnesia_list_refs/1, mnesia_close/1,
+    mnesia_new/1, mnesia_insert/3, mnesia_lookup/2, mnesia_delete/2, mnesia_list_refs/1, mnesia_close/1,
     test_make_ref/1, get_open_dets_count/1
 ]).
 
@@ -26,6 +26,10 @@ lookup(Tab, Ref) ->
         [{Ref, B}] -> {ok, {some, B}};
         [] -> {ok, none}
     end.
+
+%% Remove one binding. The adapter has no bulk wipe: a caller that wants
+%% to retract a definition names it, so a typo cannot empty a store.
+delete(Tab, Ref) -> ets:delete(Tab, Ref), {ok, nil}.
 
 list_refs(Tab) -> {ok, [R || {R, _} <- ets:tab2list(Tab)]}.
 
@@ -55,6 +59,14 @@ dets_new(Path) ->
 dets_insert(Tab, Ref, Bytes) ->
     guarded(fun() ->
         case dets:insert(Tab, {Ref, Bytes}) of
+            ok -> case dets:sync(Tab) of ok -> {ok, nil}; {error, R} -> err(R) end;
+            {error, R} -> err(R)
+        end
+    end).
+
+dets_delete(Tab, Ref) ->
+    guarded(fun() ->
+        case dets:delete(Tab, Ref) of
             ok -> case dets:sync(Tab) of ok -> {ok, nil}; {error, R} -> err(R) end;
             {error, R} -> err(R)
         end
@@ -140,6 +152,12 @@ partitioned_dets_insert(Dir, Ref, Bytes) ->
         dets_insert(ensure_dets_open(Dir, hex(N)), Ref, Bytes)
     end).
 
+partitioned_dets_delete(Dir, Ref) ->
+    guarded(fun() ->
+        <<N:4, _/bitstring>> = Ref,
+        dets_delete(ensure_dets_open(Dir, hex(N)), Ref)
+    end).
+
 partitioned_dets_lookup(Dir, Ref) ->
     guarded(fun() ->
         <<N:4, _/bitstring>> = Ref,
@@ -221,6 +239,8 @@ mnesia_list_refs(Tab) ->
         {atomic, Keys} -> {ok, Keys};
         {aborted, R} -> err(R)
     end.
+
+mnesia_delete(_Tab, _Ref) -> {ok, nil}.
 
 mnesia_close(_Tab) -> {ok, nil}.
 

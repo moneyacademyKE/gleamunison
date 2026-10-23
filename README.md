@@ -286,8 +286,10 @@ gleamunison <command>
   repl                   interactive REPL (optionally preload a .lisp file)
   verify [file]          verify a scratch file
   publish <file.lisp>    publish definitions behind the evidence gate
+  unpublish <name>       retract a name: index line, binding, and bytes
   test <file.lisp>       run the test forms in a file
   run <content-hash>     run a definition from the store, by hash
+                         [args...] [--json] [--store path]
   llm <provider> <prompt> call an LLM (openai | anthropic)
   mcp [port] [--load f]  MCP server for agents (default 8099)
   all                    run all available levels
@@ -304,9 +306,12 @@ branch namespace. From then on the definition is fetchable and runnable by
 identity:
 
 ```
-gleam run -- test lib.lisp      # evidence attaches to content hashes
-gleam run -- publish lib.lisp   # admitted: bytes stored, names bound
-gleam run -- run <hash>         # executes it, dependencies first
+gleam run -- test lib.lisp         # evidence attaches to content hashes
+gleam run -- publish lib.lisp      # admitted: bytes stored, names bound
+gleam run -- run <hash>            # executes it, dependencies first
+gleam run -- run <hash> 40 2       # a function takes its declared arity
+gleam run -- run --json <hash> 40 2 # {"ref":"…","value":42}
+gleam run -- unpublish <name>      # retract the name (refuses if in use)
 ```
 
 `run` resolves the dependency closure before executing, so a stored definition
@@ -315,6 +320,24 @@ are referenced by name ref, which is why the namespace binding matters; builtin
 names (`+`, `eq?`) come from the baseline environment, the same one the REPL
 establishes. A ref the store does not hold fails with the missing hash instead
 of pretending to run.
+
+Retraction is the reverse of admission, and it removes all three facts a name
+stands on: the index line, the namespace binding, and the bytes. `unpublish`
+refuses rather than half-finishing — if another stored definition depends on
+the content, or another name still binds it, nothing is removed and the message
+names what stands in the way.
+
+| Exit | Meaning |
+|---|---|
+| 0 | the value rendered on stdout |
+| 1 | refused: wrong arity, no verified evidence, not a runnable term |
+| 2 | unresolvable: absent from the store, unreadable, or a malformed hash |
+
+Errors go to stderr, so stdout carries only the result: `run … | jq` works.
+`run` executes verified content by default; `GLEAMUNISON_STORE_ALLOW_UNVERIFIED=1`
+is the explicit hatch for local work and warns on stderr.
+`GLEAMUNISON_STORE_DIR` points every command at another store directory (the
+index lives beside it), which is how a test or CI run keeps its own.
 
 ## HTTP API
 
