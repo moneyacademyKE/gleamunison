@@ -1,12 +1,12 @@
 //// Run by hash: resolve the closure, load it, execute it. These tests use an
 //// in-memory store, which is the same adapter contract dets satisfies.
 
-import gleeunit/should
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Local, Ref, hash_bytes}
 import gleamunison/run_ref
+import gleeunit/should
 
 fn insert(
   cb: codebase.Codebase,

@@ -21,9 +21,11 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
 fn run(args: List(String)) -> Result(Nil, String) {
   use #(hash, store_path) <- result.try(parse_args(args, None, default_store))
   use ref <- result.try(identity.parse_ref_hex(hash))
-  use output <- result.try(cli_store.with_dets(store_path, fn(adapter) {
-    run_ref.run(adapter, ref) |> result.map_error(run_ref.describe)
-  }))
+  use output <- result.try(
+    cli_store.with_dets(store_path, fn(adapter) {
+      run_ref.run(adapter, ref) |> result.map_error(run_ref.describe)
+    }),
+  )
   cli_result.success(output)
 }
 

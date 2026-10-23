@@ -12,7 +12,8 @@ import gleamunison/identity.{type DefinitionRef}
 
 pub fn refs_of_definition(definition: ast.Definition) -> List(DefinitionRef) {
   let refs = case definition {
-    ast.TermDef(term:, typ:) -> list.append(refs_of_term(term), refs_of_type(typ))
+    ast.TermDef(term:, typ:) ->
+      list.append(refs_of_term(term), refs_of_type(typ))
     ast.TypeDef(ast.Structural(constructors:, ..)) ->
       refs_of_constructors(constructors)
     ast.TypeDef(ast.Unique(constructors:, ..)) ->
@@ -35,16 +36,19 @@ pub fn refs_of_term(term: ast.Term) -> List(DefinitionRef) {
       list.append(refs_of_term(value), refs_of_term(body))
     ast.RefTo(ref) -> [ref]
     ast.Match(scrutinee:, cases:) ->
-      list.append(
-        refs_of_term(scrutinee),
-        list.flat_map(cases, refs_of_case),
-      )
-    ast.Do(ability:, args:, ..) ->
-      [ability, ..list.flat_map(args, refs_of_term)]
-    ast.Handle(computation:, handler:, ability:) ->
-      [ability, ..list.append(refs_of_term(computation), refs_of_term(handler))]
-    ast.Construct(ctor_ref:, args:) ->
-      [ctor_ref, ..list.flat_map(args, refs_of_term)]
+      list.append(refs_of_term(scrutinee), list.flat_map(cases, refs_of_case))
+    ast.Do(ability:, args:, ..) -> [
+      ability,
+      ..list.flat_map(args, refs_of_term)
+    ]
+    ast.Handle(computation:, handler:, ability:) -> [
+      ability,
+      ..list.append(refs_of_term(computation), refs_of_term(handler))
+    ]
+    ast.Construct(ctor_ref:, args:) -> [
+      ctor_ref,
+      ..list.flat_map(args, refs_of_term)
+    ]
     ast.Use(call:, body:, ..) ->
       list.append(refs_of_term(call), refs_of_term(body))
   }
@@ -70,8 +74,10 @@ pub fn refs_of_pattern(pattern: ast.Pattern) -> List(DefinitionRef) {
     | ast.PatCons(_, _)
     | ast.PatEmptyList -> []
     ast.PatAs(inner:, ..) -> refs_of_pattern(inner)
-    ast.PatConstructor(ctor_ref:, args:) ->
-      [ctor_ref, ..list.flat_map(args, refs_of_pattern)]
+    ast.PatConstructor(ctor_ref:, args:) -> [
+      ctor_ref,
+      ..list.flat_map(args, refs_of_pattern)
+    ]
   }
 }
 

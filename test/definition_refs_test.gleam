@@ -2,10 +2,10 @@
 //// a ref the store must resolve before the definition can run.
 
 import gleam/option
-import gleeunit/should
 import gleamunison/ast
 import gleamunison/definition_refs
 import gleamunison/identity.{Local, Ref, hash_bytes}
+import gleeunit/should
 
 pub fn refs_of_a_term_definition_are_deduped_test() {
   let a = Ref(hash_bytes(<<"a">>))
@@ -29,16 +29,13 @@ pub fn refs_of_a_definition_without_refs_is_empty_test() {
 pub fn refs_of_a_pattern_constructor_are_collected_test() {
   let constructor = Ref(hash_bytes(<<"ctor">>))
   let term =
-    ast.Match(
-      scrutinee: ast.Int(1),
-      cases: [
-        ast.Case(
-          pattern: ast.PatConstructor(ctor_ref: constructor, args: [ast.PatInt(2)]),
-          guard: option.None,
-          body: ast.Int(3),
-        ),
-      ],
-    )
+    ast.Match(scrutinee: ast.Int(1), cases: [
+      ast.Case(
+        pattern: ast.PatConstructor(ctor_ref: constructor, args: [ast.PatInt(2)]),
+        guard: option.None,
+        body: ast.Int(3),
+      ),
+    ])
   let definition = ast.TermDef(term: term, typ: ast.Builtin(ast.IntType))
   definition_refs.refs_of_definition(definition)
   |> should.equal([constructor])
@@ -59,10 +56,10 @@ pub fn refs_of_a_concrete_ability_requirement_are_collected_test() {
 pub fn refs_of_a_type_definition_constructor_args_are_collected_test() {
   let argument = Ref(hash_bytes(<<"type-argument">>))
   let definition =
-    ast.TypeDef(ast.Structural(
-      Local(0),
-      [],
-      [ast.Constructor(Local(1), [ast.TypeCon(argument)])],
-    ))
+    ast.TypeDef(
+      ast.Structural(Local(0), [], [
+        ast.Constructor(Local(1), [ast.TypeCon(argument)]),
+      ]),
+    )
   definition_refs.refs_of_definition(definition) |> should.equal([argument])
 }

@@ -2,10 +2,10 @@
 //// hash to its key must never reach the decoder.
 
 import gleam/bit_array
-import gleeunit/should
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/identity.{Ref, hash_bytes}
+import gleeunit/should
 
 pub fn get_round_trips_an_inserted_definition_test() {
   let definition = ast.TermDef(term: ast.Int(42), typ: ast.Builtin(ast.IntType))
@@ -19,8 +19,7 @@ pub fn get_round_trips_an_inserted_definition_test() {
 
 pub fn get_reports_not_found_for_an_absent_ref_test() {
   let ref = Ref(hash_bytes(<<"never-inserted">>))
-  let assert Error(codebase.NotFound(got)) =
-    codebase.get(codebase.empty(), ref)
+  let assert Error(codebase.NotFound(got)) = codebase.get(codebase.empty(), ref)
   got |> should.equal(ref)
 }
 

@@ -1,10 +1,10 @@
 //// Availability is what lets a definition load without a store entry: the
 //// genesis builtins and registered jets are already in the runtime.
 
-import gleeunit/should
 import gleamunison/genesis
 import gleamunison/identity.{Ref, hash_bytes, hash_from_bytes}
 import gleamunison/loader
+import gleeunit/should
 
 pub fn a_genesis_builtin_is_already_available_test() {
   loader.module_available(genesis.builtin_int_add()) |> should.be_true
