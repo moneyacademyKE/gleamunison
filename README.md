@@ -285,12 +285,36 @@ gleamunison <command>
   server [port]          start the web server (default 8080)
   repl                   interactive REPL (optionally preload a .lisp file)
   verify [file]          verify a scratch file
+  publish <file.lisp>    publish definitions behind the evidence gate
+  test <file.lisp>       run the test forms in a file
+  run <content-hash>     run a definition from the store, by hash
   llm <provider> <prompt> call an LLM (openai | anthropic)
   mcp [port] [--load f]  MCP server for agents (default 8099)
   all                    run all available levels
   schema-version         print the storage/codec schema version
   levelN                 run playbook level N
 ```
+
+### Definitions are the program
+
+`publish` admits a definition only after its evidence gate passes, and admission
+puts the definition *itself* in the content-addressed store: the bytes are
+inserted under their content hash and the name is bound to that ref on the
+branch namespace. From then on the definition is fetchable and runnable by
+identity:
+
+```
+gleam run -- test lib.lisp      # evidence attaches to content hashes
+gleam run -- publish lib.lisp   # admitted: bytes stored, names bound
+gleam run -- run <hash>         # executes it, dependencies first
+```
+
+`run` resolves the dependency closure before executing, so a stored definition
+that calls another stored definition works with no source on disk. Dependencies
+are referenced by name ref, which is why the namespace binding matters; builtin
+names (`+`, `eq?`) come from the baseline environment, the same one the REPL
+establishes. A ref the store does not hold fails with the missing hash instead
+of pretending to run.
 
 ## HTTP API
 
