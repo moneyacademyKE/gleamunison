@@ -13,6 +13,7 @@ import gleamunison/cli_lsp
 import gleamunison/cli_mcp
 import gleamunison/cli_pkg
 import gleamunison/cli_publish
+import gleamunison/cli_purge
 import gleamunison/cli_replay
 import gleamunison/cli_result
 import gleamunison/cli_run
@@ -61,6 +62,7 @@ pub fn run(args: List(String)) -> Nil {
     ["test", ..rest] -> cli_test.command(rest)
     ["publish", ..rest] -> cli_publish.command(rest)
     ["unpublish", ..rest] -> cli_unpublish.command(rest)
+    ["purge", ..rest] -> cli_purge.command(rest)
     ["evidence", ..rest] -> cli_result.finish(cli_evidence.command(rest))
     ["lsp", ..rest] -> cli_lsp.command(rest)
     ["sync", ..rest] -> cli_result.finish(cli_sync.command(rest))
@@ -177,6 +179,9 @@ fn print_help() -> Nil {
   )
   io.println(
     "  unpublish <name>       retract a name: index line, binding, and bytes",
+  )
+  io.println(
+    "  purge <hash> [--yes]   remove a definition and its exclusive deps",
   )
   io.println("  evidence <hash>        list attestations for a content hash")
   io.println(

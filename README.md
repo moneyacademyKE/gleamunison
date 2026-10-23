@@ -287,6 +287,7 @@ gleamunison <command>
   verify [file]          verify a scratch file
   publish <file.lisp>    publish definitions behind the evidence gate
   unpublish <name>       retract a name: index line, binding, and bytes
+  purge <hash> [--yes]   remove a definition and the deps only it kept alive
   test <file.lisp>       run the test forms in a file
   run <content-hash>     run a definition from the store, by hash
                          [args...] [--json] [--store path]
@@ -312,6 +313,8 @@ gleam run -- run <hash>            # executes it, dependencies first
 gleam run -- run <hash> 40 2       # a function takes its declared arity
 gleam run -- run --json <hash> 40 2 # {"ref":"…","value":42}
 gleam run -- unpublish <name>      # retract the name (refuses if in use)
+gleam run -- purge <hash>          # dry run: what would go, and why
+gleam run -- purge <hash> --yes    # remove it and its exclusive deps
 ```
 
 `run` resolves the dependency closure before executing, so a stored definition
@@ -326,6 +329,12 @@ stands on: the index line, the namespace binding, and the bytes. `unpublish`
 refuses rather than half-finishing — if another stored definition depends on
 the content, or another name still binds it, nothing is removed and the message
 names what stands in the way.
+
+`purge` works by content hash instead of by name, and it is a dry run until
+`--yes`: it prints the removal set (the definition plus every stored dependency
+that nothing outside the set uses) and changes nothing. Both commands refuse
+when something outside the set depends on the ref, because a store that loses
+the thing its definitions call is a store that lies about being runnable.
 
 | Exit | Meaning |
 |---|---|

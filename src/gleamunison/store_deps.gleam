@@ -96,3 +96,103 @@ pub fn hex(ref: DefinitionRef) -> String {
   let Ref(hash) = ref
   hash_to_debug_string(hash)
 }
+
+/// The stored content refs a definition depends on, with name refs resolved
+/// through the namespace. Builtins and jets have no store entry, so they are
+/// absent here: there is nothing to remove for them.
+pub fn stored_dependencies(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+) -> List(DefinitionRef) {
+  let cb = codebase.with_adapter(adapter)
+  case codebase.get(cb, ref) {
+    Error(_) -> []
+    Ok(definition) ->
+      definition_refs.refs_of_definition(definition)
+      |> list.filter_map(fn(dependency) {
+        case codebase.get(cb, dependency) {
+          Ok(_) -> Ok(dependency)
+          Error(_) ->
+            // A name ref: the bytes live under the content ref it binds.
+            case resolve_name(adapter, dependency) {
+              Ok(content_ref) -> Ok(content_ref)
+              Error(_) -> Error(Nil)
+            }
+        }
+      })
+      |> list.unique
+  }
+}
+
+fn resolve_name(
+  adapter: storage.StorageAdapter,
+  name_ref: DefinitionRef,
+) -> Result(DefinitionRef, Nil) {
+  case namespace.load_current(adapter, branch) {
+    Error(_) -> Error(Nil)
+    Ok(ns) ->
+      list.find_map(namespace.names(ns), fn(name) {
+        case repl_eval.ref_for_name(name) == name_ref {
+          True ->
+            case namespace.get(ns, name) {
+              Ok(content_ref) -> Ok(content_ref)
+              Error(_) -> Error(Nil)
+            }
+          False -> Error(Nil)
+        }
+      })
+  }
+}
+
+/// The ref plus every stored dependency that nothing outside the set uses:
+/// removing a definition removes what only it kept alive, and nothing else.
+/// Iterated to a fixpoint because a dependency becomes exclusive once its
+/// other dependents are themselves in the set.
+pub fn exclusive_closure(
+  adapter: storage.StorageAdapter,
+  root: DefinitionRef,
+) -> List(DefinitionRef) {
+  let roots = [root]
+  expand(adapter, roots, 0)
+}
+
+const max_rounds = 64
+
+fn expand(
+  adapter: storage.StorageAdapter,
+  set: List(DefinitionRef),
+  round: Int,
+) -> List(DefinitionRef) {
+  case round >= max_rounds {
+    True -> set
+    False -> {
+      let candidates =
+        list.flat_map(set, fn(ref) { stored_dependencies(adapter, ref) })
+        |> list.filter(fn(dep) { !list.contains(set, dep) })
+        |> list.unique
+      let additions =
+        list.filter(candidates, fn(dep) {
+          dependents(adapter, dep)
+          |> list.all(fn(dependent) { list.contains(set, dependent) })
+        })
+      case additions {
+        [] -> set
+        _ -> expand(adapter, list.append(set, additions), round + 1)
+      }
+    }
+  }
+}
+
+/// Every name bound to `ref` on this branch.
+pub fn names_for(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+) -> List(String) {
+  case namespace.load_current(adapter, branch) {
+    Error(_) -> []
+    Ok(ns) ->
+      list.filter(namespace.names(ns), fn(name) {
+        namespace.get(ns, name) == Ok(ref)
+      })
+  }
+}
