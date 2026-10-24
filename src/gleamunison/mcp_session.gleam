@@ -69,6 +69,76 @@ pub fn load_file(
   }
 }
 
+/// Every name the session can resolve: the baseline plus whatever a define bound.
+/// Sorted, so a listing does not change order between requests.
+pub fn defined_names(state: SessionState) -> List(String) {
+  state.defs |> list.map(fn(pair) { pair.0 }) |> list.sort(string.compare)
+}
+
+/// Evaluate source against the session and return the last value plus the
+/// advanced state. This is the live-session contract the REPL and the HTTP
+/// routes share: a `define` binds a name for later evaluation, anything else
+/// is an expression. The HTTP surface used to call a stateless evaluator with
+/// no baseline, so `/eval?expr=(+ 1 2)` answered "undefined variable `+`" and
+/// `/define` stored the source text in a notebook without binding anything —
+/// the route said "defined" and nothing was.
+pub fn eval_source(
+  state: SessionState,
+  source: String,
+) -> Result(#(String, SessionState), String) {
+  let tokens = lexer.tokenize(source)
+  use exprs <- result.try(
+    verify.parse_all_sexprs(tokens, [])
+    |> result.map_error(fn(e) { "parse error: " <> e.message }),
+  )
+  use terms <- result.try(
+    verify.terms_from_sexprs(exprs, [])
+    |> result.map_error(fn(e) { "sexpr error: " <> e.message }),
+  )
+  eval_terms_collecting(state, terms, "")
+}
+
+/// Bind one definition by name, so a later `eval` sees it.
+pub fn define_source(
+  state: SessionState,
+  name: String,
+  source: String,
+) -> Result(#(String, SessionState), String) {
+  eval_source(state, "(define " <> name <> " " <> source <> ")")
+}
+
+fn eval_terms_collecting(
+  state: SessionState,
+  terms: List(elab_types.SurfaceTerm),
+  last: String,
+) -> Result(#(String, SessionState), String) {
+  case terms {
+    [] -> Ok(#(last, state))
+    [term, ..rest] -> {
+      case term {
+        elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), val]) ->
+          case repl_eval.handle_define(name, val, state.cache, state.defs) {
+            Ok(#(cache, defs)) ->
+              eval_terms_collecting(SessionState(cache, defs), rest, name)
+            Error(err) -> Error("define " <> name <> ": " <> err)
+          }
+        _ ->
+          case
+            repl_eval.do_eval(term, "session_expr", state.cache, state.defs)
+          {
+            Ok(#(value, _, cache)) ->
+              eval_terms_collecting(
+                SessionState(..state, cache: cache),
+                rest,
+                value,
+              )
+            Error(err) -> Error("eval: " <> err)
+          }
+      }
+    }
+  }
+}
+
 fn eval_terms(
   state: SessionState,
   terms: List(elab_types.SurfaceTerm),

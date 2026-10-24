@@ -14,6 +14,7 @@ start_link(Port) when is_integer(Port) ->
 
 start_server(Port) when is_integer(Port) ->
     ensure_storage(),
+    ensure_web_session(),
     ensure_sync_listener(),
     case gleamunison_runtime_sup:start_http(Port) of
         {ok, Pid} -> wait_for_server(Pid), ok;
@@ -57,6 +58,18 @@ in_memory() ->
 %% with no server, so the documented pull path could not be exercised between
 %% two real nodes. The listener binds loopback only, so booting it adds no
 %% network surface.
+%% One live session for /eval and /define, started with the server so it
+%% outlives any connection.
+ensure_web_session() ->
+    case whereis(gleamunison_web_session) of
+        Pid when is_pid(Pid) -> ok;
+        undefined ->
+            case gleamunison_runtime_sup:start_web_session() of
+                {ok, _Pid} -> ok;
+                {error, _} -> ok
+            end
+    end.
+
 ensure_sync_listener() ->
     case whereis(gleamunison_tcp_sync) of
         Pid when is_pid(Pid) -> ok;

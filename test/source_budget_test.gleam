@@ -139,3 +139,19 @@ pub fn datalog_script_output_excludes_engine_definitions_test() {
   let assert Ok(out) = cli_datalog.run(path)
   out |> should.equal("3")
 }
+
+/// The HTTP eval surface used a stateless evaluator with no baseline, so
+/// `/eval?expr=(+ 1 2)` answered "undefined variable `+`". A define also only
+/// recorded source text. One live session owns both.
+pub fn session_define_then_eval_sees_the_name_test() {
+  let state = mcp_session.boot()
+  let assert Ok(#("foo", state)) = mcp_session.define_source(state, "foo", "42")
+  let assert Ok(#(value, _)) = mcp_session.eval_source(state, "(+ foo 1)")
+  value |> should.equal("43")
+}
+
+pub fn session_eval_has_the_baseline_environment_test() {
+  let state = mcp_session.boot()
+  let assert Ok(#(value, _)) = mcp_session.eval_source(state, "(+ 1 2)")
+  value |> should.equal("3")
+}

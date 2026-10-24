@@ -49,7 +49,10 @@ handle_eval_admitted(Socket, Expr) ->
     case is_localhost(Socket) of
         true ->
             Decoded = gleamunison_http_util:url_decode(Expr),
-            case gleamunison_ffi:eval_expression(Decoded) of
+            %% One live session owns the baseline and every define, so a name
+            %% defined here is visible to the next eval — the same contract the
+            %% REPL and the MCP session already give.
+            case gleamunison_web_session:eval(Decoded) of
                 {ok, Result} ->
                     gleamunison_http_util:notify_sse_eval(Expr, Result),
                     Json = <<"{\"result\":", (gleamunison_http_util:escape_json(Result))/binary, "}">>,
@@ -85,14 +88,11 @@ handle_define_admitted(Socket, Rest) ->
                 [Name, Expr] ->
                     DecodedName = gleamunison_http_util:url_decode(Name),
                     DecodedExpr = gleamunison_http_util:url_decode(Expr),
-                    case gleamunison_ffi:eval_expression(DecodedExpr) of
+                    %% A define binds the name in the live session. Storing the
+                    %% source text and reporting success made the route claim
+                    %% something the evaluator never did.
+                    case gleamunison_web_session:define(DecodedName, DecodedExpr) of
                         {ok, Result} ->
-                            persistent_term:put({gleamunison_notebook, DecodedName}, DecodedExpr),
-                            Keys = case persistent_term:get({gleamunison_notebook_keys}, []) of
-                                undefined -> [DecodedName];
-                                Ks -> lists:usort([DecodedName | Ks])
-                            end,
-                            persistent_term:put({gleamunison_notebook_keys}, Keys),
                             gleamunison_http_util:notify_sse_def(DecodedName),
                             Json = iolist_to_binary(io_lib:format(
                                 "{\"status\":\"defined\",\"name\":~ts,\"result\":~ts}",
@@ -114,22 +114,16 @@ handle_define_admitted(Socket, Rest) ->
     end.
 
 handle_browse_route(Socket) ->
-    Keys = case persistent_term:get({gleamunison_notebook_keys}, []) of
-        undefined -> [];
-        Ks -> Ks
+    %% The session is the only owner of what is defined. A second notebook table
+    %% recorded source text next to it and could disagree with the evaluator;
+    %% one owner, so a listing cannot show a name the session would refuse.
+    Names = case gleamunison_web_session:definitions() of
+        {ok, List} -> List;
+        _ -> []
     end,
-    Entries = lists:map(fun(Name) ->
-        Expr = case persistent_term:get({gleamunison_notebook, Name}, undefined) of
-            undefined -> <<"unknown">>;
-            V -> V
-        end,
-        {Name, Expr}
-    end, Keys),
-    JsonParts = lists:map(fun({Name, Expr}) ->
-        EscName = gleamunison_http_util:escape_json(Name),
-        EscExpr = gleamunison_http_util:escape_json(Expr),
-        <<"{\"name\":", EscName/binary, ",\"expr\":", EscExpr/binary, "}">>
-    end, Entries),
+    JsonParts = lists:map(fun(Name) ->
+        <<"{\"name\":", (gleamunison_http_util:escape_json(Name))/binary, "}">>
+    end, Names),
     Json = <<"{\"defs\":[", (iolist_to_binary(lists:join(<<",">>, JsonParts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
 
@@ -233,9 +227,9 @@ pid_to_binary(Pid) ->
 handle_sync_status_route(Socket) ->
     LoadedMods = length([M || {M, _} <- code:all_loaded(), lists:prefix("m_", atom_to_list(M))]),
     BeamCount = length([F || {_M, F} <- code:all_loaded(), filename:extension(F) =:= ".beam"]),
-    Keys = case persistent_term:get({gleamunison_notebook_keys}, []) of
-        undefined -> [];
-        Ks -> Ks
+    Keys = case gleamunison_web_session:definitions() of
+        {ok, Names} -> Names;
+        _ -> []
     end,
     %% The sync port is the one fact a peer needs to dial this node, so it is
     %% reported where an operator looks. null means no listener, not port 0.
