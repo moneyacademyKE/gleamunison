@@ -1,7 +1,7 @@
 -module(gleamunison_runtime_sup).
 -behaviour(supervisor).
--export([start_link/0, init/1, start_http/1, start_mcp/1, stop_http/0,
-         stop_mcp/0, stop/0]).
+-export([start_link/0, init/1, start_http/1, start_mcp/1, start_sync/0,
+         stop_http/0, stop_mcp/0, stop/0]).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
@@ -21,6 +21,16 @@ start_mcp(LoadFiles) when is_list(LoadFiles) ->
     case ensure_started() of
         {ok, Sup} -> start_child(Sup, mcp, gleamunison_mcp_session,
                                  start_link, [LoadFiles], worker, 5000);
+        Error -> Error
+    end.
+
+%% The sync peer is a listener nothing started: `sync` had a client and no
+%% server, so a peer could never exist. It is part of the same long-running
+%% runtime as HTTP and MCP, so it belongs under the same supervisor.
+start_sync() ->
+    case ensure_started() of
+        {ok, Sup} -> start_child(Sup, sync, gleamunison_tcp_sync,
+                                 start_link, [], worker, 5000);
         Error -> Error
     end.
 

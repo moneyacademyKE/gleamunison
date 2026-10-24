@@ -237,9 +237,15 @@ handle_sync_status_route(Socket) ->
         undefined -> [];
         Ks -> Ks
     end,
+    %% The sync port is the one fact a peer needs to dial this node, so it is
+    %% reported where an operator looks. null means no listener, not port 0.
+    SyncPort = case whereis(gleamunison_tcp_sync) of
+        undefined -> <<"null">>;
+        _ -> integer_to_binary(gleamunison_tcp_sync:get_port())
+    end,
     Json = iolist_to_binary(io_lib:format(
-        "{\"genesis_count\":52,\"notebook_defs\":~p,\"loaded_modules\":~p,\"beams_loaded\":~p}",
-        [length(Keys), LoadedMods, BeamCount])),
+        "{\"genesis_count\":~p,\"notebook_defs\":~p,\"loaded_modules\":~p,\"beams_loaded\":~p,\"sync_port\":~s}",
+        [length(gleamunison@bootstraps:get_init_defs_data()), length(Keys), LoadedMods, BeamCount, SyncPort])),
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_redefinitions_route(Socket) ->

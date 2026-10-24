@@ -14,25 +14,57 @@ start_link(Port) when is_integer(Port) ->
 
 start_server(Port) when is_integer(Port) ->
     ensure_storage(),
+    ensure_sync_listener(),
     case gleamunison_runtime_sup:start_http(Port) of
         {ok, Pid} -> wait_for_server(Pid), ok;
         {error, {already_started, Pid}} -> wait_for_server(Pid), ok;
         {error, Reason} -> {error, Reason}
     end.
 
-%% Readiness marks storage as required, but nothing acquired it at boot: the
-%% persistent_term was written only by tests, so /api/ready could never pass
-%% in production. One boot, one storage handle, and the probe observes a
-%% resource the runtime actually holds.
+%% One node, one store. This used to open a fresh in-memory ETS table, which
+%% meant the server held a second, empty truth: a definition published by the
+%% CLI was invisible to /api/ready, to /define, and to the sync peer, so a
+%% remote node pulling from a real server always received nothing. The server
+%% now opens the same store file every CLI command resolves.
 ensure_storage() ->
     case persistent_term:get({gleamunison, active_storage}, undefined) of
-        undefined ->
-            try gleamunison_storage:new() of
-                _ -> ok
-            catch
-                _:_ -> ok
-            end;
+        undefined -> open_store();
         _ -> ok
+    end.
+
+open_store() ->
+    case catch gleamunison@cli_lifecycle:resolve_store_path() of
+        {ok, Path} ->
+            _ = filelib:ensure_dir(binary_to_list(Path)),
+            case gleamunison_storage:dets_new(Path) of
+                {ok, _} -> ok;
+                _ -> in_memory()
+            end;
+        %% No resolvable path (or a store that will not open): the server still
+        %% has to boot, and an in-memory store is the honest degradation.
+        _ -> in_memory()
+    end.
+
+in_memory() ->
+    try gleamunison_storage:new() of
+        _ -> ok
+    catch
+        _:_ -> ok
+    end.
+
+%% A peer is a listener plus a store. `sync <host:port>` has always been able
+%% to dial one, but no shipped command ever listened: the transport was a client
+%% with no server, so the documented pull path could not be exercised between
+%% two real nodes. The listener binds loopback only, so booting it adds no
+%% network surface.
+ensure_sync_listener() ->
+    case whereis(gleamunison_tcp_sync) of
+        Pid when is_pid(Pid) -> ok;
+        undefined ->
+            case gleamunison_runtime_sup:start_sync() of
+                {ok, _Pid} -> ok;
+                {error, _} -> ok
+            end
     end.
 
 wait_for_server(Pid) when is_pid(Pid) ->

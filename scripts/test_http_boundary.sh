@@ -17,3 +17,11 @@ done
 code=$(curl --silent --show-error --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/static/js/dashboard.js")
 printf '/static/js/dashboard.js => %s\n' "$code"
 test "$code" = 200
+
+# The server is the only long-running runtime, so it is where the sync peer
+# lives. A null sync_port means no peer: `sync` has a client and nothing to
+# dial, which is how the documented pull path went unexercised.
+sync_port=$(curl --silent --show-error --max-time 3 "http://127.0.0.1:$port/api/sync-status" \
+  | sed -n 's/.*"sync_port":\([0-9]*\).*/\1/p')
+printf '/api/sync-status sync_port => %s\n' "${sync_port:-null}"
+test -n "$sync_port"
