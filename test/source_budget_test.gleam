@@ -128,3 +128,14 @@ pub fn control_characters_are_refused_not_tokenized_test() {
   // Tab and newline are source whitespace, not control characters.
   source_budget.check("(define (f)\t1)\n") |> should.equal(Ok(Nil))
 }
+
+/// The datalog engine is ~124 definitions of infrastructure. Printing a
+/// `(defined ...)` line for each one put the engine's setup on stdout before
+/// the script's own answer, so `datalog script.lisp` could not be piped.
+/// eval_source still reports every top-level value; the CLI path does not.
+pub fn datalog_script_output_excludes_engine_definitions_test() {
+  let path = "/tmp/gleamunison-datalog-output-test.lisp"
+  let assert Ok(_) = simplifile.write("(+ 1 2)\n", to: path)
+  let assert Ok(out) = cli_datalog.run(path)
+  out |> should.equal("3")
+}

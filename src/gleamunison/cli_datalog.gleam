@@ -36,7 +36,50 @@ pub fn run(script_path: String) -> Result(String, String) {
     simplifile.read(script_path)
     |> result.replace_error("cannot read script: " <> script_path),
   )
-  eval_source(engine_src <> "\n" <> script_src)
+  // The engine is infrastructure, not the user's program. Concatenating both
+  // sources and printing every top-level value meant 124 `(defined ...)` lines
+  // of engine setup reached stdout before the script's own answer, so the
+  // command could not be piped anywhere. Load the engine silently, then print
+  // only what the script evaluates.
+  let #(cache, defs) =
+    repl_eval.bootstrap_defs(verify.get_init_defs(), empty_cache())
+  use #(_, cache, defs) <- result.try(load_engine(engine_src, cache, defs))
+  eval_script(script_src, cache, defs)
+}
+
+fn load_engine(
+  source: String,
+  cache: TypeCache,
+  defs: List(#(String, elab_types.SurfaceDef)),
+) -> Result(
+  #(String, TypeCache, List(#(String, elab_types.SurfaceDef))),
+  String,
+) {
+  use terms <- result.try(parse_source(source))
+  run_terms(terms, cache, defs, [], False)
+}
+
+fn eval_script(
+  source: String,
+  cache: TypeCache,
+  defs: List(#(String, elab_types.SurfaceDef)),
+) -> Result(String, String) {
+  use terms <- result.try(parse_source(source))
+  use #(out, _, _) <- result.try(run_terms(terms, cache, defs, [], True))
+  Ok(out)
+}
+
+fn parse_source(
+  source: String,
+) -> Result(List(elab_types.SurfaceTerm), String) {
+  let tokens = lexer.tokenize(source)
+  use sexprs <- result.try(parse_all(tokens, []))
+  list.try_map(sexprs, fn(s) {
+    parser.sexpr_to_term(s)
+    |> result.map_error(fn(e) {
+      "parse: " <> e.message <> " at line " <> int.to_string(e.line)
+    })
+  })
 }
 
 @external(erlang, "gleamunison_engine_locator", "read_embedded")
@@ -95,20 +138,14 @@ fn read_engine_dir(dir: String) -> Result(String, Nil) {
   })
 }
 
+/// Evaluate one self-contained source, printing every top-level value. Kept
+/// for callers that want the whole program's output, including defines.
 pub fn eval_source(source: String) -> Result(String, String) {
-  let tokens = lexer.tokenize(source)
-  use sexprs <- result.try(parse_all(tokens, []))
-  use terms <- result.try(
-    list.try_map(sexprs, fn(s) {
-      parser.sexpr_to_term(s)
-      |> result.map_error(fn(e) {
-        "parse: " <> e.message <> " at line " <> int.to_string(e.line)
-      })
-    }),
-  )
+  use terms <- result.try(parse_source(source))
   let #(cache, defs) =
     repl_eval.bootstrap_defs(verify.get_init_defs(), empty_cache())
-  run_terms(terms, cache, defs, [])
+  use #(out, _, _) <- result.try(run_terms(terms, cache, defs, [], True))
+  Ok(out)
 }
 
 fn parse_all(tokens, acc) {
@@ -130,9 +167,18 @@ fn parse_all(tokens, acc) {
   }
 }
 
-fn run_terms(terms, cache: TypeCache, defs, out: List(String)) {
+fn run_terms(
+  terms: List(elab_types.SurfaceTerm),
+  cache: TypeCache,
+  defs: List(#(String, elab_types.SurfaceDef)),
+  out: List(String),
+  echo_defines: Bool,
+) -> Result(
+  #(String, TypeCache, List(#(String, elab_types.SurfaceDef))),
+  String,
+) {
   case terms {
-    [] -> Ok(string.join(list.reverse(out), "\n"))
+    [] -> Ok(#(string.join(list.reverse(out), "\n"), cache, defs))
     [term, ..rest] -> {
       case term {
         elab_types.SList([
@@ -142,20 +188,39 @@ fn run_terms(terms, cache: TypeCache, defs, out: List(String)) {
         ]) -> {
           case repl_eval.handle_define(name, val, cache, defs) {
             Ok(#(nc, ndefs)) ->
-              run_terms(rest, nc, ndefs, ["(defined " <> name <> ")", ..out])
+              run_terms(
+                rest,
+                nc,
+                ndefs,
+                case echo_defines {
+                  True -> ["(defined " <> name <> ")", ..out]
+                  False -> out
+                },
+                echo_defines,
+              )
             Error(err) -> Error("define " <> name <> ": " <> err)
           }
         }
         elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), val]) -> {
           case repl_eval.handle_define(name, val, cache, defs) {
             Ok(#(nc, ndefs)) ->
-              run_terms(rest, nc, ndefs, ["(defined " <> name <> ")", ..out])
+              run_terms(
+                rest,
+                nc,
+                ndefs,
+                case echo_defines {
+                  True -> ["(defined " <> name <> ")", ..out]
+                  False -> out
+                },
+                echo_defines,
+              )
             Error(err) -> Error("define " <> name <> ": " <> err)
           }
         }
         _ -> {
           case repl_eval.do_eval(term, "datalog_expr", cache, defs) {
-            Ok(#(val_str, _, nc)) -> run_terms(rest, nc, defs, [val_str, ..out])
+            Ok(#(val_str, _, nc)) ->
+              run_terms(rest, nc, defs, [val_str, ..out], echo_defines)
             Error(err) -> Error("eval: " <> err)
           }
         }
