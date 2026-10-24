@@ -10,6 +10,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import gleamunison/cli_lifecycle
 import gleamunison/cli_publish
 import gleamunison/cli_result
 import gleamunison/cli_store
@@ -22,7 +23,7 @@ import gleamunison/sync
 import gleamunison/sync_types.{PeerId}
 import gleamunison/verify
 
-const default_store = ".gleamunison/store.dets"
+const default_branch = "main"
 
 pub fn command(args: List(String)) -> Result(Nil, String) {
   case args {
@@ -43,8 +44,10 @@ fn publish(args: List(String)) -> Result(Nil, String) {
     None,
     None,
   ))
+  use context <- result.try(cli_lifecycle.resolve_context(None))
+  let store_path = cli_lifecycle.store_path(context)
   use output <- result.try(
-    cli_store.with_dets(default_store, fn(adapter) {
+    cli_store.with_dets(store_path, fn(adapter) {
       use #(cache, defs, file_names) <- result.try(verify.load_defs_file_scoped(
         path,
       ))
@@ -104,12 +107,14 @@ fn parse_publish_args(
 }
 
 fn install(args: List(String)) -> Result(Nil, String) {
-  use #(hash_hex, peer, branch, store_path) <- result.try(parse_args(
+  use #(hash_hex, peer, branch, store_override) <- result.try(parse_args(
     args,
     None,
     None,
-    default_store,
+    None,
   ))
+  use context <- result.try(cli_lifecycle.resolve_context(store_override))
+  let store_path = cli_lifecycle.store_path(context)
   use _ <- result.try(manifest.ref_from_hex(hash_hex))
   use output <- result.try(
     cli_store.with_dets(store_path, fn(adapter) {
@@ -133,8 +138,8 @@ fn parse_args(
   args: List(String),
   hash: Option(String),
   peer: Option(String),
-  store: String,
-) -> Result(#(String, Option(String), String, String), String) {
+  store: Option(String),
+) -> Result(#(String, Option(String), String, Option(String)), String) {
   case args {
     [] ->
       case hash {
@@ -142,7 +147,7 @@ fn parse_args(
           Error(
             "usage: gleam run -- pkg install <manifest-hash> [--peer host:port] [--branch name]",
           )
-        Some(h) -> Ok(#(h, peer, "main", store))
+        Some(h) -> Ok(#(h, peer, default_branch, store))
       }
     ["--peer", p, ..rest] -> parse_args(rest, hash, Some(p), store)
     ["--peer"] -> Error("--peer needs host:port")
@@ -151,7 +156,7 @@ fn parse_args(
         None -> Error("--branch needs the manifest hash first")
         Some(_) -> parse_args_with_branch(rest, hash, peer, store, b)
       }
-    ["--store", path, ..rest] -> parse_args(rest, hash, peer, path)
+    ["--store", path, ..rest] -> parse_args(rest, hash, peer, Some(path))
     [h, ..rest] ->
       case hash {
         None -> parse_args(rest, Some(h), peer, store)
@@ -165,9 +170,9 @@ fn parse_args_with_branch(
   rest: List(String),
   hash: Option(String),
   peer: Option(String),
-  store: String,
+  store: Option(String),
   branch: String,
-) -> Result(#(String, Option(String), String, String), String) {
+) -> Result(#(String, Option(String), String, Option(String)), String) {
   case rest {
     [] ->
       case hash {
@@ -175,7 +180,7 @@ fn parse_args_with_branch(
         None -> Error("missing manifest hash")
       }
     ["--store", path, ..more] ->
-      parse_args_with_branch(more, hash, peer, path, branch)
+      parse_args_with_branch(more, hash, peer, Some(path), branch)
     ["--peer", p, ..more] ->
       parse_args_with_branch(more, hash, Some(p), store, branch)
     [other, ..] -> Error("unknown argument: " <> other)

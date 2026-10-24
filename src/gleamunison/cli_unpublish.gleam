@@ -26,7 +26,7 @@ import gleamunison/storage
 import gleamunison/store_deps
 import simplifile
 
-const branch = "main"
+const default_branch = "main"
 
 pub fn command(args: List(String)) -> Nil {
   case run(args) {
@@ -36,15 +36,18 @@ pub fn command(args: List(String)) -> Nil {
 }
 
 fn run(args: List(String)) -> Result(String, #(Int, String)) {
-  use #(name, store_override) <- result.try(parse_args(args, None, None))
-  use store_path <- result.try(resolve(
-    store_override,
-    cli_lifecycle.resolve_store_path,
-  ))
-  use manifest_path <- result.try(resolve(
+  use #(name, store_override, branch) <- result.try(parse_args(
+    args,
     None,
-    cli_lifecycle.resolve_manifest_path,
+    None,
+    default_branch,
   ))
+  use context <- result.try(
+    cli_lifecycle.resolve_context(store_override)
+    |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
+  )
+  let store_path = cli_lifecycle.store_path(context)
+  let manifest_path = cli_lifecycle.manifest_path(context)
   use lines <- result.try(read_manifest(manifest_path))
   use hash <- result.try(find_name(lines, name))
   use ref <- result.try(
@@ -54,7 +57,9 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
   use report <- result.try(
     cli_store.with_dets_mapped(
       store_path,
-      fn(adapter) { retract(adapter, manifest_path, name, hash, ref, lines) },
+      fn(adapter) {
+        retract(adapter, manifest_path, name, hash, ref, branch, lines)
+      },
       fn(message) { #(cli_result.unresolvable, message) },
     ),
   )
@@ -67,14 +72,15 @@ fn retract(
   name: String,
   hash: String,
   ref: identity.DefinitionRef,
+  branch: String,
   lines: List(String),
 ) -> Result(String, #(Int, String)) {
   // Both checks before any mutation: a refusal must leave the store exactly as
   // it was.
-  use _ <- result.try(refuse_dependents(adapter, name, ref))
-  use _ <- result.try(refuse_other_names(adapter, name, ref))
+  use _ <- result.try(refuse_dependents(adapter, name, ref, branch))
+  use _ <- result.try(refuse_other_names(adapter, name, ref, branch))
   use _ <- result.try(rewrite_manifest(manifest_path, name, lines))
-  use _ <- result.try(unbind(adapter, name))
+  use _ <- result.try(unbind(adapter, name, branch))
   use _ <- result.try(
     adapter.delete(ref)
     |> result.map_error(fn(error) {
@@ -91,8 +97,9 @@ fn refuse_dependents(
   adapter: storage.StorageAdapter,
   name: String,
   ref: identity.DefinitionRef,
+  branch: String,
 ) -> Result(Nil, #(Int, String)) {
-  case store_deps.dependents(adapter, ref) {
+  case store_deps.dependents_on_branch(adapter, branch, ref) {
     [] -> Ok(Nil)
     dependents ->
       Error(#(
@@ -112,8 +119,9 @@ fn refuse_other_names(
   adapter: storage.StorageAdapter,
   name: String,
   ref: identity.DefinitionRef,
+  branch: String,
 ) -> Result(Nil, #(Int, String)) {
-  case store_deps.other_names(adapter, ref, name) {
+  case store_deps.other_names_on_branch(adapter, branch, ref, name) {
     [] -> Ok(Nil)
     others ->
       Error(#(
@@ -132,6 +140,7 @@ fn refuse_other_names(
 fn unbind(
   adapter: storage.StorageAdapter,
   name: String,
+  branch: String,
 ) -> Result(Nil, #(Int, String)) {
   let ns = case namespace.load_current(adapter, branch) {
     Ok(current) -> current
@@ -210,16 +219,21 @@ fn parse_args(
   args: List(String),
   name: Option(String),
   store_override: Option(String),
-) -> Result(#(String, Option(String)), #(Int, String)) {
+  branch: String,
+) -> Result(#(String, Option(String), String), #(Int, String)) {
   case args {
     [] ->
       case name {
-        Some(value) -> Ok(#(value, store_override))
+        Some(value) -> Ok(#(value, store_override, branch))
         None -> Error(#(cli_result.refused, usage()))
       }
-    ["--store", path, ..rest] -> parse_args(rest, name, Some(path))
+    ["--store", path, ..rest] -> parse_args(rest, name, Some(path), branch)
     ["--store"] ->
       Error(#(cli_result.refused, "--store needs a path\n" <> usage()))
+    ["--branch", selected, ..rest] ->
+      parse_args(rest, name, store_override, selected)
+    ["--branch"] ->
+      Error(#(cli_result.refused, "--branch needs a name\n" <> usage()))
     [value, ..rest] ->
       case name {
         Some(_) ->
@@ -227,20 +241,8 @@ fn parse_args(
             cli_result.refused,
             "unpublish: unexpected argument '" <> value <> "'\n" <> usage(),
           ))
-        None -> parse_args(rest, Some(value), store_override)
+        None -> parse_args(rest, Some(value), store_override, branch)
       }
-  }
-}
-
-fn resolve(
-  override: Option(String),
-  fallback: fn() -> Result(String, String),
-) -> Result(String, #(Int, String)) {
-  case override {
-    Some(path) -> Ok(path)
-    None ->
-      fallback()
-      |> result.map_error(fn(message) { #(cli_result.unresolvable, message) })
   }
 }
 
@@ -257,9 +259,10 @@ fn short(ref: identity.DefinitionRef) -> String {
 }
 
 fn usage() -> String {
-  "usage: gleam run -- unpublish <name> [--store path]\n"
+  "usage: gleam run -- unpublish <name> [--store path] [--branch name]\n"
   <> "\n"
   <> "Retracts a published name: its index line, its namespace binding, and\n"
   <> "its definition bytes. Refuses when another stored definition depends on\n"
-  <> "it, or when another name still binds the same content."
+  <> "it, or when another name still binds the same content.\n"
+  <> "The branch defaults to main; --branch selects another namespace."
 }

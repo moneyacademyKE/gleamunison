@@ -26,7 +26,8 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
     None,
     None,
   ))
-  use store_path <- result.try(resolve_store_path(store_override))
+  use context <- result.try(cli_lifecycle.resolve_context(store_override))
+  let store_path = cli_lifecycle.store_path(context)
   use output <- result.try(
     cli_store.with_dets(store_path, fn(adapter) {
       let cb = codebase.with_adapter(adapter)
@@ -39,7 +40,11 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
       // it belongs in the content log beside the definitions `publish` admits.
       list.each(new_refs, fn(ref) {
         let _ =
-          store_log.record_content(store_dir(store_path), ref_hex(ref), "sync")
+          store_log.record_content(
+            cli_lifecycle.root_dir(context),
+            ref_hex(ref),
+            "sync",
+          )
         Nil
       })
       use _ <- result.try(case branch {
@@ -60,25 +65,6 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
     }),
   )
   cli_result.success(output)
-}
-
-fn resolve_store_path(override: Option(String)) -> Result(String, String) {
-  case override {
-    Some(path) -> Ok(path)
-    None -> cli_lifecycle.resolve_store_path()
-  }
-}
-
-/// The directory a store file lives in: the logs sit beside it.
-fn store_dir(path: String) -> String {
-  case list.reverse(string.split(path, "/")) {
-    [_, ..parent] ->
-      case list.reverse(parent) |> string.join("/") {
-        "" -> "/"
-        dir -> dir
-      }
-    [] -> "."
-  }
 }
 
 fn ref_hex(ref: identity.DefinitionRef) -> String {

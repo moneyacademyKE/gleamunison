@@ -12,6 +12,7 @@ import gleam/option
 import gleam/result
 import gleam/string
 import gleamunison/ast
+import gleamunison/bootstraps
 import gleamunison/codebase
 import gleamunison/compile
 import gleamunison/definition_refs
@@ -35,7 +36,7 @@ fn call_eval_ffi(
 @external(erlang, "gleamunison_ffi", "render_term")
 fn render_term_ffi(term: Dynamic) -> String
 
-const run_branch = "main"
+const default_branch = "main"
 
 pub type RunError {
   Missing(ref: DefinitionRef)
@@ -62,9 +63,19 @@ pub fn run_verified(
   args: List(Dynamic),
   allow_unverified: Bool,
 ) -> Result(String, RunError) {
+  run_verified_on_branch(adapter, ref, default_branch, args, allow_unverified)
+}
+
+pub fn run_verified_on_branch(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  branch: String,
+  args: List(Dynamic),
+  allow_unverified: Bool,
+) -> Result(String, RunError) {
   use _ <- result.try(preflight(adapter, ref))
   use _ <- result.try(evidence_gate(adapter, ref, allow_unverified))
-  run(adapter, ref, args)
+  run_on_branch(adapter, ref, branch, args)
 }
 
 /// The same gate, returning the raw term for a caller that renders it itself.
@@ -74,9 +85,25 @@ pub fn run_verified_raw(
   args: List(Dynamic),
   allow_unverified: Bool,
 ) -> Result(Dynamic, RunError) {
+  run_verified_raw_on_branch(
+    adapter,
+    ref,
+    default_branch,
+    args,
+    allow_unverified,
+  )
+}
+
+pub fn run_verified_raw_on_branch(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  branch: String,
+  args: List(Dynamic),
+  allow_unverified: Bool,
+) -> Result(Dynamic, RunError) {
   use _ <- result.try(preflight(adapter, ref))
   use _ <- result.try(evidence_gate(adapter, ref, allow_unverified))
-  execute(adapter, ref, args)
+  execute(adapter, ref, branch, args)
 }
 
 fn preflight(
@@ -115,22 +142,40 @@ pub fn run(
   ref: DefinitionRef,
   args: List(Dynamic),
 ) -> Result(String, RunError) {
-  use term <- result.try(execute(adapter, ref, args))
+  run_on_branch(adapter, ref, default_branch, args)
+}
+
+pub fn run_on_branch(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  branch: String,
+  args: List(Dynamic),
+) -> Result(String, RunError) {
+  use term <- result.try(execute(adapter, ref, branch, args))
   Ok(render_term_ffi(term))
 }
 
-/// The raw term, for a caller that renders it itself (--json).
 pub fn run_raw(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
   args: List(Dynamic),
 ) -> Result(Dynamic, RunError) {
-  execute(adapter, ref, args)
+  run_raw_on_branch(adapter, ref, default_branch, args)
+}
+
+pub fn run_raw_on_branch(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  branch: String,
+  args: List(Dynamic),
+) -> Result(Dynamic, RunError) {
+  execute(adapter, ref, branch, args)
 }
 
 fn execute(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
+  branch: String,
   args: List(Dynamic),
 ) -> Result(Dynamic, RunError) {
   let cb = codebase.with_adapter(adapter)
@@ -158,9 +203,14 @@ fn execute(
               verify.get_init_defs(),
               types.empty_cache(),
             )
-          use ld <- result.try(
-            resolve_definition(loader.new_loader(), cb, ref, definition, []),
-          )
+          use ld <- result.try(resolve_definition(
+            loader.new_loader(),
+            cb,
+            ref,
+            definition,
+            [],
+            branch,
+          ))
           let _ = ld
           call_eval_ffi(compile.module_name_for(ref), args)
           |> result.map_error(fn(reason) { EvaluationFailed(ref, reason) })
@@ -191,34 +241,49 @@ fn resolve(
   cb: codebase.Codebase,
   ref: DefinitionRef,
   visiting: List(DefinitionRef),
+  branch: String,
 ) -> Result(loader.Loader, RunError) {
-  case loader.is_loaded(ld, ref) || loader.module_available(ref) {
+  case loader.is_loaded(ld, ref) {
     True -> Ok(ld)
     False ->
-      case jets.get_jet(ref) {
-        option.Some(_) ->
-          loader.ensure_loaded_jet(ld, ref)
-          |> result.map_error(fn(pair) {
-            LoadFailed(ref, describe_load(pair.1))
-          })
-        option.None -> {
-          case codebase.get(cb, ref) {
+      case codebase.get(cb, ref) {
+        Ok(definition) ->
+          resolve_definition(ld, cb, ref, definition, visiting, branch)
+        Error(codebase.NotFound(_)) ->
+          // A missing store ref may be a name ref. Resolve the selected branch
+          // before consulting the VM's module table; otherwise a module loaded
+          // during an earlier run could make the current branch invisible.
+          case resolve_name_ref(cb, ref, branch) {
             Ok(definition) ->
-              resolve_definition(ld, cb, ref, definition, visiting)
-            Error(codebase.NotFound(_)) ->
-              // An elaborated term references its dependencies by
-              // ref_for_name(name), not by content hash. Those refs live in the
-              // branch namespace (name → content ref), the same table
-              // `publish` and `pkg install` commit. The module is loaded under
-              // the NAME ref so its module name matches what the caller emits.
-              case resolve_name_ref(cb, ref) {
-                Ok(definition) ->
-                  resolve_definition(ld, cb, ref, definition, visiting)
-                Error(_) -> Error(Missing(ref))
-              }
-            Error(other) -> Error(read_error(ref, other))
+              resolve_definition(ld, cb, ref, definition, visiting, branch)
+            Error(_) -> resolve_runtime_ref(ld, ref)
           }
-        }
+        Error(other) -> Error(read_error(ref, other))
+      }
+  }
+}
+
+fn is_bootstrap_ref(ref: DefinitionRef) -> Bool {
+  list.any(bootstraps.get_init_defs_data(), fn(definition) {
+    case definition {
+      bootstraps.BAbility(name, _) -> repl_eval.ref_for_name(name) == ref
+      bootstraps.BTerm(_, known_ref) -> known_ref == ref
+    }
+  })
+}
+
+fn resolve_runtime_ref(
+  ld: loader.Loader,
+  ref: DefinitionRef,
+) -> Result(loader.Loader, RunError) {
+  case jets.get_jet(ref) {
+    option.Some(_) ->
+      loader.ensure_loaded_jet(ld, ref)
+      |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
+    option.None ->
+      case is_bootstrap_ref(ref) && loader.module_available(ref) {
+        True -> Ok(ld)
+        False -> Error(Missing(ref))
       }
   }
 }
@@ -229,6 +294,7 @@ fn resolve_definition(
   ref: DefinitionRef,
   definition: ast.Definition,
   visiting: List(DefinitionRef),
+  branch: String,
 ) -> Result(loader.Loader, RunError) {
   case list.contains(visiting, ref) {
     // Content addressing makes this unreachable by construction: a definition
@@ -241,7 +307,7 @@ fn resolve_definition(
         list.try_fold(
           definition_refs.refs_of_definition(definition),
           ld,
-          fn(ld, dependency) { resolve(ld, cb, dependency, visiting) },
+          fn(ld, dependency) { resolve(ld, cb, dependency, visiting, branch) },
         ),
       )
       loader.ensure_loaded(ld, ref, definition)
@@ -256,8 +322,9 @@ fn resolve_definition(
 fn resolve_name_ref(
   cb: codebase.Codebase,
   ref: DefinitionRef,
+  branch: String,
 ) -> Result(ast.Definition, Nil) {
-  case namespace.load_current(codebase.get_adapter(cb), run_branch) {
+  case namespace.load_current(codebase.get_adapter(cb), branch) {
     Error(_) -> Error(Nil)
     Ok(ns) ->
       list.find_map(namespace.names(ns), fn(name) {
@@ -363,6 +430,14 @@ pub fn inspect_function(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
 ) -> Result(FunctionInfo, RunError) {
+  inspect_function_on_branch(adapter, ref, default_branch)
+}
+
+pub fn inspect_function_on_branch(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  branch: String,
+) -> Result(FunctionInfo, RunError) {
   let cb = codebase.with_adapter(adapter)
   use definition <- result.try(
     codebase.get(cb, ref)
@@ -372,9 +447,14 @@ pub fn inspect_function(
     ast.TermDef(typ: typ, ..) -> {
       let _ =
         repl_eval.bootstrap_defs(verify.get_init_defs(), types.empty_cache())
-      use ld <- result.try(
-        resolve_definition(loader.new_loader(), cb, ref, definition, []),
-      )
+      use ld <- result.try(resolve_definition(
+        loader.new_loader(),
+        cb,
+        ref,
+        definition,
+        [],
+        branch,
+      ))
       let _ = ld
       use exports <- result.try(
         loader.exports(ref)

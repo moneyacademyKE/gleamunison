@@ -16,7 +16,6 @@ import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_output
 import gleamunison/cli_result
@@ -54,18 +53,23 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
 }
 
 fn execute(args: List(String)) -> Result(String, #(Int, String)) {
-  use #(hash, call_args, store_override, json, inspect) <- result.try(
-    parse_args(args, None, [], None, False, False)
+  use #(hash, call_args, store_override, branch_override, json, inspect) <- result.try(
+    parse_args(args, None, [], None, None, False, False)
     |> result.map_error(fn(message) { #(cli_result.refused, message) }),
   )
   use ref <- result.try(
     identity.parse_ref_hex(hash)
     |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
   )
-  use store_path <- result.try(
-    resolve_store_path(store_override)
+  use context <- result.try(
+    cli_lifecycle.resolve_context(store_override)
     |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
   )
+  let store_path = cli_lifecycle.store_path(context)
+  let branch = case branch_override {
+    Some(value) -> value
+    None -> "main"
+  }
   let allow_unverified = cli_lifecycle.resolve_allow_unverified()
   case allow_unverified {
     True ->
@@ -81,8 +85,9 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
       fn(adapter) {
         render_output(
           adapter,
-          store_dir(store_path),
+          cli_lifecycle.root_dir(context),
           ref,
+          branch,
           call_args,
           allow_unverified,
           json,
@@ -104,6 +109,7 @@ fn render_output(
   adapter: storage.StorageAdapter,
   dir: String,
   ref: DefinitionRef,
+  branch: String,
   call_args: List(Dynamic),
   allow_unverified: Bool,
   json: Bool,
@@ -111,7 +117,7 @@ fn render_output(
 ) -> Result(String, #(Int, String)) {
   case inspect {
     True ->
-      run_ref.inspect_function(adapter, ref)
+      run_ref.inspect_function_on_branch(adapter, ref, branch)
       |> result.map(fn(info) {
         cli_output.function_json(
           run_ref.hex(ref),
@@ -125,13 +131,25 @@ fn render_output(
       case json {
         False -> {
           let outcome =
-            run_ref.run_verified(adapter, ref, call_args, allow_unverified)
+            run_ref.run_verified_on_branch(
+              adapter,
+              ref,
+              branch,
+              call_args,
+              allow_unverified,
+            )
           record(dir, ref, outcome)
           outcome |> result.map_error(classify)
         }
         True -> {
           let outcome =
-            run_ref.run_verified_raw(adapter, ref, call_args, allow_unverified)
+            run_ref.run_verified_raw_on_branch(
+              adapter,
+              ref,
+              branch,
+              call_args,
+              allow_unverified,
+            )
           record(dir, ref, outcome)
           outcome
           |> result.map(fn(term) {
@@ -177,13 +195,6 @@ fn classify(error: run_ref.RunError) -> #(Int, String) {
   }
 }
 
-fn resolve_store_path(override: Option(String)) -> Result(String, String) {
-  case override {
-    Some(path) -> Ok(path)
-    None -> cli_lifecycle.resolve_store_path()
-  }
-}
-
 /// Each argument is a term when it parses as one, raw text otherwise. The
 /// fallback is deliberate: `hello` is a text argument, `3x` is text too, and
 /// the type error at the call site is the honest report.
@@ -201,9 +212,13 @@ fn parse_args(
   hash: Option(String),
   call_args: List(String),
   store_override: Option(String),
+  branch: Option(String),
   json: Bool,
   inspect: Bool,
-) -> Result(#(String, List(Dynamic), Option(String), Bool, Bool), String) {
+) -> Result(
+  #(String, List(Dynamic), Option(String), Option(String), Bool, Bool),
+  String,
+) {
   case args {
     [] ->
       case hash {
@@ -212,18 +227,30 @@ fn parse_args(
             value,
             to_call_args(list.reverse(call_args)),
             store_override,
+            branch,
             json,
             inspect,
           ))
         None -> Error(usage())
       }
     ["--json", ..rest] ->
-      parse_args(rest, hash, call_args, store_override, True, inspect)
+      parse_args(rest, hash, call_args, store_override, branch, True, inspect)
     ["--inspect", ..rest] ->
-      parse_args(rest, hash, call_args, store_override, json, True)
+      parse_args(rest, hash, call_args, store_override, branch, json, True)
     ["--store", path, ..rest] ->
-      parse_args(rest, hash, call_args, Some(path), json, inspect)
+      parse_args(rest, hash, call_args, Some(path), branch, json, inspect)
     ["--store"] -> Error("run: --store needs a path\n" <> usage())
+    ["--branch", name, ..rest] ->
+      parse_args(
+        rest,
+        hash,
+        call_args,
+        store_override,
+        Some(name),
+        json,
+        inspect,
+      )
+    ["--branch"] -> Error("run: --branch needs a name\n" <> usage())
     [value, ..rest] ->
       case hash {
         Some(_) ->
@@ -232,6 +259,7 @@ fn parse_args(
             hash,
             [value, ..call_args],
             store_override,
+            branch,
             json,
             inspect,
           )
@@ -241,6 +269,7 @@ fn parse_args(
             Some(value),
             call_args,
             store_override,
+            branch,
             json,
             inspect,
           )
@@ -249,10 +278,11 @@ fn parse_args(
 }
 
 fn usage() -> String {
-  "usage: gleam run -- run <content-hash> [args...] [--json] [--inspect] [--store path]\n"
+  "usage: gleam run -- run <content-hash> [args...] [--json] [--inspect] [--store path] [--branch name]\n"
   <> "\n"
   <> "Runs the definition the store holds under that hash, loading its\n"
   <> "dependencies first. The hash is the content hash printed by publish.\n"
+  <> "The branch defaults to main; --branch selects another namespace.\n"
   <> "\n"
   <> "A value takes no arguments. A function of arity N takes N: each is\n"
   <> "read as an Erlang term (42, 1.5, true, nil, \"text\") and passed as raw\n"
@@ -268,16 +298,4 @@ fn usage() -> String {
   <> "Default store: "
   <> cli_lifecycle.default_store_dir()
   <> "/store.dets"
-}
-
-/// The directory a store file lives in: the logs sit beside it.
-fn store_dir(path: String) -> String {
-  case list.reverse(string.split(path, "/")) {
-    [_, ..parent] ->
-      case list.reverse(parent) |> string.join("/") {
-        "" -> "/"
-        dir -> dir
-      }
-    [] -> "."
-  }
 }

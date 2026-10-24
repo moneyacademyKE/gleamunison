@@ -2,6 +2,7 @@
 //// are environment reads, so both are resolved in one place and asserted here
 //// rather than discovered at a call site.
 
+import gleam/option.{Some}
 import gleamunison/cli_lifecycle
 import gleeunit/should
 
@@ -55,6 +56,23 @@ pub fn a_relative_override_is_refused_test() {
       "GLEAMUNISON_STORE_DIR must be an absolute path, got: relative/store",
     )
   })
+}
+
+pub fn an_explicit_store_context_owns_siblings_test() {
+  let assert Ok(context) =
+    cli_lifecycle.resolve_context(Some("/tmp/selected/store.dets"))
+  cli_lifecycle.store_path(context)
+  |> should.equal("/tmp/selected/store.dets")
+  cli_lifecycle.manifest_path(context)
+  |> should.equal("/tmp/selected/published")
+  cli_lifecycle.root_dir(context) |> should.equal("/tmp/selected")
+}
+
+pub fn a_relative_explicit_store_is_refused_test() {
+  let assert Error(message) =
+    cli_lifecycle.resolve_context(Some("relative/store.dets"))
+  message
+  |> should.equal("store path must be absolute, got: relative/store.dets")
 }
 
 pub fn an_empty_override_falls_back_to_the_default_test() {

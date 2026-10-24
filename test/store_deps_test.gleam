@@ -78,6 +78,27 @@ pub fn a_name_ref_dependent_is_found_test() {
   store_deps.dependents(adapter, dep_ref) |> should.equal([caller_ref])
 }
 
+pub fn a_name_ref_dependent_is_found_on_the_selected_branch_test() {
+  let #(cb, dep_ref) = insert(codebase.empty(), int_fn_returning(13))
+  let name_ref = repl_eval.ref_for_name("release-dep")
+  let caller =
+    ast.TermDef(
+      term: ast.Apply(function: ast.RefTo(name_ref), arg: ast.Int(0)),
+      typ: ast.Builtin(ast.IntType),
+    )
+  let #(cb, caller_ref) = insert(cb, caller)
+  let adapter = codebase.get_adapter(cb)
+  let assert Ok(_) =
+    namespace.commit(
+      adapter,
+      "release",
+      namespace.set(namespace.empty(), "release-dep", dep_ref),
+    )
+  store_deps.dependents_on_branch(adapter, "release", dep_ref)
+  |> should.equal([caller_ref])
+  store_deps.dependents(adapter, dep_ref) |> should.equal([])
+}
+
 pub fn the_ref_itself_is_not_its_own_dependent_test() {
   let #(cb, ref) = insert(codebase.empty(), int_fn_returning(4))
   store_deps.dependents(codebase.get_adapter(cb), ref)

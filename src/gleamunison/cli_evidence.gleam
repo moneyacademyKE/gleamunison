@@ -7,6 +7,7 @@
 
 import gleam/int
 import gleam/list
+import gleam/option.{None}
 import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
@@ -38,7 +39,8 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
     "" -> Error("evidence attest: a note is required — say what you observed")
     _ -> {
       use signer <- result.try(evidence.production_signer())
-      use store_path <- result.try(cli_lifecycle.resolve_store_path())
+      use context <- result.try(cli_lifecycle.resolve_context(None))
+      let store_path = cli_lifecycle.store_path(context)
       use output <- result.try(
         cli_store.with_dets(store_path, fn(adapter) {
           evidence.attach_signed(
@@ -62,7 +64,8 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
 }
 
 fn run(hash: String) -> Result(Nil, String) {
-  use store_path <- result.try(cli_lifecycle.resolve_store_path())
+  use context <- result.try(cli_lifecycle.resolve_context(None))
+  let store_path = cli_lifecycle.store_path(context)
   use output <- result.try(
     cli_store.with_dets(store_path, fn(adapter) {
       case trust.production_policy() {

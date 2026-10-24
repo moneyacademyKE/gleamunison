@@ -9,7 +9,7 @@
 import gleam/int
 import gleam/io
 import gleam/list
-import gleam/option
+import gleam/option.{None}
 import gleam/result
 import gleam/string
 import gleamunison/ast
@@ -46,21 +46,19 @@ pub fn command(args: List(String)) -> Nil {
 }
 
 fn run(path: String) -> Nil {
-  case cli_lifecycle.resolve_store_path() {
+  case cli_lifecycle.resolve_context(None) {
     Error(reason) -> fail("publish: " <> reason)
-    Ok(store_path) -> publish_with_store(path, store_path)
+    Ok(context) -> publish_with_store(path, context)
   }
 }
 
-fn publish_with_store(path: String, store_path: String) -> Nil {
-  let _ = simplifile.create_directory_all(store_dir(store_path))
-  let manifest_path = case cli_lifecycle.resolve_manifest_path() {
-    Ok(found) -> found
-    Error(reason) -> {
-      fail("publish: " <> reason)
-      ""
-    }
-  }
+fn publish_with_store(
+  path: String,
+  context: cli_lifecycle.StoreContext,
+) -> Nil {
+  let store_path = cli_lifecycle.store_path(context)
+  let manifest_path = cli_lifecycle.manifest_path(context)
+  let _ = simplifile.create_directory_all(cli_lifecycle.root_dir(context))
   case storage.dets(store_path) {
     Error(e) -> fail("publish: cannot open store: " <> string.inspect(e))
     Ok(adapter) ->
@@ -110,7 +108,7 @@ fn publish_with_store(path: String, store_path: String) -> Nil {
                   let prepared = {
                     use _ <- result.try(store_definitions(
                       adapter,
-                      store_dir(store_path),
+                      cli_lifecycle.root_dir(context),
                       term_names,
                       defs,
                       cache,
@@ -406,18 +404,5 @@ fn write_manifest(path: String, pairs: List(#(String, String, Bool))) -> Nil {
   case simplifile.write(path, content) {
     Ok(_) -> Nil
     Error(e) -> fail("publish: cannot write manifest: " <> string.inspect(e))
-  }
-}
-
-/// The directory a store file lives in, so an overridden store creates its own
-/// directory rather than the default one.
-fn store_dir(path: String) -> String {
-  case list.reverse(string.split(path, "/")) {
-    [_, ..parent] ->
-      case list.reverse(parent) |> string.join("/") {
-        "" -> "/"
-        dir -> dir
-      }
-    [] -> "."
   }
 }

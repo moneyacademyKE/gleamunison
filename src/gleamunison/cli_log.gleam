@@ -8,7 +8,7 @@
 import gleam/int
 import gleam/io
 import gleam/list
-
+import gleam/option.{None}
 import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
@@ -29,10 +29,11 @@ pub fn command(args: List(String)) -> Nil {
 
 fn run(args: List(String)) -> Result(String, #(Int, String)) {
   use #(which, count) <- result.try(parse_args(args, "content", default_tail))
-  use dir <- result.try(
-    cli_lifecycle.resolve_store_dir()
+  use context <- result.try(
+    cli_lifecycle.resolve_context(None)
     |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
   )
+  let dir = cli_lifecycle.root_dir(context)
   case which {
     "content" -> render_content(dir, count)
     "exec" -> render_exec(dir, count)

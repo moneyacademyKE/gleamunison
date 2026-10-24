@@ -94,6 +94,37 @@ pub fn a_name_reference_resolves_through_the_namespace_test() {
   run_ref.run(adapter, main_ref, []) |> should.equal(Ok("9"))
 }
 
+pub fn a_name_reference_uses_the_selected_branch_without_fallback_test() {
+  let #(cb, release_dep_ref) = insert(codebase.empty(), int_fn_returning(12))
+  let #(cb, main_dep_ref) = insert(cb, int_fn_returning(13))
+  let name_ref = repl_eval.ref_for_name("release-dep")
+  let main =
+    ast.TermDef(
+      term: ast.Apply(function: ast.RefTo(name_ref), arg: ast.Int(0)),
+      typ: ast.Builtin(ast.IntType),
+    )
+  let #(cb, main_ref) = insert(cb, main)
+  let adapter = codebase.get_adapter(cb)
+  let assert Ok(_) =
+    namespace.commit(
+      adapter,
+      "release",
+      namespace.set(namespace.empty(), "release-dep", release_dep_ref),
+    )
+  run_ref.run_on_branch(adapter, main_ref, "release", [])
+  |> should.equal(Ok("12"))
+  let assert Ok(_) =
+    namespace.commit(
+      adapter,
+      "main",
+      namespace.set(namespace.empty(), "release-dep", main_dep_ref),
+    )
+  run_ref.run_on_branch(adapter, main_ref, "release", [])
+  |> should.equal(Ok("12"))
+  run_ref.run_on_branch(adapter, main_ref, "main", [])
+  |> should.equal(Ok("13"))
+}
+
 pub fn a_name_reference_without_a_binding_is_missing_test() {
   let name_ref = repl_eval.ref_for_name("unbound")
   let main =

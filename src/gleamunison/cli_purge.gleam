@@ -29,7 +29,7 @@ import gleamunison/storage
 import gleamunison/store_deps
 import simplifile
 
-const branch = "main"
+const default_branch = "main"
 
 pub fn command(args: List(String)) -> Nil {
   case run(args) {
@@ -39,24 +39,26 @@ pub fn command(args: List(String)) -> Nil {
 }
 
 fn run(args: List(String)) -> Result(String, #(Int, String)) {
-  use #(hash, confirmed, store_override) <- result.try(parse_args(
+  use #(hash, confirmed, store_override, branch) <- result.try(parse_args(
     args,
     None,
     False,
     None,
+    default_branch,
   ))
   use ref <- result.try(
     identity.parse_ref_hex(hash)
     |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
   )
-  use store_path <- result.try(resolve(store_override))
-  use manifest_path <- result.try(
-    cli_lifecycle.resolve_manifest_path()
+  use context <- result.try(
+    cli_lifecycle.resolve_context(store_override)
     |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
   )
+  let store_path = cli_lifecycle.store_path(context)
+  let manifest_path = cli_lifecycle.manifest_path(context)
   cli_store.with_dets_mapped(
     store_path,
-    fn(adapter) { purge(adapter, manifest_path, ref, confirmed) },
+    fn(adapter) { purge(adapter, manifest_path, ref, branch, confirmed) },
     fn(message) { #(cli_result.unresolvable, message) },
   )
 }
@@ -65,16 +67,17 @@ fn purge(
   adapter: storage.StorageAdapter,
   manifest_path: String,
   ref: DefinitionRef,
+  branch: String,
   confirmed: Bool,
 ) -> Result(String, #(Int, String)) {
   use _ <- result.try(exists(adapter, ref))
   let outside =
-    store_deps.dependents(adapter, ref)
+    store_deps.dependents_on_branch(adapter, branch, ref)
     |> list.filter(fn(dependent) { dependent != ref })
   case outside {
     [] -> {
-      let removal = store_deps.exclusive_closure(adapter, ref)
-      let report = describe_set(adapter, removal)
+      let removal = store_deps.exclusive_closure_on_branch(adapter, branch, ref)
+      let report = describe_set(adapter, branch, removal)
       case confirmed {
         False ->
           Ok(
@@ -85,7 +88,12 @@ fn purge(
             <> "\npurge: nothing changed; re-run with --yes to remove them",
           )
         True -> {
-          use _ <- result.try(remove_all(adapter, manifest_path, removal))
+          use _ <- result.try(remove_all(
+            adapter,
+            manifest_path,
+            branch,
+            removal,
+          ))
           Ok(
             "purge: removed "
             <> int.to_string(list.length(removal))
@@ -129,11 +137,12 @@ fn exists(
 /// One line per definition: ref, and the names that point at it.
 fn describe_set(
   adapter: storage.StorageAdapter,
+  branch: String,
   removal: List(DefinitionRef),
 ) -> String {
   removal
   |> list.map(fn(ref) {
-    let names = store_deps.names_for(adapter, ref)
+    let names = store_deps.names_for_on_branch(adapter, branch, ref)
     case names {
       [] -> "  " <> short(ref)
       _ -> "  " <> short(ref) <> "  (" <> string.join(names, ", ") <> ")"
@@ -145,10 +154,11 @@ fn describe_set(
 fn remove_all(
   adapter: storage.StorageAdapter,
   manifest_path: String,
+  branch: String,
   removal: List(DefinitionRef),
 ) -> Result(Nil, #(Int, String)) {
   let hashes = list.map(removal, full_hex)
-  use _ <- result.try(unbind_all(adapter, removal))
+  use _ <- result.try(unbind_all(adapter, branch, removal))
   use _ <- result.try(drop_index_lines(manifest_path, hashes))
   use _ <- result.try(
     list.try_fold(removal, Nil, fn(_, ref) {
@@ -167,6 +177,7 @@ fn remove_all(
 /// Drop the namespace bindings for every removed ref, in one commit.
 fn unbind_all(
   adapter: storage.StorageAdapter,
+  branch: String,
   removal: List(DefinitionRef),
 ) -> Result(Nil, #(Int, String)) {
   let current = case namespace.load_current(adapter, branch) {
@@ -174,7 +185,9 @@ fn unbind_all(
     Error(_) -> namespace.empty()
   }
   let names =
-    list.flat_map(removal, fn(ref) { store_deps.names_for(adapter, ref) })
+    list.flat_map(removal, fn(ref) {
+      store_deps.names_for_on_branch(adapter, branch, ref)
+    })
   case names {
     [] -> Ok(Nil)
     _ -> {
@@ -230,17 +243,23 @@ fn parse_args(
   hash: Option(String),
   confirmed: Bool,
   store_override: Option(String),
-) -> Result(#(String, Bool, Option(String)), #(Int, String)) {
+  branch: String,
+) -> Result(#(String, Bool, Option(String), String), #(Int, String)) {
   case args {
     [] ->
       case hash {
-        Some(value) -> Ok(#(value, confirmed, store_override))
+        Some(value) -> Ok(#(value, confirmed, store_override, branch))
         None -> Error(#(cli_result.refused, usage()))
       }
-    ["--yes"] -> parse_args([], hash, True, store_override)
-    ["--store", path, ..rest] -> parse_args(rest, hash, confirmed, Some(path))
+    ["--yes"] -> parse_args([], hash, True, store_override, branch)
+    ["--store", path, ..rest] ->
+      parse_args(rest, hash, confirmed, Some(path), branch)
     ["--store"] ->
       Error(#(cli_result.refused, "--store needs a path\n" <> usage()))
+    ["--branch", name, ..rest] ->
+      parse_args(rest, hash, confirmed, store_override, name)
+    ["--branch"] ->
+      Error(#(cli_result.refused, "--branch needs a name\n" <> usage()))
     [value, ..rest] ->
       case hash {
         Some(_) ->
@@ -248,17 +267,8 @@ fn parse_args(
             cli_result.refused,
             "purge: unexpected argument '" <> value <> "'\n" <> usage(),
           ))
-        None -> parse_args(rest, Some(value), confirmed, store_override)
+        None -> parse_args(rest, Some(value), confirmed, store_override, branch)
       }
-  }
-}
-
-fn resolve(override: Option(String)) -> Result(String, #(Int, String)) {
-  case override {
-    Some(path) -> Ok(path)
-    None ->
-      cli_lifecycle.resolve_store_path()
-      |> result.map_error(fn(message) { #(cli_result.unresolvable, message) })
   }
 }
 
@@ -280,9 +290,10 @@ fn describe(error: storage.StorageError) -> String {
 }
 
 fn usage() -> String {
-  "usage: gleam run -- purge <content-hash> [--yes] [--store path]\n"
+  "usage: gleam run -- purge <content-hash> [--yes] [--store path] [--branch name]\n"
   <> "\n"
   <> "Removes a definition and the stored dependencies nothing else uses.\n"
   <> "Dry run by default: prints the removal set and changes nothing until\n"
-  <> "--yes. Refuses when something outside that set depends on the ref."
+  <> "--yes. Refuses when something outside that set depends on the ref.\n"
+  <> "The branch defaults to main; --branch selects another namespace."
 }

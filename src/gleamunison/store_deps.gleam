@@ -20,7 +20,7 @@ import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
 
-const branch = "main"
+const default_branch = "main"
 
 /// Every stored definition that references `target`, either by its content ref
 /// or by a name ref that currently binds to it.
@@ -28,7 +28,15 @@ pub fn dependents(
   adapter: storage.StorageAdapter,
   target: DefinitionRef,
 ) -> List(DefinitionRef) {
-  let name_refs = name_refs_for(adapter, target)
+  dependents_on_branch(adapter, default_branch, target)
+}
+
+pub fn dependents_on_branch(
+  adapter: storage.StorageAdapter,
+  branch: String,
+  target: DefinitionRef,
+) -> List(DefinitionRef) {
+  let name_refs = name_refs_for(adapter, branch, target)
   let cb = codebase.with_adapter(adapter)
   case adapter.list_refs() {
     Error(_) -> []
@@ -38,8 +46,6 @@ pub fn dependents(
           True -> Error(Nil)
           False -> {
             case codebase.get(cb, ref) {
-              // Payloads that are not definitions (namespace chunks, head
-              // pointers, evidence records) are skipped, not errors.
               Error(_) -> Error(Nil)
               Ok(definition) -> {
                 let refs_used = definition_refs.refs_of_definition(definition)
@@ -62,6 +68,7 @@ pub fn dependents(
 /// The name refs that currently resolve to `target` on this branch.
 fn name_refs_for(
   adapter: storage.StorageAdapter,
+  branch: String,
   target: DefinitionRef,
 ) -> List(DefinitionRef) {
   case namespace.load_current(adapter, branch) {
@@ -80,6 +87,15 @@ fn name_refs_for(
 /// the one being retracted.
 pub fn other_names(
   adapter: storage.StorageAdapter,
+  target: DefinitionRef,
+  retracting: String,
+) -> List(String) {
+  other_names_on_branch(adapter, default_branch, target, retracting)
+}
+
+pub fn other_names_on_branch(
+  adapter: storage.StorageAdapter,
+  branch: String,
   target: DefinitionRef,
   retracting: String,
 ) -> List(String) {
@@ -104,6 +120,14 @@ pub fn stored_dependencies(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
 ) -> List(DefinitionRef) {
+  stored_dependencies_on_branch(adapter, default_branch, ref)
+}
+
+pub fn stored_dependencies_on_branch(
+  adapter: storage.StorageAdapter,
+  branch: String,
+  ref: DefinitionRef,
+) -> List(DefinitionRef) {
   let cb = codebase.with_adapter(adapter)
   case codebase.get(cb, ref) {
     Error(_) -> []
@@ -114,7 +138,7 @@ pub fn stored_dependencies(
           Ok(_) -> Ok(dependency)
           Error(_) ->
             // A name ref: the bytes live under the content ref it binds.
-            case resolve_name(adapter, dependency) {
+            case resolve_name(adapter, branch, dependency) {
               Ok(content_ref) -> Ok(content_ref)
               Error(_) -> Error(Nil)
             }
@@ -126,6 +150,7 @@ pub fn stored_dependencies(
 
 fn resolve_name(
   adapter: storage.StorageAdapter,
+  branch: String,
   name_ref: DefinitionRef,
 ) -> Result(DefinitionRef, Nil) {
   case namespace.load_current(adapter, branch) {
@@ -152,14 +177,23 @@ pub fn exclusive_closure(
   adapter: storage.StorageAdapter,
   root: DefinitionRef,
 ) -> List(DefinitionRef) {
+  exclusive_closure_on_branch(adapter, default_branch, root)
+}
+
+pub fn exclusive_closure_on_branch(
+  adapter: storage.StorageAdapter,
+  branch: String,
+  root: DefinitionRef,
+) -> List(DefinitionRef) {
   let roots = [root]
-  expand(adapter, roots, 0)
+  expand(adapter, branch, roots, 0)
 }
 
 const max_rounds = 64
 
 fn expand(
   adapter: storage.StorageAdapter,
+  branch: String,
   set: List(DefinitionRef),
   round: Int,
 ) -> List(DefinitionRef) {
@@ -167,17 +201,19 @@ fn expand(
     True -> set
     False -> {
       let candidates =
-        list.flat_map(set, fn(ref) { stored_dependencies(adapter, ref) })
+        list.flat_map(set, fn(ref) {
+          stored_dependencies_on_branch(adapter, branch, ref)
+        })
         |> list.filter(fn(dep) { !list.contains(set, dep) })
         |> list.unique
       let additions =
         list.filter(candidates, fn(dep) {
-          dependents(adapter, dep)
+          dependents_on_branch(adapter, branch, dep)
           |> list.all(fn(dependent) { list.contains(set, dependent) })
         })
       case additions {
         [] -> set
-        _ -> expand(adapter, list.append(set, additions), round + 1)
+        _ -> expand(adapter, branch, list.append(set, additions), round + 1)
       }
     }
   }
@@ -186,6 +222,14 @@ fn expand(
 /// Every name bound to `ref` on this branch.
 pub fn names_for(
   adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+) -> List(String) {
+  names_for_on_branch(adapter, default_branch, ref)
+}
+
+pub fn names_for_on_branch(
+  adapter: storage.StorageAdapter,
+  branch: String,
   ref: DefinitionRef,
 ) -> List(String) {
   case namespace.load_current(adapter, branch) {

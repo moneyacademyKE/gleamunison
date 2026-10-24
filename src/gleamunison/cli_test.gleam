@@ -48,14 +48,19 @@ fn run(path: String) -> Nil {
 }
 
 fn run_with_signer(path: String, signer: evidence.Signer) -> Nil {
-  let store_path = case cli_lifecycle.resolve_store_path() {
+  let context = case cli_lifecycle.resolve_context(option.None) {
     Ok(found) -> found
     Error(reason) -> {
       fail("test: " <> reason)
-      ""
+      cli_lifecycle.StoreContext(
+        store_path: "",
+        manifest_path: "",
+        root_dir: "",
+      )
     }
   }
-  case simplifile.create_directory_all(store_dir(store_path)) {
+  let store_path = cli_lifecycle.store_path(context)
+  case simplifile.create_directory_all(cli_lifecycle.root_dir(context)) {
     Error(e) -> fail("test: cannot create store: " <> string.inspect(e))
     Ok(_) ->
       case storage.dets(store_path) {
@@ -161,17 +166,4 @@ pub fn run_file_with_signer(
       #(subject_hex, payload)
     }),
   ))
-}
-
-/// The directory a store file lives in, so an overridden store creates its own
-/// directory rather than the default one.
-fn store_dir(path: String) -> String {
-  case list.reverse(string.split(path, "/")) {
-    [_, ..parent] ->
-      case list.reverse(parent) |> string.join("/") {
-        "" -> "/"
-        dir -> dir
-      }
-    [] -> "."
-  }
 }
