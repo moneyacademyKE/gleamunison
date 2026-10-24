@@ -223,10 +223,11 @@ test_soft_purge_scenario() ->
     code:purge(m_purge_test),
     {ok, {PurgeRes1, PurgeRes2}}.
 
-%% Render a runtime value the way the REPL does (~tp). One renderer for the
-%% CLI text path and the log, so a value never has two spellings.
+%% Render a runtime value the way the REPL does. One renderer for the CLI text
+%% path and the log, so a value never has two spellings. UTF-8 text renders as
+%% text; `gleamunison_render` owns that decision.
 render_term(Term) ->
-    list_to_binary(io_lib:format("~tp", [Term])).
+    gleamunison_render:term(Term).
 
 %% A runtime value as JSON, for `run --json`. Native where the shape is
 %% unambiguous (numbers, text, booleans, nil, lists), tagged where the language

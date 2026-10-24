@@ -38,10 +38,18 @@ fn get_plain_args() -> List(String)
 @external(erlang, "gleamunison_ffi", "halt_failure")
 fn halt_failure() -> Nil
 
+@external(erlang, "gleamunison_render", "setup_stdio")
+fn setup_stdio() -> Nil
+
 @external(erlang, "gleamunison_definition_codec", "version")
 fn definition_codec_version() -> Int
 
 pub fn run(args: List(String)) -> Nil {
+  // Before any command writes: the console device defaults to latin1, which
+  // escapes every codepoint outside Latin-1 as \x{...} — including the em dash
+  // in this program's own help text. One call at the entry point, so no command
+  // has to remember.
+  setup_stdio()
   case args {
     [] -> print_help()
     ["llm", ..rest] -> cli_result.print(cli_llm.command_result(rest))

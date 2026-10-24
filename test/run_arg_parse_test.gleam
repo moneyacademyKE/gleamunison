@@ -50,3 +50,22 @@ pub fn garbage_is_refused_test() {
   parsed("3x") |> should.equal("REFUSED")
   parsed("(1,") |> should.equal("REFUSED")
 }
+
+/// Text is text, not a byte list. `~tp` only prints a binary as a string when
+/// every byte is printable Latin-1, so `run` on a definition returning UTF-8
+/// text printed <<104,195,169,108,108,111>> — the term, and nothing a human
+/// could read. The shape stays the one the REPL uses.
+pub fn unicode_text_renders_as_text_test() {
+  parsed("\"héllo ✓\"") |> should.equal("<<\"héllo ✓\">>")
+}
+
+pub fn escaped_bytes_stay_escaped_inside_the_quotes_test() {
+  parsed("\"a\\\"b\"") |> should.equal("<<\"a\\\"b\">>")
+  parsed("\"a\\nb\"") |> should.equal("<<\"a\\nb\">>")
+}
+
+pub fn non_text_bytes_stay_bytes_test() {
+  // A payload that is not valid UTF-8 is not text; showing it as one would lie.
+  let assert Ok(term) = parse_term_arg("\"\\xff\"")
+  render(term) |> should.equal("<<255>>")
+}
