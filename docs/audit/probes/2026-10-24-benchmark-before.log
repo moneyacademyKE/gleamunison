@@ -1,0 +1,13 @@
+rank_bm25 n=100 times_us=[875,833,816] median_us=833
+rank_hybrid n=100 times_us=[2361,2292,2268] median_us=2292
+rank_bm25 n=500 times_us=[19725,19489,19491] median_us=19491
+rank_hybrid n=500 times_us=[27120,27562,27472] median_us=27472
+rank_bm25 n=1000 times_us=[77824,78472,78690] median_us=78472
+rank_hybrid n=1000 times_us=[95475,96447,95456] median_us=95475
+dependents_ets n=100 times_us=[490,455,444] median_us=455
+evidence_ets n=100 times_us=[41,39,39] median_us=39
+dependents_ets n=1000 times_us=[4549,4546,4584] median_us=4549
+evidence_ets n=1000 times_us=[436,397,445] median_us=436
+dependents_ets n=5000 times_us=[22440,21854,22110] median_us=22110
+evidence_ets n=5000 times_us=[1856,1938,1921] median_us=1921
+benchmark_probe=PASS

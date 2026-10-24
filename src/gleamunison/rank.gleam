@@ -134,11 +134,12 @@ pub fn rank(query: String, docs: List(Doc(a))) -> List(#(Float, a)) {
         0 -> 1.0
         n -> int_to_float(total) /. int_to_float(n)
       }
+      let weighted_terms = list.map(terms, fn(term) { #(term, idf(term, all)) })
       docs
       |> list.map(fn(d) {
         let score =
-          list.fold(terms, 0.0, fn(acc, term) {
-            acc +. score_term(term, d.tokens, idf(term, all), avgdl)
+          list.fold(weighted_terms, 0.0, fn(acc, term) {
+            acc +. score_term(term.0, d.tokens, term.1, avgdl)
           })
         #(score, d.id)
       })
@@ -273,14 +274,20 @@ pub fn rank_hybrid(query: String, docs: List(DocV(a))) -> List(#(Float, a)) {
         True -> 0.5 *. max_cos
         False -> 0.1
       }
+      // Reverse fold preserves the old first-match semantics for duplicate
+      // ids: highest BM25 score, but first input cosine.
+      let bm25 =
+        dict.from_list(list.reverse(list.map(bm25, fn(p) { #(p.1, p.0) })))
+      let cosines =
+        dict.from_list(list.reverse(list.map(cosines, fn(p) { #(p.1, p.0) })))
       docs
       |> list.filter_map(fn(d) {
-        let b = case list.find(bm25, fn(p) { p.1 == d.id }) {
-          Ok(p) -> p.0
+        let b = case dict.get(bm25, d.id) {
+          Ok(score) -> score
           Error(_) -> 0.0
         }
-        let #(c, shared) = case list.find(cosines, fn(p) { p.1 == d.id }) {
-          Ok(p) -> p.0
+        let #(c, shared) = case dict.get(cosines, d.id) {
+          Ok(score) -> score
           Error(_) -> #(0.0, 0)
         }
         let s = case c >. floor && shared >= 2 {

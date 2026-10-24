@@ -5,6 +5,11 @@
 %% No source mutation, network call, production store, or disk-backed fixture.
 %% All generated data lives inside this VM. Timings are synthetic, not SLAs.
 
+main(["benchmark"]) ->
+    ok = code:add_paths(filelib:wildcard("build/dev/erlang/*/ebin")),
+    benchmark_search(),
+    benchmark_store(),
+    io:format("benchmark_probe=PASS~n");
 main(_) ->
     Paths = filelib:wildcard("build/dev/erlang/*/ebin"),
     true = code:add_paths(Paths) =:= ok,
