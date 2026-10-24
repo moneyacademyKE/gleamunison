@@ -217,6 +217,12 @@ dispatch({_SelfName, {request_defs, Refs}}) when is_list(Refs) ->
     Defs = gleamunison_ffi_io:fetch_defs_binary(Refs),
     {ok, Defs};
 
+%% Attestations are content, not definitions: a closure fetch carries the defs a
+%% manifest names, and the evidence that admits them travels by subject.
+dispatch({_SelfName, {request_evidence, Subjects}}) when is_list(Subjects) ->
+    Records = gleamunison_ffi_io:evidence_for_subjects(Subjects),
+    {ok, Records};
+
 dispatch({_SelfName, {push_defs, Defs}}) when is_list(Defs) ->
     gleamunison_ffi_io:receive_pushed_defs(Defs);
 

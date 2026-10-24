@@ -206,6 +206,16 @@ fn pull_first(
     |> result.map_error(fn(e) { string.inspect(e) })
   }
   use closure <- result.try(pkg.pull_closure(adapter, root_hex, fetch))
+  // The closure is content; admission is a claim about it. Pull the peer's
+  // attestations for exactly those subjects, or the evidence gate below can
+  // never pass and `--peer` refuses every install.
+  use _ <- result.try(
+    sync.fetch_evidence(PeerId(peer), cb, closure.defs)
+    |> result.map(fn(_) { Nil })
+    |> result.map_error(fn(e) {
+      "pkg: cannot fetch evidence: " <> string.inspect(e)
+    }),
+  )
   cli_result.success(
     "pkg: pulled "
     <> int.to_string(list.length(closure.manifests))

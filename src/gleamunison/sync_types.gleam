@@ -17,6 +17,12 @@ pub fn sync_request_defs(
   refs: List(String),
 ) -> Result(List(#(String, BitArray)), String)
 
+@external(erlang, "gleamunison_ffi_io", "sync_request_evidence")
+pub fn sync_request_evidence(
+  node: String,
+  subjects: List(String),
+) -> Result(List(#(String, BitArray)), String)
+
 @external(erlang, "gleamunison_ffi_io", "sync_push_defs")
 pub fn sync_push_defs(
   node: String,

@@ -9,7 +9,8 @@ import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/sync_types.{
   type PeerId, type SyncError, type SyncState, Connected, ConnectionFailed,
   HashConflict, PeerId, PeerNotFound, PeerState, SyncState, TransferFailed,
-  sync_connect, sync_receive_diff, sync_request_defs, sync_send_refs,
+  sync_connect, sync_receive_diff, sync_request_defs, sync_request_evidence,
+  sync_send_refs,
 }
 import gleamy/priority_queue
 
@@ -80,6 +81,35 @@ pub fn fetch_refs(
     Ok(def_blobs) -> {
       use Nil <- result.try(validate_chunk_set(hexes, def_blobs))
       list.try_fold(def_blobs, codebase, fn(cb, pair) {
+        let #(hash_hex, bytes) = pair
+        use ref <- result.try(
+          identity.parse_ref_hex(hash_hex)
+          |> result.map_error(fn(msg) { TransferFailed(peer, msg) }),
+        )
+        accept_chunk(peer, cb, ref, bytes)
+      })
+    }
+  }
+}
+
+/// Fetch the attestations that cover these subjects. A package closure is
+/// definitions and manifests; the evidence that admits those definitions is
+/// separate content, so a peer installing by manifest hash had nothing to
+/// satisfy its own gate with and refused every install. Content addressing
+/// still applies: each chunk is verified against its ref on arrival, and the
+/// signature is checked locally by the trust policy, not by the peer.
+pub fn fetch_evidence(
+  peer: PeerId,
+  codebase: Codebase,
+  subjects: List(String),
+) -> Result(Codebase, SyncError) {
+  let PeerId(name) = peer
+  case sync_request_evidence(name, subjects) {
+    Error(msg) -> Error(TransferFailed(peer, msg))
+    Ok(blobs) -> {
+      let requested = list.map(blobs, fn(pair) { pair.0 })
+      use Nil <- result.try(validate_chunk_set(requested, blobs))
+      list.try_fold(blobs, codebase, fn(cb, pair) {
         let #(hash_hex, bytes) = pair
         use ref <- result.try(
           identity.parse_ref_hex(hash_hex)

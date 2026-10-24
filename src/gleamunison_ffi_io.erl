@@ -8,7 +8,8 @@
     serialize_term/1, deserialize_term/1,
     register_peer_refs/2, compute_diff/1, fetch_defs_binary/1, receive_pushed_defs/1,
     node_atom/1, hex_to_ref/1, ref_to_hex/1, parse_host_port/1,
-    local_content_refs/0
+    local_content_refs/0, evidence_for_subjects/1,
+    sync_request_evidence/2
 ]).
 
 %% --- State (process dictionary) ---
@@ -157,6 +158,24 @@ sync_request_defs(NodeBin, Refs) ->
             tcp_call(NodeBin, {request_defs, Refs})
     end.
 
+%% Ask a peer which of its attestations cover these subjects. Same transport
+%% shape as sync_request_defs: BEAM rpc when the name carries @, framed TCP
+%% otherwise.
+sync_request_evidence(NodeBin, Subjects) ->
+    case has_node_at(NodeBin) of
+        true ->
+            case safe_node_atom(NodeBin) of
+                {ok, NodeAtom} ->
+                    case rpc:call(NodeAtom, ?MODULE, evidence_for_subjects, [Subjects]) of
+                        {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
+                        Res -> {ok, Res}
+                    end;
+                {error, Reason} -> {error, Reason}
+            end;
+        false ->
+            tcp_call(NodeBin, {request_evidence, Subjects})
+    end.
+
 sync_push_defs(NodeBin, Defs) ->
     case has_node_at(NodeBin) of
         true ->
@@ -263,6 +282,57 @@ storage_failure(Reason) ->
 %% same shape, so listing keys advertised attestations as content and the peer
 %% died verifying bytes against a ref they never hashed to. The codec owns the
 %% question of what a payload is.
+%% Evidence covering the given subjects, as {Hex, Bytes} content chunks.
+%%
+%% A package closure is definitions and manifests; the attestations that admit
+%% those definitions are separate content-addressed records. A peer installing
+%% by manifest hash therefore had nothing to satisfy the evidence gate with and
+%% refused every install, even though the peer held the records. The subject is
+%% the first field of the record, so this answers the question directly instead
+%% of shipping the whole store.
+evidence_for_subjects(Subjects) when is_list(Subjects) ->
+    Wanted = sets:from_list(Subjects),
+    case persistent_term:get({gleamunison, active_storage}, undefined) of
+        undefined -> [];
+        {Type, Tab} ->
+            RefsResult = case Type of
+                ets -> gleamunison_storage:list_refs(Tab);
+                dets -> gleamunison_storage:dets_list_refs(Tab);
+                partitioned_dets -> gleamunison_storage:partitioned_dets_list_refs(Tab);
+                mnesia -> gleamunison_storage:mnesia_list_refs(Tab)
+            end,
+            case RefsResult of
+                {ok, Refs} ->
+                    lists:filtermap(fun(Ref) ->
+                        case storage_lookup(Type, Tab, Ref) of
+                            {ok, {some, Bytes}} ->
+                                case evidence_subject(Bytes) of
+                                    {ok, Subject} ->
+                                        case sets:is_element(Subject, Wanted) of
+                                            true -> {true, {ref_to_hex(Ref), Bytes}};
+                                            false -> false
+                                        end;
+                                    error -> false
+                                end;
+                            _ -> false
+                        end
+                    end, Refs);
+                _ -> []
+            end
+    end.
+
+%% "evidence:1:<subject-b64>:<tag>:..." — the subject is the third field.
+evidence_subject(<<"evidence:1:", Rest/binary>>) ->
+    case binary:split(Rest, <<":">>) of
+        [B64, _] ->
+            try base64:decode(B64) of
+                Subject -> {ok, Subject}
+            catch _:_ -> error
+            end;
+        _ -> error
+    end;
+evidence_subject(_) -> error.
+
 %% What this node would offer a peer, as hex. Exported so the filter that
 %% keeps evidence and namespace rows out of a sync diff is testable directly.
 local_content_refs() ->
@@ -279,14 +349,14 @@ get_local_refs_hex() ->
                 mnesia -> gleamunison_storage:mnesia_list_refs(Tab)
             end,
             case RefsResult of
-                {ok, Refs} -> [ref_to_hex(R) || R <- Refs, is_definition_row(Type, Tab, R)];
+                {ok, Refs} -> [ref_to_hex(R) || R <- Refs, is_content_row(Type, Tab, R)];
                 _ -> []
             end
     end.
 
-is_definition_row(Type, Tab, Ref) ->
+is_content_row(Type, Tab, Ref) ->
     case storage_lookup(Type, Tab, Ref) of
-        {ok, {some, Bytes}} -> gleamunison_definition_codec:is_definition(Bytes);
+        {ok, {some, Bytes}} -> gleamunison_cas:verify(Ref, Bytes) =:= {ok, nil};
         _ -> false
     end.
 
