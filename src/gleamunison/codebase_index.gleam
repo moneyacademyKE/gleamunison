@@ -2,6 +2,7 @@ import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
+import gleam/set
 import gleamunison/cli_datalog
 import gleamunison/elab_types.{
   type SCase, type SurfaceDef, type SurfaceTerm, SApply, SConstruct, SDo, SFloat,
@@ -48,7 +49,7 @@ fn ref_to_hex(r: DefinitionRef) -> String {
 /// The index schema: one entity per definition, carrying name/hash/kind,
 /// plus one def/dep datom per in-corpus name the body references.
 pub fn datoms_of(defs: List(#(String, SurfaceDef))) -> List(Datom) {
-  let names = list.map(defs, fn(p) { p.0 })
+  let names = list.map(defs, fn(p) { p.0 }) |> set.from_list
   list.index_fold(defs, [], fn(acc, pair, i) {
     let e = i + 1
     let base = [
@@ -59,10 +60,11 @@ pub fn datoms_of(defs: List(#(String, SurfaceDef))) -> List(Datom) {
     let deps =
       surface_deps(pair.1)
       |> list.unique
-      |> list.filter(fn(n) { list.contains(names, n) })
+      |> list.filter(fn(n) { set.contains(names, n) })
       |> list.map(fn(n) { Datom(e, "def/dep", n) })
-    list.append(acc, list.append(base, deps))
+    list.fold(list.append(base, deps), acc, fn(acc, datom) { [datom, ..acc] })
   })
+  |> list.reverse
 }
 
 /// Names a definition's body references (free vars at the surface level).
