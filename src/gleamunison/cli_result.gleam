@@ -37,8 +37,12 @@ pub fn print(result: Result(String, String)) -> Nil {
   }
 }
 
+/// Fail on stderr. The doc comment above says stdout carries only the result,
+/// and `fail_with_code` already honours it — this one did not, so every command
+/// that declined through `fail` wrote its error to stdout: `replay ... | jq`
+/// piped a message, not a result. One boundary, one stream.
 pub fn fail(message: String) -> Nil {
-  io.println(message)
+  io.println_error(message)
   halt_failure()
 }
 
