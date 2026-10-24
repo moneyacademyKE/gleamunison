@@ -240,7 +240,12 @@ mnesia_list_refs(Tab) ->
         {aborted, R} -> err(R)
     end.
 
-mnesia_delete(_Tab, _Ref) -> {ok, nil}.
+mnesia_delete(Tab, Ref) ->
+    F = fun() -> mnesia:delete({Tab, Ref}) end,
+    case mnesia:transaction(F) of
+        {atomic, ok} -> {ok, nil};
+        {aborted, R} -> err(R)
+    end.
 
 mnesia_close(_Tab) -> {ok, nil}.
 
