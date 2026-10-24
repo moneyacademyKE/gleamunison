@@ -17,39 +17,73 @@ import gleamunison/identity.{
 }
 import gleamunison/storage.{type StorageAdapter}
 
+pub type ManifestDef {
+  ManifestDef(name: String, hash_hex: String, effectful: Bool)
+}
+
 pub type Manifest {
   Manifest(
     name: String,
     version: String,
-    /// (definition name, hash hex) pairs; hashing/serialization are
-    /// canonical (sorted), so order in this list is presentation only.
-    defs: List(#(String, String)),
+    defs: List(ManifestDef),
     /// Hex hashes of manifests this package depends on.
     deps: List(String),
     require_evidence: Bool,
+    /// 1 is the legacy name=hash format; 2 carries effectful per-def flags.
+    format_version: Int,
   )
 }
 
 pub fn new(name: String, version: String) -> Manifest {
-  Manifest(name, version, [], [], True)
+  Manifest(name, version, [], [], True, 2)
 }
 
+/// Add a pure definition. Pure is the conservative compatibility default.
 pub fn add_def(m: Manifest, name: String, hash_hex: String) -> Manifest {
-  Manifest(..m, defs: list.append(m.defs, [#(name, hash_hex)]))
+  add_def_with_effect(m, name, hash_hex, False)
+}
+
+pub fn add_def_with_effect(
+  m: Manifest,
+  name: String,
+  hash_hex: String,
+  effectful: Bool,
+) -> Manifest {
+  Manifest(
+    ..m,
+    defs: list.append(m.defs, [ManifestDef(name, hash_hex, effectful)]),
+    format_version: 2,
+  )
+}
+
+pub fn def_name(def: ManifestDef) -> String {
+  def.name
+}
+
+pub fn def_hash(def: ManifestDef) -> String {
+  def.hash_hex
+}
+
+pub fn def_effectful(def: ManifestDef) -> Bool {
+  def.effectful
 }
 
 pub fn add_dep(m: Manifest, manifest_hash_hex: String) -> Manifest {
-  Manifest(..m, deps: list.append(m.deps, [manifest_hash_hex]))
+  Manifest(
+    ..m,
+    deps: list.append(m.deps, [manifest_hash_hex]),
+    format_version: 2,
+  )
 }
 
 pub fn without_evidence_requirement(m: Manifest) -> Manifest {
-  Manifest(..m, require_evidence: False)
+  Manifest(..m, require_evidence: False, format_version: 2)
 }
 
 /// Content hash over the canonical form: same contents, same hash,
 /// regardless of the order defs were added in.
 pub fn hash_of(m: Manifest) -> Hash {
-  hash_bytes(bit_array.from_string(canonical(m)))
+  hash_bytes(bit_array.from_string(serialize(m)))
 }
 
 /// The ref this manifest is stored under.
@@ -68,21 +102,20 @@ pub fn ref_hex_of(ref: DefinitionRef) -> String {
   hash_to_debug_string(ref_hash(ref))
 }
 
+/// Current canonical text. The version marker makes the format unambiguous;
+/// the effect token is part of the content identity.
 fn canonical(m: Manifest) -> String {
   let defs =
     m.defs
-    |> list.sort(fn(a, b) { string.compare(a.0 <> a.1, b.0 <> b.1) })
-    |> list.map(fn(p) { p.0 <> "=" <> p.1 })
+    |> list.sort(fn(a, b) { string.compare(def_sort_key(a), def_sort_key(b)) })
+    |> list.map(serialize_def)
     |> string.join(",")
   let deps =
     m.deps
     |> list.sort(string.compare)
     |> string.join(",")
-  let ev = case m.require_evidence {
-    True -> "yes"
-    False -> "no"
-  }
-  "pkg:"
+  let ev = evidence_flag(m.require_evidence)
+  "pkg:2:"
   <> m.name
   <> ":"
   <> m.version
@@ -94,39 +127,130 @@ fn canonical(m: Manifest) -> String {
   <> ev
 }
 
-/// Canonical text serialization — what gets stored in the DAG.
-pub fn serialize(m: Manifest) -> String {
-  canonical(m)
+/// Legacy canonical text is retained so a parsed old manifest re-hashes to
+/// its existing ref. Legacy entries have no effect metadata and are pure.
+fn legacy_canonical(m: Manifest) -> String {
+  let defs =
+    m.defs
+    |> list.sort(fn(a, b) {
+      string.compare(a.name <> a.hash_hex, b.name <> b.hash_hex)
+    })
+    |> list.map(fn(d) { d.name <> "=" <> d.hash_hex })
+    |> string.join(",")
+  let deps =
+    m.deps
+    |> list.sort(string.compare)
+    |> string.join(",")
+  "pkg:"
+  <> m.name
+  <> ":"
+  <> m.version
+  <> ":"
+  <> defs
+  <> ":"
+  <> deps
+  <> ":"
+  <> evidence_flag(m.require_evidence)
 }
 
-/// Parse a manifest back from its canonical text form.
+fn def_sort_key(def: ManifestDef) -> String {
+  def.name <> def.hash_hex <> effect_token(def.effectful)
+}
+
+fn serialize_def(def: ManifestDef) -> String {
+  def.name <> "=" <> def.hash_hex <> "=" <> effect_token(def.effectful)
+}
+
+fn effect_token(effectful: Bool) -> String {
+  case effectful {
+    True -> "effectful"
+    False -> "pure"
+  }
+}
+
+fn evidence_flag(required: Bool) -> String {
+  case required {
+    True -> "yes"
+    False -> "no"
+  }
+}
+
+/// Serialize using the format version carried by the value. This preserves
+/// the hash of legacy manifests loaded from the store.
+pub fn serialize(m: Manifest) -> String {
+  case m.format_version {
+    1 -> legacy_canonical(m)
+    _ -> canonical(m)
+  }
+}
+
+/// Parse current manifests and the original name=hash format. Legacy entries
+/// deliberately become pure: absent metadata never grants Io admission.
 pub fn parse(text: String) -> Result(Manifest, String) {
   case string.split(text, ":") {
-    ["pkg", name, version, defs, deps, ev] -> {
-      use def_pairs <- result.try(parse_defs(defs))
-      let dep_list = case deps {
-        "" -> []
-        _ -> string.split(deps, ",")
-      }
-      use require_evidence <- result.try(case ev {
-        "yes" -> Ok(True)
-        "no" -> Ok(False)
-        _ -> Error("bad evidence flag: " <> ev)
-      })
-      Ok(Manifest(name, version, def_pairs, dep_list, require_evidence))
-    }
+    ["pkg", "2", name, version, defs, deps, ev] ->
+      parse_parts(name, version, defs, deps, ev, 2, parse_current_defs)
+    ["pkg", name, version, defs, deps, ev] ->
+      parse_parts(name, version, defs, deps, ev, 1, parse_legacy_defs)
     _ -> Error("not a manifest: " <> text)
   }
 }
 
-fn parse_defs(s: String) -> Result(List(#(String, String)), String) {
+fn parse_parts(
+  name: String,
+  version: String,
+  defs: String,
+  deps: String,
+  ev: String,
+  format_version: Int,
+  parse_defs: fn(String) -> Result(List(ManifestDef), String),
+) -> Result(Manifest, String) {
+  use def_entries <- result.try(parse_defs(defs))
+  let dep_list = case deps {
+    "" -> []
+    _ -> string.split(deps, ",")
+  }
+  use require_evidence <- result.try(case ev {
+    "yes" -> Ok(True)
+    "no" -> Ok(False)
+    _ -> Error("bad evidence flag: " <> ev)
+  })
+  Ok(Manifest(
+    name,
+    version,
+    def_entries,
+    dep_list,
+    require_evidence,
+    format_version,
+  ))
+}
+
+fn parse_legacy_defs(s: String) -> Result(List(ManifestDef), String) {
   case s {
     "" -> Ok([])
     _ ->
       list.try_map(string.split(s, ","), fn(pair) {
         case string.split(pair, "=") {
-          [name, hash] -> Ok(#(name, hash))
-          _ -> Error("bad def entry: " <> pair)
+          [name, hash] -> Ok(ManifestDef(name, hash, False))
+          _ -> Error("bad legacy def entry: " <> pair)
+        }
+      })
+  }
+}
+
+fn parse_current_defs(s: String) -> Result(List(ManifestDef), String) {
+  case s {
+    "" -> Ok([])
+    _ ->
+      list.try_map(string.split(s, ","), fn(pair) {
+        case string.split(pair, "=") {
+          [name, hash, effect] ->
+            case effect {
+              "pure" -> Ok(ManifestDef(name, hash, False))
+              "effectful" -> Ok(ManifestDef(name, hash, True))
+              _ -> Error("bad effect flag: " <> effect)
+            }
+          _ -> Error("bad current def entry: " <> pair)
         }
       })
   }

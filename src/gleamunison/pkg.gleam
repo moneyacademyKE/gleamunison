@@ -60,7 +60,7 @@ fn closure_walk(
           use ref <- result.try(manifest.ref_from_hex(hex))
           use m <- result.try(manifest.fetch(adapter, ref))
           let seen = set.insert(seen, hex)
-          let def_hashes = list.map(m.defs, fn(d) { d.1 })
+          let def_hashes = list.map(m.defs, manifest.def_hash)
           closure_walk(
             adapter,
             list.append(m.deps, rest),
@@ -121,7 +121,7 @@ fn pull_manifests(
           })
           use ref <- result.try(manifest.ref_from_hex(hex))
           use m <- result.try(manifest.fetch(adapter, ref))
-          let def_hashes = list.map(m.defs, fn(d) { d.1 })
+          let def_hashes = list.map(m.defs, manifest.def_hash)
           pull_manifests(
             adapter,
             list.append(m.deps, rest),
@@ -207,8 +207,8 @@ fn install_recursive(
       use m <- result.try(manifest.fetch(adapter, ref))
       use def_refs <- result.try(
         list.try_map(m.defs, fn(d) {
-          use ref <- result.try(manifest.ref_from_hex(d.1))
-          Ok(#(d.0, ref))
+          use ref <- result.try(manifest.ref_from_hex(manifest.def_hash(d)))
+          Ok(#(manifest.def_name(d), ref))
         }),
       )
       use #(dep_names, visited) <- result.try(
@@ -228,14 +228,20 @@ fn install_recursive(
         True ->
           turnstile.check_with_policy(
             adapter,
-            list.map(m.defs, fn(d) { #(d.0, d.1, False) }),
+            list.map(m.defs, fn(d) {
+              #(
+                manifest.def_name(d),
+                manifest.def_hash(d),
+                manifest.def_effectful(d),
+              )
+            }),
             policy,
           )
           |> result.map_error(fn(missing) {
             "install REFUSED — no passing test evidence for: "
             <> string.join(missing, ", ")
           })
-        False -> Ok(list.map(m.defs, fn(d) { d.0 }))
+        False -> Ok(list.map(m.defs, manifest.def_name))
       })
       let current = case namespace.load_current(adapter, branch) {
         Ok(ns) -> ns
@@ -253,8 +259,7 @@ fn install_recursive(
 /// turnstile runs first with the real flags: pure defs need passing-test
 /// evidence, effectful defs may carry Io attestation. Any unevidenced def
 /// refuses the whole publish (Error names them). Success stores the
-/// manifest (name+hash only — effect flags are a filed follow-up) and
-/// returns its hex: the shareable name of the package.
+/// manifest and returns its hex: the shareable name of the package.
 pub fn publish_to_store(
   adapter: StorageAdapter,
   defs: List(#(String, String, Bool)),
@@ -287,7 +292,7 @@ pub fn publish_to_store_with_policy(
   use _ <- result.try(turnstile.check_with_policy(adapter, defs, policy))
   let m =
     list.fold(defs, manifest.new(name, version), fn(m, d) {
-      manifest.add_def(m, d.0, d.1)
+      manifest.add_def_with_effect(m, d.0, d.1, d.2)
     })
   case manifest.store(adapter, m) {
     Ok(ref) -> Ok(manifest.ref_hex_of(ref))

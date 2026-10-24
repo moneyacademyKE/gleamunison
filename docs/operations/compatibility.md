@@ -13,6 +13,18 @@ the combination. Anything else may work; it is not claimed.
 | Windows | unsupported | no CI, no claim |
 | Hex deps | gleam_stdlib <2, gleamy_structures <3, simplifile <3, glam <3 | runtime closure; birdie/gleeunit are dev-only and never ship in the artifact |
 
+## Package manifest compatibility
+
+Package manifests are content-addressed. New manifests use a versioned payload with per-definition effect metadata:
+
+```text
+pkg:2:<name>:<version>:<name>=<hash>=pure|effectful,...:<deps>:<yes|no>
+```
+
+The effect token is part of the canonical bytes and therefore part of the manifest ref. Definition ordering is canonical. The parser accepts the original unversioned `name=hash` payload as legacy data, defaults each entry to `effectful: False`, and preserves its legacy serialization so existing refs remain fetchable under their original hashes. Legacy manifests are intentionally conservative: missing metadata never grants the Io evidence path.
+
+The current delimiter grammar has no escaping layer. Ambiguous structural delimiters and unknown effect tokens are rejected rather than silently producing content that cannot round-trip. Manifest refs are immutable; no in-place rewrite or migration is performed.
+
 ## Versioning contract
 
 - Artifact identity lives in `gleam.toml` and flows into the packaged

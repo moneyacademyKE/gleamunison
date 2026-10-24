@@ -65,7 +65,34 @@ pub fn install_admits_evidenced_package_test() {
   namespace.get(ns, "post-json") |> should.be_ok
 }
 
-/// require_evidence = false skips the gate entirely.
+/// An effectful manifest may install with Io evidence instead of Test evidence.
+pub fn install_effectful_def_uses_io_evidence_test() {
+  let adapter = storage.inmemory()
+  let content = string.repeat("ef", 32)
+  let m =
+    manifest.new("io-lib", "1.0.0")
+    |> manifest.add_def_with_effect("write-log", content, True)
+  let assert Ok(ref) = manifest.store(adapter, m)
+  let hex = manifest.ref_hex_of(ref)
+  let assert Ok(_) =
+    evidence.attach(adapter, content, evidence.Io, "approved", "manual", 1)
+  let assert Ok(installed) = pkg.install_from_store(adapter, hex, "main")
+  installed |> should.equal(["write-log"])
+}
+
+/// A pure manifest still refuses Io-only evidence.
+pub fn install_pure_def_refuses_io_only_evidence_test() {
+  let adapter = storage.inmemory()
+  let content = string.repeat("aa", 32)
+  let m = manifest.new("pure-lib", "1.0.0") |> manifest.add_def("read", content)
+  let assert Ok(ref) = manifest.store(adapter, m)
+  let assert Ok(_) =
+    evidence.attach(adapter, content, evidence.Io, "approved", "manual", 1)
+  let assert Error(message) =
+    pkg.install_from_store(adapter, manifest.ref_hex_of(ref), "main")
+  string.contains(message, "read") |> should.be_true
+}
+
 pub fn install_without_evidence_requirement_test() {
   let adapter = storage.inmemory()
   let m =
@@ -132,8 +159,22 @@ pub fn publish_stores_fetchable_manifest_test() {
   m.name |> should.equal("http-utils")
   m.version |> should.equal("1.0.0")
   m.defs
+  |> list.map(fn(d) { #(manifest.def_name(d), manifest.def_hash(d)) })
   |> should.equal(list.map(pairs, fn(p) { #(p.0, p.1) }))
   m.require_evidence |> should.equal(True)
+}
+
+/// Publish preserves the effectful bit in the stored manifest.
+pub fn publish_preserves_effect_flag_test() {
+  let adapter = storage.inmemory()
+  let content = string.repeat("cd", 32)
+  let pairs = [#("write", content, True)]
+  let assert Ok(_) =
+    evidence.attach(adapter, content, evidence.Io, "approved", "manual", 1)
+  let assert Ok(hex) = pkg.publish_to_store(adapter, pairs, "io-lib", "1.0.0")
+  let assert Ok(m) = manifest.fetch(adapter, ref_from_hex(hex))
+  let assert [def] = m.defs
+  manifest.def_effectful(def) |> should.equal(True)
 }
 
 /// Deps install recursively: installing the root also installs its
