@@ -5,6 +5,7 @@
 //// no store entry, so a stored definition that adds two numbers does not have
 //// to carry the definition of `+`.
 
+import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/list
@@ -20,7 +21,7 @@ import gleamunison/evidence
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/jets
 import gleamunison/loader
-import gleamunison/namespace
+import gleamunison/name_snapshot
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleamunison/trust
@@ -203,13 +204,17 @@ fn execute(
               verify.get_init_defs(),
               types.empty_cache(),
             )
+          use names <- result.try(
+            name_snapshot.read(adapter, branch)
+            |> result.map_error(fn(reason) { Unreadable(ref, reason) }),
+          )
           use ld <- result.try(resolve_definition(
             loader.new_loader(),
             cb,
             ref,
             definition,
             [],
-            branch,
+            names,
           ))
           let _ = ld
           call_eval_ffi(compile.module_name_for(ref), args)
@@ -241,21 +246,24 @@ fn resolve(
   cb: codebase.Codebase,
   ref: DefinitionRef,
   visiting: List(DefinitionRef),
-  branch: String,
+  names: name_snapshot.Bindings,
 ) -> Result(loader.Loader, RunError) {
   case loader.is_loaded(ld, ref) {
     True -> Ok(ld)
     False ->
       case codebase.get(cb, ref) {
         Ok(definition) ->
-          resolve_definition(ld, cb, ref, definition, visiting, branch)
+          resolve_definition(ld, cb, ref, definition, visiting, names)
         Error(codebase.NotFound(_)) ->
-          // A missing store ref may be a name ref. Resolve the selected branch
-          // before consulting the VM's module table; otherwise a module loaded
-          // during an earlier run could make the current branch invisible.
-          case resolve_name_ref(cb, ref, branch) {
-            Ok(definition) ->
-              resolve_definition(ld, cb, ref, definition, visiting, branch)
+          // Resolve the selected branch before consulting the VM module table.
+          case dict.get(names, ref) {
+            Ok(content_ref) -> {
+              use definition <- result.try(
+                codebase.get(cb, content_ref)
+                |> result.map_error(fn(error) { read_error(content_ref, error) }),
+              )
+              resolve_definition(ld, cb, ref, definition, visiting, names)
+            }
             Error(_) -> resolve_runtime_ref(ld, ref)
           }
         Error(other) -> Error(read_error(ref, other))
@@ -294,7 +302,7 @@ fn resolve_definition(
   ref: DefinitionRef,
   definition: ast.Definition,
   visiting: List(DefinitionRef),
-  branch: String,
+  names: name_snapshot.Bindings,
 ) -> Result(loader.Loader, RunError) {
   case list.contains(visiting, ref) {
     // Content addressing makes this unreachable by construction: a definition
@@ -307,38 +315,12 @@ fn resolve_definition(
         list.try_fold(
           definition_refs.refs_of_definition(definition),
           ld,
-          fn(ld, dependency) { resolve(ld, cb, dependency, visiting, branch) },
+          fn(ld, dependency) { resolve(ld, cb, dependency, visiting, names) },
         ),
       )
       loader.ensure_loaded(ld, ref, definition)
       |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
     }
-  }
-}
-
-/// A name reference is sha256(name); the namespace binds that name to a content
-/// ref. Finding the name means scanning the binding table, which is small and
-/// loaded once per run.
-fn resolve_name_ref(
-  cb: codebase.Codebase,
-  ref: DefinitionRef,
-  branch: String,
-) -> Result(ast.Definition, Nil) {
-  case namespace.load_current(codebase.get_adapter(cb), branch) {
-    Error(_) -> Error(Nil)
-    Ok(ns) ->
-      list.find_map(namespace.names(ns), fn(name) {
-        case repl_eval.ref_for_name(name) == ref {
-          False -> Error(Nil)
-          True ->
-            case namespace.get(ns, name) {
-              Error(_) -> Error(Nil)
-              Ok(content_ref) ->
-                codebase.get(cb, content_ref)
-                |> result.map_error(fn(_) { Nil })
-            }
-        }
-      })
   }
 }
 
@@ -447,13 +429,17 @@ pub fn inspect_function_on_branch(
     ast.TermDef(typ: typ, ..) -> {
       let _ =
         repl_eval.bootstrap_defs(verify.get_init_defs(), types.empty_cache())
+      use names <- result.try(
+        name_snapshot.read(adapter, branch)
+        |> result.map_error(fn(reason) { Unreadable(ref, reason) }),
+      )
       use ld <- result.try(resolve_definition(
         loader.new_loader(),
         cb,
         ref,
         definition,
         [],
-        branch,
+        names,
       ))
       let _ = ld
       use exports <- result.try(
