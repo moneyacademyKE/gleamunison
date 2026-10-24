@@ -72,7 +72,7 @@ One dropped fact now crosses one versioned data boundary; the existing turnstile
 
 ## Verification receipts
 
-- `export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH; gleam clean && gleam test` — exit 0; **616 passed, 0 failures**.
+- `export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH; gleam clean && gleam test` — exit 0; **617 passed, 0 failures**.
 - `export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH; gleam format --check src test` — exit 0.
 - `export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH; gleam check --target erlang` — exit 0; one pre-existing unused `None` import warning in `test/sync_accept_test.gleam`.
 - `export PATH=/opt/homebrew/bin:/Users/moe/.local/bin:$PATH; bb scripts/verify_production_boundaries.clj` — exit 0; integrated gate PASS, all listed gates PASS, including artifact and LOC checks.
