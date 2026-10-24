@@ -64,8 +64,11 @@ jobs:
       - run: bb scripts/test_release_contract.clj
       - run: bb scripts/test_upgrade_rollback.clj
 
-  # The batteries below ran only in `bb scripts/verify_production_boundaries.clj`
-  # on a developer's machine, so six of them could rot unnoticed while CI stayed
+  # The artifact is built before this job, so the real stdio pump is
+  # exercised against the same BEAMs CI packages. The lsp-stdio probe runs
+  # immediately after the diff gate above.
+  # The remaining batteries used to run only in `bb scripts/verify_production_boundaries.clj`
+  # on a developer's machine, so they could rot unnoticed while CI stayed
   # green (bk-f912). scripts/verify_production_boundaries.clj remains the owner of
   # the full battery list; this job runs the ones the other jobs do not cover.
   # Keep the two lists in step: a battery in the gate that is missing here is a
@@ -97,7 +100,9 @@ jobs:
       # starts a real listener from the compiled beams.
       - run: ./build_escript.sh
       - name: "diff-check: no whitespace damage in the patch"
-        run: git diff --check HEAD^ HEAD || git diff --check
+        run: git diff --check HEAD --
+      - name: "lsp-stdio: UTF-8 framing and malformed input"
+        run: bb scripts/test_lsp_stdio.clj
       - name: "cli-truth: process contract, not log text"
         run: bb scripts/test_cli_truth.clj
       - name: "http-boundary: traversal refusal, static serving"

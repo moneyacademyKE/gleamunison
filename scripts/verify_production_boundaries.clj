@@ -66,23 +66,51 @@
   (boolean (re-find #"(^|/)test/|_test\.(erl|gleam)$" path)))
 
 (defn touched-code-files []
-  (->> (str/split-lines (sh-out "git" "diff" "--name-only" base "HEAD"))
+  (->> (concat (str/split-lines (sh-out "git" "diff" "--name-only" "HEAD" "--"))
+              (str/split-lines (sh-out "git" "ls-files" "--others" "--exclude-standard")))
+       ;; Include untracked paths too: a patch that is not staged yet still
+       ;; consumes the same production LOC budget.
        (filter #(re-find #"\.(gleam|erl|clj|sh)$" %))
        (remove test-file?)
        (map #(str repo "/" %))
        (filter fs/exists?)))
 
+(defn diff-check-files []
+  {:tracked (str/split-lines (sh-out "git" "diff" "--name-only" "HEAD" "--"))
+   :untracked (str/split-lines (sh-out "git" "ls-files" "--others" "--exclude-standard"))})
+
 (defn loc-gate []
-  (let [over (filter (fn [f] (> (count (str/split-lines (slurp f))) 500))
+  (let [over (filter (fn [f] (> (count (str/split-lines (slurp f))) 499))
                      (touched-code-files))]
     {:name "loc-ceiling" :cmd "wc -l over touched files"
      :exit (if (empty? over) 0 1) :duration_ms 0 :informational false
      :tail (if (empty? over) "all touched files under 500 LOC"
                (str "over: " (str/join ", " over)))}))
 
+(defn diff-check-gate []
+  (let [{:keys [tracked untracked]} (diff-check-files)
+        tracked-result (apply shell {:continue true :dir repo :out :string :err :string}
+                              (concat env-prefix ["git" "diff" "--check" "HEAD" "--"]))
+        untracked-results
+        (map (fn [path]
+               (let [absolute (str repo "/" path)
+                     r (shell {:continue true :dir repo :out :string :err :string}
+                              "/usr/bin/git" "diff" "--no-index" "--check" "/dev/null" absolute)
+                     output (str (:out r) (:err r))]
+                 {:path path :bad (not (str/blank? output)) :output output}))
+             (filter #(fs/exists? (str repo "/" %)) untracked))
+        bad-untracked (filter :bad untracked-results)
+        output (str (:out tracked-result) (:err tracked-result)
+                    (str/join "" (map :output bad-untracked)))]
+    {:name "diff-check" :cmd "git diff --check HEAD plus untracked files"
+     :exit (if (or (not (zero? (:exit tracked-result))) (seq bad-untracked)) 1 0)
+     :duration_ms 0 :informational false :tail (str/trim output)}))
+
 (println "=== production boundary gate ===")
 (run-gate "format" ["gleam" "format" "--check" "src" "test"])
-(run-gate "diff-check" ["git" "diff" "--check"])
+(let [diff (diff-check-gate)]
+  (swap! results conj diff)
+  (println (format "  -> exit=%d %s" (:exit diff) (:tail diff))))
 (run-gate "suite" ["gleam" "test"])
 (run-gate "build-escript" ["./build_escript.sh"])
 (run-gate "artifact-contract" ["bash" "scripts/test_artifact.sh"])

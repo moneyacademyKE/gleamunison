@@ -8,10 +8,10 @@ demand to BEAM bytecode, and loaded into a running VM by hash. Not a filename,
 not a module path, not a package — the hash *is* the identity.
 
 - **Version:** 3.24.0
-- **Suite:** 508 tests, 0 failures
-- **CI:** Erlang/OTP 27, 28, 29 × Ubuntu, macOS — all legs green
+- **Suite:** 649 tests, 0 failures
+- **CI:** Erlang/OTP 27, 28, 29 × Ubuntu, macOS — matrix configured; local receipts are not a substitute for every hosted leg
 - **Classification:** `authenticated-single-node-service`
-  ([verification witness](docs/verification/production-boundaries-2026-10-21.md))
+  ([verification witness](docs/verification/production-boundaries-2026-10-24.md))
 
 ## Status: what this is, and what it is not
 
@@ -29,7 +29,7 @@ a safe place to run arbitrary untrusted code, and it does not claim to be.
 | Pull-based sync: TCP protocol **v2** (HMAC handshake) + Erlang distribution | Implemented |
 | HTTP + MCP service with bind gate, request auth, readiness probes | Implemented, single node |
 | Evaluation budgets (wall clock, reductions, memory) | Implemented |
-| Evidence signing and single-signer validity/revocation policy | Enforced at `publish`, `pkg install` and `run`; multi-key overlap is library-only |
+| Evidence signing and trust policy | Enforced at `publish`, `pkg install` and `run`; the production environment accepts one configured signer; multi-key overlap is library-only |
 | LLM budgets, cancellation, transcript redaction | Implemented |
 | **OS/container isolation for untrusted code** | **Not implemented** — requires an external executor |
 | **TLS / mTLS transport encryption** | **Not implemented** — bind gate + token auth only |
@@ -182,11 +182,11 @@ v3.24.0.
 
 | Metric | Value |
 |---|---|
-| Tests | 611 passing, 0 failures |
-| Test suites | 85 files under `test/` |
-| Playbook levels defined | 1,172 across 40 playbook docs |
-| Gleam modules | 100 (93 in `src/gleamunison/`, 7 top-level) |
-| Erlang modules | 43 production (plus 53 genesis `m_*.erl`) |
+| Tests | 649 passing, 0 failures |
+| Test suites | 105 files under `test/` |
+| Playbook levels defined | 934 executable passes plus 238 explicit exclusions in the default run |
+| Gleam modules | 109 (102 in `src/gleamunison/`, 7 top-level) |
+| Erlang modules | 46 production (plus 53 genesis `m_*.erl`) |
 | Datalog engine | 13 self-hosted `.lisp` modules |
 | ADRs | 68 |
 | Escript | ~1.3 MB standalone |
@@ -206,7 +206,7 @@ v3.24.0.
 
 ## Modules
 
-100 Gleam modules, 43 production Erlang modules, 53 genesis `m_*.erl` modules,
+109 Gleam modules, 46 production Erlang modules, 53 genesis `m_*.erl` modules,
 and 13 self-hosted Datalog modules. Grouped by concern:
 
 | Area | Key modules |
@@ -226,15 +226,16 @@ and 13 self-hosted Datalog modules. Grouped by concern:
 | **Genesis** | `genesis`, `bootstraps`, plus 53 `m_*.erl` modules |
 | **Datalog** | 13 self-hosted `.lisp` modules: core, index, transact, schema, query, aggregate, pull, temporal, rules, graph, vector, bm25, actor |
 
-### Library-only modules
+### Library and CLI boundaries
 
-Five modules are published API but are **not wired into the CLI runtime**.
-They compile, they are tested, and a program that imports the package can call
-them; nothing in `gleamunison server`, the REPL or the CLI reaches them today.
+Four modules remain intentionally library-first: `sap`, `patch`, `prompt`, and
+`schema_printer` are published, compiled, and tested but are not CLI routes.
+`trust` is different: production `publish`, `pkg install`, and `run` call its
+policy gate; its multi-key overlap constructor remains a library/test surface.
 
 | Module | What it provides | Wired into the runtime? |
 |---|---|---|
-| `gleamunison/trust` | Key states (active/revoked/expired) and rotation windows | No — `evidence` verifies signatures against a configured signer; it does not consult a rotation policy |
+| `gleamunison/trust` | Key states (active/revoked/expired) and rotation windows | Yes for production `publish`, `pkg install`, and `run`; multi-key overlap remains library/test-only |
 | `gleamunison/sap` | Schema-aligned parsing of near-miss model output (fences, trailing commas, Python literals) | No — the LLM CLI expects well-formed JSON |
 | `gleamunison/patch` | Named, content-addressed update propagation | No |
 | `gleamunison/prompt` | Content-addressed prompts as definitions | No |
@@ -258,10 +259,10 @@ Every push runs the full matrix on Ubuntu and macOS for each OTP version:
 release-gates job that builds the escript and checks the artifact contract.
 
 ```sh
-gleam test                                    # 611 tests
+gleam test                                    # 649 tests
 gleam format --check src test                 # formatting gate
 ./build_escript.sh                            # standalone artifact
-bb scripts/run_playbook_tests.clj             # playbook conformance (1,172 levels)
+bb scripts/run_playbook_tests.clj             # 934 passes + 238 explicit exclusions
 bb scripts/verify_production_boundaries.clj   # full boundary gate + witness
 ```
 
@@ -445,7 +446,7 @@ runtime.
 - [Compatibility](docs/operations/compatibility.md) — schema versions and migration
 - [Upgrade and rollback](docs/operations/upgrade-and-rollback.md) — artifact gates
 - [Verification matrix](docs/operations/verification-matrix.md) — what each gate proves
-- [Verification witness](docs/verification/production-boundaries-2026-10-21.md) — the machine-readable proof
+- [Verification witness](docs/verification/production-boundaries-2026-10-24.md) — the machine-readable proof
 - [ADRs](docs/adr/) — 68 Architecture Decision Records
 - [Learnings](docs/LEARNINGS.md) — architectural insights discovered
 - [Patterns](docs/PATTERNS.md) — design patterns used

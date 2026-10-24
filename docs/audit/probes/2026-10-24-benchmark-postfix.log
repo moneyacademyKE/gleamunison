@@ -1,0 +1,18 @@
+storage_error_refusal=pass
+lsp_utf8_byte_frame=pass
+mnesia_delete_payload=removed
+datalog_literal_boundary=pass
+rank_bm25 n=100 times_us=[40,43,36] median_us=40
+rank_hybrid n=100 times_us=[1367,1406,1355] median_us=1367
+rank_bm25 n=500 times_us=[162,153,156] median_us=156
+rank_hybrid n=500 times_us=[6413,6433,6301] median_us=6413
+rank_bm25 n=1000 times_us=[336,295,353] median_us=336
+rank_hybrid n=1000 times_us=[12915,14672,14615] median_us=14615
+dependents_ets n=100 times_us=[449,454,437] median_us=449
+evidence_ets n=100 times_us=[47,48,45] median_us=47
+dependents_ets n=1000 times_us=[4369,4351,4374] median_us=4369
+evidence_ets n=1000 times_us=[450,448,483] median_us=450
+dependents_ets n=5000 times_us=[22930,22672,22761] median_us=22761
+evidence_ets n=5000 times_us=[1958,2036,1956] median_us=1958
+parser_depth_budget=refused
+audit_probe=PASS (post-fix contracts)
