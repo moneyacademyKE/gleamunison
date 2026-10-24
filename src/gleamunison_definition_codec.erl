@@ -1,7 +1,16 @@
 -module(gleamunison_definition_codec).
--export([encode/1, decode/1, version/0]).
+-export([encode/1, decode/1, version/0, is_definition/1]).
 
 version() -> 1.
+
+%% Whether a stored payload is a definition. Sync advertises what the store
+%% holds, and the store holds more than definitions: evidence records are
+%% content-addressed too, so a key alone cannot say what a row is. Without this
+%% predicate a peer offered its own attestations as definitions and the pull
+%% died in CAS admission. One owner for the envelope, so the prefix is never
+%% spelled twice.
+is_definition(<<"GUDEF", 1, _/binary>>) -> true;
+is_definition(_) -> false.
 
 %% Wire bytes are recoverable data, not identity. Identity is recomputed by
 %% codebase:hash_of_definition after decoding this bounded, versioned envelope.

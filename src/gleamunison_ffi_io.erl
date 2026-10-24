@@ -7,7 +7,8 @@
     sync_request_defs/2, sync_push_defs/2,
     serialize_term/1, deserialize_term/1,
     register_peer_refs/2, compute_diff/1, fetch_defs_binary/1, receive_pushed_defs/1,
-    node_atom/1, hex_to_ref/1, ref_to_hex/1, parse_host_port/1
+    node_atom/1, hex_to_ref/1, ref_to_hex/1, parse_host_port/1,
+    local_content_refs/0
 ]).
 
 %% --- State (process dictionary) ---
@@ -257,6 +258,16 @@ storage_lookup(mnesia, Tab, Ref) -> gleamunison_storage:mnesia_lookup(Tab, Ref).
 storage_failure(Reason) ->
     {error, iolist_to_binary(io_lib:format("storage failure: ~p", [Reason]))}.
 
+%% What this node can offer a peer: definitions, and only definitions. The
+%% store also holds evidence records and namespace metadata under keys of the
+%% same shape, so listing keys advertised attestations as content and the peer
+%% died verifying bytes against a ref they never hashed to. The codec owns the
+%% question of what a payload is.
+%% What this node would offer a peer, as hex. Exported so the filter that
+%% keeps evidence and namespace rows out of a sync diff is testable directly.
+local_content_refs() ->
+    get_local_refs_hex().
+
 get_local_refs_hex() ->
     case persistent_term:get({gleamunison, active_storage}, undefined) of
         undefined -> [];
@@ -268,9 +279,15 @@ get_local_refs_hex() ->
                 mnesia -> gleamunison_storage:mnesia_list_refs(Tab)
             end,
             case RefsResult of
-                {ok, Refs} -> [ref_to_hex(R) || R <- Refs];
+                {ok, Refs} -> [ref_to_hex(R) || R <- Refs, is_definition_row(Type, Tab, R)];
                 _ -> []
             end
+    end.
+
+is_definition_row(Type, Tab, Ref) ->
+    case storage_lookup(Type, Tab, Ref) of
+        {ok, {some, Bytes}} -> gleamunison_definition_codec:is_definition(Bytes);
+        _ -> false
     end.
 
 ref_to_hex({ref, {hash, Bytes}}) ->
