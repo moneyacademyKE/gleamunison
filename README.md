@@ -29,7 +29,7 @@ a safe place to run arbitrary untrusted code, and it does not claim to be.
 | Pull-based sync: TCP protocol **v2** (HMAC handshake) + Erlang distribution | Implemented |
 | HTTP + MCP service with bind gate, request auth, readiness probes | Implemented, single node |
 | Evaluation budgets (wall clock, reductions, memory) | Implemented |
-| Evidence signing, trust policy, key rotation/revocation | Implemented and enforced at `publish`, `pkg install` and `run` |
+| Evidence signing and single-signer validity/revocation policy | Enforced at `publish`, `pkg install` and `run`; multi-key overlap is library-only |
 | LLM budgets, cancellation, transcript redaction | Implemented |
 | **OS/container isolation for untrusted code** | **Not implemented** — requires an external executor |
 | **TLS / mTLS transport encryption** | **Not implemented** — bind gate + token auth only |
@@ -101,10 +101,10 @@ down.
 
 ### Step-by-step execution
 
-1. **DAG resolution** — the runtime looks up the root hash, walks the dependency
-   graph transitively, and fetches missing dependencies from peers over the sync
-   protocol (TCP v2 with an HMAC challenge-response handshake, or Erlang
-   distribution).
+1. **DAG resolution** — the runtime looks up the root hash and walks the dependency
+   graph in the selected local store and branch namespace. Missing content must be
+   transferred explicitly with `sync` or `pkg --peer` before `run`; execution does
+   not fetch from peers implicitly.
 2. **On-the-fly compilation** — resolved AST nodes compile to BEAM bytecode in
    modules named after their hashes (e.g. `m_ff45e8`).
 3. **Dynamic loading** — the VM loads the binary with `code:load_binary/3` and
@@ -182,7 +182,7 @@ v3.24.0.
 
 | Metric | Value |
 |---|---|
-| Tests | 508 passing, 0 failures |
+| Tests | 611 passing, 0 failures |
 | Test suites | 85 files under `test/` |
 | Playbook levels defined | 1,172 across 40 playbook docs |
 | Gleam modules | 100 (93 in `src/gleamunison/`, 7 top-level) |
@@ -258,7 +258,7 @@ Every push runs the full matrix on Ubuntu and macOS for each OTP version:
 release-gates job that builds the escript and checks the artifact contract.
 
 ```sh
-gleam test                                    # 508 tests
+gleam test                                    # 611 tests
 gleam format --check src test                 # formatting gate
 ./build_escript.sh                            # standalone artifact
 bb scripts/run_playbook_tests.clj             # playbook conformance (1,172 levels)
