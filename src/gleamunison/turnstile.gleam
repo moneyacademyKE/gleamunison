@@ -9,6 +9,7 @@
 //// manifest write — no evidence, no entry.
 
 import gleam/list
+import gleam/result
 import gleam/string
 import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
@@ -34,9 +35,14 @@ pub fn check_with_policy(
   policy: trust.TrustPolicy,
 ) -> Result(List(String), List(String)) {
   let gated = list.filter(defs, fn(d) { !string.starts_with(d.0, "test_") })
+  let snapshot = evidence.snapshot(adapter)
   let missing =
     list.filter_map(gated, fn(d) {
-      case admitted(adapter, d.1, d.2, policy) {
+      let accepted = case snapshot {
+        Ok(snapshot) -> admitted(snapshot, d.1, d.2, policy)
+        Error(_) -> False
+      }
+      case accepted {
         True -> Error(Nil)
         False -> Ok(d.0)
       }
@@ -50,11 +56,14 @@ pub fn check_with_policy(
 /// The gate rule for one def: Test evidence always admits; Io attestation
 /// admits only when the def's inferred requirement row is non-empty.
 fn admitted(
-  adapter: StorageAdapter,
+  snapshot: evidence.Snapshot,
   subject: String,
   effectful: Bool,
   policy: trust.TrustPolicy,
 ) -> Bool {
-  trust.admits(adapter, subject, evidence.Test, policy)
-  || { effectful && trust.admits(adapter, subject, evidence.Io, policy) }
+  result.is_ok(trust.verified_in(snapshot, subject, evidence.Test, policy))
+  || {
+    effectful
+    && result.is_ok(trust.verified_in(snapshot, subject, evidence.Io, policy))
+  }
 }

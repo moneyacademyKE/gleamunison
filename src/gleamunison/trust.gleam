@@ -63,6 +63,7 @@ pub type TrustRefusal {
   SignatureMismatch(id: String)
   UnsignedRecord
   AttestationTooOld(kind: String, ts: Int, max_age_secs: Int)
+  EvidenceReadFailed
   NoRecord(kind: String)
   NoPassingVerdict(kind: String, verdict: String)
 }
@@ -78,6 +79,7 @@ pub fn refusal_name(refusal: TrustRefusal) -> String {
     SignatureMismatch(id) -> "signature_mismatch:" <> id
     UnsignedRecord -> "unsigned_record"
     AttestationTooOld(kind, _ts, _max) -> "attestation_too_old:" <> kind
+    EvidenceReadFailed -> "evidence_read_failed"
     NoRecord(kind) -> "no_record:" <> kind
     NoPassingVerdict(kind, _verdict) -> "no_passing_verdict:" <> kind
   }
@@ -209,8 +211,36 @@ pub fn verified_at(
   policy: TrustPolicy,
   now: Int,
 ) -> Result(Nil, TrustRefusal) {
+  use snapshot <- result.try(
+    evidence.snapshot(adapter) |> result.replace_error(EvidenceReadFailed),
+  )
+  verified_in_at(snapshot, subject, kind, policy, now)
+}
+
+pub fn verified_in(
+  snapshot: evidence.Snapshot,
+  subject: String,
+  kind: evidence.Kind,
+  policy: TrustPolicy,
+) -> Result(Nil, TrustRefusal) {
+  verified_in_at(
+    snapshot,
+    subject,
+    kind,
+    policy,
+    datetime.to_unix(datetime.now()),
+  )
+}
+
+pub fn verified_in_at(
+  snapshot: evidence.Snapshot,
+  subject: String,
+  kind: evidence.Kind,
+  policy: TrustPolicy,
+  now: Int,
+) -> Result(Nil, TrustRefusal) {
   let of_kind =
-    evidence.for_subject(adapter, subject)
+    evidence.from_snapshot(snapshot, subject)
     |> list.filter(fn(e) { e.kind == kind })
   let newest_first = list.sort(of_kind, fn(a, b) { int.compare(b.ts, a.ts) })
   let passing =

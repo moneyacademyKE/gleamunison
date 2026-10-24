@@ -1,4 +1,5 @@
 import gleam/bit_array
+import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/option.{Some}
@@ -246,29 +247,48 @@ pub fn attach_signed(
   attach_record(adapter, sign(signer, subject, kind, verdict, payload, ts))
 }
 
-/// Every well-formed, untampered evidence record for a subject hash.
-/// Tampered chunks and non-evidence chunks are silently excluded.
-pub fn for_subject(adapter: StorageAdapter, subject: String) -> List(Evidence) {
-  case adapter.list_refs() {
-    Error(_) -> []
-    Ok(refs) ->
-      list.filter_map(refs, fn(ref) {
-        case adapter.lookup(ref) {
-          Ok(Some(bytes)) -> {
-            let Ref(h) = ref
-            case hash_equal(hash_bytes(bytes), h) {
-              False -> Error(Nil)
-              True ->
-                case parse(bytes) {
-                  Ok(e) if e.subject == subject -> Ok(e)
-                  _ -> Error(Nil)
-                }
+/// One operation-local view, keyed by subject. Tampered/non-evidence chunks
+/// remain excluded; I/O failure is explicit, never an incomplete snapshot.
+pub opaque type Snapshot {
+  Snapshot(records: Dict(String, List(Evidence)))
+}
+
+pub fn snapshot(
+  adapter: StorageAdapter,
+) -> Result(Snapshot, storage.StorageError) {
+  use refs <- result.try(adapter.list_refs())
+  use records <- result.try(
+    list.try_fold(refs, dict.new(), fn(records, ref) {
+      use bytes <- result.try(adapter.lookup(ref))
+      case bytes {
+        Some(bytes) -> {
+          let Ref(h) = ref
+          case hash_equal(hash_bytes(bytes), h), parse(bytes) {
+            True, Ok(record) -> {
+              let prior = dict.get(records, record.subject) |> result.unwrap([])
+              Ok(dict.insert(records, record.subject, [record, ..prior]))
             }
+            _, _ -> Ok(records)
           }
-          _ -> Error(Nil)
         }
-      })
-  }
+        _ -> Ok(records)
+      }
+    }),
+  )
+  Ok(
+    Snapshot(dict.map_values(records, fn(_, records) { list.reverse(records) })),
+  )
+}
+
+pub fn from_snapshot(snapshot: Snapshot, subject: String) -> List(Evidence) {
+  dict.get(snapshot.records, subject) |> result.unwrap([])
+}
+
+/// Read-only compatibility shape. Admission operations reuse one snapshot.
+pub fn for_subject(adapter: StorageAdapter, subject: String) -> List(Evidence) {
+  snapshot(adapter)
+  |> result.map(fn(view) { from_snapshot(view, subject) })
+  |> result.unwrap([])
 }
 
 /// Constant-time hex comparison for signature checks outside this module.

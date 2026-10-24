@@ -91,7 +91,18 @@ pub fn report_with_policy(
   subject: String,
   policy: trust.TrustPolicy,
 ) -> String {
-  let records = evidence.for_subject(adapter, subject)
+  case evidence.snapshot(adapter) {
+    Error(_) -> "cannot read evidence for " <> subject
+    Ok(snapshot) -> report_snapshot(snapshot, subject, policy)
+  }
+}
+
+fn report_snapshot(
+  snapshot: evidence.Snapshot,
+  subject: String,
+  policy: trust.TrustPolicy,
+) -> String {
+  let records = evidence.from_snapshot(snapshot, subject)
   case records {
     [] -> "no evidence for " <> subject
     _ -> {
@@ -107,13 +118,15 @@ pub fn report_with_policy(
           <> ")"
         })
       let verified_line = case
-        trust.verified(adapter, subject, evidence.Test, policy)
+        trust.verified_in(snapshot, subject, evidence.Test, policy)
       {
         Ok(_) -> "test: admitted by the policy"
         Error(refusal) ->
           "test: refused (" <> trust.refusal_name(refusal) <> ")"
       }
-      let io_line = case trust.verified(adapter, subject, evidence.Io, policy) {
+      let io_line = case
+        trust.verified_in(snapshot, subject, evidence.Io, policy)
+      {
         Ok(_) -> "io: admitted by the policy"
         Error(refusal) -> "io: refused (" <> trust.refusal_name(refusal) <> ")"
       }
