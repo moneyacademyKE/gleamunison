@@ -10,6 +10,7 @@ import gleamunison/elab_types.{
   SurfaceTermDef, SurfaceTypeAlias, SurfaceTypeDef,
 }
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/lisp_literal
 import gleamunison/repl_eval
 
 /// A datalog datom for the codebase index: entity is a stable per-def int,
@@ -115,11 +116,11 @@ pub fn index_source(defs: List(#(String, SurfaceDef))) -> String {
     list.map(datoms_of(defs), fn(d) {
       "(db-assert db "
       <> int.to_string(d.entity)
-      <> " \""
-      <> d.attr
-      <> "\" \""
-      <> d.value
-      <> "\")"
+      <> " "
+      <> lisp_literal.text(d.attr)
+      <> " "
+      <> lisp_literal.text(d.value)
+      <> ")"
     })
   // Chronological threading: (let db db-empty (let db A1 (let db A2 db))).
   // Reversed fold builds innermost-last; the seed binds db-empty.

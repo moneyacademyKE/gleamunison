@@ -16,6 +16,7 @@ import gleam/string
 import gleamunison/codebase_index
 import gleamunison/elab_types.{type SurfaceDef, SurfaceTermDef}
 import gleamunison/lexer
+import gleamunison/lisp_literal
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/parser
 import gleamunison/rank
@@ -170,9 +171,9 @@ pub fn callers_of(
 ) -> Result(List(String), String) {
   index_names(
     state,
-    "\n(define q (list (pair (q-var \"?e\") (pair \"def/dep\" (q-val \""
-      <> name
-      <> "\"))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
+    "\n(define q (list (pair (q-var \"?e\") (pair \"def/dep\" (q-val "
+      <> lisp_literal.text(name)
+      <> "))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
   )
 }
 
@@ -183,9 +184,9 @@ pub fn deps_of(
 ) -> Result(List(String), String) {
   index_names(
     state,
-    "\n(define q (list (pair (q-var \"?e\") (pair \"def/name\" (q-val \""
-      <> name
-      <> "\"))) (pair (q-var \"?e\") (pair \"def/dep\" (q-var \"?d\")))))\n(binding-values (db-query db q) \"?d\")\n",
+    "\n(define q (list (pair (q-var \"?e\") (pair \"def/name\" (q-val "
+      <> lisp_literal.text(name)
+      <> "))) (pair (q-var \"?e\") (pair \"def/dep\" (q-var \"?d\")))))\n(binding-values (db-query db q) \"?d\")\n",
   )
 }
 
@@ -196,60 +197,23 @@ pub fn defs_by_kind(
 ) -> Result(List(String), String) {
   index_names(
     state,
-    "\n(define q (list (pair (q-var \"?e\") (pair \"def/kind\" (q-val \""
-      <> kind
-      <> "\"))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
+    "\n(define q (list (pair (q-var \"?e\") (pair \"def/kind\" (q-val "
+      <> lisp_literal.text(kind)
+      <> "))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
   )
 }
 
-/// Run a query tail against the session's datalog index; extract the quoted
-/// strings from the final form's printed value.
+/// Validate the engine's result as a complete list of UTF-8 text values.
+@external(erlang, "gleamunison_index_result", "strings")
+fn decode_index_names(output: String) -> Result(List(String), String)
+
 fn index_names(
   state: SessionState,
   tail: String,
 ) -> Result(List(String), String) {
   let script = codebase_index.index_source(state.defs) <> tail
-  case codebase_index.eval_index_source(script) {
-    Error(e) -> Error(e)
-    Ok(out) -> {
-      // Engine define forms print as `(defined name)` — no quotes — so every
-      // quoted string in the output belongs to the final result value. Scan
-      // all lines: long result lists wrap across them.
-      Ok(extract_quoted(out, False, "", []))
-    }
-  }
-}
-
-/// Pull every "..."-quoted string out of a printed value. Robust to either
-/// list shape the runtime prints.
-fn extract_quoted(
-  s: String,
-  in_str: Bool,
-  cur: String,
-  acc: List(String),
-) -> List(String) {
-  case string.pop_grapheme(s) {
-    Error(_) ->
-      case in_str {
-        True -> list.reverse([cur, ..acc])
-        False -> list.reverse(acc)
-      }
-    Ok(#("\\", rest)) ->
-      case string.pop_grapheme(rest) {
-        Ok(#(g, rest2)) -> extract_quoted(rest2, in_str, cur <> g, acc)
-        Error(_) -> list.reverse(acc)
-      }
-    Ok(#("\"", rest)) ->
-      case in_str {
-        True -> extract_quoted(rest, False, "", [cur, ..acc])
-        False -> extract_quoted(rest, True, "", acc)
-      }
-    Ok(#(g, rest)) ->
-      case in_str {
-        True -> extract_quoted(rest, True, cur <> g, acc)
-        False -> extract_quoted(rest, False, cur, acc)
-      }
-  }
+  use output <- result.try(codebase_index.eval_index_source(script))
+  decode_index_names(output)
 }
 
 fn get_definition(
