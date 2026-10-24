@@ -291,7 +291,8 @@ gleamunison <command>
   log [content|exec|all]  what the store has seen (--tail N)
   test <file.lisp>       run the test forms in a file
   run <content-hash>     run a definition from the store, by hash
-                         [args...] [--json] [--store path]
+                         [args...] [--json] [--inspect] [--store path]
+                         [--branch name] (default: main)
   llm <provider> <prompt> call an LLM (openai | anthropic)
   mcp [port] [--load f]  MCP server for agents (default 8099)
   all                    run all available levels
