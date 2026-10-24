@@ -47,6 +47,27 @@
       #(let [replies (frames %)]
          (assert (= ["café🦀" "done"] (mapv :id replies)) (str "Unicode or next frame corrupted: " (pr-str replies)))
          (assert (get-in (first replies) [:result :capabilities]) "initialize missing")))
+(def session-uri "file:///tmp/gleamunison-lsp-session.lisp")
+(def session-text "(define (f) \"héllo\")\n(define (g) (+ 1 2))\n")
+(run! "editing session over byte framing"
+      (apply str (map #(frame (message %))
+                      [{:jsonrpc "2.0" :id 1 :method "initialize" :params {}}
+                       {:jsonrpc "2.0" :method "initialized" :params {}}
+                       {:jsonrpc "2.0" :id 2 :method "textDocument/didOpen"
+                        :params {:textDocument {:uri session-uri :languageId "lisp"
+                                                :version 1 :text session-text}}}
+                       {:jsonrpc "2.0" :id 3 :method "textDocument/hover"
+                        :params {:textDocument {:uri session-uri}
+                                 :position {:line 1 :character 12}}}
+                       {:jsonrpc "2.0" :id 4 :method "shutdown"}
+                       {:jsonrpc "2.0" :method "exit"}]))
+      #(let [replies (frames %)
+             ids (set (map :id replies))]
+         ;; A document whose text contains non-ASCII bytes must not shift the
+         ;; framing of the messages that follow it: every request still answers.
+         (assert (contains? ids 3) (str "hover reply missing after unicode document: " (pr-str (map :id replies))))
+         (assert (contains? ids 4) (str "shutdown reply missing: " (pr-str (map :id replies))))))
+
 (doseq [[label input] [["negative length" "Content-Length: -1\r\n\r\nx"]
                        ["oversized body" "Content-Length: 1048577\r\n\r\n"]
                        ["duplicate length" "Content-Length: 1\r\nContent-Length: 1\r\n\r\nx"]
