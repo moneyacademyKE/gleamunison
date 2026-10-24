@@ -105,3 +105,26 @@ pub fn generated_index_does_not_spend_depth_per_datom_test() {
   source_budget.check(codebase_index.index_source(defs))
   |> should.equal(Ok(Nil))
 }
+
+/// Source written with CRLF line endings is the same program. `\r` is a line
+/// break, not a symbol byte: without this, a file saved on Windows parsed as
+/// `undefined variable "\r"` with no hint that the file was fine.
+pub fn crlf_line_endings_parse_like_lf_test() {
+  let lf = "(define (f) 1)\n(define (g) (f))\n"
+  let crlf = "(define (f) 1)\r\n(define (g) (f))\r\n"
+  parser.parse_string(crlf) |> should.equal(parser.parse_string(lf))
+  source_budget.check(crlf) |> should.equal(Ok(Nil))
+}
+
+/// Control bytes are not source text. Before this, a NUL or an ESC became part
+/// of a symbol: it reached identifiers, error messages, and terminal output,
+/// which is an escape-sequence injection surface for anything that lists names.
+pub fn control_characters_are_refused_not_tokenized_test() {
+  source_budget.check("(define (f\u{1}x) 1)")
+  |> should.equal(Error("source limit: control character U+0001"))
+  source_budget.check("(define (f) 1) ; comment\u{1b}[31m")
+  |> should.equal(Error("source limit: control character U+001B"))
+  parser.parse_string("(define (f\u{1}x) 1)") |> should.be_error
+  // Tab and newline are source whitespace, not control characters.
+  source_budget.check("(define (f)\t1)\n") |> should.equal(Ok(Nil))
+}

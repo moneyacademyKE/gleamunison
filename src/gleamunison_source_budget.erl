@@ -25,6 +25,14 @@ scan(_, _, N, _, D, _, F, Size, {MT, MD, MF, MS})
                 F > MF -> <<"forms">>;
                 true -> <<"token bytes">> end,
     {error, <<"source limit: ", Reason/binary>>};
+%% Control bytes are not source text. Refusing them in the same raw pass keeps
+%% one admission gate: a NUL or an ESC cannot become part of an identifier, an
+%% error message, or terminal output. Tab, newline, and carriage return are
+%% source whitespace and fall through to their own clauses.
+scan(<<C, _/binary>>, _Mode, _, _, _, _, _, _, _)
+  when C =:= 16#7F; C < 16#20, C =/= $\t, C =/= $\n, C =/= $\r ->
+    {error, iolist_to_binary(io_lib:format(
+        "source limit: control character U+~4.16.0B", [C]))};
 scan(<<>>, _, _, _, _, _, _, _, _) -> {ok, nil};
 scan(<<$\n, Rest/binary>>, comment, N, S, D, Q, F, _, L) ->
     scan(Rest, normal, N, S, D, Q, F, 0, L);
@@ -38,13 +46,13 @@ scan(<<$", Rest/binary>>, text, N, S, D, Q, F, Size, L) ->
 scan(<<_, Rest/binary>>, text, N, S, D, Q, F, Size, L) ->
     scan(Rest, text, N, S, D, Q, F, Size + 1, L);
 scan(<<C, _/binary>> = Bin, atom, N, S, D, Q, F, _, L)
-  when C =:= $\n; C =:= $\t; C =:= $\s; C =:= $(; C =:= $);
+  when C =:= $\n; C =:= $\t; C =:= $\s; C =:= $\r; C =:= $(; C =:= $);
        C =:= $;; C =:= $' ->
     scan(Bin, normal, N, S, D - Q, 0, F, 0, L);
 scan(<<_, Rest/binary>>, atom, N, S, D, Q, F, Size, L) ->
     scan(Rest, atom, N, S, D, Q, F, Size + 1, L);
 scan(<<C, Rest/binary>>, normal, N, S, D, Q, F, _, L)
-  when C =:= $\n; C =:= $\t; C =:= $\s ->
+  when C =:= $\n; C =:= $\t; C =:= $\s; C =:= $\r ->
     scan(Rest, normal, N, S, D, Q, F, 0, L);
 scan(<<$;, Rest/binary>>, normal, N, S, D, Q, F, _, L) ->
     scan(Rest, comment, N + 1, S, D, Q, F, 1, L);

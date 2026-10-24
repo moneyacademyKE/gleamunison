@@ -38,9 +38,17 @@ pub fn tokenize(input: String) -> List(TokenInfo) {
 fn do_tokenize(chars, acc, sl, sc, l, c) {
   case chars {
     [] -> flush_token(acc, sl, sc, [])
+    // CRLF is a single grapheme cluster in Unicode, so it arrives as one
+    // element here. Matching it before the `\n` clause is what makes a file
+    // with Windows line endings the same program as the same file with LF.
+    ["\r\n", ..rest] ->
+      flush_token(acc, sl, sc, do_tokenize(rest, "", 1, 1, l + 1, 1))
     ["\n", ..rest] ->
       flush_token(acc, sl, sc, do_tokenize(rest, "", 1, 1, l + 1, 1))
-    [" ", ..rest] | ["\t", ..rest] ->
+    [" ", ..rest] | ["\t", ..rest] | ["\r", ..rest] ->
+      // `\r` is a line break, not a symbol byte. Skipping it here means a CRLF
+      // file parses exactly like the same file with LF endings; the following
+      // `\n` still advances the line counter.
       flush_token(acc, sl, sc, do_tokenize(rest, "", 1, 1, l, c + 1))
     ["(", ..rest] ->
       flush_token(acc, sl, sc, [
