@@ -1,23 +1,22 @@
-//// `gleamunison lsp` — stdio pump for the LSP server. The protocol layer
-//// (lsp.gleam) is pure; this module only moves bytes: read a framed
-//// message, hand it over, write the framed replies. EOF or `exit` stops.
+//// Stdio pump: one bounded header block, one exact UTF-8 body, then replies.
 
-import gleam/int
 import gleam/list
+import gleam/result
 import gleam/string
 import gleamunison/lsp
+import gleamunison/lsp_frame
 import gleamunison/lsp_types
 
-@external(erlang, "gleamunison_ffi", "stdio_binary_mode")
+@external(erlang, "gleamunison_lsp_stdio", "init")
 fn stdio_binary_mode() -> Nil
 
-@external(erlang, "gleamunison_ffi", "stdio_read_line")
-fn stdio_read_line() -> Result(String, Nil)
+@external(erlang, "gleamunison_lsp_stdio", "read_headers")
+fn read_headers(limit: Int) -> Result(String, Nil)
 
-@external(erlang, "gleamunison_ffi", "stdio_read_chars")
-fn stdio_read_chars(n: Int) -> Result(String, Nil)
+@external(erlang, "gleamunison_lsp_stdio", "read_body")
+fn stdio_read_bytes(n: Int) -> Result(String, Nil)
 
-@external(erlang, "gleamunison_ffi", "stdio_write")
+@external(erlang, "gleamunison_lsp_stdio", "write")
 fn stdio_write(s: String) -> Nil
 
 pub fn command(_args: List(String)) -> Nil {
@@ -39,38 +38,11 @@ fn serve(state: lsp_types.State) -> Nil {
   }
 }
 
-/// Read one Content-Length framed message from stdin. EOF anywhere is a
-/// clean stop; a malformed header block is skipped line by line until a
-/// parseable Content-Length appears (an LSP client that speaks garbage
-/// should not kill the server).
+/// EOF, malformed/oversized headers, invalid UTF-8 and short bodies stop the
+/// stream. Guessing a new boundary after bad framing would consume body bytes
+/// as headers and silently desynchronize the client.
 fn read_message() -> Result(String, Nil) {
-  case read_headers(0) {
-    Error(_) -> Error(Nil)
-    Ok(length) -> stdio_read_chars(length)
-  }
-}
-
-fn read_headers(length: Int) -> Result(Int, Nil) {
-  case stdio_read_line() {
-    Error(_) -> Error(Nil)
-    Ok(line) -> {
-      let trimmed = string.trim(line)
-      case trimmed {
-        "" ->
-          case length {
-            0 -> Error(Nil)
-            n -> Ok(n)
-          }
-        _ ->
-          case string.lowercase(trimmed) {
-            "content-length:" <> rest ->
-              case int.parse(string.trim(rest)) {
-                Ok(n) -> read_headers(n)
-                Error(_) -> read_headers(length)
-              }
-            _ -> read_headers(length)
-          }
-      }
-    }
-  }
+  use headers <- result.try(read_headers(lsp_frame.max_header_bytes))
+  use length <- result.try(lsp_frame.content_length(headers))
+  stdio_read_bytes(length)
 }

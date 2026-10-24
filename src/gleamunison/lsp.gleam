@@ -16,6 +16,7 @@ import gleamunison/elaborate as elab
 import gleamunison/json
 import gleamunison/lexer
 import gleamunison/lsp_features
+import gleamunison/lsp_frame
 import gleamunison/lsp_types
 import gleamunison/repl_eval
 import gleamunison/types.{empty_cache}
@@ -30,40 +31,11 @@ pub type Diagnostic {
 /// Split one Content-Length framed message off a buffer. Error means
 /// incomplete: the pump keeps reading and retries.
 pub fn decode_framed(buffer: String) -> Result(#(String, String), Nil) {
-  case string.split_once(buffer, "\r\n\r\n") {
-    Error(_) -> Error(Nil)
-    Ok(#(headers, rest)) -> {
-      use length <- result.try(content_length(headers))
-      case string.length(rest) >= length {
-        False -> Error(Nil)
-        True -> {
-          let body = string.slice(rest, 0, length)
-          let remaining = string.drop_start(rest, length)
-          Ok(#(body, remaining))
-        }
-      }
-    }
-  }
-}
-
-fn content_length(headers: String) -> Result(Int, Nil) {
-  let lines = string.split(headers, "\r\n")
-  let found =
-    list.find_map(lines, fn(line) {
-      case string.split_once(line, ":") {
-        Ok(#(name, value)) ->
-          case string.lowercase(string.trim(name)) == "content-length" {
-            True -> int.parse(string.trim(value))
-            False -> Error(Nil)
-          }
-        Error(_) -> Error(Nil)
-      }
-    })
-  found
+  lsp_frame.decode(buffer)
 }
 
 pub fn encode_frame(body: String) -> String {
-  "Content-Length: " <> int.to_string(string.length(body)) <> "\r\n\r\n" <> body
+  lsp_frame.encode(body)
 }
 
 /// Handle one JSON-RPC body. Returns reply bodies (responses and
