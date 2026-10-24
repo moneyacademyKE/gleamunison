@@ -14,6 +14,7 @@ import gleam/result
 import gleam/string
 import gleamunison/ast
 import gleamunison/cli_lifecycle
+import gleamunison/cli_result
 import gleamunison/codebase
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex}
@@ -30,12 +31,10 @@ import simplifile
 
 const publish_branch = "main"
 
-@external(erlang, "gleamunison_ffi", "halt_failure")
-fn halt_failure() -> Nil
-
+// One exit boundary: cli_result owns the stream and the code, so a command
+// cannot quietly invent its own.
 fn fail(message: String) -> Nil {
-  io.println(message)
-  halt_failure()
+  cli_result.fail(message)
 }
 
 pub fn command(args: List(String)) -> Nil {

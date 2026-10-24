@@ -7,6 +7,7 @@ import gleam/option
 import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
+import gleamunison/cli_result
 import gleamunison/evidence
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/test_runner.{type TestResult}
@@ -35,9 +36,9 @@ pub fn command(args: List(String)) -> Nil {
   }
 }
 
+// One exit boundary: cli_result owns the stream and the code.
 fn fail(message: String) -> Nil {
-  io.println(message)
-  halt_failure()
+  cli_result.fail(message)
 }
 
 fn run(path: String) -> Nil {
