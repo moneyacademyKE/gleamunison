@@ -271,11 +271,20 @@ fn resolve(
   }
 }
 
+/// Whether a ref names something the baseline environment already provides.
+///
+/// The elaborator references a dependency as `ref_for_name(name)` — sha256 of
+/// the name — for every bootstrap entry, terms included. The synthetic genesis
+/// ref (`<<1:256>>`, ...) is an internal handle for the *definition* of a
+/// builtin; no elaborated term ever points at it. Matching only the genesis ref
+/// therefore declared every builtin missing, and `run` on a stored definition
+/// could not resolve `+`. Both shapes name the same builtin, so both count.
 fn is_bootstrap_ref(ref: DefinitionRef) -> Bool {
   list.any(bootstraps.get_init_defs_data(), fn(definition) {
     case definition {
       bootstraps.BAbility(name, _) -> repl_eval.ref_for_name(name) == ref
-      bootstraps.BTerm(_, known_ref) -> known_ref == ref
+      bootstraps.BTerm(name, known_ref) ->
+        known_ref == ref || repl_eval.ref_for_name(name) == ref
     }
   })
 }

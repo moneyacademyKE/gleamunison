@@ -59,6 +59,26 @@ pub fn a_genesis_builtin_needs_no_store_entry_test() {
   run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("3"))
 }
 
+/// The shape production actually emits. `a_genesis_builtin_needs_no_store_entry_test`
+/// builds the AST with `genesis.builtin_int_add()`, but the elaborator wires a
+/// dependency as `ref_for_name(name)` (sha256 of the name), never as the
+/// synthetic genesis ref. A test that only ever used the genesis ref proved a
+/// shape the compiler cannot produce, and hid the regression where `run` on a
+/// published definition could not resolve `+` at all.
+pub fn a_builtin_reached_by_name_ref_needs_no_store_entry_test() {
+  let plus = repl_eval.ref_for_name("+")
+  let main =
+    ast.TermDef(
+      term: ast.Apply(
+        function: ast.Apply(function: ast.RefTo(plus), arg: ast.Int(1)),
+        arg: ast.Int(2),
+      ),
+      typ: ast.Builtin(ast.IntType),
+    )
+  let #(cb, main_ref) = insert(codebase.empty(), main)
+  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("3"))
+}
+
 pub fn a_missing_dependency_names_the_ref_test() {
   let absent = Ref(hash_bytes(<<"absent-dependency">>))
   let main =
