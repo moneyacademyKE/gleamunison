@@ -1,0 +1,25 @@
+otp=29 architecture=aarch64-apple-darwin27.0.0
+dependents_after_storage_error=[]
+aliases_after_storage_error=[]
+lsp_utf8_body_bytes=5
+lsp_utf8_declared_length=4
+lsp_proper_utf8_frame_decode={error,nil}
+lsp_ascii_control=ok
+mnesia_delete_return={ok,nil}
+mnesia_lookup_after_delete={ok,{some,<<"payload">>}}
+rank_bm25 n=100 times_us=[896,868,872] median_us=872
+rank_hybrid n=100 times_us=[2390,2399,2276] median_us=2390
+rank_bm25 n=500 times_us=[20008,19898,20134] median_us=20008
+rank_hybrid n=500 times_us=[27628,27816,27938] median_us=27816
+rank_bm25 n=1000 times_us=[80052,80445,80285] median_us=80285
+rank_hybrid n=1000 times_us=[97321,98346,97035] median_us=97321
+dependents_ets n=100 times_us=[482,484,436] median_us=482
+evidence_ets n=100 times_us=[36,38,38] median_us=38
+dependents_ets n=1000 times_us=[4301,4298,4229] median_us=4298
+evidence_ets n=1000 times_us=[415,372,374] median_us=374
+dependents_ets n=5000 times_us=[20583,20926,20321] median_us=20583
+evidence_ets n=5000 times_us=[1794,1744,1615] median_us=1744
+accepted_parser_depth=100 source_bytes=801
+accepted_parser_depth=1000 source_bytes=8001
+accepted_parser_depth=5000 source_bytes=40001
+audit_probe=PASS (defects reproduced, not fixed)
