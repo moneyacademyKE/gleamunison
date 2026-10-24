@@ -33,17 +33,18 @@ render(Bin, _Depth) when is_binary(Bin) ->
         %% only shape that cannot be mistaken for decoded text.
         _ -> bytes(Bin)
     end;
+%% Canonical Erlang notation puts no spaces after separators, and the REPL
+%% already prints tuples that way. Rendering must not change the shape of a
+%% value a caller re-parses.
 render(List, Depth) when is_list(List) ->
-    [$[, lists:join(", ", [render(E, Depth + 1) || E <- List]), $]];
+    [$[, lists:join(",", [render(E, Depth + 1) || E <- List]), $]];
 render(Tuple, Depth) when is_tuple(Tuple) ->
     Elements = tuple_to_list(Tuple),
-    [${, lists:join(", ", [render(E, Depth + 1) || E <- Elements]), $}];
-render(Map, Depth) when is_map(Map) ->
-    Pairs = maps:to_list(Map),
-    [${, lists:join(", ", [
-        [render(K, Depth + 1), " => ", render(V, Depth + 1)]
-        || {K, V} <- Pairs
-    ]), $}];
+    [${, lists:join(",", [render(E, Depth + 1) || E <- Elements]), $}];
+%% Maps print through ~tp: their canonical form is #{k => v} and reimplementing
+%% it here would be a second spelling of the same data.
+render(Map, _Depth) when is_map(Map) ->
+    io_lib:format("~tp", [Map]);
 render(Other, _) ->
     io_lib:format("~tp", [Other]).
 

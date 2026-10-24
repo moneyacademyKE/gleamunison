@@ -40,7 +40,7 @@ eval_module_inner(Mod) ->
         0 => fun([Val], Cont) ->
             Str = case is_binary(Val) of
                 true -> << "\"", Val/binary, "\"" >>;
-                false -> list_to_binary(io_lib:format("~tp", [Val]))
+                false -> gleamunison_render:term(Val)
             end,
             Cont(Str)
         end
@@ -96,7 +96,7 @@ eval_module_inner(Mod) ->
                 end)
             end)
         end),
-        {ok, list_to_binary(io_lib:format("~tp", [Val]))}
+        {ok, gleamunison_render:term(Val)}
     catch
         Class:Reason:Stacktrace ->
             {error, list_to_binary(io_lib:format("~p:~p at ~p", [Class, Reason, Stacktrace]))}
@@ -138,7 +138,7 @@ eval_module_bare_inner(Mod) ->
     end,
     try
         Val = ModuleAtom:'$eval'(),
-        {ok, list_to_binary(io_lib:format("~tp", [Val]))}
+        {ok, gleamunison_render:term(Val)}
     catch
         Class:Reason:Stacktrace ->
             {error, list_to_binary(io_lib:format("~p:~p at ~p", [Class, Reason, Stacktrace]))}

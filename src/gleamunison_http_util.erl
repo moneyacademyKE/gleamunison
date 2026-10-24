@@ -180,11 +180,29 @@ hex_digit(C) when C >= $A, C =< $F -> {ok, C - $A + 10};
 hex_digit(C) when C >= $a, C =< $f -> {ok, C - $a + 10};
 hex_digit(_) -> error.
 
+%% Every byte a JSON string cannot carry raw is escaped: quote, backslash, and
+%% the control range. A CR or TAB used to pass through literally, which is not
+%% valid JSON — a client parser rejects the whole response, so one control byte
+%% in a definition name broke the endpoint that listed it.
 escape_json(Bin) when is_binary(Bin) ->
-    B1 = binary:replace(Bin, <<"\\">>, <<"\\\\">>, [global]),
-    B2 = binary:replace(B1, <<"\"">>, <<"\\\"">>, [global]),
-    B3 = binary:replace(B2, <<"\n">>, <<"\\n">>, [global]),
-    <<"\"", B3/binary, "\"">>.
+    <<"\"", (escape_json_body(Bin, []))/binary, "\"">>.
+
+escape_json_body(<<>>, Acc) ->
+    iolist_to_binary(lists:reverse(Acc));
+escape_json_body(<<$", Rest/binary>>, Acc) ->
+    escape_json_body(Rest, [<<"\\\"">> | Acc]);
+escape_json_body(<<$\\, Rest/binary>>, Acc) ->
+    escape_json_body(Rest, [<<"\\\\">> | Acc]);
+escape_json_body(<<$\n, Rest/binary>>, Acc) ->
+    escape_json_body(Rest, [<<"\\n">> | Acc]);
+escape_json_body(<<$\r, Rest/binary>>, Acc) ->
+    escape_json_body(Rest, [<<"\\r">> | Acc]);
+escape_json_body(<<$\t, Rest/binary>>, Acc) ->
+    escape_json_body(Rest, [<<"\\t">> | Acc]);
+escape_json_body(<<C, Rest/binary>>, Acc) when C < 16#20; C =:= 16#7F ->
+    escape_json_body(Rest, [io_lib:format("\\u~4.16.0b", [C]) | Acc]);
+escape_json_body(<<C, Rest/binary>>, Acc) ->
+    escape_json_body(Rest, [C | Acc]).
 
 send_json(Socket, StatusCode, Body) ->
     gleamunison_http_metrics:observe(StatusCode),
