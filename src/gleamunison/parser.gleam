@@ -39,6 +39,8 @@ pub fn parse_sexpr(
         Error(e) -> Error(e)
       }
     }
+    [lexer.TokenInfo(lexer.AdmissionRefused(reason), l, c), ..] ->
+      Error(ParseError(reason, l, c))
     [lexer.TokenInfo(lexer.UnterminatedString(_), l, c), ..] ->
       Error(ParseError("Unterminated string literal", l, c))
     [lexer.TokenInfo(other, l, c), ..rest] -> Ok(#(SAtom(other, l, c), rest))

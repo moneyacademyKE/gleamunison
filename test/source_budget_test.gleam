@@ -1,0 +1,107 @@
+import gleam/int
+import gleam/list
+import gleam/string
+import gleamunison/cli_datalog
+import gleamunison/codebase_index
+import gleamunison/elab_types
+import gleamunison/formatter
+import gleamunison/lsp
+import gleamunison/mcp_session
+import gleamunison/parser
+import gleamunison/source_budget
+import gleamunison/types
+import gleamunison/verify
+import gleeunit/should
+import simplifile
+
+fn deep_source() -> String {
+  string.repeat("(lam x ", 5000) <> "1" <> string.repeat(")", 5000)
+}
+
+pub fn deep_source_refuses_at_parser_formatter_lsp_and_datalog_test() {
+  let source = deep_source()
+  parser.parse_string(source) |> should.be_error
+  formatter.format_source(source) |> should.be_error
+  let assert [diagnostic] = lsp.diagnose(source)
+  string.contains(diagnostic.message, "source limit") |> should.equal(True)
+  cli_datalog.eval_source(source) |> should.be_error
+}
+
+pub fn byte_limit_applies_before_grapheme_token_allocation_test() {
+  parser.parse_string("\"" <> string.repeat("a", 1_048_576) <> "\"")
+  |> should.be_error
+}
+
+pub fn file_verification_and_mcp_load_refuse_before_compilation_test() {
+  let path = "/tmp/gleamunison-source-budget-test.lisp"
+  let assert Ok(_) = simplifile.write(deep_source(), to: path)
+  verify.verify_file(path) |> should.be_error
+  mcp_session.load_file(mcp_session.from_parts(types.empty_cache(), []), path)
+  |> should.be_error
+  let assert Ok(_) = simplifile.delete(path)
+}
+
+pub fn quoted_delimiters_and_comments_are_not_source_depth_test() {
+  let text = string.repeat("( ) ; '", 1100)
+  parser.parse_string("\"" <> text <> "\"")
+  |> should.equal(Ok(elab_types.SText(<<text:utf8>>)))
+  parser.parse_string(";" <> text <> "\n42")
+  |> should.equal(Ok(elab_types.SInt(42)))
+}
+
+pub fn each_budget_is_inclusive_and_refuses_one_over_test() {
+  let budget =
+    source_budget.Budget(
+      bytes: 4,
+      tokens: 3,
+      depth: 2,
+      forms: 2,
+      token_bytes: 4,
+    )
+  source_budget.check_with("café", budget)
+  |> should.equal(Error("source limit: bytes"))
+  source_budget.check_with("1234", budget) |> should.equal(Ok(Nil))
+  source_budget.check_with("1 2", budget) |> should.equal(Ok(Nil))
+  source_budget.check_with("1 2 3", source_budget.Budget(..budget, bytes: 20))
+  |> should.equal(Error("source limit: forms"))
+  source_budget.check_with("(1)", budget) |> should.equal(Ok(Nil))
+  source_budget.check_with("(1 2)", source_budget.Budget(..budget, bytes: 20))
+  |> should.equal(Error("source limit: tokens"))
+  source_budget.check_with("'''1", source_budget.Budget(..budget, tokens: 10))
+  |> should.equal(Error("source limit: depth"))
+  source_budget.check_with(
+    "'('(1))",
+    source_budget.Budget(..budget, bytes: 20, tokens: 20),
+  )
+  |> should.equal(Error("source limit: depth"))
+  source_budget.check_with("12345", source_budget.Budget(..budget, bytes: 20))
+  |> should.equal(Error("source limit: token bytes"))
+}
+
+pub fn adjacent_forms_and_escaped_strings_do_not_bypass_limits_test() {
+  let budget =
+    source_budget.Budget(
+      bytes: 100,
+      tokens: 20,
+      depth: 4,
+      forms: 1,
+      token_bytes: 100,
+    )
+  source_budget.check_with("1(2)", budget)
+  |> should.equal(Error("source limit: forms"))
+  source_budget.check_with("'('\"(\\\";\"')", budget) |> should.equal(Ok(Nil))
+  source_budget.check_with("'('('1))", budget)
+  |> should.equal(Error("source limit: depth"))
+}
+
+pub fn generated_index_does_not_spend_depth_per_datom_test() {
+  let defs =
+    list.index_fold(list.repeat(Nil, 400), [], fn(defs, _, n) {
+      [
+        #(int.to_string(n), elab_types.SurfaceTermDef(elab_types.SInt(n))),
+        ..defs
+      ]
+    })
+  source_budget.check(codebase_index.index_source(defs))
+  |> should.equal(Ok(Nil))
+}

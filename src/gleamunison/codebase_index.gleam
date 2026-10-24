@@ -3,6 +3,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/set
+import gleam/string
 import gleamunison/cli_datalog
 import gleamunison/elab_types.{
   type SCase, type SurfaceDef, type SurfaceTerm, SApply, SConstruct, SDo, SFloat,
@@ -111,28 +112,23 @@ fn case_refs(c: SCase) -> List(String) {
   list.append(guard_refs, term_refs(c.body))
 }
 
-/// The generated index script: engine-agnostic prelude (bindings extraction
-/// helper) followed by one db-assert chain building `db`.
+/// Build index data as a flat list of triples, not a nested let per datom.
+/// The native engine folds the data; generated source obeys normal admission.
 pub fn index_source(defs: List(#(String, SurfaceDef))) -> String {
-  let asserts =
+  let triples =
     list.map(datoms_of(defs), fn(d) {
-      "(db-assert db "
+      "(pair "
       <> int.to_string(d.entity)
-      <> " "
+      <> " (pair "
       <> lisp_literal.text(d.attr)
       <> " "
       <> lisp_literal.text(d.value)
-      <> ")"
+      <> "))"
     })
-  // Chronological threading: (let db db-empty (let db A1 (let db A2 db))).
-  // Reversed fold builds innermost-last; the seed binds db-empty.
-  let chain =
-    "(let db db-empty "
-    <> list.fold(list.reverse(asserts), "db", fn(acc, a) {
-      "(let db " <> a <> " " <> acc <> ")"
-    })
-    <> ")"
-  prelude_source <> "\n(define db " <> chain <> ")\n"
+  prelude_source
+  <> "\n(define db (db-assert-many db-empty (list "
+  <> string.join(triples, " ")
+  <> ")))\n"
 }
 
 /// Helper available to index scripts: extract one var's values from a

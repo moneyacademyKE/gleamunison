@@ -1,6 +1,7 @@
 import gleam/float
 import gleam/int
 import gleam/string
+import gleamunison/source_budget
 
 pub type Token {
   Symbol(String)
@@ -9,6 +10,7 @@ pub type Token {
   LParen
   RParen
   Quote
+  AdmissionRefused(String)
   UnterminatedString(String)
   /// A `;` comment, text preserved including the leading semicolon.
   /// Emitted only outside string literals (strings scan in their own
@@ -27,7 +29,10 @@ pub type ParseError {
 }
 
 pub fn tokenize(input: String) -> List(TokenInfo) {
-  do_tokenize(string.to_graphemes(input), "", 1, 1, 1, 1)
+  case source_budget.check(input) {
+    Error(reason) -> [TokenInfo(AdmissionRefused(reason), 1, 1)]
+    Ok(_) -> do_tokenize(string.to_graphemes(input), "", 1, 1, 1, 1)
+  }
 }
 
 fn do_tokenize(chars, acc, sl, sc, l, c) {
