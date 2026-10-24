@@ -23,10 +23,10 @@ import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/cli_store
+import gleamunison/dependency_snapshot
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/namespace
 import gleamunison/storage
-import gleamunison/store_deps
 import simplifile
 
 const default_branch = "main"
@@ -63,7 +63,7 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
   )
 }
 
-fn purge(
+pub fn purge(
   adapter: storage.StorageAdapter,
   manifest_path: String,
   ref: DefinitionRef,
@@ -71,13 +71,20 @@ fn purge(
   confirmed: Bool,
 ) -> Result(String, #(Int, String)) {
   use _ <- result.try(exists(adapter, ref))
-  let outside =
-    store_deps.dependents_on_branch(adapter, branch, ref)
-    |> list.filter(fn(dependent) { dependent != ref })
+  use snapshot <- result.try(
+    dependency_snapshot.read(adapter, branch)
+    |> result.map_error(fn(error) {
+      #(
+        cli_result.refused,
+        "purge: cannot inspect store: " <> string.inspect(error),
+      )
+    }),
+  )
+  let outside = dependency_snapshot.dependents(snapshot, ref)
   case outside {
     [] -> {
-      let removal = store_deps.exclusive_closure_on_branch(adapter, branch, ref)
-      let report = describe_set(adapter, branch, removal)
+      let removal = dependency_snapshot.exclusive_closure(snapshot, ref)
+      let report = describe_set(snapshot, removal)
       case confirmed {
         False ->
           Ok(
@@ -93,6 +100,7 @@ fn purge(
             manifest_path,
             branch,
             removal,
+            snapshot,
           ))
           Ok(
             "purge: removed "
@@ -136,13 +144,12 @@ fn exists(
 
 /// One line per definition: ref, and the names that point at it.
 fn describe_set(
-  adapter: storage.StorageAdapter,
-  branch: String,
+  snapshot: dependency_snapshot.Snapshot,
   removal: List(DefinitionRef),
 ) -> String {
   removal
   |> list.map(fn(ref) {
-    let names = store_deps.names_for_on_branch(adapter, branch, ref)
+    let names = dependency_snapshot.names(snapshot, ref)
     case names {
       [] -> "  " <> short(ref)
       _ -> "  " <> short(ref) <> "  (" <> string.join(names, ", ") <> ")"
@@ -156,10 +163,22 @@ fn remove_all(
   manifest_path: String,
   branch: String,
   removal: List(DefinitionRef),
+  snapshot: dependency_snapshot.Snapshot,
 ) -> Result(Nil, #(Int, String)) {
+  // All reads precede mutation. Missing index is valid for hash-only stores;
+  // an unreadable index is not an empty one.
+  use lines <- result.try(case simplifile.read(manifest_path) {
+    Ok(content) -> Ok(string.split(content, "\n"))
+    Error(simplifile.Enoent) -> Ok([])
+    Error(error) ->
+      Error(#(
+        cli_result.refused,
+        "purge: cannot read the index: " <> string.inspect(error),
+      ))
+  })
   let hashes = list.map(removal, full_hex)
-  use _ <- result.try(unbind_all(adapter, branch, removal))
-  use _ <- result.try(drop_index_lines(manifest_path, hashes))
+  use _ <- result.try(unbind_all(adapter, branch, removal, snapshot))
+  use _ <- result.try(drop_index_lines(manifest_path, hashes, lines))
   use _ <- result.try(
     list.try_fold(removal, Nil, fn(_, ref) {
       adapter.delete(ref)
@@ -179,15 +198,11 @@ fn unbind_all(
   adapter: storage.StorageAdapter,
   branch: String,
   removal: List(DefinitionRef),
+  snapshot: dependency_snapshot.Snapshot,
 ) -> Result(Nil, #(Int, String)) {
-  let current = case namespace.load_current(adapter, branch) {
-    Ok(found) -> found
-    Error(_) -> namespace.empty()
-  }
+  let current = dependency_snapshot.current_namespace(snapshot)
   let names =
-    list.flat_map(removal, fn(ref) {
-      store_deps.names_for_on_branch(adapter, branch, ref)
-    })
+    list.flat_map(removal, fn(ref) { dependency_snapshot.names(snapshot, ref) })
   case names {
     [] -> Ok(Nil)
     _ -> {
@@ -206,11 +221,8 @@ fn unbind_all(
 fn drop_index_lines(
   path: String,
   hashes: List(String),
+  lines: List(String),
 ) -> Result(Nil, #(Int, String)) {
-  let lines = case simplifile.read(path) {
-    Ok(content) -> string.split(content, "\n")
-    Error(_) -> []
-  }
   let kept =
     list.filter(lines, fn(line) {
       case string.split_once(line, " ") {

@@ -20,6 +20,7 @@ import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/cli_store
+import gleamunison/dependency_snapshot
 import gleamunison/identity
 import gleamunison/namespace
 import gleamunison/storage
@@ -66,7 +67,7 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
   Ok(report)
 }
 
-fn retract(
+pub fn retract(
   adapter: storage.StorageAdapter,
   manifest_path: String,
   name: String,
@@ -75,33 +76,44 @@ fn retract(
   branch: String,
   lines: List(String),
 ) -> Result(String, #(Int, String)) {
-  // Both checks before any mutation: a refusal must leave the store exactly as
-  // it was.
-  use _ <- result.try(refuse_dependents(adapter, name, ref, branch))
-  use _ <- result.try(refuse_other_names(adapter, name, ref, branch))
-  use _ <- result.try(rewrite_manifest(manifest_path, name, lines))
-  use _ <- result.try(unbind(adapter, name, branch))
-  use _ <- result.try(
-    adapter.delete(ref)
+  use snapshot <- result.try(
+    dependency_snapshot.read(adapter, branch)
     |> result.map_error(fn(error) {
       #(
         cli_result.refused,
-        "unpublish: cannot remove " <> hash <> ": " <> describe(error),
+        "unpublish: cannot inspect store: " <> string.inspect(error),
       )
     }),
   )
-  Ok("unpublished: " <> name <> " #" <> string.slice(hash, 0, 12))
-}
-
-fn refuse_dependents(
-  adapter: storage.StorageAdapter,
-  name: String,
-  ref: identity.DefinitionRef,
-  branch: String,
-) -> Result(Nil, #(Int, String)) {
-  case store_deps.dependents_on_branch(adapter, branch, ref) {
-    [] -> Ok(Nil)
-    dependents ->
+  let dependents = dependency_snapshot.dependents(snapshot, ref)
+  let aliases =
+    dependency_snapshot.names(snapshot, ref)
+    |> list.filter(fn(other) { other != name })
+  case dependents, aliases {
+    [], [] -> {
+      let ns = dependency_snapshot.current_namespace(snapshot)
+      use _ <- result.try(
+        namespace.commit(adapter, branch, namespace.remove(ns, name))
+        |> result.map_error(fn(reason) {
+          #(
+            cli_result.refused,
+            "unpublish: cannot commit the namespace: " <> reason,
+          )
+        }),
+      )
+      use _ <- result.try(rewrite_manifest(manifest_path, name, lines))
+      use _ <- result.try(
+        adapter.delete(ref)
+        |> result.map_error(fn(error) {
+          #(
+            cli_result.refused,
+            "unpublish: cannot remove " <> hash <> ": " <> describe(error),
+          )
+        }),
+      )
+      Ok("unpublished: " <> name <> " #" <> string.slice(hash, 0, 12))
+    }
+    [_, ..], _ ->
       Error(#(
         cli_result.refused,
         "unpublish: "
@@ -112,51 +124,27 @@ fn refuse_dependents(
           <> string.join(list.map(dependents, short), ", ")
           <> "\nunpublish: retract those first, or use `purge` to remove the set",
       ))
-  }
-}
-
-fn refuse_other_names(
-  adapter: storage.StorageAdapter,
-  name: String,
-  ref: identity.DefinitionRef,
-  branch: String,
-) -> Result(Nil, #(Int, String)) {
-  case store_deps.other_names_on_branch(adapter, branch, ref, name) {
-    [] -> Ok(Nil)
-    others ->
+    _, [_, ..] ->
       Error(#(
         cli_result.refused,
         "unpublish: "
           <> name
           <> "'s content is still bound as "
-          <> string.join(others, ", ")
+          <> string.join(aliases, ", ")
           <> "; unpublish those names instead",
       ))
   }
 }
 
-/// The binding goes with the name. A namespace without the entry is committed
-/// as a new head, so the retraction is itself a durable fact in the history.
-fn unbind(
-  adapter: storage.StorageAdapter,
-  name: String,
-  branch: String,
-) -> Result(Nil, #(Int, String)) {
-  let ns = case namespace.load_current(adapter, branch) {
-    Ok(current) -> current
-    Error(_) -> namespace.empty()
-  }
-  namespace.commit(adapter, branch, namespace.remove(ns, name))
-  |> result.map(fn(_) { Nil })
-  |> result.map_error(fn(reason) {
-    #(cli_result.refused, "unpublish: cannot commit the namespace: " <> reason)
-  })
-}
-
 fn read_manifest(path: String) -> Result(List(String), #(Int, String)) {
   case simplifile.read(path) {
     Ok(content) -> Ok(string.split(content, "\n"))
-    Error(_) -> Ok([])
+    Error(simplifile.Enoent) -> Ok([])
+    Error(error) ->
+      Error(#(
+        cli_result.refused,
+        "unpublish: cannot read the index: " <> string.inspect(error),
+      ))
   }
 }
 

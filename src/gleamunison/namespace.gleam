@@ -165,15 +165,19 @@ pub fn branch_head(
   adapter: StorageAdapter,
   branch: String,
 ) -> Result(#(Int, DefinitionRef), String) {
-  case adapter.lookup(branch_pointer_ref(branch)) {
-    Ok(Some(bytes)) ->
-      case parse_head(bytes) {
-        Ok(#(name, seq, ns_ref, _)) if name == branch && seq > 0 ->
-          Ok(#(seq, ns_ref))
-        _ -> Error("corrupt branch head or branch identity mismatch")
-      }
-    Ok(None) -> Error("no such branch: " <> branch)
-    Error(_) -> Error("store lookup failed")
+  use prior <- result.try(read_head(adapter, branch))
+  case prior {
+    Some(#(seq, ns_ref, _)) -> Ok(#(seq, ns_ref))
+    None -> Error("no such branch: " <> branch)
+  }
+}
+
+/// A mutable pointer has a name-derived key, not a content hash. Safety scans
+/// can skip it only when both its embedded branch and pointer key agree.
+pub fn is_branch_pointer(ref: DefinitionRef, bytes: BitArray) -> Bool {
+  case parse_head(bytes) {
+    Ok(#(branch, seq, _, _)) -> seq > 0 && branch_pointer_ref(branch) == ref
+    Error(_) -> False
   }
 }
 
@@ -184,11 +188,13 @@ pub fn commit(
   branch: String,
   ns: Namespace,
 ) -> Result(DefinitionRef, String) {
-  use ns_ref <- result.try(save(adapter, ns))
-  let #(seq, prev) = case branch_head(adapter, branch) {
-    Ok(#(n, _)) -> #(n + 1, head_chunk_ref(adapter, branch))
-    Error(_) -> #(1, None)
+  // Read/validate first: a failed or corrupt head is not a new branch.
+  use prior <- result.try(read_head(adapter, branch))
+  let #(seq, prev) = case prior {
+    Some(#(n, _, head)) -> #(n + 1, Some(head))
+    None -> #(1, None)
   }
+  use ns_ref <- result.try(save(adapter, ns))
   let head_bytes = serialize_head(branch, seq, ns_ref, prev)
   let head_ref = Ref(hash_bytes(head_bytes))
   use _ <- result.try(
@@ -203,13 +209,32 @@ pub fn commit(
   Ok(head_ref)
 }
 
-fn head_chunk_ref(
+fn read_head(
   adapter: StorageAdapter,
   branch: String,
-) -> Option(DefinitionRef) {
+) -> Result(Option(#(Int, DefinitionRef, DefinitionRef)), String) {
   case adapter.lookup(branch_pointer_ref(branch)) {
-    Ok(Some(bytes)) -> Some(Ref(hash_bytes(bytes)))
-    _ -> None
+    Ok(Some(bytes)) ->
+      case parse_head(bytes) {
+        Ok(#(name, seq, ns_ref, _)) if name == branch && seq > 0 ->
+          Ok(Some(#(seq, ns_ref, Ref(hash_bytes(bytes)))))
+        _ -> Error("corrupt branch head or branch identity mismatch")
+      }
+    Ok(None) -> Ok(None)
+    Error(_) -> Error("store lookup failed")
+  }
+}
+
+/// Only a genuinely missing pointer is an empty namespace. Read errors and
+/// corrupt/dangling heads must refuse safety decisions and mutations.
+pub fn load_current_or_empty(
+  adapter: StorageAdapter,
+  branch: String,
+) -> Result(Namespace, String) {
+  use prior <- result.try(read_head(adapter, branch))
+  case prior {
+    None -> Ok(empty())
+    Some(#(_, ns_ref, _)) -> load(adapter, ns_ref)
   }
 }
 
