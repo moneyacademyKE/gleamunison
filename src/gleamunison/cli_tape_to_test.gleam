@@ -12,10 +12,10 @@
 //// cursor — future work.
 
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/string
 import gleamunison/bootstraps
+import gleamunison/cli_result
 import gleamunison/compile
 import gleamunison/repl_eval
 import gleamunison/transcript
@@ -25,17 +25,23 @@ pub fn command(args: List(String)) -> Nil {
   case args {
     [path, name, tape_path] ->
       case simplifile.read(tape_path) {
+        // A generator that could not read its input exits 0 and prints the
+        // reason to stdout, so a script sees success and an empty file next to
+        // it. Every failure here goes through the shared boundary: stderr and
+        // a nonzero code.
         Error(e) ->
-          io.println("tape-to-test: cannot read tape: " <> string.inspect(e))
+          cli_result.fail(
+            "tape-to-test: cannot read tape: " <> string.inspect(e),
+          )
         Ok(json) ->
           case generate(path, name, json) {
-            Error(err) -> io.println("tape-to-test: " <> err)
+            Error(err) -> cli_result.fail("tape-to-test: " <> err)
             Ok(source) -> {
               let out = "test_" <> name <> "_tape.lisp"
               case simplifile.write(source, to: out) {
-                Ok(_) -> io.println("tape-to-test: wrote " <> out)
+                Ok(_) -> cli_result.success("tape-to-test: wrote " <> out)
                 Error(e) ->
-                  io.println(
+                  cli_result.fail(
                     "tape-to-test: write failed: " <> string.inspect(e),
                   )
               }
@@ -43,7 +49,7 @@ pub fn command(args: List(String)) -> Nil {
           }
       }
     _ ->
-      io.println(
+      cli_result.fail(
         "usage: gleam run -- tape-to-test <file.lisp> <def> <tape.json>",
       )
   }
