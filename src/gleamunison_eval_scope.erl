@@ -53,7 +53,23 @@ init({Owner, Token, Fun, Timeout, Budget}) ->
 
 init_scope(Owner, Token, Fun, Timeout, Budget) ->
     Scope = self(),
+    %% Output belongs to whoever asked for the evaluation, not to whoever
+    %% happened to start this supervisor first. A scope is started under a
+    %% lazily-created supervisor, so its own group leader is whatever the first
+    %% caller's was — in a test run that is a per-test capture device, which is
+    %% dead by the time the next evaluation runs, and every `Console print`
+    %% then fails with `{io,terminated}` for the life of the VM. The owner is
+    %% alive right now (it is blocked waiting for this result), so its io
+    %% device is the correct and stable one.
+    OwnerGL = case process_info(Owner, group_leader) of
+        {group_leader, GL} -> GL;
+        undefined -> undefined
+    end,
     {Worker, Mon} = spawn_monitor(fun() ->
+        case OwnerGL of
+            undefined -> ok;
+            _ -> group_leader(OwnerGL, self())
+        end,
         receive run -> Scope ! {evaluation_result, self(), Fun()} end
     end),
     %% set_on_spawn is inherited before a descendant runs, even when the
