@@ -336,11 +336,19 @@ names (`+`, `eq?`) come from the baseline environment, the same one the REPL
 establishes. A ref the store does not hold fails with the missing hash instead
 of pretending to run.
 
-Retraction is the reverse of admission, and it removes all three facts a name
-stands on: the index line, the namespace binding, and the bytes. `unpublish`
-refuses rather than half-finishing — if another stored definition depends on
-the content, or another name still binds it, nothing is removed and the message
-names what stands in the way.
+Retraction is the reverse of admission, and it removes the facts a name stands
+on: the index line, the namespace binding, and the bytes. `unpublish` refuses
+rather than half-finishing — if another stored definition depends on the
+content, or another name on the same branch still binds it, nothing is removed
+and the message names what stands in the way.
+
+Branches complicate exactly one of those facts, because **the name is
+branch-scoped and the bytes are not**. `unpublish` on `main` removes the binding
+there and keeps the bytes when another branch still resolves to them, naming
+that branch: two branches binding the same content can never both retract first,
+so a refusal would deadlock. The last branch to let go removes the bytes. The
+branch namespace is the authority for its own bindings, so a branch can still
+retract a name whose store-wide index line is already gone.
 
 `purge` works by content hash instead of by name, and it is a dry run until
 `--yes`: it prints the removal set (the definition plus every stored dependency

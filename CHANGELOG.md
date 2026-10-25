@@ -40,6 +40,30 @@ than what the caller asked about.
 command drifting from 1 to 2 still passed. Each case now declares its exact
 code, and `run`/`pkg` are exercised in both directions.
 
+### Retraction looked at one branch while deleting from all of them
+
+`unpublish` and `purge` read one branch's namespace, then removed bytes from
+the store — which every branch shares. A name bound on `dev` looked absent
+from `main`, so retracting it on `main` deleted content `dev` still resolved
+to: a binding pointing at a ref nobody can load.
+
+- `branch_scope.branches` recovers the branch set from the store's own
+  pointer chunks (each carries its branch name back), so no second index can
+  drift from the pointers. `branches_binding` answers which branches bind a
+  ref, and `namespace.branch_name_of` is now the single rule for "is this
+  chunk that branch's pointer".
+- `unpublish` removes the name, which is branch-scoped, and keeps the bytes,
+  which are not, naming the branch that still holds them. Refusing instead
+  would deadlock: two branches binding the same content can never both go
+  first. The last branch to let go removes the bytes.
+- The published index is store-wide, so a second branch could not retract at
+  all once the first had removed the index line: the binding was reported
+  "not published" forever. The index is tried first, then the branch
+  namespace, which is the authority for its own bindings.
+- `namespace.gleam` crossed 500 LOC, so the cross-branch read model moved to
+  `branch_scope.gleam`: the name layer owns pointers and commits, that module
+  owns the questions asked across all of them.
+
 ### Dead code removed
 
 - Six modules had no importer and are gone: `gleamunison/filepath`, `gleamunison/config`,
