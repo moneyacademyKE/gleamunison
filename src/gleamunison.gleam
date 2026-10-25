@@ -76,7 +76,7 @@ pub fn run(args: List(String)) -> Nil {
     ["lsp", ..rest] -> cli_lsp.command(rest)
     ["log", ..rest] -> cli_log.command(rest)
     ["sync", ..rest] -> cli_result.finish(cli_sync.command(rest))
-    ["pkg", ..rest] -> cli_result.finish(cli_pkg.command(rest))
+    ["pkg", ..rest] -> cli_result.finish_coded(cli_pkg.command(rest))
     ["watch", path] -> cli_watch.command(path)
     ["watch"] -> cli_result.fail("usage: gleam run -- watch <file.lisp>")
     ["repl", ..paths] -> repl.start_repl_loading(paths)

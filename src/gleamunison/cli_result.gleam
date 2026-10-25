@@ -25,7 +25,24 @@ pub fn finish(result: Result(Nil, String)) -> Nil {
   }
 }
 
+/// The same boundary for a command whose failure carries its own exit code:
+/// "absent" and "refused" are different answers, and the code is how a script
+/// reads the difference.
+pub fn finish_coded(result: Result(Nil, #(Int, String))) -> Nil {
+  case result {
+    Ok(Nil) -> Nil
+    Error(#(code, message)) -> fail_with_code(code, message)
+  }
+}
+
 pub fn success(message: String) -> Result(Nil, String) {
+  io.println(message)
+  Ok(Nil)
+}
+
+/// Success at the coded boundary: the result still goes to stdout, only the
+/// failure side carries a code.
+pub fn success_coded(message: String) -> Result(Nil, #(Int, String)) {
   io.println(message)
   Ok(Nil)
 }

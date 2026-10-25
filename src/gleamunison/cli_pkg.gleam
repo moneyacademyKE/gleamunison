@@ -25,19 +25,22 @@ import gleamunison/verify
 
 const default_branch = "main"
 
-pub fn command(args: List(String)) -> Result(Nil, String) {
+pub fn command(args: List(String)) -> Result(Nil, #(Int, String)) {
   case args {
     ["install", ..rest] -> install(rest)
-    ["publish", ..rest] -> publish(rest)
+    ["publish", ..rest] ->
+      publish_outcome(rest)
+      |> result.map_error(fn(message) { #(cli_result.refused, message) })
     _ ->
-      Error(
+      Error(#(
+        cli_result.refused,
         "usage: gleam run -- pkg install <manifest-hash> [--peer host:port] [--branch name]\n"
-        <> "       gleam run -- pkg publish <file.lisp> --name <pkg> --version <v>",
-      )
+          <> "       gleam run -- pkg publish <file.lisp> --name <pkg> --version <v>",
+      ))
   }
 }
 
-fn publish(args: List(String)) -> Result(Nil, String) {
+fn publish_outcome(args: List(String)) -> Result(Nil, String) {
   use #(path, name, version) <- result.try(parse_publish_args(
     args,
     None,
@@ -106,22 +109,43 @@ fn parse_publish_args(
   }
 }
 
-fn install(args: List(String)) -> Result(Nil, String) {
-  use #(hash_hex, peer, branch, store_override) <- result.try(parse_args(
-    args,
-    None,
-    None,
-    None,
-  ))
-  use context <- result.try(cli_lifecycle.resolve_context(store_override))
+fn install(args: List(String)) -> Result(Nil, #(Int, String)) {
+  use #(hash_hex, peer, branch, store_override) <- result.try(
+    parse_args(args, None, None, None)
+    |> result.map_error(fn(message) { #(cli_result.refused, message) }),
+  )
+  use context <- result.try(
+    cli_lifecycle.resolve_context(store_override)
+    |> result.map_error(fn(message) { #(cli_result.refused, message) }),
+  )
   let store_path = cli_lifecycle.store_path(context)
-  use _ <- result.try(manifest.ref_from_hex(hash_hex))
-  use output <- result.try(
-    cli_store.with_dets(store_path, fn(adapter) {
+  use _ <- result.try(
+    manifest.ref_from_hex(hash_hex)
+    |> result.map(fn(_) { Nil })
+    |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
+  )
+  use output <- result.try(cli_store.with_dets_mapped(
+    store_path,
+    fn(adapter) {
       use _ <- result.try(case peer {
         None -> Ok(Nil)
-        Some(p) -> pull_first(p, adapter, hash_hex)
+        Some(p) ->
+          pull_first(p, adapter, hash_hex)
+          |> result.map_error(fn(message) {
+            #(cli_result.unresolvable, message)
+          })
       })
+      // Every manifest the install will read must already be in the store.
+      // Walking the graph first is what makes a missing manifest
+      // could-not-resolve (exit 2) instead of a refusal, and it names the
+      // absent hash before any policy is consulted.
+      use _ <- result.try(
+        pkg.manifest_closure(adapter, hash_hex)
+        |> result.map(fn(_) { Nil })
+        |> result.map_error(fn(reason) {
+          #(cli_result.unresolvable, "pkg: " <> reason)
+        }),
+      )
       pkg.install_from_store_production(adapter, hash_hex, branch)
       |> result.map(fn(installed) {
         "pkg: installed "
@@ -129,9 +153,11 @@ fn install(args: List(String)) -> Result(Nil, String) {
         <> " onto branch "
         <> branch
       })
-    }),
-  )
-  cli_result.success(output)
+      |> result.map_error(fn(reason) { #(cli_result.refused, reason) })
+    },
+    fn(message) { #(cli_result.refused, message) },
+  ))
+  cli_result.success_coded(output)
 }
 
 fn parse_args(

@@ -169,6 +169,14 @@ pub fn install_from_store_production(
   manifest_hex: String,
   branch: String,
 ) -> Result(List(String), String) {
+  // Existence before policy. `trust.production_policy` refuses when no signing
+  // key is configured, so asking it first told a caller with an empty store to
+  // configure a key — a resolution failure reported as a policy refusal, and
+  // the wrong exit code for anything scripting the install.
+  use root_ref <- result.try(manifest.ref_from_hex(manifest_hex))
+  use _ <- result.try(
+    manifest.fetch(adapter, root_ref) |> result.map(fn(_) { Nil }),
+  )
   case trust.production_policy() {
     Error(reason) -> Error(reason)
     Ok(policy) ->
