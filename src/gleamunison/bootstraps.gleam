@@ -1,3 +1,4 @@
+import gleam/list
 import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef}
 
@@ -95,4 +96,33 @@ pub fn get_init_defs_data() -> List(BootstrapDef) {
     BTerm("http-get", genesis.builtin_http_get()),
     BTerm("file-read", genesis.builtin_file_read()),
   ]
+}
+
+/// Whether this ref is one of the synthetic handles the runtime uses to name a
+/// builtin's definition (`<<1:256>>`, `<<2:256>>`, ...). It is internal: no
+/// elaborated term points at it, and its hex is not a content hash — printing it
+/// as one told a caller that `list-map` lives at `#000000000000`.
+pub fn is_synthetic_ref(ref: DefinitionRef) -> Bool {
+  list.any(get_init_defs_data(), fn(definition) {
+    case definition {
+      BTerm(_, known) -> known == ref
+      BAbility(_, _) -> False
+    }
+  })
+}
+
+/// The name of the builtin a synthetic ref belongs to, if any. The name ref is
+/// what the elaborator actually emits, so it is the reference a caller can use.
+pub fn builtin_name_for(ref: DefinitionRef) -> Result(String, Nil) {
+  case
+    list.find_map(get_init_defs_data(), fn(definition) {
+      case definition {
+        BTerm(name, known) if known == ref -> Ok(name)
+        _ -> Error(Nil)
+      }
+    })
+  {
+    Ok(name) -> Ok(name)
+    Error(_) -> Error(Nil)
+  }
 }

@@ -4,6 +4,7 @@ import gleam/option
 import gleam/result
 import gleam/set
 import gleam/string
+import gleamunison/bootstraps
 import gleamunison/cli_datalog
 import gleamunison/elab_types.{
   type SCase, type SurfaceDef, type SurfaceTerm, SApply, SConstruct, SDo, SFloat,
@@ -37,7 +38,15 @@ pub fn kind_of(def: SurfaceDef) -> String {
 /// index, MCP search, and graph tools.
 pub fn ref_hex(name: String, def: SurfaceDef) -> String {
   case def {
-    SurfaceTermDef(SRef(r)) -> ref_to_hex(r)
+    // A builtin's definition is stored under a synthetic handle, not a content
+    // hash. Printing that handle as a hash told a caller `list-map` lives at
+    // `#000000000000` — a ref nothing can resolve. The name ref is what the
+    // elaborator emits and what a caller can actually reference.
+    SurfaceTermDef(SRef(r)) ->
+      case bootstraps.builtin_name_for(r) {
+        Ok(builtin) -> ref_to_hex(repl_eval.ref_for_name(builtin))
+        Error(_) -> ref_to_hex(r)
+      }
     _ -> ref_to_hex(repl_eval.ref_for_name(name))
   }
 }

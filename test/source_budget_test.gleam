@@ -5,9 +5,11 @@ import gleamunison/cli_datalog
 import gleamunison/codebase_index
 import gleamunison/elab_types
 import gleamunison/formatter
+import gleamunison/identity
 import gleamunison/lsp
 import gleamunison/mcp_session
 import gleamunison/parser
+import gleamunison/repl_eval
 import gleamunison/source_budget
 import gleamunison/types
 import gleamunison/verify
@@ -154,4 +156,18 @@ pub fn session_eval_has_the_baseline_environment_test() {
   let state = mcp_session.boot()
   let assert Ok(#(value, _)) = mcp_session.eval_source(state, "(+ 1 2)")
   value |> should.equal("3")
+}
+
+/// `find` promises a hash you can reference. For a builtin it printed
+/// `#000000000000`: the synthetic handle the runtime uses internally for a
+/// builtin's definition, which nothing can resolve. The name ref is what the
+/// elaborator emits, so that is what a caller gets.
+pub fn find_reports_a_reference_that_resolves_test() {
+  let state = mcp_session.boot()
+  let hits = mcp_session.search(state, "list-map")
+  let assert [hit, ..] = hits
+  let identity.Ref(name_hash) = repl_eval.ref_for_name("list-map")
+  hit.ref_hex |> should.equal(identity.hash_to_debug_string(name_hash))
+  // Not the synthetic genesis handle, whose hex starts with zeros.
+  hit.ref_hex |> string.starts_with("0000000000") |> should.equal(False)
 }
