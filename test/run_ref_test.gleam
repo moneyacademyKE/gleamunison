@@ -1,6 +1,7 @@
 //// Run by hash: resolve the closure, load it, execute it. These tests use an
 //// in-memory store, which is the same adapter contract dets satisfies.
 
+import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/ast
 import gleamunison/codebase
@@ -232,3 +233,33 @@ pub fn run_gate_is_skipped_only_when_explicitly_allowed_test() {
   run_ref.run_verified(codebase.get_adapter(cb), ref, [], True)
   |> should.equal(Ok("7"))
 }
+
+// --- an effect inside an APPLIED function runs ------------------------------
+//
+// `run <hash> <arg>` applies the stored closure one argument at a time. The
+// baseline handler frames were installed around `'$eval'()` — which only
+// *builds* the closure — and popped before the fold that applies the
+// arguments, so an effectful function was admitted by the turnstile and then
+// died with `ability m_74eafa15 (operation 0) is not handled here`. The
+// zero-argument case passed, which is why the hole survived.
+pub fn an_effectful_function_runs_with_its_argument_test() {
+  let console = repl_eval.ref_for_name("Console")
+  let def =
+    ast.TermDef(
+      term: ast.Lambda(
+        binder: Local(0),
+        body: ast.Do(console, Local(0), [ast.Text(<<"probe">>)]),
+      ),
+      typ: ast.Fn(
+        params: [ast.Builtin(ast.TextType)],
+        result: ast.Builtin(ast.IntType),
+        requires: ast.Required([]),
+      ),
+    )
+  let #(cb, ref) = insert(codebase.empty(), def)
+  run_ref.run(codebase.get_adapter(cb), ref, [text_arg(<<"probe">>)])
+  |> should.equal(Ok("0"))
+}
+
+@external(erlang, "gleamunison_ffi", "to_dynamic")
+fn text_arg(value: BitArray) -> Dynamic

@@ -172,8 +172,14 @@ call_eval(Mod, Args) ->
 call_eval_inner(Mod, Args) ->
     ModuleAtom = module_atom(Mod),
     try
-        V0 = with_baseline_handlers(fun() -> ModuleAtom:'$eval'() end),
-        Val = lists:foldl(fun(A, F) -> erlang:apply(F, [A]) end, V0, Args),
+        %% The frames must span the APPLICATION, not just the closure's
+        %% construction: `'$eval'()` returns a fun, so a handler scope that
+        %% closed before the fold left every effect in the function body
+        %% unhandled — admitted by the turnstile, dead on arrival at run.
+        Val = with_baseline_handlers(fun() ->
+            V0 = ModuleAtom:'$eval'(),
+            lists:foldl(fun(A, F) -> erlang:apply(F, [A]) end, V0, Args)
+        end),
         {ok, Val}
     catch
         Class:Reason:Stacktrace ->
