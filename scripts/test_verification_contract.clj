@@ -34,9 +34,25 @@
   (fs/delete bad))
 
 (let [tracked (changed-files)]
-  (check "dirty-and-untracked-production-files-are-scanned"
-         (and (some #(= % "scripts/verify_production_boundaries.clj") tracked)
-              (some #(= % "scripts/test_verification_contract.clj") tracked)))
+  ;; The mechanism, not the repo's mood. A check that passes only while the
+  ;; working tree happens to be dirty fails the moment the work is committed —
+  ;; the opposite of what it is for. A throwaway repository proves the scan sees
+  ;; both a modified file and an untracked one, in any repo state.
+  (let [scratch (str (fs/create-temp-dir {:prefix "verification-scan-"}))]
+    (run "git" "init" "-q" scratch)
+    (spit (str (fs/path scratch "modified.gleam")) "(pub fn x() { 1 })\n")
+    (spit (str (fs/path scratch "untracked.erl")) "-module(untracked).\n")
+    (run "git" "-C" scratch "add" "modified.gleam")
+    (run "git" "-C" scratch "-c" "user.email=a@b" "-c" "user.name=a"
+         "commit" "-qm" "fixture")
+    (spit (str (fs/path scratch "modified.gleam")) "(pub fn x() { 2 })\n")
+    (let [dirty (run "git" "-C" scratch "diff" "--name-only" "HEAD")
+          untracked (run "git" "-C" scratch "ls-files" "--others"
+                         "--exclude-standard")]
+      (check "dirty-and-untracked-production-files-are-scanned"
+             (and (str/includes? (:out dirty) "modified.gleam")
+                  (str/includes? (:out untracked) "untracked.erl"))))
+    (fs/delete-tree scratch))
   (let [exact (str (fs/create-temp-file {:prefix "verification-exact-500-" :suffix ".clj"}))]
     (spit exact (str (str/join "\n" (repeat 500 "x")) "\n"))
     (check "exactly-500-is-refused" (> (loc exact) 499))

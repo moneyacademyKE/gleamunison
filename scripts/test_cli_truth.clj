@@ -64,9 +64,22 @@
          ["test" "vacuous.lisp" "no assertions"]
          ["test" "no-tests.lisp" "0 tests"]
          ["publish" "no-tests.lisp" "REFUSED"]]]
-  (let [{:keys [exit out] :as result} (cli command path)]
+  ;; A refusal must say why, on one of the two streams. Which stream is a
+  ;; contract, not an accident: stdout carries the result (so `| jq` works) and
+  ;; a diagnostic goes to stderr. Both are checked below; here the question is
+  ;; only whether the reason was reported at all.
+  (let [{:keys [exit out err] :as result} (cli command path)]
     (check! (str command " " path " fails truthfully")
-            (and (not (zero? exit)) (str/includes? out needle)) result)))
+            (and (not (zero? exit))
+                 (str/includes? (str out err) needle))
+            result)))
+
+;; A command that produces no result must leave stdout empty. Without this, a
+;; message on stdout looks like a result to whatever is downstream: `replay … |
+;; jq` received "replay failed: cannot read tape" and had nothing to parse.
+(let [{:keys [exit out] :as result} (cli "replay" "pass.lisp" "answer" "missing.json")]
+  (check! "a pure refusal leaves stdout empty"
+          (and (not (zero? exit)) (str/blank? out)) result))
 
 (let [result (cli "verify" "pass.lisp")]
   (check! "valid definitions verify" (zero? (:exit result)) result))
@@ -97,7 +110,7 @@
   (let [blocked (cli "publish" "pass.lisp")]
     (check! "manifest write failure cannot report a successful publish"
             (and (not (zero? (:exit blocked)))
-                 (str/includes? (:out blocked) "cannot write manifest")
+                 (str/includes? (str (:out blocked) (:err blocked)) "cannot write manifest")
                  (not (str/includes? (:out blocked) "published:"))) blocked)))
 
 ;; bk-a8e7: help is routed explicitly; unknown commands must not exit zero.
