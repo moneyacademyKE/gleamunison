@@ -389,6 +389,18 @@ can rely on is the one at the point of use.
 | 1 | refused: wrong arity, no verified evidence, not a runnable term |
 | 2 | unresolvable: absent from the store, unreadable, or a malformed hash |
 
+`pkg install` shares the contract: an absent manifest is `2` (could not
+resolve), a manifest the evidence gate declines is `1`, and usage errors stay
+`1`. Existence is settled before policy, so a fresh store names the missing
+manifest rather than asking you to configure a signing key for content it does
+not hold.
+
+`--branch` names the namespace a run resolves *dependency names* through. The
+target is content, so its hash is the same on every branch: an explicit branch
+that does not exist is `2`, and a branch that exists but does not bind this
+content runs it and says so on stderr rather than leaving you to assume
+`--branch` picked a version of the target.
+
 Errors go to stderr, so stdout carries only the result: `run … | jq` works.
 `run` executes verified content by default; `GLEAMUNISON_STORE_ALLOW_UNVERIFIED=1`
 is the explicit hatch for local work and warns on stderr.

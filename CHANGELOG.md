@@ -4,6 +4,42 @@
 
 ## Unreleased
 
+### Three answers that were not the question asked
+
+Each of these returned a truthful-looking result that described something other
+than what the caller asked about.
+
+- **A comment inside a form hoisted above it.** `(define answer ; note \n 42)`
+  came back as `; note` on its own line above the whole form: the comment moved
+  away from the child it documented, and when the form then fit on one line it
+  left the form entirely. A comment inside a form now keeps its place, on the
+  line above the child that followed it, and forces that form to break — flat
+  text has nowhere to put a comment and dropping it is not an option. Deciding
+  this needs the position of each form's *closing* paren, which is not
+  derivable from its children (the last child ends before the closer), so the
+  lexer's paren positions are collected once and a comment at or after a closer
+  belongs to the next form.
+- **`run <hash> --branch dev` read content that dev never bound.** Name
+  resolution treats a missing branch pointer as an empty namespace, so a typo
+  selected no bindings at all, and a definition needing no name refs ran exactly
+  as though the branch had been applied. An explicit `--branch` now resolves:
+  a branch nobody committed is could-not-resolve (exit 2). The default branch
+  stays optional, because a fresh store has none. The target is content and its
+  hash is the same on every branch, so a branch that exists but does not bind it
+  still runs — and says so on stderr.
+- **`pkg install <hash>` on a fresh store asked for a signing key.** Existence
+  was never settled before policy, so the first answer was `evidence:
+  GLEAMUNISON_EVIDENCE_SIGNING_KEY is required for production verification` —
+  telling the caller to configure a key to verify a manifest that was not there,
+  with exit 1 for a script that should have seen 2. The hex is checked, then the
+  whole manifest closure is walked, then the policy is consulted. `pkg` also
+  gains the exit-code contract `run` already had (`cli_result.finish_coded`):
+  absent is 2, refused is 1.
+
+`scripts/test_cli_errors.clj` asserted "nonzero" for every error case, so a
+command drifting from 1 to 2 still passed. Each case now declares its exact
+code, and `run`/`pkg` are exercised in both directions.
+
 ### Dead code removed
 
 - Six modules had no importer and are gone: `gleamunison/filepath`, `gleamunison/config`,
