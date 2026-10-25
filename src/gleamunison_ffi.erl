@@ -15,6 +15,7 @@
     deny_capability/2,
     corrupt_handler_stack/1, assert_throws_corrupted_stack/1,
     render_term/1, parse_term_arg/1, term_to_json/2, json_quote/1,
+    argv_to_binary/1,
     test_soft_purge_scenario/0,
     eval_expression/1,
     load_dogfood_levels/1, load_dogfood_levels_resolved/0
@@ -361,7 +362,25 @@ binary_to_erl_literal(Bin) when is_binary(Bin) ->
     erlang:iolist_to_binary(["<<", string:join(Segments, ", "), ">>"]).
 
 get_plain_args() ->
-    [list_to_binary(A) || A <- init:get_plain_arguments()].
+    [argv_to_binary(A) || A <- init:get_plain_arguments()].
+
+%% Erlang hands plain arguments over as latin-1 codepoints: the UTF-8 bytes
+%% 195,169 (é) arrive as the single codepoint 233, and `list_to_binary/1` then
+%% writes 0xE9 — not valid UTF-8. Every caller downstream (the term parser, the
+%% Text type) then sees mojibake. Re-encode the codepoints as UTF-8 to recover
+%% the bytes the shell actually passed. A list already carrying codepoints
+%% above 255 came in as unicode (`+pc unicode`) and needs no latin-1 step.
+argv_to_binary(A) when is_binary(A) ->
+    A;
+argv_to_binary(A) when is_list(A) ->
+    Encoding = case lists:all(fun(C) -> is_integer(C) andalso C >= 0 andalso C =< 255 end, A) of
+        true -> latin1;
+        false -> unicode
+    end,
+    case unicode:characters_to_binary(A, Encoding, utf8) of
+        Bin when is_binary(Bin) -> Bin;
+        _ -> list_to_binary(A)
+    end.
 
 halt_failure() ->
     erlang:halt(1).

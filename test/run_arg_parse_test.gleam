@@ -69,3 +69,23 @@ pub fn non_text_bytes_stay_bytes_test() {
   let assert Ok(term) = parse_term_arg("\"\\xff\"")
   render(term) |> should.equal("<<255>>")
 }
+
+// --- argv arrives as latin-1 codepoints, not bytes ---------------------------
+//
+// Erlang decodes plain arguments from the OS as latin-1 codepoints, so the
+// UTF-8 bytes 195,169 (é) arrive as the single codepoint 233. Turning that
+// list straight into a binary writes 0xE9, which is not valid UTF-8, and the
+// argument is corrupt before the language ever sees it: `run <hash> "héllo"`
+// printed a mojibake term instead of the text it was given.
+@external(erlang, "gleamunison_ffi", "argv_to_binary")
+fn argv_to_binary(argv: List(Int)) -> BitArray
+
+pub fn a_utf8_argument_survives_the_latin1_argv_decoding_test() {
+  argv_to_binary([104, 233, 108, 108, 111])
+  |> should.equal(<<104, 195, 169, 108, 108, 111>>)
+}
+
+pub fn an_ascii_argument_is_unchanged_test() {
+  argv_to_binary([104, 105])
+  |> should.equal(<<104, 105>>)
+}
