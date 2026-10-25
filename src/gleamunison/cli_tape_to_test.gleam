@@ -39,7 +39,9 @@ pub fn command(args: List(String)) -> Nil {
             Ok(source) -> {
               let out = "test_" <> name <> "_tape.lisp"
               case simplifile.write(source, to: out) {
-                Ok(_) -> cli_result.success("tape-to-test: wrote " <> out)
+                Ok(_) ->
+                  cli_result.success("tape-to-test: wrote " <> out)
+                  |> cli_result.finish
                 Error(e) ->
                   cli_result.fail(
                     "tape-to-test: write failed: " <> string.inspect(e),
