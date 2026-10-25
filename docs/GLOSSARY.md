@@ -50,7 +50,7 @@ Terms specific to the gleamunison project.
 
 **Genesis Block** — The set of pre-computed builtin definitions seeded into every codebase. Each builtin has a SHA256 hash and a corresponding BEAM module.
 
-**Genesis Module** — A raw Erlang module (`src/m_*.erl`) implementing a builtin primitive. 52 modules as of v0.8.0. See `docs/genesis-modules.md`.
+**Genesis Module** — A raw Erlang module (`src/m_*.erl`) implementing a builtin primitive. 53 modules as of v3.24.0. See `docs/genesis-modules.md`.
 
 ## H
 

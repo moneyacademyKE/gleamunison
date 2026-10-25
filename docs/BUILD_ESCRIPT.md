@@ -33,7 +33,7 @@ for f in src/m_*.erl; do
   erlc -o "$TMPDIR" "$f"
 done
 ```
-The 52 genesis modules (`m_*.erl`) are compiled directly by `erlc` (Erlang compiler). This step is required because genesis modules are written in raw Erlang — they bootstrap the runtime before the Gleam compiler runs. See `docs/genesis-modules.md`.
+The 53 genesis modules (`m_*.erl`) are compiled directly by `erlc` (Erlang compiler). This step is required because genesis modules are written in raw Erlang — they bootstrap the runtime before the Gleam compiler runs. See `docs/genesis-modules.md`.
 
 ### 4. Package into Escript
 ```sh
@@ -53,7 +53,7 @@ The zip is appended directly after the header. The escript runtime scans for `PK
 
 | Component | Size |
 |---|---|
-| 52 genesis modules (compiled) | ~100 KB |
+| 53 genesis modules (compiled) | ~100 KB |
 | 27 Gleam library modules | ~400 KB |
 | 24 hex dependencies (stdlib, json, structures, etc.) | ~600 KB |
 | Total zip | ~1.1 MB |
@@ -94,9 +94,9 @@ gleam build
 ### "function_clause" or "undef" at startup
 A genesis module failed to compile or wasn't included. Check:
 ```sh
-ls src/m_*.erl | wc -l   # Should show 52
+ls src/m_*.erl | wc -l   # Should show 53
 ```
-If fewer than 52 genesis modules exist, some builtins are missing.
+If fewer than 53 genesis modules exist, some builtins are missing.
 
 ### Future: `gleam release`
 Per the Phase 10 roadmap, the escript approach will eventually be replaced by `gleam release`, which will produce a standalone tarball including ERTS (Erlang Runtime System). This will eliminate the need for Erlang/OTP to be pre-installed on the target machine.

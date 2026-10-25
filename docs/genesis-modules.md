@@ -1,6 +1,6 @@
 # Genesis Modules
 
-**52 content-addressed builtin modules** (`src/m_*.erl`) found at `src/m_00000001.erl` through `src/m_00000035.erl`, plus `src/m_state.erl`.
+**53 content-addressed builtin modules** (`src/m_*.erl`) found at `src/m_00000001.erl` through `src/m_00000038.erl`, plus `src/m_state.erl`.
 
 ## What Are Genesis Modules?
 
