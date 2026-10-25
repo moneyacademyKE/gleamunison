@@ -77,3 +77,27 @@ fn list_last(xs: List(a)) -> a {
     [] -> panic as "empty list"
   }
 }
+
+/// CRLF arrives as one grapheme cluster. A comment that terminates only on
+/// "\n" therefore never terminates in a file with Windows line endings: it
+/// swallows the rest of the file, and the parser reports "Unexpected EOF" on a
+/// perfectly good program. Every command that reads source (verify, publish,
+/// test, fmt) inherits that.
+pub fn comment_ends_at_a_crlf_line_break_test() {
+  let toks = tokenize("; note\r\n42")
+  case toks {
+    [TokenInfo(Comment("; note"), 1, 1), TokenInfo(IntVal(42), 2, 1)] -> Nil
+    _ -> panic as "a CRLF comment must end at the line break"
+  }
+}
+
+/// The whole file still parses, and the comment does not eat the closer.
+pub fn crlf_file_with_a_comment_parses_test() {
+  case
+    verify.parse_all_sexprs(tokenize("(define x\r\n  ; why\r\n  1)\r\n"), [])
+  {
+    Ok([_]) -> Nil
+    Ok(_) -> panic as "expected one form, got a different count"
+    Error(_) -> panic as "a CRLF file with a comment must parse"
+  }
+}

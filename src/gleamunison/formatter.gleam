@@ -135,6 +135,12 @@ fn before_pos(c: Cmt, pos: Pos) -> Bool {
   c.line < pos.0 || { c.line == pos.0 && c.col < pos.1 }
 }
 
+/// A comment trails a form when it sits after the form ends, on the line
+/// where it ends. Anything earlier is inside the form.
+fn trails(c: Cmt, end: Pos) -> Bool {
+  c.line == end.0 && !before_pos(c, end)
+}
+
 /// Interleave comments and rendered forms into output lines.
 fn merge(
   comments: List(Cmt),
@@ -148,17 +154,15 @@ fn merge(
       let end = end_of(e, closers)
       let #(before, rest1) =
         list.partition(comments, fn(c) { before_pos(c, start) })
-      // A comment on the form's first line trails it; so does one after the
-      // closer, when the closer has a line to itself. Neither belongs to the
-      // next form.
-      let #(trailing, rest2) =
-        list.partition(rest1, fn(c) {
-          c.line == start.0 || { c.line == end.0 && c.col > end.1 }
-        })
+      // A comment trails the form only when it sits after the form's
+      // closer, on the closer's line. A comment on the *opening* line of a
+      // form that spans several lines is inside it: that is where it was
+      // written, and moving it out was the bug.
+      let #(trailing, rest2) = list.partition(rest1, fn(c) { trails(c, end) })
       let #(inside, after) = list.partition(rest2, fn(c) { before_pos(c, end) })
       let body = render(e, 0, inside, closers)
       let body = case trailing {
-        [c, ..] -> append_to_first_line(body, c.text)
+        [c, ..] -> append_to_last_line(body, c.text)
         [] -> body
       }
       list.append(list.map(before, fn(c) { c.text }), [body])
@@ -296,7 +300,7 @@ fn place(
   let start = start_of(child)
   let end = end_of(child, closers)
   let #(mine, later) = list.partition(comments, fn(c) { before_pos(c, end) })
-  let #(on_start, rest) = list.partition(mine, fn(c) { c.line == start.0 })
+  let #(on_start, rest) = list.partition(mine, fn(c) { trails(c, end) })
   let #(before, inside) = list.partition(rest, fn(c) { c.line < start.0 })
   let trailing = case on_start {
     [c, ..] -> Some(c)
@@ -307,15 +311,26 @@ fn place(
 
 fn append_trailing(body: String, trailing: Option(Cmt)) -> String {
   case trailing {
-    Some(c) -> append_to_first_line(body, c.text)
+    Some(c) -> append_to_last_line(body, c.text)
     None -> body
   }
 }
 
-fn append_to_first_line(body: String, text: String) -> String {
+/// A trailing comment is written after the form's closer, on the line
+/// that holds it. Appending it to the first line of a *broken* form puts it
+/// inside the form, where the next pass reads it as an interior comment and
+/// moves it again — so the formatter would not be a fixed point. For a flat
+/// form the first and last line are the same line, so this is the same
+/// output the single-line case always had.
+fn append_to_last_line(body: String, text: String) -> String {
   case string.split(body, "\n") {
-    [first, ..rest] -> string.join([first <> " " <> text, ..rest], "\n")
-    [] -> body <> " " <> text
+    [only] -> only <> " " <> text
+    lines ->
+      case list.reverse(lines) {
+        [last, ..rest] ->
+          string.join(list.reverse([last <> " " <> text, ..rest]), "\n")
+        [] -> body <> " " <> text
+      }
   }
 }
 

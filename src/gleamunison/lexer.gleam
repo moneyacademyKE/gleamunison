@@ -99,9 +99,24 @@ fn read_string(chars, acc, sl, sc, l, c) {
 fn read_comment(chars, acc, sl, sc, l, c) {
   case chars {
     [] -> [TokenInfo(Comment(acc), sl, sc)]
+    // CRLF is one grapheme cluster, so a comment that only terminates on "\n"
+    // never terminates in a Windows-authored file: it swallows the rest of the
+    // source and the parser reports "Unexpected EOF" on a good program. The
+    // main tokenizer already treats both endings as one line break; a comment
+    // ends where the line does.
+    ["\r\n", ..rest] -> [
+      TokenInfo(Comment(acc), sl, sc),
+      ..do_tokenize(rest, "", 1, 1, l + 1, 1)
+    ]
     ["\n", ..rest] -> [
       TokenInfo(Comment(acc), sl, sc),
       ..do_tokenize(rest, "", 1, 1, l + 1, 1)
+    ]
+    // A lone CR is whitespace without a line break, exactly as the main loop
+    // treats it: the comment ends and the CR is skipped.
+    ["\r", ..rest] -> [
+      TokenInfo(Comment(acc), sl, sc),
+      ..do_tokenize(rest, "", 1, 1, l, c)
     ]
     [ch, ..rest] -> read_comment(rest, acc <> ch, sl, sc, l, c + 1)
   }
