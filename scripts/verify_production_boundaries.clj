@@ -76,8 +76,14 @@
        (filter fs/exists?)))
 
 (defn diff-check-files []
-  {:tracked (str/split-lines (sh-out "git" "diff" "--name-only" "HEAD" "--"))
-   :untracked (str/split-lines (sh-out "git" "ls-files" "--others" "--exclude-standard"))})
+  ;; split-lines on empty output is [""], not []: a CLEAN tree (no untracked
+  ;; files) then handed the untracked loop one blank path, whose "absolute" form
+  ;; is the repo directory itself, and `git diff --no-index` failed on it. The
+  ;; gate therefore only passed while the tree was dirty — the exact inversion
+  ;; of what a cleanliness gate is for.
+  (let [lines (fn [s] (remove str/blank? (str/split-lines s)))]
+    {:tracked (lines (sh-out "git" "diff" "--name-only" "HEAD" "--"))
+     :untracked (lines (sh-out "git" "ls-files" "--others" "--exclude-standard"))}))
 
 (defn loc-gate []
   (let [over (filter (fn [f] (> (count (str/split-lines (slurp f))) 499))
