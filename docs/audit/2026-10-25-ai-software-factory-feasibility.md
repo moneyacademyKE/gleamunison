@@ -1,6 +1,6 @@
 # Feasibility: gleamunison as an AI software factory for in-database apps
 
-**Date:** 2026-10-25 (EAT) · **Branch:** `fix/component-audit-2026-10-24` · **Basis:** source reads + live probes in an isolated store (`/tmp/factory-probe`). No production code changed.
+**Date:** 2026-10-25 (EAT) · **Branch:** `fix/component-audit-2026-10-24` · **Basis:** source reads + live probes in an isolated store (`/tmp/facprobe`). Three defects were found while probing; two are fixed on this branch, one is not.
 
 ## Verdict
 
@@ -14,7 +14,7 @@ LLM ability all exist. What is missing is a *write path from the agent surface*,
 
 | Piece | Evidence |
 |---|---|
-| Content-addressed identity, store, evidence turnstile, `run <hash>` | `id` and `inc` published and executed in an isolated store |
+| Content-addressed identity, store, evidence turnstile, `run <hash>` | `shout` = `(lam msg (do Console print msg))` attested `io`, published, then executed by hash with its argument — the whole admit → store → run chain, live |
 | Datalog engine **written in the language** | 13 modules under `gleamunison_datalog/src/`: core, index, transact, schema, query, aggregate, pull, temporal, rules, graph, vector, bm25, actor — immutable, Datomic-shaped |
 | The codebase is itself a Datalog database | `codebase_index.gleam` builds datoms; MCP `callers_of` / `deps_of` / `defs_by_kind` answer from it |
 | LLM as a first-class ability | `m_a12979b5` in `baseline_abilities/0` — reachable from the REPL **and** from `run` |
@@ -32,9 +32,11 @@ in one language, typechecked by one checker and admitted by one hash, is a real 
    still requires the CLI `test` → `publish` pair. An agent can inspect and evaluate;
    it cannot commit.
 2. **No database ability, no persistence.** The ambient namespace has no file-write and no
-   DB open/transact; `State` is the process dictionary. The Datalog engine is loaded
-   per-process by `cli_datalog` and is **not** in the ambient namespace — a stored
-   definition cannot even reference `db-assert` (probe: `E001 undefined variable`).
+   DB open/transact; `State` is the process dictionary (`erlang:get/put` in
+   `gleamunison_repl_ffi:baseline_abilities/0`). The Datalog engine is loaded as a
+   *prelude* by `cli_datalog` alone — `publish` and `run` accept no prelude — so a stored
+   definition cannot even reference `db-assert` (probe: `E001 undefined variable
+   db-assert`). The engine is a separate CLI surface, not an ambient capability.
 3. **No route binding.** HTTP routes are a fixed Erlang case table. A published definition
    cannot be served at a URL, so a generated app has no deployment surface.
 4. **The generation loop is unwired.** `sap`, `schema_printer`, `prompt` and `patch` are
@@ -68,7 +70,21 @@ Separately: `http-get` and `file-read` are ambient, ungated primitives
 the REPL and through `/eval` today; they are only kept out of published content by the
 defect above, which is an accident rather than a policy.
 
-## Cheapest credible path
+## Two more defects found by running the thing (both fixed here)
+
+A factory is only as good as its `run` path, so the probes exercised it end to end. Two
+defects sat behind the *zero-argument* case that the previous pass had already fixed.
+
+| Defect | Symptom | Cause | Fix |
+|---|---|---|---|
+| Effectful **function** could not run | `run <hash> "héllo"` → `ability m_74eafa15 (operation 0) is not handled here` | `call_eval_inner` installed the baseline frames around `'$eval'()`, which only *builds* the closure, and popped them before the fold that applies the arguments | frames now span the application — `000a14c` |
+| Non-ASCII argument corrupted | the same command printed a mojibake term instead of the text | `get_plain_args/0` did `list_to_binary/1` on Erlang's latin-1 argv codepoints, so the UTF-8 bytes 195,169 became the single byte 0xE9 | re-encode codepoints as UTF-8 — `84123a3` |
+
+Both were invisible to the test suite because it only ever ran arity-0 definitions and
+ASCII arguments. Regression tests: `an_effectful_function_runs_with_its_argument_test`,
+`a_utf8_argument_survives_the_latin1_argv_decoding_test`.
+
+
 
 1. **Type the builtins.** Give `BTerm` a declared type so `RefTo` never yields `-1`.
    This is the load-bearing step: without it the identity hash contains "unknown" and a
