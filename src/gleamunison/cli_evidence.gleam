@@ -15,6 +15,7 @@ import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/datetime
 import gleamunison/evidence
+import gleamunison/identity
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/trust
 
@@ -38,6 +39,17 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
   case note {
     "" -> Error("evidence attest: a note is required — say what you observed")
     _ -> {
+      // The subject is a content hash. `zzz` used to be accepted and attested
+      // to, producing a record that can never cover anything: a typo that
+      // reports success is worse than a typo that stops.
+      use _ <- result.try(
+        identity.parse_ref_hex(hash)
+        |> result.replace_error(
+          "evidence attest: '"
+          <> hash
+          <> "' is not a content hash (expected 64 hex digits)",
+        ),
+      )
       use signer <- result.try(evidence.production_signer())
       use context <- result.try(cli_lifecycle.resolve_context(None))
       let store_path = cli_lifecycle.store_path(context)
@@ -64,6 +76,17 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
 }
 
 fn run(hash: String) -> Result(Nil, String) {
+  // Same rule as attest: a subject is a content hash. Asking for the evidence
+  // on `zzz` reported a record and exited 0, so a mistyped lookup looked like
+  // an answered question.
+  use _ <- result.try(
+    identity.parse_ref_hex(hash)
+    |> result.replace_error(
+      "evidence: '"
+      <> hash
+      <> "' is not a content hash (expected 64 hex digits)",
+    ),
+  )
   use context <- result.try(cli_lifecycle.resolve_context(None))
   let store_path = cli_lifecycle.store_path(context)
   use output <- result.try(
