@@ -21,6 +21,8 @@ import gleamunison/cli_output
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/identity.{type DefinitionRef}
+import gleamunison/name_snapshot
+import gleamunison/namespace
 import gleamunison/run_error
 import gleamunison/run_ref
 import gleamunison/storage
@@ -84,6 +86,7 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
     cli_store.with_dets_mapped(
       store_path,
       fn(adapter) {
+        use _ <- result.try(preflight_branch(adapter, branch_override, ref))
         render_output(
           adapter,
           cli_lifecycle.root_dir(context),
@@ -99,6 +102,67 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
     ),
   )
   Ok(output)
+}
+
+/// `--branch` names the namespace a run resolves dependency names through. An
+/// explicit branch that nobody committed must not read as "no bindings": a typo
+/// would select an empty namespace, and a definition needing no name refs would
+/// run as though the branch had been applied. The default branch stays optional
+/// because a fresh store has no namespace and a self-contained definition still
+/// runs.
+pub fn preflight_branch(
+  adapter: storage.StorageAdapter,
+  branch: Option(String),
+  ref: DefinitionRef,
+) -> Result(Nil, #(Int, String)) {
+  use note <- result.try(branch_scope_note(adapter, branch, ref))
+  case note {
+    Some(text) -> {
+      io.println_error(text)
+      Ok(Nil)
+    }
+    None -> Ok(Nil)
+  }
+}
+
+/// The branch-scope decision as data, so the wording is testable: `Error` when
+/// the named branch does not exist, `Ok(Some(warning))` when it exists but does
+/// not bind this content, `Ok(None)` when there is nothing to say.
+///
+/// The target itself is content: its hash is the same on every branch, so a
+/// branch that exists but does not bind it is legitimate — and worth saying out
+/// loud, because the caller may believe `--branch` selected a version of the
+/// target rather than the names around it.
+pub fn branch_scope_note(
+  adapter: storage.StorageAdapter,
+  branch: Option(String),
+  ref: DefinitionRef,
+) -> Result(Option(String), #(Int, String)) {
+  case branch {
+    None -> Ok(None)
+    Some(name) ->
+      case namespace.branch_head(adapter, name) {
+        Error(reason) -> Error(#(cli_result.unresolvable, "run: " <> reason))
+        Ok(_) ->
+          case name_snapshot.read(adapter, name) {
+            Ok(bindings) ->
+              case name_snapshot.binds_content(bindings, ref) {
+                True -> Ok(None)
+                False ->
+                  Ok(Some(
+                    "run: warning — this content is not bound on branch "
+                    <> name
+                    <> "; --branch selects the names dependencies resolve"
+                    <> " through, not a version of the target (the hash is"
+                    <> " the content)",
+                  ))
+              }
+            // The branch exists and its namespace is readable; a read failure
+            // here is reported by the run itself, not by a warning.
+            Error(_) -> Ok(None)
+          }
+      }
+  }
 }
 
 /// Text or JSON, from one execution path. `--inspect` is the only mode that
