@@ -34,12 +34,81 @@ pub fn trailing_comment_survives_a_broken_form_test() {
   }
 }
 
-pub fn interior_comment_hoists_before_the_form_test() {
+/// A comment written inside a form describes the child that follows it, so it
+/// stays inside: hoisting it above the form moved it away from what it
+/// documents and, for a form that then fit on one line, out of the form
+/// entirely.
+pub fn interior_comment_stays_inside_the_form_test() {
   let src = "(define answer\n  ; the meaning of life\n  42)\n"
   let assert Ok(out) = formatter.format_source(src)
-  case out == "; the meaning of life\n(define answer 42)\n" {
+  case out == "(define answer\n  ; the meaning of life\n  42)\n" {
     True -> Nil
-    False -> panic as { "interior comment not hoisted:\n" <> out }
+    False -> panic as { "interior comment not kept in place:\n" <> out }
+  }
+}
+
+/// A short form with a comment inside cannot be flat: flat text has nowhere to
+/// put a comment, and dropping it is not an option.
+pub fn interior_comment_forces_a_break_test() {
+  let src = "(define one\n  ; one is the loneliest number\n  1)\n"
+  let assert Ok(out) = formatter.format_source(src)
+  case out == "(define one\n  ; one is the loneliest number\n  1)\n" {
+    True -> Nil
+    False -> panic as { "comment did not force a break:\n" <> out }
+  }
+}
+
+/// The comment belongs to the form that encloses it, not the outermost one.
+pub fn interior_comment_of_a_nested_form_test() {
+  let src = "(define (shout)\n  (do Console print\n    ; louder\n    \"hi\"))\n"
+  let assert Ok(out) = formatter.format_source(src)
+  case
+    out
+    == "(define (shout)\n  (do Console\n    print\n    ; louder\n    \"hi\"))\n"
+  {
+    True -> Nil
+    False -> panic as { "nested comment misplaced:\n" <> out }
+  }
+}
+
+/// A comment after the last child, before the closer, is still inside.
+pub fn comment_before_the_closer_stays_inside_test() {
+  let src = "(define answer\n  42\n  ; why\n)\n"
+  let assert Ok(out) = formatter.format_source(src)
+  case out == "(define answer\n  42\n  ; why\n)\n" {
+    True -> Nil
+    False -> panic as { "pre-closer comment moved:\n" <> out }
+  }
+}
+
+/// A comment after the closer on the closer's own line trails the form; it
+/// must not be handed to whatever comes next.
+pub fn comment_after_a_broken_closer_trails_the_form_test() {
+  let src =
+    "(define (long-name alpha beta gamma delta)\n  (chain ((a alpha) (b beta) (c gamma)) (add a b))) ; why\n(define two 2)\n"
+  let assert Ok(out) = formatter.format_source(src)
+  let first_line = case string.split(out, "\n") {
+    [l, ..] -> l
+    [] -> ""
+  }
+  case
+    string.ends_with(first_line, "; why"),
+    string.contains(out, "; why\n(define two 2)")
+  {
+    True, False -> Nil
+    _, _ -> panic as { "closing-line comment escaped the form:\n" <> out }
+  }
+}
+
+/// Formatting is a fixed point, comments included.
+pub fn interior_comments_are_idempotent_test() {
+  let src =
+    "(define answer\n  ; meaning\n  42\n  ; why\n)\n(define (shout)\n  (do Console print\n    ; louder\n    \"hi\"))\n"
+  let assert Ok(once) = formatter.format_source(src)
+  let assert Ok(twice) = formatter.format_source(once)
+  case once == twice {
+    True -> Nil
+    False -> panic as { "not idempotent:\n" <> once <> "\n---\n" <> twice }
   }
 }
 
