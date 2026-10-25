@@ -1,23 +1,23 @@
 # Production-boundary witness — 2026-10-25
 
-Branch `fix/component-audit-2026-10-24` @ `fb55a1a`
+Branch `fix/component-audit-2026-10-24` @ `ca079a0`
 
 | Gate | Exit | ms | Command |
 |---|---|---|---|
-| format | 0 | 133 | `gleam format --check src test` |
+| format | 0 | 84 | `gleam format --check src test` |
 | diff-check | 0 | 0 | `git diff --check HEAD plus untracked files` |
-| suite | 0 | 35771 | `gleam test` |
-| build-escript | 0 | 9998 | `./build_escript.sh` |
-| artifact-contract | 0 | 1236 | `bash scripts/test_artifact.sh` |
-| cli-truth | 0 | 3948 | `bb scripts/test_cli_truth.clj` |
-| http-boundary | 0 | 1106 | `bash scripts/test_http_boundary.sh` |
-| release-contract | 0 | 25258 | `bb scripts/test_release_contract.clj` |
-| upgrade-rollback | 0 | 14654 | `bb scripts/test_upgrade_rollback.clj` |
-| playbook-default | 0 | 8495 | `bb scripts/run_playbook_tests.clj` |
-| cli-errors | 0 | 4102 | `bb scripts/test_cli_errors.clj` |
-| dashboard-safety | 0 | 111 | `bun scripts/test_dashboard_safety.mjs` |
-| parser | 0 | 42 | `bb scripts/test_parser.clj` |
-| playbook-runner | 0 | 654 | `bb scripts/test_playbook_runner.clj` |
+| suite | 0 | 36136 | `gleam test` |
+| build-escript | 0 | 10005 | `./build_escript.sh` |
+| artifact-contract | 0 | 989 | `bash scripts/test_artifact.sh` |
+| cli-truth | 0 | 3965 | `bb scripts/test_cli_truth.clj` |
+| http-boundary | 0 | 1172 | `bash scripts/test_http_boundary.sh` |
+| release-contract | 0 | 25174 | `bb scripts/test_release_contract.clj` |
+| upgrade-rollback | 0 | 14201 | `bb scripts/test_upgrade_rollback.clj` |
+| playbook-default | 0 | 8534 | `bb scripts/run_playbook_tests.clj` |
+| cli-errors | 0 | 4115 | `bb scripts/test_cli_errors.clj` |
+| dashboard-safety | 0 | 16 | `bun scripts/test_dashboard_safety.mjs` |
+| parser | 0 | 41 | `bb scripts/test_parser.clj` |
+| playbook-runner | 0 | 290 | `bb scripts/test_playbook_runner.clj` |
 | loc-ceiling | 0 | 0 | `wc -l over touched files` |
 
 ```json
@@ -28,7 +28,7 @@ Branch `fix/component-audit-2026-10-24` @ `fb55a1a`
     "name" : "format",
     "cmd" : "gleam format --check src test",
     "exit" : 0,
-    "duration_ms" : 133,
+    "duration_ms" : 84,
     "informational" : false,
     "tail" : ""
   }, {
@@ -42,84 +42,84 @@ Branch `fix/component-audit-2026-10-24` @ `fb55a1a`
     "name" : "suite",
     "cmd" : "gleam test",
     "exit" : 0,
-    "duration_ms" : 35771,
+    "duration_ms" : 36136,
     "informational" : false,
-    "tail" : "   Compiled in 0.20s\n    Running gleamunison_test.main\nrun: warning — this content is not bound on branch dev; --branch selects the names dependencies resolve through, not a version of the target (the hash is the content)"
+    "tail" : "   Compiled in 0.19s\n    Running gleamunison_test.main\nrun: warning — this content is not bound on branch dev; --branch selects the names dependencies resolve through, not a version of the target (the hash is the content)"
   }, {
     "name" : "build-escript",
     "cmd" : "./build_escript.sh",
     "exit" : 0,
-    "duration_ms" : 9998,
+    "duration_ms" : 10005,
     "informational" : false,
     "tail" : "Hint: You can safely remove it.\n\n   Compiled in 0.20s"
   }, {
     "name" : "artifact-contract",
     "cmd" : "bash scripts/test_artifact.sh",
     "exit" : 0,
-    "duration_ms" : 1236,
+    "duration_ms" : 989,
     "informational" : false,
     "tail" : "artifact_version=3.24.0 declared_version=3.24.0\nartifact_engine_modules=13\nartifact_test_modules=0"
   }, {
     "name" : "cli-truth",
     "cmd" : "bb scripts/test_cli_truth.clj",
     "exit" : 0,
-    "duration_ms" : 3948,
+    "duration_ms" : 3965,
     "informational" : false,
-    "tail" : "PASS: --help prints usage and exits zero\nPASS: unknown command exits non-zero\n22 CLI truth checks passed; workspace: /var/folders/r5/njvx_5n968j2rqq7y3bv5slh0000gn/T/gleamunison-cli-truth-17285820059567510726"
+    "tail" : "PASS: --help prints usage and exits zero\nPASS: unknown command exits non-zero\n22 CLI truth checks passed; workspace: /var/folders/r5/njvx_5n968j2rqq7y3bv5slh0000gn/T/gleamunison-cli-truth-279921044345960191"
   }, {
     "name" : "http-boundary",
     "cmd" : "bash scripts/test_http_boundary.sh",
     "exit" : 0,
-    "duration_ms" : 1106,
+    "duration_ms" : 1172,
     "informational" : false,
-    "tail" : "/api/sync-status sync_port => 60133\n=INFO REPORT==== 25-Oct-2026::05:31:48.898901 ===\nSIGTERM received - shutting down"
+    "tail" : "/api/sync-status sync_port => 60333\n=INFO REPORT==== 25-Oct-2026::05:34:14.898954 ===\nSIGTERM received - shutting down"
   }, {
     "name" : "release-contract",
     "cmd" : "bb scripts/test_release_contract.clj",
     "exit" : 0,
-    "duration_ms" : 25258,
+    "duration_ms" : 25174,
     "informational" : false,
     "tail" : "INFO two clean builds (this is the slow part)...\nPASS clean-builds-byte-identical          sha256=a4af23a3c365b70bc5cd778dafc449952554fcf1433015dbf6b35411d89e313f\nrelease-contract: PASS"
   }, {
     "name" : "upgrade-rollback",
     "cmd" : "bb scripts/test_upgrade_rollback.clj",
     "exit" : 0,
-    "duration_ms" : 14654,
+    "duration_ms" : 14201,
     "informational" : false,
     "tail" : "\nupgrade-rollback: PASS\nPreparing worktree (detached HEAD 35c8cf8)"
   }, {
     "name" : "playbook-default",
     "cmd" : "bb scripts/run_playbook_tests.clj",
     "exit" : 0,
-    "duration_ms" : 8495,
+    "duration_ms" : 8534,
     "informational" : false,
     "tail" : "Level 1641 {:status :excluded, :reason \"no executable cases\", :coverage \"manual/not executable; not a passing test\"}\n=== Evaluation summary before cleanup === {:passed 934, :failed 0, :skipped 0, :timed-out 0, :excluded 238}\n=== Final summary === {:passed 934, :failed 0, :skipped 0, :timed-out 0, :excluded 238}"
   }, {
     "name" : "cli-errors",
     "cmd" : "bb scripts/test_cli_errors.clj",
     "exit" : 0,
-    "duration_ms" : 4102,
+    "duration_ms" : 4115,
     "informational" : false,
-    "tail" : "{:args [\"find\" \"nothing-matches-this\"], :exit 0, :expected 0, :clean true}\n{:args [\"evidence\" \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"], :exit 0, :expected 0, :clean true}\nCLI error contract: 0 failures; workspace: /var/folders/r5/njvx_5n968j2rqq7y3bv5slh0000gn/T/gleamunison-cli-errors-2707660385824937641"
+    "tail" : "{:args [\"find\" \"nothing-matches-this\"], :exit 0, :expected 0, :clean true}\n{:args [\"evidence\" \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"], :exit 0, :expected 0, :clean true}\nCLI error contract: 0 failures; workspace: /var/folders/r5/njvx_5n968j2rqq7y3bv5slh0000gn/T/gleamunison-cli-errors-206238012596404822"
   }, {
     "name" : "dashboard-safety",
     "cmd" : "bun scripts/test_dashboard_safety.mjs",
     "exit" : 0,
-    "duration_ms" : 111,
+    "duration_ms" : 16,
     "informational" : false,
     "tail" : "dashboard hostile names/expressions/module/process values stay text: PASS"
   }, {
     "name" : "parser",
     "cmd" : "bb scripts/test_parser.clj",
     "exit" : 0,
-    "duration_ms" : 42,
+    "duration_ms" : 41,
     "informational" : false,
     "tail" : "PLAYBOOK_DOGFOOD_2871-2920.md: parsed 0 levels\nPLAYBOOK_DOGFOOD_2921-2970.md: parsed 0 levels\nPLAYBOOK_DOGFOOD_2971-3020.md: parsed 0 levels"
   }, {
     "name" : "playbook-runner",
     "cmd" : "bb scripts/test_playbook_runner.clj",
     "exit" : 0,
-    "duration_ms" : 654,
+    "duration_ms" : 290,
     "informational" : false,
     "tail" : "injected code_server crash + OK marker => runner exit 1\nnonzero child with OK marker + escript badarg: FAIL-CLOSED; timeout: FAIL-CLOSED; stale/unlisted exclusions: FAIL-CLOSED"
   }, {
@@ -132,7 +132,7 @@ Branch `fix/component-audit-2026-10-24` @ `fb55a1a`
   } ],
   "exclusions" : [ "CI matrix (OTP 27/28/29 x ubuntu/macos) runs on push; local proof is OTP 29 / macOS arm64", "LOC ceiling: src/gleamunison_ffi_test.erl (625 LOC, base 471) is a test-only probe module called exclusively from test/*.gleam, exempt under the test-file exemption; every production file touched by this branch is under 500 LOC", "all gates execute behind /usr/bin/env with a pinned tool PATH (homebrew + ~/.local/bin) so results never depend on the caller environment; recorded commands are the logical ones" ],
   "classification" : "authenticated-single-node-service",
-  "head" : "fb55a1a",
+  "head" : "ca079a0",
   "side_effects" : "none: no tag, no Hex publish, no merge, no deploy",
   "classification_note" : "untrusted-execution profile remains disabled: external OS/container isolation is required and not claimed",
   "unresolved_risks" : [ "the 'transient full-suite flake' (507/1) recorded by earlier runs is identified and fixed: evaluation_timeout_test asserted the wall-clock timeout message while the 10ms budget tick could hit the reduction ceiling first on fast machines — reproduced on all seven CI matrix legs; the test now asserts containment under any named evaluation_* error (bk-19fe)", "first CI matrix run on PR #30 exposed four latent platform defects, all root-caused from the matrix's own honest-error output and fixed (bk-19fe): (1) binary:join/2 does not exist on OTP 27 (added in OTP 28) — json.encode plus 8 HTTP route handlers that would have crashed any OTP-27 deployment now use lists:join; (2) the emitter emitted curried handler application ('m':'$eval'()(Val)) that OTP 27/28 erl_parse rejects while OTP 29's extended grammar accepts it — now nested erlang:apply like every other call site; (3) the corrupt-artifact rollback probe assumed an exit code, but Linux exec rejects the corrupt file with an IOException where macOS returns one — exec refusal now counts as failing loudly; (4) drain raced a self-inflicted link backfire: the http acceptor is spawn_linked and drain killed it with reason shutdown without unlinking, so the signal could kill the server before the drain reply under CI scheduling — macos-28 crashed with {shutdown,{gen_server,call,...}} and no assertion block, the same shape as the earlier blockless '4th failure' on ubuntu-27; fixed by unlink-before-kill, stress probe 120/120 clean. Next matrix run is the confirmation", "LLM cost metering is estimate-only until operator rates are configured", "provider error bodies are omitted, so provider-side debugging needs the provider dashboard" ],
