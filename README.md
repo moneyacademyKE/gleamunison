@@ -402,7 +402,7 @@ liveness are always available for orchestrators.
 
 | Route | Purpose |
 |---|---|
-| `POST /eval`, `POST /define` | Evaluate or install a definition |
+| `GET /eval?expr=`, `GET /define?name=&expr=` | Evaluate or install a definition |
 | `GET /browse`, `GET /counter` | Inspect the codebase |
 | `POST /mcp` | MCP over HTTP |
 | `GET /api/status`, `/api/events`, `/api/processes`, `/api/sync-status` | Runtime state |

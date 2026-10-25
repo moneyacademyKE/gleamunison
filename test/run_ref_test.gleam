@@ -8,6 +8,7 @@ import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Local, Ref, hash_bytes}
 import gleamunison/namespace
 import gleamunison/repl_eval
+import gleamunison/run_error
 import gleamunison/run_ref
 import gleeunit/should
 
@@ -87,7 +88,7 @@ pub fn a_missing_dependency_names_the_ref_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
-  let assert Error(run_ref.Missing(got)) =
+  let assert Error(run_error.Missing(got)) =
     run_ref.run(codebase.get_adapter(cb), main_ref, [])
   got |> should.equal(absent)
 }
@@ -153,14 +154,14 @@ pub fn a_name_reference_without_a_binding_is_missing_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
-  let assert Error(run_ref.Missing(got)) =
+  let assert Error(run_error.Missing(got)) =
     run_ref.run(codebase.get_adapter(cb), main_ref, [])
   got |> should.equal(name_ref)
 }
 
 pub fn an_absent_root_ref_is_missing_test() {
   let absent = Ref(hash_bytes(<<"absent-root">>))
-  let assert Error(run_ref.Missing(got)) =
+  let assert Error(run_error.Missing(got)) =
     run_ref.run(codebase.get_adapter(codebase.empty()), absent, [])
   got |> should.equal(absent)
 }
@@ -168,7 +169,7 @@ pub fn an_absent_root_ref_is_missing_test() {
 pub fn a_type_definition_refuses_to_execute_test() {
   let definition = ast.TypeDef(ast.Structural(Local(0), [], []))
   let #(cb, ref) = insert(codebase.empty(), definition)
-  let assert Error(run_ref.NotExecutable(got, _)) =
+  let assert Error(run_error.NotExecutable(got, _)) =
     run_ref.run(codebase.get_adapter(cb), ref, [])
   got |> should.equal(ref)
 }
@@ -178,7 +179,7 @@ pub fn absence_is_reported_before_evidence_test() {
   // unverified (1). The gate must not mask a missing ref behind a policy
   // failure, which it would if evidence were checked first.
   let absent = Ref(hash_bytes(<<"absent-before-evidence">>))
-  let assert Error(run_ref.Missing(got)) =
+  let assert Error(run_error.Missing(got)) =
     run_ref.run_verified(
       codebase.get_adapter(codebase.empty()),
       absent,
@@ -190,7 +191,7 @@ pub fn absence_is_reported_before_evidence_test() {
 
 pub fn raw_absence_is_reported_before_evidence_test() {
   let absent = Ref(hash_bytes(<<"absent-before-evidence-raw">>))
-  let assert Error(run_ref.Missing(got)) =
+  let assert Error(run_error.Missing(got)) =
     run_ref.run_verified_raw(
       codebase.get_adapter(codebase.empty()),
       absent,
@@ -220,7 +221,7 @@ pub fn run_gate_refuses_and_names_the_reason_test() {
   let #(cb, ref) = insert(codebase.empty(), int_value(7))
   let assert Error(error) =
     run_ref.run_verified(codebase.get_adapter(cb), ref, [], False)
-  run_ref.describe(error)
+  run_error.describe(error)
   |> string.contains("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   |> should.be_true
 }

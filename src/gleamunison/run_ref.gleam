@@ -5,26 +5,26 @@
 //// no store entry, so a stored definition that adds two numbers does not have
 //// to carry the definition of `+`.
 
-import gleam/dict
 import gleam/dynamic.{type Dynamic}
-import gleam/int
 import gleam/list
-import gleam/option
 import gleam/result
-import gleam/string
 import gleamunison/ast
-import gleamunison/bootstraps
 import gleamunison/codebase
 import gleamunison/compile
-import gleamunison/definition_refs
+import gleamunison/effect_evidence
 import gleamunison/evidence
-import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
-import gleamunison/jets
+import gleamunison/identity.{type DefinitionRef}
 import gleamunison/loader
 import gleamunison/name_snapshot
 import gleamunison/repl_eval
+import gleamunison/run_closure
+import gleamunison/run_error.{
+  type RunError, ArityUnavailable, EvaluationFailed, LoadFailed, NoEvidence,
+  NotExecutable, Unreadable, hex, read_error,
+}
 import gleamunison/storage
 import gleamunison/trust
+import gleamunison/turnstile
 import gleamunison/types
 import gleamunison/verify
 
@@ -38,17 +38,6 @@ fn call_eval_ffi(
 fn render_term_ffi(term: Dynamic) -> String
 
 const default_branch = "main"
-
-pub type RunError {
-  Missing(ref: DefinitionRef)
-  Unreadable(ref: DefinitionRef, reason: String)
-  NotExecutable(ref: DefinitionRef, kind: String)
-  LoadFailed(ref: DefinitionRef, reason: String)
-  Cycle(ref: DefinitionRef)
-  ArityUnavailable(ref: DefinitionRef, expected: Int, supplied: Int)
-  NoEvidence(ref: DefinitionRef, reason: String)
-  EvaluationFailed(ref: DefinitionRef, reason: String)
-}
 
 /// Execute with the evidence gate on. A definition runs only when a verified
 /// Test record covers its content hash — the same turnstile `publish` passes,
@@ -128,12 +117,53 @@ fn evidence_gate(
       case trust.production_policy() {
         Error(reason) -> Error(NoEvidence(ref, reason))
         Ok(policy) ->
-          case trust.verified(adapter, hex(ref), evidence.Test, policy) {
-            Ok(_) -> Ok(Nil)
-            Error(refusal) ->
-              Error(NoEvidence(ref, trust.refusal_name(refusal)))
+          case evidence.snapshot(adapter) {
+            Error(_) -> Error(NoEvidence(ref, "evidence_unreadable"))
+            Ok(snapshot) ->
+              // The rule is the turnstile's, not a second opinion. `publish`
+              // admits an effectful definition on a human `io` attestation,
+              // because a suite cannot drive real IO. Asking only for `test`
+              // here meant such a definition was admitted and then refused at
+              // the moment it was run: the gate that lets content in and the
+              // gate that executes it have to be the same rule.
+              case
+                turnstile.admits(
+                  snapshot,
+                  hex(ref),
+                  definition_is_effectful(adapter, ref),
+                  policy,
+                )
+              {
+                True -> Ok(Nil)
+                False ->
+                  Error(NoEvidence(ref, refusal_for(snapshot, ref, policy)))
+              }
           }
       }
+  }
+}
+
+/// Name the refusal the way an operator can act on: which evidence is missing.
+fn refusal_for(
+  snapshot: evidence.Snapshot,
+  ref: DefinitionRef,
+  policy: trust.TrustPolicy,
+) -> String {
+  case trust.verified_in(snapshot, hex(ref), evidence.Test, policy) {
+    Error(refusal) -> trust.refusal_name(refusal)
+    Ok(_) -> "no_record:io"
+  }
+}
+
+fn definition_is_effectful(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+) -> Bool {
+  case codebase.get(codebase.with_adapter(adapter), ref) {
+    Ok(definition) -> effect_evidence.definition_is_effectful(definition)
+    // Unreadable content is already refused by preflight; if it reaches here the
+    // conservative answer is "pure", which demands test evidence.
+    Error(_) -> False
   }
 }
 
@@ -208,7 +238,7 @@ fn execute(
             name_snapshot.read(adapter, branch)
             |> result.map_error(fn(reason) { Unreadable(ref, reason) }),
           )
-          use ld <- result.try(resolve_definition(
+          use ld <- result.try(run_closure.resolve_definition(
             loader.new_loader(),
             cb,
             ref,
@@ -236,157 +266,6 @@ pub fn arity_of(typ: ast.Type) -> Int {
   case typ {
     ast.Fn(params:, result:, ..) -> list.length(params) + arity_of(result)
     _ -> 0
-  }
-}
-
-/// Load one ref and everything it points at, dependencies first: a compiled
-/// module calls its dependencies by module name at run time.
-fn resolve(
-  ld: loader.Loader,
-  cb: codebase.Codebase,
-  ref: DefinitionRef,
-  visiting: List(DefinitionRef),
-  names: name_snapshot.Bindings,
-) -> Result(loader.Loader, RunError) {
-  case loader.is_loaded(ld, ref) {
-    True -> Ok(ld)
-    False ->
-      case codebase.get(cb, ref) {
-        Ok(definition) ->
-          resolve_definition(ld, cb, ref, definition, visiting, names)
-        Error(codebase.NotFound(_)) ->
-          // Resolve the selected branch before consulting the VM module table.
-          case dict.get(names, ref) {
-            Ok(content_ref) -> {
-              use definition <- result.try(
-                codebase.get(cb, content_ref)
-                |> result.map_error(fn(error) { read_error(content_ref, error) }),
-              )
-              resolve_definition(ld, cb, ref, definition, visiting, names)
-            }
-            Error(_) -> resolve_runtime_ref(ld, ref)
-          }
-        Error(other) -> Error(read_error(ref, other))
-      }
-  }
-}
-
-/// Whether a ref names something the baseline environment already provides.
-///
-/// The elaborator references a dependency as `ref_for_name(name)` — sha256 of
-/// the name — for every bootstrap entry, terms included. The synthetic genesis
-/// ref (`<<1:256>>`, ...) is an internal handle for the *definition* of a
-/// builtin; no elaborated term ever points at it. Matching only the genesis ref
-/// therefore declared every builtin missing, and `run` on a stored definition
-/// could not resolve `+`. Both shapes name the same builtin, so both count.
-fn is_bootstrap_ref(ref: DefinitionRef) -> Bool {
-  list.any(bootstraps.get_init_defs_data(), fn(definition) {
-    case definition {
-      bootstraps.BAbility(name, _) -> repl_eval.ref_for_name(name) == ref
-      bootstraps.BTerm(name, known_ref) ->
-        known_ref == ref || repl_eval.ref_for_name(name) == ref
-    }
-  })
-}
-
-fn resolve_runtime_ref(
-  ld: loader.Loader,
-  ref: DefinitionRef,
-) -> Result(loader.Loader, RunError) {
-  case jets.get_jet(ref) {
-    option.Some(_) ->
-      loader.ensure_loaded_jet(ld, ref)
-      |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
-    option.None ->
-      case is_bootstrap_ref(ref) && loader.module_available(ref) {
-        True -> Ok(ld)
-        False -> Error(Missing(ref))
-      }
-  }
-}
-
-fn resolve_definition(
-  ld: loader.Loader,
-  cb: codebase.Codebase,
-  ref: DefinitionRef,
-  definition: ast.Definition,
-  visiting: List(DefinitionRef),
-  names: name_snapshot.Bindings,
-) -> Result(loader.Loader, RunError) {
-  case list.contains(visiting, ref) {
-    // Content addressing makes this unreachable by construction: a definition
-    // cannot hash its own hash. Reaching it means the store admitted content
-    // that does not match its key.
-    True -> Error(Cycle(ref))
-    False -> {
-      let visiting = [ref, ..visiting]
-      use ld <- result.try(
-        list.try_fold(
-          definition_refs.refs_of_definition(definition),
-          ld,
-          fn(ld, dependency) { resolve(ld, cb, dependency, visiting, names) },
-        ),
-      )
-      loader.ensure_loaded(ld, ref, definition)
-      |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
-    }
-  }
-}
-
-fn read_error(ref: DefinitionRef, error: codebase.ReadError) -> RunError {
-  case error {
-    codebase.NotFound(_) -> Missing(ref)
-    codebase.StoreFailure(reason) -> Unreadable(ref, string.inspect(reason))
-    codebase.Corrupt(_, reason) ->
-      Unreadable(ref, "content does not match its ref: " <> reason)
-    codebase.DecodeFailed(_, reason) ->
-      Unreadable(ref, "payload is not a definition: " <> reason)
-  }
-}
-
-fn describe_load(error: loader.LoaderError) -> String {
-  case error {
-    loader.CompileFailed(_, message) -> "compile failed: " <> message
-    loader.LoadFailed(_, message) -> "load failed: " <> message
-  }
-}
-
-pub fn hex(ref: DefinitionRef) -> String {
-  let Ref(hash) = ref
-  hash_to_debug_string(hash)
-}
-
-pub fn describe(error: RunError) -> String {
-  case error {
-    Missing(ref) ->
-      "not in the store: " <> hex(ref) <> " (publish it or sync it first)"
-    Unreadable(ref, reason) -> "cannot read " <> hex(ref) <> ": " <> reason
-    NotExecutable(ref, kind) ->
-      hex(ref) <> " is " <> kind <> ", not a runnable term"
-    LoadFailed(ref, reason) -> "cannot load " <> hex(ref) <> ": " <> reason
-    Cycle(ref) ->
-      "dependency cycle at "
-      <> hex(ref)
-      <> "; the store disagrees with its refs"
-    ArityUnavailable(ref, expected, supplied) ->
-      case supplied == 0 {
-        True ->
-          hex(ref)
-          <> " is a function of arity "
-          <> int.to_string(expected)
-          <> "; pass "
-          <> int.to_string(expected)
-          <> " argument(s), or inspect it without calling"
-        False ->
-          hex(ref)
-          <> " expects "
-          <> int.to_string(expected)
-          <> " argument(s), got "
-          <> int.to_string(supplied)
-      }
-    NoEvidence(ref, reason) -> hex(ref) <> " is not verified: " <> reason
-    EvaluationFailed(ref, reason) ->
-      "evaluation of " <> hex(ref) <> " failed: " <> reason
   }
 }
 
@@ -442,7 +321,7 @@ pub fn inspect_function_on_branch(
         name_snapshot.read(adapter, branch)
         |> result.map_error(fn(reason) { Unreadable(ref, reason) }),
       )
-      use ld <- result.try(resolve_definition(
+      use ld <- result.try(run_closure.resolve_definition(
         loader.new_loader(),
         cb,
         ref,

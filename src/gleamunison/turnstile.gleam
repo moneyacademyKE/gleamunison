@@ -39,7 +39,7 @@ pub fn check_with_policy(
   let missing =
     list.filter_map(gated, fn(d) {
       let accepted = case snapshot {
-        Ok(snapshot) -> admitted(snapshot, d.1, d.2, policy)
+        Ok(snapshot) -> admits(snapshot, d.1, d.2, policy)
         Error(_) -> False
       }
       case accepted {
@@ -53,9 +53,11 @@ pub fn check_with_policy(
   }
 }
 
-/// The gate rule for one def: Test evidence always admits; Io attestation
-/// admits only when the def's inferred requirement row is non-empty.
-fn admitted(
+/// The gate rule for one definition, public because the same rule has to hold
+/// where content is ADMITTED (`publish`) and where it is EXECUTED (`run`). Two
+/// spellings of "is this evidenced" is how a definition gets published by one
+/// gate and refused by the other.
+pub fn admits(
   snapshot: evidence.Snapshot,
   subject: String,
   effectful: Bool,

@@ -9,6 +9,7 @@ import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Local, Ref}
+import gleamunison/run_error
 import gleamunison/run_ref
 import gleeunit/should
 
@@ -79,7 +80,7 @@ pub fn a_two_argument_function_runs_with_two_arguments_test() {
 pub fn passing_an_argument_to_a_value_is_refused_test() {
   let definition = ast.TermDef(term: ast.Int(42), typ: ast.Builtin(ast.IntType))
   let #(cb, ref) = insert(codebase.empty(), definition)
-  let assert Error(run_ref.ArityUnavailable(got, expected, supplied)) =
+  let assert Error(run_error.ArityUnavailable(got, expected, supplied)) =
     run_ref.run(codebase.get_adapter(cb), ref, [arg(1)])
   got |> should.equal(ref)
   expected |> should.equal(0)
@@ -92,7 +93,7 @@ pub fn too_few_arguments_is_refused_test() {
       codebase.empty(),
       int_fn(2, ast.Lambda(binder: Local(0), body: ast.Int(0))),
     )
-  let assert Error(run_ref.ArityUnavailable(_, expected, supplied)) =
+  let assert Error(run_error.ArityUnavailable(_, expected, supplied)) =
     run_ref.run(codebase.get_adapter(cb), ref, [arg(1)])
   expected |> should.equal(2)
   supplied |> should.equal(1)

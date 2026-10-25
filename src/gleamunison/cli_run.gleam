@@ -21,6 +21,7 @@ import gleamunison/cli_output
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/identity.{type DefinitionRef}
+import gleamunison/run_error
 import gleamunison/run_ref
 import gleamunison/storage
 import gleamunison/store_log
@@ -120,7 +121,7 @@ fn render_output(
       run_ref.inspect_function_on_branch(adapter, ref, branch)
       |> result.map(fn(info) {
         cli_output.function_json(
-          run_ref.hex(ref),
+          run_error.hex(ref),
           info.module,
           info.arity,
           info.exports,
@@ -153,7 +154,7 @@ fn render_output(
           record(dir, ref, outcome)
           outcome
           |> result.map(fn(term) {
-            cli_output.value_json(run_ref.hex(ref), term)
+            cli_output.value_json(run_error.hex(ref), term)
           })
           |> result.map_error(classify)
         }
@@ -167,13 +168,13 @@ fn render_output(
 fn record(
   dir: String,
   ref: DefinitionRef,
-  outcome: Result(a, run_ref.RunError),
+  outcome: Result(a, run_error.RunError),
 ) -> Nil {
   let #(kind, reason) = case outcome {
     Ok(_) -> #("ok", "")
-    Error(error) -> #("refused", run_ref.describe(error))
+    Error(error) -> #("refused", run_error.describe(error))
   }
-  case store_log.record_exec(dir, run_ref.hex(ref), kind, reason, "cli") {
+  case store_log.record_exec(dir, run_error.hex(ref), kind, reason, "cli") {
     Ok(_) -> Nil
     Error(problem) ->
       io.println_error("run: cannot write the exec log: " <> problem)
@@ -181,17 +182,17 @@ fn record(
 }
 
 /// Refused vs could-not-resolve: the two failures a caller scripts against.
-fn classify(error: run_ref.RunError) -> #(Int, String) {
-  let message = run_ref.describe(error)
+fn classify(error: run_error.RunError) -> #(Int, String) {
+  let message = run_error.describe(error)
   case error {
-    run_ref.Missing(_) -> #(cli_result.unresolvable, message)
-    run_ref.Unreadable(_, _) -> #(cli_result.unresolvable, message)
-    run_ref.Cycle(_) -> #(cli_result.unresolvable, message)
-    run_ref.ArityUnavailable(_, _, _) -> #(cli_result.refused, message)
-    run_ref.NoEvidence(_, _) -> #(cli_result.refused, message)
-    run_ref.NotExecutable(_, _) -> #(cli_result.refused, message)
-    run_ref.LoadFailed(_, _) -> #(cli_result.refused, message)
-    run_ref.EvaluationFailed(_, _) -> #(cli_result.refused, message)
+    run_error.Missing(_) -> #(cli_result.unresolvable, message)
+    run_error.Unreadable(_, _) -> #(cli_result.unresolvable, message)
+    run_error.Cycle(_) -> #(cli_result.unresolvable, message)
+    run_error.ArityUnavailable(_, _, _) -> #(cli_result.refused, message)
+    run_error.NoEvidence(_, _) -> #(cli_result.refused, message)
+    run_error.NotExecutable(_, _) -> #(cli_result.refused, message)
+    run_error.LoadFailed(_, _) -> #(cli_result.refused, message)
+    run_error.EvaluationFailed(_, _) -> #(cli_result.refused, message)
   }
 }
 

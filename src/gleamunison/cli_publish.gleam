@@ -16,6 +16,7 @@ import gleamunison/ast
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/codebase
+import gleamunison/effect_evidence
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex}
 import gleamunison/namespace
@@ -93,9 +94,22 @@ fn publish_with_store(
               case decision {
                 Error(missing) -> {
                   let _ = adapter.close()
+                  // Name the hash of every refused definition. Without it the
+                  // attestation path for an effectful def is unreachable: the
+                  // hash is what evidence attaches to, and publish was the only
+                  // command that printed one — while refusing to print it.
+                  let hashes =
+                    list.filter_map(pairs, fn(pair) {
+                      case list.contains(missing, pair.0) {
+                        True -> Ok("  " <> pair.0 <> "  #" <> pair.1)
+                        False -> Error(Nil)
+                      }
+                    })
                   fail(
                     "publish: REFUSED — no evidence for: "
                     <> string.join(missing, ", ")
+                    <> "\npublish: content hashes (attest these):\n"
+                    <> string.join(hashes, "\n")
                     <> "\npublish: pure defs need `gleam run -- test "
                     <> path
                     <> "` (evidence attaches to the content hash);"
@@ -266,7 +280,7 @@ fn compute_effectful(
 ) -> List(String) {
   let initial =
     list.filter_map(entries, fn(e) {
-      case term_has_do(e.2) {
+      case effect_evidence.term_is_effectful(e.2) {
         True -> Ok(e.0)
         False -> Error(Nil)
       }
@@ -312,36 +326,6 @@ fn name_of_hex(
     Ok(e) -> Ok(e.0)
     Error(_) -> Error(Nil)
   }
-}
-
-fn term_has_do(t: ast.Term) -> Bool {
-  case t {
-    ast.Do(..) -> True
-    ast.RefTo(_)
-    | ast.LocalVarRef(_)
-    | ast.Int(_)
-    | ast.Float(_)
-    | ast.Text(_)
-    | ast.Hole -> False
-    ast.List(items) -> list.any(items, term_has_do)
-    ast.Apply(f, a) -> term_has_do(f) || term_has_do(a)
-    ast.Lambda(_, body) -> term_has_do(body)
-    ast.Let(_, value, body) -> term_has_do(value) || term_has_do(body)
-    ast.Match(scrutinee, cases) ->
-      term_has_do(scrutinee) || list.any(cases, case_has_do)
-    ast.Handle(comp, handler, _) -> term_has_do(comp) || term_has_do(handler)
-    ast.Construct(_, args) -> list.any(args, term_has_do)
-    ast.Use(_, call, body) -> term_has_do(call) || term_has_do(body)
-    ast.Located(inner, _) -> term_has_do(inner)
-  }
-}
-
-fn case_has_do(c: ast.Case) -> Bool {
-  let guard_has = case c.guard {
-    option.Some(ast.GuardTerm(t)) -> term_has_do(t)
-    option.None -> False
-  }
-  guard_has || term_has_do(c.body)
 }
 
 /// Every definition hash this term references — the closure edges. Ability
