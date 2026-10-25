@@ -172,13 +172,24 @@ pub fn branch_head(
   }
 }
 
-/// A mutable pointer has a name-derived key, not a content hash. Safety scans
-/// can skip it only when both its embedded branch and pointer key agree.
-pub fn is_branch_pointer(ref: DefinitionRef, bytes: BitArray) -> Bool {
+/// The branch a pointer chunk names: the embedded name and the name-derived
+/// key must agree, so a stray chunk cannot invent a branch.
+pub fn branch_name_of(ref: DefinitionRef, bytes: BitArray) -> Option(String) {
   case parse_head(bytes) {
-    Ok(#(branch, seq, _, _)) -> seq > 0 && branch_pointer_ref(branch) == ref
-    Error(_) -> False
+    Ok(#(branch, seq, _, _)) if seq > 0 ->
+      case branch_pointer_ref(branch) == ref {
+        True -> Some(branch)
+        False -> None
+      }
+    _ -> None
   }
+}
+
+/// A mutable pointer has a name-derived key, not a content hash. Safety scans
+/// can skip it only when both its embedded branch and pointer key agree —
+/// the same rule that names the branch, so the two cannot disagree.
+pub fn is_branch_pointer(ref: DefinitionRef, bytes: BitArray) -> Bool {
+  option.is_some(branch_name_of(ref, bytes))
 }
 
 /// Point branch at ns (stored if needed), recording the causal link to the

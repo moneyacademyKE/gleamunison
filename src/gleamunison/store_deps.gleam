@@ -3,6 +3,8 @@
 
 import gleam/list
 import gleam/result
+import gleam/string
+import gleamunison/branch_scope
 import gleamunison/dependency_snapshot
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/storage
@@ -157,6 +159,42 @@ pub fn names_for_on_branch(
   dependency_snapshot.read(adapter, branch)
   |> result.map(fn(snapshot) { dependency_snapshot.names(snapshot, ref) })
   |> result.unwrap([])
+}
+
+/// Content is shared by every branch, so a retraction decision needs to know
+/// whether a branch other than the selected one still binds the ref: deleting
+/// bytes another branch resolves to leaves a binding nobody can load.
+pub fn branches_binding_elsewhere(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  selected: String,
+) -> Result(List(#(String, String)), DependencyError) {
+  branch_scope.branches_binding(adapter, ref)
+  |> result.map(fn(found) {
+    list.filter(found, fn(pair) { pair.0 != selected })
+  })
+  |> result.map_error(NamespaceFailure)
+}
+
+/// `dev (a), feature (b)`: which branch holds it, and under what names.
+/// One spelling of the refusal, so both retraction commands name the same
+/// thing the same way.
+pub fn describe_branch_bindings(held: List(#(String, String))) -> String {
+  held
+  |> list.fold([], fn(acc: List(#(String, String)), pair) {
+    case list.find(acc, fn(entry) { entry.0 == pair.0 }) {
+      Ok(_) ->
+        list.map(acc, fn(entry) {
+          case entry.0 == pair.0 {
+            True -> #(entry.0, entry.1 <> ", " <> pair.1)
+            False -> entry
+          }
+        })
+      Error(_) -> list.append(acc, [pair])
+    }
+  })
+  |> list.map(fn(entry) { entry.0 <> " (" <> entry.1 <> ")" })
+  |> string.join(", ")
 }
 
 pub fn hex(ref: DefinitionRef) -> String {

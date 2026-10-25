@@ -27,6 +27,7 @@ import gleamunison/dependency_snapshot
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/namespace
 import gleamunison/storage
+import gleamunison/store_deps
 import simplifile
 
 const default_branch = "main"
@@ -78,6 +79,33 @@ pub fn purge(
         cli_result.refused,
         "purge: cannot inspect store: " <> string.inspect(error),
       )
+    }),
+  )
+  // Bytes are shared by every branch; the snapshot above is one branch. A
+  // ref still bound elsewhere is a reason not to remove it, whatever the
+  // selected branch says.
+  use _ <- result.try(
+    store_deps.branches_binding_elsewhere(adapter, ref, branch)
+    |> result.map_error(fn(error) {
+      #(
+        cli_result.refused,
+        "purge: cannot read branch bindings: "
+          <> store_deps.describe_dependency_error(error),
+      )
+    })
+    |> result.try(fn(held) {
+      case held {
+        [] -> Ok(Nil)
+        _ ->
+          Error(#(
+            cli_result.refused,
+            "purge: "
+              <> short(ref)
+              <> " is still bound on "
+              <> store_deps.describe_branch_bindings(held)
+              <> "\npurge: bytes are shared by every branch; retract it there first",
+          ))
+      }
     }),
   )
   let outside = dependency_snapshot.dependents(snapshot, ref)

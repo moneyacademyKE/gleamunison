@@ -50,21 +50,70 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
   let store_path = cli_lifecycle.store_path(context)
   let manifest_path = cli_lifecycle.manifest_path(context)
   use lines <- result.try(read_manifest(manifest_path))
-  use hash <- result.try(find_name(lines, name))
-  use ref <- result.try(
-    identity.parse_ref_hex(hash)
-    |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
-  )
   use report <- result.try(
     cli_store.with_dets_mapped(
       store_path,
       fn(adapter) {
+        use #(hash, ref) <- result.try(resolve_target(
+          adapter,
+          lines,
+          name,
+          branch,
+        ))
         retract(adapter, manifest_path, name, hash, ref, branch, lines)
       },
       fn(message) { #(cli_result.unresolvable, message) },
     ),
   )
   Ok(report)
+}
+
+/// Which content this name means on this branch.
+///
+/// The published index is store-wide; a binding is per-branch. Retracting on
+/// one branch removes the index line, so a second branch holding the same
+/// name had no line left to find and could never be retracted. The index is
+/// tried first (it is what `publish` wrote), then the branch namespace, which
+/// is the authority for its own bindings.
+pub fn resolve_target(
+  adapter: storage.StorageAdapter,
+  lines: List(String),
+  name: String,
+  branch: String,
+) -> Result(#(String, identity.DefinitionRef), #(Int, String)) {
+  case find_name(lines, name) {
+    Ok(hash) ->
+      identity.parse_ref_hex(hash)
+      |> result.map(fn(ref) { #(hash, ref) })
+      |> result.map_error(fn(message) { #(cli_result.unresolvable, message) })
+    Error(_) ->
+      case namespace.load_current(adapter, branch) {
+        Ok(ns) ->
+          case namespace.get(ns, name) {
+            Ok(ref) -> Ok(#(store_deps.hex(ref), ref))
+            Error(_) -> Error(not_published(name))
+          }
+        // A branch that does not exist has no binding to retract; a
+        // store that cannot be read is a different failure, and saying
+        // "not published" would hide it.
+        Error(reason) ->
+          case string.starts_with(reason, "no such branch") {
+            True -> Error(not_published(name))
+            False ->
+              Error(#(
+                cli_result.refused,
+                "unpublish: cannot read branch " <> branch <> ": " <> reason,
+              ))
+          }
+      }
+  }
+}
+
+fn not_published(name: String) -> #(Int, String) {
+  #(
+    cli_result.refused,
+    "unpublish: " <> name <> " is not published (nothing to retract)",
+  )
 }
 
 pub fn retract(
@@ -85,6 +134,18 @@ pub fn retract(
       )
     }),
   )
+  // Bytes are shared by every branch; the snapshot above is one branch. A
+  // name still bound elsewhere is a reason not to delete them.
+  use held <- result.try(
+    store_deps.branches_binding_elsewhere(adapter, ref, branch)
+    |> result.map_error(fn(error) {
+      #(
+        cli_result.refused,
+        "unpublish: cannot read branch bindings: "
+          <> store_deps.describe_dependency_error(error),
+      )
+    }),
+  )
   let dependents = dependency_snapshot.dependents(snapshot, ref)
   let aliases =
     dependency_snapshot.names(snapshot, ref)
@@ -102,17 +163,13 @@ pub fn retract(
         }),
       )
       use _ <- result.try(rewrite_manifest(manifest_path, name, lines))
-      use _ <- result.try(
-        adapter.delete(ref)
-        |> result.map_error(fn(error) {
-          #(
-            cli_result.refused,
-            "unpublish: cannot remove " <> hash <> ": " <> describe(error),
-          )
-        }),
-      )
-      Ok("unpublished: " <> name <> " #" <> string.slice(hash, 0, 12))
+      // The name is branch-scoped; the bytes are not. Two branches binding the
+      // same content cannot both retract first, so refusing while another
+      // branch holds it would be a deadlock. Delete the bytes only when no other
+      // branch still resolves to them, and say where they stay when one does.
+      drop_bytes_unless_held(adapter, ref, hash, name, held)
     }
+
     [_, ..], _ ->
       Error(#(
         cli_result.refused,
@@ -133,6 +190,42 @@ pub fn retract(
           <> string.join(aliases, ", ")
           <> "; unpublish those names instead",
       ))
+  }
+}
+
+/// The bytes are the only shared thing here: remove them when this was the
+/// last branch holding the content, and leave them when another branch still
+/// resolves to them, naming that branch instead of deleting under it.
+fn drop_bytes_unless_held(
+  adapter: storage.StorageAdapter,
+  ref: identity.DefinitionRef,
+  hash: String,
+  name: String,
+  held: List(#(String, String)),
+) -> Result(String, #(Int, String)) {
+  case held {
+    [] -> {
+      use _ <- result.try(
+        adapter.delete(ref)
+        |> result.map_error(fn(error) {
+          #(
+            cli_result.refused,
+            "unpublish: cannot remove " <> hash <> ": " <> describe(error),
+          )
+        }),
+      )
+      Ok("unpublished: " <> name <> " #" <> string.slice(hash, 0, 12))
+    }
+    _ ->
+      Ok(
+        "unpublished: "
+        <> name
+        <> " #"
+        <> string.slice(hash, 0, 12)
+        <> " (bytes kept: still bound on "
+        <> store_deps.describe_branch_bindings(held)
+        <> ")",
+      )
   }
 }
 
