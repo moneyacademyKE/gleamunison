@@ -77,6 +77,7 @@ For paths that were considered and *declined*, with the reasoning, see [`unimple
 | [ADR-0069](0069-durable-db-ability.md) | Durable application data through one Db ability | Accepted |
 | [ADR-0070](0070-admitted-agent-writes.md) | Admitted agent writes through one MCP publication tool | Accepted |
 | [ADR-0071](0071-admitted-app-routes.md) | Admitted definitions served through application routes | Accepted |
+| [ADR-0072](0072-bounded-agent-generation.md) | Bounded generation through admitted publication | Accepted |
 
 
 

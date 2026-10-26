@@ -89,10 +89,11 @@ write a new ADR or update an existing one. Currently 71 ADRs are cataloged.
 
 ### Admitted agent writes
 
-- Use [ADR 0070](adr/0070-admitted-agent-writes.md). `agent_publish` is the
-  only MCP write tool: callers submit source, never storage keys, branch
-  names, or store paths. The branch is server-selected; the receipt carries
-  real content refs that `run` executes.
+- Use [ADR 0070](adr/0070-admitted-agent-writes.md). `agent_publish` accepts
+  source, never storage keys, branch names, or store paths. `agent_generate`
+  (ADR 0072) adds bounded model candidates to the **same** admitted publication
+  path. Neither tool creates a second storage authority. The branch is
+  server-selected; receipts carry real content refs that `run` executes.
 - Agent publication runs the same pipeline as the CLI: elaboration, tests
   with signed evidence, turnstile, CAS, branch binding. Do not add a second
   admission path or a hash-addressed write tool; that re-opens the
@@ -104,6 +105,27 @@ write a new ADR or update an existing one. Currently 71 ADRs are cataloged.
   win for stored names; scratch shadows by name but stale stored types must
   never survive a refresh. Publication never erases scratch and never
   absorbs it into CAS.
+
+### Bounded agent generation
+
+- Use [ADR 0072](adr/0072-bounded-agent-generation.md). `agent_generate` accepts
+  a template, string variables, a small documented signature vocabulary, and
+  1–8 attempts. It never accepts a store, branch, credential, provider, or
+  arbitrary content key.
+- The complete prompt is content-addressed with checked CAS storage. SAP may
+  repair a near-miss `{source, signature}` envelope, but admission checks the
+  target's inferred type before tests, evidence, or branch writes.
+- Every candidate uses `agent_publish`: one target term plus its tests, then
+  elaboration, signed evidence, turnstile, CAS, and selected-branch binding.
+  Provider errors and rejected candidates become bounded retry feedback;
+  exhaustion returns the last error without changing branch bindings.
+- Production uses the existing server-owned LLM effect. Deterministic provider
+  injection and a loopback completion fixture prove repository behavior; they
+  do not claim an external-provider call.
+- Patch analysis reports direct stored dependents of newly published names.
+  Existing runtime dependencies are name refs: rebinding changes their next
+  execution, not their content identity. Do not reconstruct stored source or
+  claim automatic dependent regeneration.
 
 ### Admitted application routes
 

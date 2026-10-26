@@ -228,18 +228,19 @@ and 13 self-hosted Datalog modules. Grouped by concern:
 
 ### Library and CLI boundaries
 
-Four modules remain intentionally library-first: `sap`, `patch`, `prompt`, and
-`schema_printer` are published, compiled, and tested but are not CLI routes.
+`sap`, `patch`, `prompt`, and `schema_printer` now compose in the bounded
+`agent_generate` loop (ADR 0072); they are not standalone CLI commands. The
+ordinary `llm` CLI still expects its own well-formed completion shape.
 `trust` is different: production `publish`, `pkg install`, and `run` call its
 policy gate; its multi-key overlap constructor remains a library/test surface.
 
 | Module | What it provides | Wired into the runtime? |
 |---|---|---|
 | `gleamunison/trust` | Key states (active/revoked/expired) and rotation windows | Yes for production `publish`, `pkg install`, and `run`; multi-key overlap remains library/test-only |
-| `gleamunison/sap` | Schema-aligned parsing of near-miss model output (fences, trailing commas, Python literals) | No — the LLM CLI expects well-formed JSON |
-| `gleamunison/patch` | Named, content-addressed update propagation | No |
-| `gleamunison/prompt` | Content-addressed prompts as definitions | No |
-| `gleamunison/schema_printer` | Type → compact prompt schema | No |
+| `gleamunison/sap` | Schema-aligned parsing of near-miss model output (fences, trailing commas, Python literals) | Yes — bounded `agent_generate` candidate envelopes |
+| `gleamunison/patch` | Named, content-addressed update propagation and dependency analysis | Yes — direct-dependent impact in `agent_generate`; no automatic stored-source regeneration |
+| `gleamunison/prompt` | Content-addressed prompts as definitions | Yes — checked prompt storage in `agent_generate` |
+| `gleamunison/schema_printer` | Type → compact prompt schema | Yes — request rendering and inferred-type signature checks |
 
 `sandbox_policy` **is** wired: `/eval`, `/define`, `/mcp`, and `/app/*` admit
 through it, and the `untrusted-execution` profile refuses with

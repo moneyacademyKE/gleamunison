@@ -71,6 +71,7 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - **Configuration**: environment variables read at the point of use (`GLEAMUNISON_PROFILE`, `GLEAMUNISON_BIND_ADDRESS`, `GLEAMUNISON_HTTP_TOKEN`, `GLEAMUNISON_REQUIRED_SERVICES`).
 - **Trace Inspector**: `gleamunison_trace.erl` — DETS-backed HTTP request capture, SSE push, `/api/traces` endpoint.
 - **Admitted application routes**: `gleamunison/app_route` resolves only selected-branch names or bound content refs; `app_path` owns strict route-segment decoding, `app_response` owns bounded JSON envelopes, and `run_ref` remains the sole evidence/evaluation authority. `POST /app/:name` and `/app/ref/:content-ref` share HTTP data-write and execution-profile admission with MCP.
+- **Bounded agent generation**: `generation_loop` composes checked content-addressed prompts, schema rendering, SAP candidate envelopes, bounded provider retries, and inferred-type checks with `agent_publish`. The supervised session owns provider calls and refreshes after admission. `agent_generate` accepts no caller-selected store, branch, credentials, or provider; patch analysis reports direct name-ref dependents without fabricating stored source or automatic regeneration.
 - **Namespace codecs**: `gleamunison/namespace_codec` owns canonical namespace-snapshot and branch-head bytes; `namespace` owns values, branches, history, diff, merge, and synchronization.
 
 ### 8. Standard Library (v1.1.0)
