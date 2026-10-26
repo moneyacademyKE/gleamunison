@@ -1,5 +1,11 @@
 # Design Patterns
 
+> **Historical pattern catalog.** “Applied in” entries describe the tree when
+> each note was written; some modules were later removed and some claims were
+> later narrowed. Do not use this catalog as a current module inventory or a
+> production-boundary claim. Start at [the documentation index](README.md) and
+> verify current source/ADRs before reusing a pattern.
+
 Patterns used throughout the gleamunison architecture.
 
 ---

@@ -1,5 +1,11 @@
 # Architectural Learnings
 
+> **Historical engineering notebook.** Entries record insights at the time they
+> were written. Some examples name removed modules or boundaries that are no
+> longer current. This is not setup guidance or proof of current behavior; use
+> [the documentation index](README.md), current architecture/operations guides,
+> source, and dated witnesses for those answers.
+
 Key insights discovered during the design and implementation of gleamunison.
 
 ---
