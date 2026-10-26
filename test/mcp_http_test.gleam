@@ -1,14 +1,18 @@
 import gleam/bit_array
+import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/string
 import gleamunison/cli_run
+import gleamunison/evidence
 import gleamunison/identity
 import gleamunison/json
 import gleamunison/mcp_generation
 import gleamunison/mcp_server
 import gleamunison/mcp_write
+import gleamunison/publication
 import gleamunison/run_ref
+import gleamunison/source_loader
 import gleamunison/storage
 import gleeunit/should
 import simplifile
@@ -60,6 +64,12 @@ fn ffi_unset_env(key: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "without_active_storage")
 fn without_active_storage(check: fn() -> a) -> a
+
+@external(erlang, "gleamunison_app_db", "with_path")
+fn with_db_path(path: String, work: fn() -> a) -> a
+
+@external(erlang, "gleamunison_runtime_sup", "stop_db")
+fn stop_db() -> Dynamic
 
 pub fn http_scratch_is_visible_to_mcp_and_browse_test() {
   let assert Ok(Nil) = mcp_server.start([])
@@ -270,6 +280,101 @@ fn unset_generation_env() -> Nil {
   ffi_unset_env("OPENAI_MODEL")
   ffi_unset_env("LLM_HTTP_TIMEOUT_MS")
 }
+
+pub fn mcp_generated_db_routes_survive_db_owner_restart_test() {
+  let root = "/tmp/gleamunison-mcp-generated-db-test"
+  let path = root <> "/store.dets"
+  let db_path = root <> "/application.dets"
+  let _ = storage.dets_delete_file(path)
+  let _ = simplifile.delete(db_path)
+  let assert Ok(_) = simplifile.create_directory_all(root)
+  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
+  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
+  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "generated-db-test-key")
+  ffi_set_env("OPENAI_API_KEY", "local-test-only")
+  ffi_set_env("OPENAI_MODEL", "local-test")
+  ffi_set_env("LLM_HTTP_TIMEOUT_MS", "5000")
+  let write =
+    "(define generated-db-write (do Db transact (list (pair \"person:1\" (pair \"name\" \"Moe\"))) (list)))"
+  let read = "(define generated-db-read (do Db get \"person:1\" \"name\"))"
+  let #(write_response, read_response) =
+    with_db_path(db_path, fn() {
+      without_active_storage(fn() {
+        let assert Ok(adapter) = storage.dets(path)
+        attest_io(adapter, "generated-db-write", write)
+        attest_io(adapter, "generated-db-read", read)
+        let assert Ok(Nil) = mcp_server.start([])
+        ffi_start_http_server(18_106)
+        generate_from_provider(1, write, "int")
+        generate_from_provider(2, read, "list")
+        let write_response =
+          ffi_http_post(18_106, "/app/generated-db-write", "{\"args\":[]}")
+        let _ = stop_db()
+        let read_response =
+          ffi_http_post(18_106, "/app/generated-db-read", "{\"args\":[]}")
+        mcp_server.stop()
+        ffi_stop_http_server()
+        #(write_response, read_response)
+      })
+    })
+  unset_generation_env()
+  let _ = storage.dets_delete_file(path)
+  let _ = simplifile.delete(db_path)
+  let assert Ok(#(200, write_body)) = write_response
+  string.contains(write_body, "\"value\":1") |> should.be_true
+  let assert Ok(#(200, read_body)) = read_response
+  string.contains(read_body, "person:1") |> should.be_true
+  string.contains(read_body, "Moe") |> should.be_true
+}
+
+fn attest_io(
+  adapter: storage.StorageAdapter,
+  name: String,
+  source: String,
+) -> Nil {
+  let assert Ok(loaded) = source_loader.load(source)
+  let assert Ok([subject]) =
+    publication.subjects([name], loaded.definitions, loaded.cache)
+  let assert Ok(signer) = evidence.production_signer()
+  let assert Ok(_) =
+    evidence.attach_signed(
+      adapter,
+      signer,
+      subject.content_ref,
+      evidence.Io,
+      "approved",
+      "factory acceptance: generated durable Db route",
+      1,
+    )
+  Nil
+}
+
+fn generate_from_provider(id: Int, source: String, signature: String) -> Nil {
+  let candidate =
+    "{\"source\":"
+    <> json_string(source)
+    <> ",\"signature\":\""
+    <> signature
+    <> "\"}"
+  let assert Ok(provider_port) = start_completion_server(candidate)
+  ffi_set_env(
+    "OPENAI_BASE_URL",
+    "http://127.0.0.1:" <> int.to_string(provider_port) <> "/v1",
+  )
+  let body =
+    "{\"jsonrpc\":\"2.0\",\"id\":"
+    <> int.to_string(id)
+    <> ",\"method\":\"tools/call\",\"params\":{\"name\":\"agent_generate\",\"arguments\":{\"template\":\"Generate the durable application route with {{signature}}\",\"signature\":\""
+    <> signature
+    <> "\",\"max_attempts\":1}}}"
+  let result = ffi_http_post(18_106, "/mcp", body)
+  let assert Ok(#(200, response)) = result
+  let assert True = string.contains(response, "\\\"admitted\\\":1")
+  Nil
+}
+
+@external(erlang, "gleamunison_ffi", "json_quote")
+fn json_string(value: String) -> String
 
 pub fn mcp_generation_rejects_untrusted_before_storage_test() {
   let root = "/tmp/gleamunison-mcp-untrusted-generation-test"

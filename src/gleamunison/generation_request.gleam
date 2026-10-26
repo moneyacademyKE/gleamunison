@@ -136,9 +136,10 @@ fn scalar(text: String) -> Result(ast.Type, String) {
     "float" -> Ok(ast.Builtin(ast.FloatType))
     "string" -> Ok(ast.Builtin(ast.TextType))
     "bool" -> Ok(ast.Builtin(ast.BoolType))
+    "list" -> Ok(ast.Builtin(ast.ListType))
     _ ->
       Error(
-        "agent_generate: signature must use int, float, string, bool, "
+        "agent_generate: signature must use int, float, string, bool, list, "
         <> "or (parameters) -> result; received "
         <> text,
       )

@@ -1,6 +1,7 @@
 import gleam/dict
 import gleam/string
 import gleamunison/generation_request
+import gleamunison/schema_printer
 import gleeunit/should
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
@@ -37,6 +38,16 @@ pub fn request_decodes_function_signature_and_budget_test() {
   plan.variables |> should.equal([])
   string.contains(plan.template, "exactly source and signature")
   |> should.be_true
+}
+
+pub fn request_decodes_durable_read_signature_test() {
+  let args =
+    dict.from_list([
+      #("template", dynamic("read durable facts")),
+      #("signature", dynamic("list")),
+    ])
+  let assert Ok(plan) = generation_request.plan(args)
+  schema_printer.to_schema(plan.signature) |> should.equal("list")
 }
 
 pub fn request_rejects_non_string_variables_test() {
