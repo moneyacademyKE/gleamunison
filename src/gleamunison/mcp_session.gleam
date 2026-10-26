@@ -2,8 +2,6 @@
 //// The pure session owns values; the supervised web session owns mutations.
 
 import gleam/dict.{type Dict}
-import gleam/dynamic.{type Dynamic}
-import gleam/dynamic/decode
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -17,11 +15,13 @@ import gleamunison/lisp_literal
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/mcp_definition
 import gleamunison/mcp_search
+import gleamunison/mcp_tools
+import gleamunison/mcp_write
 import gleamunison/parser
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleamunison/type_pretty
-import gleamunison/types.{type TypeCache, empty_cache}
+import gleamunison/types.{type TypeCache, TypeCache, empty_cache}
 import gleamunison/verify
 import gleamunison/version
 import simplifile
@@ -87,6 +87,39 @@ pub fn from_parts(
       agent_read_model.Source(pair.0, pair.1, agent_read_model.Scratch)
     })
   SessionState(cache, defs, entries, None)
+}
+
+/// Rebuild a durable snapshot, then reapply only the previous scratch overlay.
+/// A successful write must not turn the session into a second scratch owner or
+/// silently discard unrelated exploratory definitions.
+pub fn overlay_scratch(
+  fresh: SessionState,
+  previous: SessionState,
+) -> SessionState {
+  let scratch =
+    list.filter(previous.entries, fn(entry) {
+      agent_read_model.origin(entry) == agent_read_model.Scratch
+    })
+  let entries = unique_entries(list.append(scratch, fresh.entries))
+  let cache =
+    list.fold(
+      scratch,
+      TypeCache(dict.merge(previous.cache.entries, fresh.cache.entries)),
+      fn(cache, entry) {
+        let name_ref = repl_eval.ref_for_name(agent_read_model.name(entry))
+        case dict.get(previous.cache.entries, name_ref) {
+          Ok(computed) ->
+            TypeCache(dict.insert(cache.entries, name_ref, computed))
+          Error(_) -> cache
+        }
+      },
+    )
+  SessionState(
+    cache:,
+    defs: agent_read_model.definitions(entries),
+    entries:,
+    selection: fresh.selection,
+  )
 }
 
 /// Extend a session by loading a lisp source file through the same
@@ -303,63 +336,54 @@ fn tools(state: SessionState) -> List(Tool) {
     Tool(
       name: "list_definitions",
       description: "List every definition in the session (name, kind, ref)",
-      handler: fn(_) {
-        Ok(mcp_definition.defs_json(state.cache, visible_entries(state)))
-      },
+      handler: fn(_) { Ok(definitions_json(state)) },
     ),
     Tool(
       name: "get_definition",
       description: "Fetch one definition by exact name",
-      handler: fn(args) { get_definition(state, args) },
+      handler: fn(args) {
+        use name <- result.try(mcp_tools.string_arg(args, "name"))
+        get_definition(state, name)
+      },
     ),
     Tool(
       name: "search_definitions",
       description: "Substring search over definition names and bodies",
-      handler: fn(args) { search_definitions(state, args) },
+      handler: fn(args) {
+        use query <- result.try(mcp_tools.string_arg(args, "query"))
+        search_definitions(state, query)
+      },
     ),
     Tool(
       name: "eval",
       description: "Evaluate a read-only S-expression against the session",
-      handler: fn(args) { eval_tool(state, args) },
-    ),
-    Tool(
-      name: "callers_of",
-      description: "List definitions that reference the given name (datalog index)",
       handler: fn(args) {
-        case string_arg(args, "name") {
-          Error(e) -> Error(e)
-          Ok(name) ->
-            result.map(callers_of(state, name), fn(ns) { names_json(ns) })
-        }
+        use expression <- result.try(mcp_tools.string_arg(args, "expr"))
+        eval_tool(state, expression)
       },
     ),
-    Tool(
-      name: "deps_of",
-      description: "List in-corpus names the given definition references",
-      handler: fn(args) {
-        case string_arg(args, "name") {
-          Error(e) -> Error(e)
-          Ok(name) ->
-            result.map(deps_of(state, name), fn(ns) { names_json(ns) })
-        }
-      },
-    ),
-    Tool(
-      name: "defs_by_kind",
-      description: "List definitions of a kind (term, type, ability, type-alias)",
-      handler: fn(args) {
-        case string_arg(args, "kind") {
-          Error(e) -> Error(e)
-          Ok(k) -> result.map(defs_by_kind(state, k), fn(ns) { names_json(ns) })
-        }
-      },
-    ),
+    mcp_write.tool(),
+    names_tool("callers_of", "name", callers_of(state, _)),
+    names_tool("deps_of", "name", deps_of(state, _)),
+    names_tool("defs_by_kind", "kind", defs_by_kind(state, _)),
   ]
 }
 
-fn names_json(names: List(String)) -> String {
-  let parts = list.map(names, mcp.json_string)
-  "[" <> string.join(parts, ",") <> "]"
+fn names_tool(
+  name: String,
+  argument: String,
+  query: fn(String) -> Result(List(String), String),
+) -> Tool {
+  let description = case name {
+    "callers_of" ->
+      "List definitions that reference the given name (datalog index)"
+    "deps_of" -> "List in-corpus names the given definition references"
+    _ -> "List definitions of a kind (term, type, ability, type-alias)"
+  }
+  Tool(name:, description:, handler: fn(args) {
+    use value <- result.try(mcp_tools.string_arg(args, argument))
+    result.map(query(value), mcp_tools.names_json)
+  })
 }
 
 /// Callers of a name: every definition with a def/dep edge pointing at it.
@@ -415,28 +439,18 @@ fn index_names(
   decode_index_names(output)
 }
 
-fn get_definition(
-  state: SessionState,
-  args: Dict(String, Dynamic),
-) -> Result(String, String) {
-  case string_arg(args, "name") {
-    Error(e) -> Error(e)
-    Ok(name) ->
-      case find_entry(state, name) {
-        Error(_) -> Error("definition not found: " <> name)
-        Ok(entry) -> Ok(mcp_definition.json(state.cache, state.defs, entry))
-      }
+fn get_definition(state: SessionState, name: String) -> Result(String, String) {
+  case find_entry(state, name) {
+    Error(_) -> Error("definition not found: " <> name)
+    Ok(entry) -> Ok(mcp_definition.json(state.cache, state.defs, entry))
   }
 }
 
 fn search_definitions(
   state: SessionState,
-  args: Dict(String, Dynamic),
+  query: String,
 ) -> Result(String, String) {
-  case string_arg(args, "query") {
-    Error(e) -> Error(e)
-    Ok(query) -> Ok(mcp_search.hits_json(search(state, query)))
-  }
+  Ok(mcp_search.hits_json(search(state, query)))
 }
 
 pub type SearchHit =
@@ -446,40 +460,16 @@ pub fn search(state: SessionState, query: String) -> List(SearchHit) {
   mcp_search.search(state.cache, state.defs, visible_entries(state), query)
 }
 
-fn eval_tool(
-  state: SessionState,
-  args: Dict(String, Dynamic),
-) -> Result(String, String) {
-  case string_arg(args, "expr") {
-    Error(e) -> Error(e)
-    Ok(expr) ->
-      case parser.parse_string(expr) {
-        Error(e) -> Error("parse error: " <> e.message)
-        Ok(elab_types.SList([
-          elab_types.SVar("define"),
-          elab_types.SVar(name),
-          _,
-        ])) -> Error("define not allowed via MCP eval (read-only): " <> name)
-        Ok(term) ->
-          case repl_eval.do_eval(term, "mcp_eval", state.cache, state.defs) {
-            Ok(#(val_str, typ, _)) ->
-              Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
-            Error(err) -> Error(err)
-          }
-      }
-  }
-}
-
-fn string_arg(
-  args: Dict(String, Dynamic),
-  key: String,
-) -> Result(String, String) {
-  case dict.get(args, key) {
-    Error(_) -> Error("missing argument: " <> key)
-    Ok(dyn) ->
-      case decode.run(dyn, decode.string) {
-        Ok(s) -> Ok(s)
-        Error(_) -> Error("argument must be a string: " <> key)
+fn eval_tool(state: SessionState, expr: String) -> Result(String, String) {
+  case parser.parse_string(expr) {
+    Error(e) -> Error("parse error: " <> e.message)
+    Ok(elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), _])) ->
+      Error("define not allowed via MCP eval (read-only): " <> name)
+    Ok(term) ->
+      case repl_eval.do_eval(term, "mcp_eval", state.cache, state.defs) {
+        Ok(#(val_str, typ, _)) ->
+          Ok(val_str <> " : " <> type_pretty.pretty_print(typ))
+        Error(err) -> Error(err)
       }
   }
 }

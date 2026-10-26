@@ -75,6 +75,7 @@ For paths that were considered and *declined*, with the reasoning, see [`unimple
 | [ADR-0067](0067-production-boundaries.md) | Production boundaries and execution profiles | Accepted contract; enforcement pending |
 | [ADR-0068](0068-durable-agent-read-model.md) | Durable agent read model with explicit scratch overlays | Accepted |
 | [ADR-0069](0069-durable-db-ability.md) | Durable application data through one Db ability | Accepted |
+| [ADR-0070](0070-admitted-agent-writes.md) | Admitted agent writes through one MCP publication tool | Accepted |
 
 
 

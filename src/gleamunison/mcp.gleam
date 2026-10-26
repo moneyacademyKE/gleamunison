@@ -142,6 +142,8 @@ fn tool_schema(name: String) -> String {
       "{\"type\":\"object\",\"required\":[\"query\"],\"properties\":{\"query\":{\"type\":\"string\"}}}"
     "eval" ->
       "{\"type\":\"object\",\"required\":[\"expr\"],\"properties\":{\"expr\":{\"type\":\"string\"}}}"
+    "agent_publish" ->
+      "{\"type\":\"object\",\"required\":[\"source\"],\"properties\":{\"source\":{\"type\":\"string\"}},\"additionalProperties\":false}"
     "callers_of" ->
       "{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"}}}"
     "deps_of" ->

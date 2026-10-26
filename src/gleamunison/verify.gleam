@@ -77,7 +77,7 @@ fn verify_terms_valued(
   }
 }
 
-fn require_forms(
+pub fn require_forms(
   terms: List(SurfaceTerm),
 ) -> Result(List(SurfaceTerm), String) {
   case terms {

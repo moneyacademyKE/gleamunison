@@ -71,7 +71,7 @@ Text (S-Expr) → AST (Gleam types) → Hash (SHA256) → Codebase (DETS / in-me
 
 Every significant design decision is recorded as an ADR in `docs/adr/`.
 Before making a change, read the relevant ADRs. After making a change,
-write a new ADR or update an existing one. Currently 62 ADRs are cataloged.
+write a new ADR or update an existing one. Currently 70 ADRs are cataloged.
 
 ### Agent read model and scratch overlays
 
@@ -86,6 +86,24 @@ write a new ADR or update an existing one. Currently 62 ADRs are cataloged.
   into CAS.
 - The supervised web session owns scratch; MCP reads its current snapshots.
   Never give MCP a second bootstrap-only session or an independent write path.
+
+### Admitted agent writes
+
+- Use [ADR 0070](adr/0070-admitted-agent-writes.md). `agent_publish` is the
+  only MCP write tool: callers submit source, never storage keys, branch
+  names, or store paths. The branch is server-selected; the receipt carries
+  real content refs that `run` executes.
+- Agent publication runs the same pipeline as the CLI: elaboration, tests
+  with signed evidence, turnstile, CAS, branch binding. Do not add a second
+  admission path or a hash-addressed write tool; that re-opens the
+  name-hash/content-hash confusion and skips the turnstile.
+- `untrusted-execution` refuses writes before storage opens. Capability
+  denial is not an OS sandbox claim (ADR 0067 still owns that boundary).
+- A successful write refreshes the supervised snapshot from durable state
+  and re-applies only the previous scratch overlay. Fresh durable entries
+  win for stored names; scratch shadows by name but stale stored types must
+  never survive a refresh. Publication never erases scratch and never
+  absorbs it into CAS.
 
 ### Deployment and Synchronization
 

@@ -1,6 +1,15 @@
+import gleam/bit_array
+import gleam/dynamic/decode
 import gleam/string
+import gleamunison/cli_run
+import gleamunison/identity
+import gleamunison/json
 import gleamunison/mcp_server
+import gleamunison/mcp_write
+import gleamunison/run_ref
+import gleamunison/storage
 import gleeunit/should
+import simplifile
 
 @external(erlang, "gleamunison_ffi_test", "start_http_server")
 fn ffi_start_http_server(port: Int) -> Nil
@@ -46,6 +55,9 @@ fn ffi_set_env(key: String, value: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "unset_env")
 fn ffi_unset_env(key: String) -> Nil
+
+@external(erlang, "gleamunison_ffi_test", "without_active_storage")
+fn without_active_storage(check: fn() -> a) -> a
 
 pub fn http_scratch_is_visible_to_mcp_and_browse_test() {
   let assert Ok(Nil) = mcp_server.start([])
@@ -140,4 +152,121 @@ pub fn mcp_authority_untrusted_execution_refuses_eval_test() {
   let assert Ok(#(403, body)) = response
   let assert True = string.contains(body, "sandbox_refused")
   let assert True = string.contains(body, "missing_external_executor")
+}
+
+pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
+  let root = "/tmp/gleamunison-mcp-publish-test"
+  let path = root <> "/store.dets"
+  let _ = storage.dets_delete_file(path)
+  let assert Ok(_) = simplifile.create_directory_all(root)
+  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
+  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
+  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-publish-test-key")
+
+  let #(published, definition, scratch) =
+    without_active_storage(fn() {
+      let assert Ok(Nil) = mcp_server.start([])
+      ffi_start_http_server(18_103)
+      let assert Ok(#(200, _)) =
+        ffi_http_get(18_103, "/define?name=mcp-scratch&expr=7")
+      let publish_body =
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"agent_publish\",\"arguments\":{\"source\":\"(define mcp-published 42)\\n(define test_mcp-published (do Test expect 1))\\n\"}}}"
+      let publish_response = ffi_http_post(18_103, "/mcp", publish_body)
+      let definition_body =
+        "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"get_definition\",\"arguments\":{\"name\":\"mcp-published\"}}}"
+      let definition_response = ffi_http_post(18_103, "/mcp", definition_body)
+      let scratch_body =
+        "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"mcp-scratch\"}}}"
+      let scratch_response = ffi_http_post(18_103, "/mcp", scratch_body)
+      mcp_server.stop()
+      ffi_stop_http_server()
+      #(publish_response, definition_response, scratch_response)
+    })
+
+  ffi_unset_env("GLEAMUNISON_STORE_DIR")
+  ffi_unset_env("GLEAMUNISON_BRANCH")
+  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+
+  let assert Ok(#(200, publish_body)) = published
+  let assert Ok(#(200, definition_body)) = definition
+  let assert Ok(#(200, scratch_body)) = scratch
+  let published_ref = publish_content_ref(publish_body)
+  response_field(definition_body, "ref") |> should.equal(published_ref)
+  string.contains(scratch_body, "7 : Int") |> should.be_true
+
+  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-publish-test-key")
+  let assert Ok(adapter) = storage.dets(path)
+  let assert Ok(ref) = identity.parse_ref_hex(published_ref)
+  let execution =
+    run_ref.run_verified_on_branch(adapter, ref, "factory", [], False)
+  let assert Ok(Nil) = adapter.close()
+  let cli_execution =
+    cli_run.run([published_ref, "--store", path, "--branch", "factory"])
+  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  let _ = storage.dets_delete_file(path)
+  execution |> should.equal(Ok("42"))
+  cli_execution |> should.equal(Ok("42"))
+}
+
+pub fn mcp_untrusted_write_is_refused_before_storage_test() {
+  let root = "/tmp/gleamunison-mcp-untrusted-write-test"
+  let path = root <> "/store.dets"
+  let _ = storage.dets_delete_file(path)
+  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
+  ffi_set_env("GLEAMUNISON_PROFILE", "untrusted-execution")
+  let result =
+    without_active_storage(fn() {
+      mcp_write.publish("(define must-not-exist 1)")
+    })
+  ffi_unset_env("GLEAMUNISON_STORE_DIR")
+  ffi_unset_env("GLEAMUNISON_PROFILE")
+  let assert Error(message) = result
+  string.contains(message, "untrusted") |> should.be_true
+  simplifile.is_file(path) |> should.equal(Ok(False))
+}
+
+fn publish_content_ref(response: String) -> String {
+  let payload = tool_payload(response)
+  let assert Ok(decoded) = json.decode(bit_array.from_string(payload))
+  let decoder = {
+    use definitions <- decode.field(
+      "definitions",
+      decode.list({
+        use content_ref <- decode.field("content_ref", decode.string)
+        decode.success(content_ref)
+      }),
+    )
+    decode.success(definitions)
+  }
+  let assert Ok([content_ref]) = decode.run(decoded, decoder)
+  content_ref
+}
+
+fn response_field(response: String, field: String) -> String {
+  let payload = tool_payload(response)
+  let assert Ok(decoded) = json.decode(bit_array.from_string(payload))
+  let decoder = {
+    use value <- decode.field(field, decode.string)
+    decode.success(value)
+  }
+  let assert Ok(value) = decode.run(decoded, decoder)
+  value
+}
+
+fn tool_payload(response: String) -> String {
+  let text_decoder = {
+    use text <- decode.field("text", decode.string)
+    decode.success(text)
+  }
+  let result_decoder = {
+    use items <- decode.field("content", decode.list(text_decoder))
+    decode.success(items)
+  }
+  let envelope_decoder = {
+    use texts <- decode.field("result", result_decoder)
+    decode.success(texts)
+  }
+  let assert Ok(envelope) = json.decode(bit_array.from_string(response))
+  let assert Ok([text]) = decode.run(envelope, envelope_decoder)
+  text
 }

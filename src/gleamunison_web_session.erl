@@ -3,7 +3,7 @@
 
 %% One supervised owner for HTTP scratch and the snapshots MCP reads. Durable
 %% branch/CAS entries and mutable source overlays remain distinct in the value.
--export([start_link/0, start_link/1, eval/1, define/2, definitions/0,
+-export([start_link/0, start_link/1, eval/1, define/2, publish/1, definitions/0,
          definition_catalog/0, snapshot/0, stop/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
@@ -17,6 +17,7 @@ start_link(LoadFiles) ->
 eval(Source) when is_binary(Source) -> call({eval, Source}).
 define(Name, Source) when is_binary(Name), is_binary(Source) ->
     call({define, Name, Source}).
+publish(Source) when is_binary(Source) -> call({publish, Source}).
 definitions() -> call(definitions).
 definition_catalog() -> call(definition_catalog).
 snapshot() -> call(snapshot).
@@ -64,6 +65,9 @@ handle_call({eval, Source}, _From, State) ->
     {reply, Reply, Next};
 handle_call({define, Name, Source}, _From, State) ->
     {Reply, Next} = run(State, gleamunison@mcp_session:define_source(State, Name, Source)),
+    {reply, Reply, Next};
+handle_call({publish, Source}, _From, State) ->
+    {Reply, Next} = run(State, gleamunison@session_refresh:publish(State, Source)),
     {reply, Reply, Next};
 handle_call(definitions, _From, State) ->
     {reply, {ok, gleamunison@mcp_session:defined_names(State)}, State};

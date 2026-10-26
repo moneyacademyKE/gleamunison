@@ -48,7 +48,7 @@ pub fn command(args: List(String)) -> Nil {
 /// understood and declined), 2 when the target cannot be resolved (absent from
 /// the store, unreadable, or a store that disagrees with its own refs). A
 /// script can tell "no such definition" from "you called it wrong".
-fn run(args: List(String)) -> Result(String, #(Int, String)) {
+pub fn run(args: List(String)) -> Result(String, #(Int, String)) {
   case args {
     ["--help"] | ["help"] -> Ok(usage())
     _ -> execute(args)
