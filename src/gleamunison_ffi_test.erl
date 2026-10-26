@@ -2,13 +2,14 @@
 -compile(nowarn_deprecated_catch).
 -export([test_storage_owner_survives/0, test_effects_runtime/0, test_ffi_io_coverage/0]).
 -export([start_echo_server/0, start_slow_server/0]).
--export([start_http_server/1, stop_http_server/0, http_post/3, http_post_auth/4,
+-export([start_http_server/1, stop_http_server/0, http_get/2, http_post/3, http_post_auth/4,
          http_post_auth_length/5, set_http_token/1,
          clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
          clear_eval_timeout/0, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([metrics_restart_probe/0, http_drain_probe/0, observability_probe/1,
-         metrics_name_bound_probe/0, llm_budget_snapshot_json/0, set_env/2, unset_env/1]).
+         metrics_name_bound_probe/0, llm_budget_snapshot_json/0, set_env/2, unset_env/1,
+         without_active_storage/1]).
 -export([rescue/1]).
 
 %% Run a zero-arg fun and capture any raised reason as {error, Rendered}.
@@ -440,6 +441,25 @@ wait_for_port(Port, N) ->
         {error, _} -> timer:sleep(100), wait_for_port(Port, N - 1)
     end.
 
+%% Raw GET client for read-model integration probes.
+http_get(Port, Path) ->
+    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
+        {error, Reason} ->
+            {error, iolist_to_binary(io_lib:format("connect: ~p", [Reason]))};
+        {ok, Socket} ->
+            Req = iolist_to_binary(io_lib:format(
+                "GET ~s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+                [Path])),
+            ok = gen_tcp:send(Socket, Req),
+            Result = recv_all(Socket, <<>>),
+            gen_tcp:close(Socket),
+            case Result of
+                {ok, Resp} -> parse_http_response(Resp);
+                {error, R} ->
+                    {error, iolist_to_binary(io_lib:format("recv: ~p", [R]))}
+            end
+    end.
+
 %% Raw POST client: sends Body with Content-Length, returns {Status, RespBody}.
 http_post(Port, Path, Body) ->
     case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 2000) of
@@ -624,3 +644,19 @@ set_env(Key, Value) when is_binary(Key), is_binary(Value) ->
 unset_env(Key) when is_binary(Key) ->
     true = os:unsetenv(binary_to_list(Key)),
     nil.
+
+without_active_storage(Fun) when is_function(Fun, 0) ->
+    Old = persistent_term:get({gleamunison, active_storage}, undefined),
+    persistent_term:erase({gleamunison, active_storage}),
+    try Fun()
+    after
+        close_opened_store(Old, persistent_term:get({gleamunison, active_storage}, undefined)),
+        case Old of
+            undefined -> persistent_term:erase({gleamunison, active_storage});
+            _ -> persistent_term:put({gleamunison, active_storage}, Old)
+        end
+    end.
+
+close_opened_store(Old, Old) -> ok;
+close_opened_store(_Old, {dets, Tab}) -> {ok, nil} = gleamunison_storage:dets_close(Tab);
+close_opened_store(_Old, _New) -> ok.

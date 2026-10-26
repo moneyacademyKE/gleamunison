@@ -1,9 +1,10 @@
-//// Agent-facing definition identity: `ref` is the elaborated content hash;
-//// `name_ref` is the distinct stable name handle used for dependencies.
+//// Agent-facing definition identity: `ref` is stored/elaborated content;
+//// `name_ref` is the distinct dependency/module handle. Origin is explicit.
 
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
+import gleamunison/agent_read_model.{type Entry}
 import gleamunison/codebase
 import gleamunison/codebase_index
 import gleamunison/elab_types.{type SurfaceDef}
@@ -15,39 +16,60 @@ import gleamunison/types.{type TypeCache}
 pub fn content_hex(
   cache: TypeCache,
   defs: List(#(String, SurfaceDef)),
-  name: String,
+  entry: Entry,
 ) -> Option(String) {
-  case test_runner.elaborated_def_for(name, defs, cache) {
-    Error(_) -> None
-    Ok(definition) ->
-      Some(
-        identity.hash_to_debug_string(codebase.hash_of_definition(definition)),
-      )
+  case agent_read_model.stored_ref(entry) {
+    Some(ref) -> {
+      let identity.Ref(hash) = ref
+      Some(identity.hash_to_debug_string(hash))
+    }
+    None ->
+      case
+        test_runner.elaborated_def_for(
+          agent_read_model.name(entry),
+          defs,
+          cache,
+        )
+      {
+        Error(_) -> None
+        Ok(definition) ->
+          Some(
+            identity.hash_to_debug_string(codebase.hash_of_definition(
+              definition,
+            )),
+          )
+      }
   }
 }
 
-pub fn defs_json(
-  cache: TypeCache,
-  defs: List(#(String, SurfaceDef)),
-) -> String {
-  let parts = list.map(defs, fn(pair) { json(cache, defs, pair.0, pair.1) })
+pub fn defs_json(cache: TypeCache, entries: List(Entry)) -> String {
+  let defs = agent_read_model.definitions(entries)
+  let parts = list.map(entries, fn(entry) { json(cache, defs, entry) })
   "[" <> string.join(parts, ",") <> "]"
 }
 
 pub fn json(
   cache: TypeCache,
   defs: List(#(String, SurfaceDef)),
-  name: String,
-  def: SurfaceDef,
+  entry: Entry,
 ) -> String {
+  let #(origin, branch) = case agent_read_model.origin(entry) {
+    agent_read_model.Bootstrap -> #("bootstrap", None)
+    agent_read_model.Scratch -> #("scratch", None)
+    agent_read_model.Branch(name) -> #("branch", Some(name))
+  }
   "{\"name\":"
-  <> mcp.json_string(name)
+  <> mcp.json_string(agent_read_model.name(entry))
   <> ",\"kind\":"
-  <> mcp.json_string(codebase_index.kind_of(def))
+  <> mcp.json_string(codebase_index.kind_of_entry(entry))
   <> ",\"ref\":"
-  <> nullable_json_string(content_hex(cache, defs, name))
+  <> nullable_json_string(content_hex(cache, defs, entry))
   <> ",\"name_ref\":"
-  <> mcp.json_string(codebase_index.ref_hex(name, def))
+  <> mcp.json_string(codebase_index.ref_hex_entry(entry))
+  <> ",\"origin\":"
+  <> mcp.json_string(origin)
+  <> ",\"branch\":"
+  <> nullable_json_string(branch)
   <> "}"
 }
 

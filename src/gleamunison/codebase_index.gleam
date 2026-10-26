@@ -1,11 +1,15 @@
+import gleam/dict
 import gleam/int
 import gleam/list
 import gleam/option
 import gleam/result
 import gleam/set
 import gleam/string
+import gleamunison/agent_read_model
+import gleamunison/ast
 import gleamunison/bootstraps
 import gleamunison/cli_datalog
+import gleamunison/definition_refs
 import gleamunison/elab_types.{
   type SCase, type SurfaceDef, type SurfaceTerm, SApply, SConstruct, SDo, SFloat,
   SGuardGuard, SHandle, SHole, SInt, SLabeledFn, SLambda, SLet, SList, SLoc,
@@ -51,6 +55,26 @@ pub fn ref_hex(name: String, def: SurfaceDef) -> String {
   }
 }
 
+pub fn kind_of_entry(entry: agent_read_model.Entry) -> String {
+  case entry {
+    agent_read_model.Source(definition:, ..) -> kind_of(definition)
+    agent_read_model.Stored(definition:, ..) ->
+      case definition {
+        ast.TermDef(..) -> "term"
+        ast.TypeDef(_) -> "type"
+        ast.AbilityDecl(_) -> "ability"
+      }
+  }
+}
+
+pub fn ref_hex_entry(entry: agent_read_model.Entry) -> String {
+  case entry {
+    agent_read_model.Source(name:, definition:, ..) -> ref_hex(name, definition)
+    agent_read_model.Stored(name:, ..) ->
+      ref_to_hex(repl_eval.ref_for_name(name))
+  }
+}
+
 fn ref_to_hex(r: DefinitionRef) -> String {
   let Ref(h) = r
   hash_to_debug_string(h)
@@ -59,20 +83,51 @@ fn ref_to_hex(r: DefinitionRef) -> String {
 /// The index schema: one entity per definition, carrying name/hash/kind,
 /// plus one def/dep datom per in-corpus name the body references.
 pub fn datoms_of(defs: List(#(String, SurfaceDef))) -> List(Datom) {
-  let names = list.map(defs, fn(p) { p.0 }) |> set.from_list
-  list.index_fold(defs, [], fn(acc, pair, i) {
+  let entries =
+    list.map(defs, fn(pair) {
+      agent_read_model.Source(pair.0, pair.1, agent_read_model.Scratch)
+    })
+  datoms_of_entries(entries)
+}
+
+pub fn datoms_of_entries(entries: List(agent_read_model.Entry)) -> List(Datom) {
+  let names = list.map(entries, agent_read_model.name) |> set.from_list
+  let ref_names =
+    list.fold(entries, dict.new(), fn(acc, entry) {
+      let with_name =
+        dict.insert(
+          acc,
+          repl_eval.ref_for_name(agent_read_model.name(entry)),
+          agent_read_model.name(entry),
+        )
+      case entry {
+        agent_read_model.Stored(name:, ref:, ..) ->
+          dict.insert(with_name, ref, name)
+        _ -> with_name
+      }
+    })
+  list.index_fold(entries, [], fn(acc, entry, i) {
     let e = i + 1
     let base = [
-      Datom(e, "def/name", pair.0),
-      Datom(e, "def/hash", ref_hex(pair.0, pair.1)),
-      Datom(e, "def/kind", kind_of(pair.1)),
+      Datom(e, "def/name", agent_read_model.name(entry)),
+      Datom(e, "def/hash", ref_hex_entry(entry)),
+      Datom(e, "def/kind", kind_of_entry(entry)),
     ]
-    let deps =
-      surface_deps(pair.1)
+    let deps = case entry {
+      agent_read_model.Source(definition:, ..) ->
+        surface_deps(definition)
+        |> list.filter(fn(name) { set.contains(names, name) })
+      agent_read_model.Stored(definition:, ..) ->
+        definition_refs.refs_of_definition(definition)
+        |> list.filter_map(fn(ref) { dict.get(ref_names, ref) })
+    }
+    let dep_datoms =
+      deps
       |> list.unique
-      |> list.filter(fn(n) { set.contains(names, n) })
-      |> list.map(fn(n) { Datom(e, "def/dep", n) })
-    list.fold(list.append(base, deps), acc, fn(acc, datom) { [datom, ..acc] })
+      |> list.map(fn(name) { Datom(e, "def/dep", name) })
+    list.fold(list.append(base, dep_datoms), acc, fn(acc, datom) {
+      [datom, ..acc]
+    })
   })
   |> list.reverse
 }
@@ -124,8 +179,16 @@ fn case_refs(c: SCase) -> List(String) {
 /// Build index data as a flat list of triples, not a nested let per datom.
 /// The native engine folds the data; generated source obeys normal admission.
 pub fn index_source(defs: List(#(String, SurfaceDef))) -> String {
+  render_index(datoms_of(defs))
+}
+
+pub fn index_entries(entries: List(agent_read_model.Entry)) -> String {
+  render_index(datoms_of_entries(entries))
+}
+
+fn render_index(datoms: List(Datom)) -> String {
   let triples =
-    list.map(datoms_of(defs), fn(d) {
+    list.map(datoms, fn(d) {
       "(pair "
       <> int.to_string(d.entity)
       <> " (pair "

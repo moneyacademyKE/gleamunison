@@ -73,6 +73,20 @@ Every significant design decision is recorded as an ADR in `docs/adr/`.
 Before making a change, read the relevant ADRs. After making a change,
 write a new ADR or update an existing one. Currently 62 ADRs are cataloged.
 
+### Agent read model and scratch overlays
+
+- Agent startup reads the selected branch namespace plus its CAS through
+  [ADR 0068](adr/0068-durable-agent-read-model.md). `GLEAMUNISON_BRANCH` selects
+  the branch (default `main`); MCP, `/browse`, and `find` expose stored content
+  refs, name refs, origin, and branch as separate fields.
+- Stored entries retain their AST and identity. Never hash a surface `SRef`
+  projection or pretend it is source. Stored graph edges come from the AST.
+- MCP `--load` and HTTP `/define` definitions are explicit scratch overlays that
+  shadow branch names only for that session. Do not implicitly write scratch
+  into CAS.
+- The supervised web session owns scratch; MCP reads its current snapshots.
+  Never give MCP a second bootstrap-only session or an independent write path.
+
 ### Deployment and Synchronization
 
 Always pre-verify all remote transfers:

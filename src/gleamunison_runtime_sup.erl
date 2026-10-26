@@ -1,7 +1,7 @@
 -module(gleamunison_runtime_sup).
 -behaviour(supervisor).
 -export([start_link/0, init/1, start_http/1, start_mcp/1, start_sync/0,
-         start_web_session/0, stop_http/0, stop_mcp/0, stop/0]).
+         start_web_session/1, stop_http/0, stop_mcp/0, stop_web_session/0, stop/0]).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
@@ -27,10 +27,10 @@ start_mcp(LoadFiles) when is_list(LoadFiles) ->
 %% The live eval session the HTTP routes talk to. Supervised, so it outlives any
 %% one connection: a request handler that started it would take it down on
 %% disconnect, and the next request would get a fresh, empty session.
-start_web_session() ->
+start_web_session(LoadFiles) when is_list(LoadFiles) ->
     case ensure_started() of
         {ok, Sup} -> start_child(Sup, web_session, gleamunison_web_session,
-                                 start_link, [], worker, 5000);
+                                 start_link, [LoadFiles], worker, 5000);
         Error -> Error
     end.
 
@@ -52,6 +52,7 @@ stop_http() ->
     end,
     Result.
 stop_mcp() -> stop_child(mcp).
+stop_web_session() -> stop_child(web_session).
 
 stop() ->
     case whereis(?MODULE) of

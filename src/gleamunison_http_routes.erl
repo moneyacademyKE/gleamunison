@@ -133,17 +133,12 @@ handle_define_admitted(Socket, Rest) ->
     end.
 
 handle_browse_route(Socket) ->
-    %% The session is the only owner of what is defined. A second notebook table
-    %% recorded source text next to it and could disagree with the evaluator;
-    %% one owner, so a listing cannot show a name the session would refuse.
-    Names = case gleamunison_web_session:definitions() of
-        {ok, List} -> List;
-        _ -> []
+    %% MCP and HTTP return the same definition metadata and origin.
+    Catalog = case gleamunison_web_session:definition_catalog() of
+        {ok, CatalogJson} -> CatalogJson;
+        _ -> <<"[]">>
     end,
-    JsonParts = lists:map(fun(Name) ->
-        <<"{\"name\":", (gleamunison_http_util:escape_json(Name))/binary, "}">>
-    end, Names),
-    Json = <<"{\"defs\":[", (iolist_to_binary(lists:join(<<",">>, JsonParts)))/binary, "]}">>,
+    Json = <<"{\"defs\":", Catalog/binary, "}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 serve_static(Socket, <<"/">>) ->

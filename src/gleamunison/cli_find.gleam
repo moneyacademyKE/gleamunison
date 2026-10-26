@@ -7,6 +7,7 @@ import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/cli_result
 import gleamunison/mcp_session
@@ -53,31 +54,40 @@ fn parse_args(
 }
 
 fn run(query: String, loads: List(String), limit: Int) -> Result(Nil, String) {
-  let state = mcp_session.boot()
-  case load_all(state, loads) {
-    Error(err) -> Error("find: " <> err)
-    Ok(loaded) -> {
-      let hits = mcp_session.search(loaded, query)
-      case list.is_empty(hits) {
-        True -> cli_result.success("no definitions match: " <> query)
-        False -> {
-          hits
-          |> list.take(limit)
-          |> list.each(fn(h) {
-            io.println(
-              h.name
-              <> "  :  "
-              <> h.kind
-              <> "  #"
-              <> string.slice(h.ref_hex, 0, 12)
-              <> "  "
-              <> float.to_string(float.to_precision(h.score, 2)),
-            )
-          })
-          Ok(Nil)
+  case mcp_session.boot_configured() {
+    Error(err) -> Error("find: cannot read selected store: " <> err)
+    Ok(state) ->
+      case load_all(state, loads) {
+        Error(err) -> Error(err)
+        Ok(loaded) -> {
+          let hits = mcp_session.search(loaded, query)
+          case list.is_empty(hits) {
+            True -> cli_result.success("no definitions match: " <> query)
+            False -> {
+              hits
+              |> list.take(limit)
+              |> list.each(fn(hit) {
+                let ref = case hit.content_ref_hex {
+                  Some(content) -> string.slice(content, 0, 12)
+                  None -> "-"
+                }
+                io.println(
+                  hit.name
+                  <> "  :  "
+                  <> hit.kind
+                  <> "  #"
+                  <> ref
+                  <> "  "
+                  <> hit.origin
+                  <> "  "
+                  <> float.to_string(float.to_precision(hit.score, 2)),
+                )
+              })
+              Ok(Nil)
+            }
+          }
         }
       }
-    }
   }
 }
 

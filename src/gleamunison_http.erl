@@ -2,7 +2,7 @@
 -compile(nowarn_deprecated_catch).
 -behaviour(gen_server).
 -export([start_link/1, start_server/1, stop_server/0, drain/1, init/1, handle_call/3,
-         handle_cast/2, handle_info/2, terminate/2, worker_count/1]).
+         handle_cast/2, handle_info/2, terminate/2, worker_count/1, ensure_storage/0]).
 
 -define(MAX_BODY_BYTES, 1048576).
 -define(MAX_HEADER_COUNT, 64).
@@ -64,7 +64,7 @@ ensure_web_session() ->
     case whereis(gleamunison_web_session) of
         Pid when is_pid(Pid) -> ok;
         undefined ->
-            case gleamunison_runtime_sup:start_web_session() of
+            case gleamunison_runtime_sup:start_web_session([]) of
                 {ok, _Pid} -> ok;
                 {error, _} -> ok
             end

@@ -29,54 +29,60 @@ pub type StorageAdapter {
 fn ffi_new() -> BitArray
 
 @external(erlang, "gleamunison_storage", "insert")
-fn ffi_insert(
+pub fn ffi_ets_insert(
   tab: BitArray,
   ref: BitArray,
   bytes: BitArray,
 ) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "lookup")
-fn ffi_lookup(
+pub fn ffi_ets_lookup(
   tab: BitArray,
   ref: BitArray,
 ) -> Result(Option(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "delete")
-fn ffi_delete(tab: BitArray, ref: BitArray) -> Result(Nil, StorageError)
+pub fn ffi_ets_delete(tab: BitArray, ref: BitArray) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "dets_delete")
-fn ffi_dets_delete(tab: BitArray, ref: BitArray) -> Result(Nil, StorageError)
+pub fn ffi_dets_delete(
+  tab: BitArray,
+  ref: BitArray,
+) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "partitioned_dets_delete")
-fn ffi_partitioned_dets_delete(
+pub fn ffi_partitioned_dets_delete(
   tab: BitArray,
   ref: BitArray,
 ) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "mnesia_delete")
-fn ffi_mnesia_delete(tab: BitArray, ref: BitArray) -> Result(Nil, StorageError)
+pub fn ffi_mnesia_delete(
+  tab: BitArray,
+  ref: BitArray,
+) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "list_refs")
-fn ffi_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
+pub fn ffi_ets_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "dets_new")
 fn ffi_dets_new(path: String) -> Result(BitArray, StorageError)
 
 @external(erlang, "gleamunison_storage", "dets_insert")
-fn ffi_dets_insert(
+pub fn ffi_dets_insert(
   tab: BitArray,
   ref: BitArray,
   bytes: BitArray,
 ) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "dets_lookup")
-fn ffi_dets_lookup(
+pub fn ffi_dets_lookup(
   tab: BitArray,
   ref: BitArray,
 ) -> Result(Option(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "dets_list_refs")
-fn ffi_dets_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
+pub fn ffi_dets_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "dets_close")
 fn ffi_dets_close(tab: BitArray) -> Result(Nil, StorageError)
@@ -88,20 +94,20 @@ pub fn dets_delete_file(path: String) -> Result(Nil, StorageError)
 fn ffi_partitioned_dets_new(dir_path: String) -> Result(BitArray, StorageError)
 
 @external(erlang, "gleamunison_storage", "partitioned_dets_insert")
-fn ffi_partitioned_dets_insert(
+pub fn ffi_partitioned_dets_insert(
   tab: BitArray,
   ref: BitArray,
   bytes: BitArray,
 ) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "partitioned_dets_lookup")
-fn ffi_partitioned_dets_lookup(
+pub fn ffi_partitioned_dets_lookup(
   tab: BitArray,
   ref: BitArray,
 ) -> Result(Option(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "partitioned_dets_list_refs")
-fn ffi_partitioned_dets_list_refs(
+pub fn ffi_partitioned_dets_list_refs(
   tab: BitArray,
 ) -> Result(List(BitArray), StorageError)
 
@@ -115,20 +121,22 @@ pub fn partitioned_dets_delete(dir_path: String) -> Result(Nil, StorageError)
 fn ffi_mnesia_new(table_name: String) -> Result(BitArray, StorageError)
 
 @external(erlang, "gleamunison_storage", "mnesia_insert")
-fn ffi_mnesia_insert(
+pub fn ffi_mnesia_insert(
   tab: BitArray,
   ref: BitArray,
   bytes: BitArray,
 ) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "mnesia_lookup")
-fn ffi_mnesia_lookup(
+pub fn ffi_mnesia_lookup(
   tab: BitArray,
   ref: BitArray,
 ) -> Result(Option(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "mnesia_list_refs")
-fn ffi_mnesia_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
+pub fn ffi_mnesia_list_refs(
+  tab: BitArray,
+) -> Result(List(BitArray), StorageError)
 
 @external(erlang, "gleamunison_storage", "mnesia_close")
 fn ffi_mnesia_close(tab: BitArray) -> Result(Nil, StorageError)
@@ -177,18 +185,18 @@ pub fn inmemory() -> StorageAdapter {
   StorageAdapter(
     insert: fn(ref, bytes) {
       let Ref(h) = ref
-      ffi_insert(tab, hash_to_bytes(h), bytes)
+      ffi_ets_insert(tab, hash_to_bytes(h), bytes)
     },
     lookup: fn(ref) {
       let Ref(h) = ref
-      ffi_lookup(tab, hash_to_bytes(h))
+      ffi_ets_lookup(tab, hash_to_bytes(h))
     },
     delete: fn(ref) {
       let Ref(h) = ref
-      ffi_delete(tab, hash_to_bytes(h))
+      ffi_ets_delete(tab, hash_to_bytes(h))
     },
     list_refs: fn() {
-      case ffi_list_refs(tab) {
+      case ffi_ets_list_refs(tab) {
         Ok(lst) -> Ok(list.map(lst, fn(b) { Ref(hash_from_bytes(b)) }))
         Error(e) -> Error(e)
       }

@@ -1,11 +1,15 @@
 import gleam/string
 import gleamunison/mcp_server
+import gleeunit/should
 
 @external(erlang, "gleamunison_ffi_test", "start_http_server")
 fn ffi_start_http_server(port: Int) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "stop_http_server")
 fn ffi_stop_http_server() -> Nil
+
+@external(erlang, "gleamunison_ffi_test", "http_get")
+fn ffi_http_get(port: Int, path: String) -> Result(#(Int, String), String)
 
 @external(erlang, "gleamunison_ffi_test", "http_post")
 fn ffi_http_post(
@@ -42,6 +46,35 @@ fn ffi_set_env(key: String, value: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "unset_env")
 fn ffi_unset_env(key: String) -> Nil
+
+pub fn http_scratch_is_visible_to_mcp_and_browse_test() {
+  let assert Ok(Nil) = mcp_server.start([])
+  ffi_start_http_server(18_102)
+  let assert Ok(#(200, _)) =
+    ffi_http_get(18_102, "/define?name=factory_shared&expr=42")
+  let call_body =
+    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"get_definition\",\"arguments\":{\"name\":\"factory_shared\"}}}"
+  let mcp_response = ffi_http_post(18_102, "/mcp", call_body)
+  let eval_body =
+    "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"factory_shared\"}}}"
+  let eval_response = ffi_http_post(18_102, "/mcp", eval_body)
+  let browse_response = ffi_http_get(18_102, "/browse")
+
+  mcp_server.stop()
+  ffi_stop_http_server()
+
+  let assert Ok(#(200, definition)) = mcp_response
+  string.contains(definition, "factory_shared") |> should.be_true
+  string.contains(definition, "\\\"origin\\\":\\\"scratch\\\"")
+  |> should.be_true
+  string.contains(definition, "\\\"ref\\\":")
+  |> should.be_true
+  let assert Ok(#(200, value)) = eval_response
+  string.contains(value, "42 : Int") |> should.be_true
+  let assert Ok(#(200, browse)) = browse_response
+  string.contains(browse, "\"origin\":\"scratch\"") |> should.be_true
+  string.contains(browse, "\"name_ref\":") |> should.be_true
+}
 
 pub fn mcp_http_end_to_end_test() {
   let assert Ok(Nil) = mcp_server.start([])

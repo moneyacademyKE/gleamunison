@@ -6,7 +6,7 @@
     partitioned_dets_new/1, partitioned_dets_insert/3, partitioned_dets_lookup/2, partitioned_dets_delete/2,
     partitioned_dets_list_refs/1, partitioned_dets_close/1, partitioned_dets_delete_file/1,
     mnesia_new/1, mnesia_insert/3, mnesia_lookup/2, mnesia_delete/2, mnesia_list_refs/1, mnesia_close/1,
-    test_make_ref/1, get_open_dets_count/1
+    test_make_ref/1, get_open_dets_count/1, active/0
 ]).
 
 new() ->
@@ -46,6 +46,12 @@ bounded_ets_keys(Tab, Key, Left, Acc) ->
     bounded_ets_keys(Tab, ets:next(Tab, Key), Left - 1, [Key | Acc]).
 
 err(R) -> {error, {storage_error, list_to_binary(io_lib:format("~p", [R]))}}.
+
+active() ->
+    case persistent_term:get({gleamunison, active_storage}, undefined) of
+        undefined -> {error, <<"no_active_storage">>};
+        Backend -> {ok, Backend}
+    end.
 
 dets_new(Path) ->
     N = stable_name(<<"gleamunison_dets_", Path/binary>>),

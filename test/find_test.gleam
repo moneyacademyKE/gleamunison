@@ -1,7 +1,66 @@
 import gleam/list
+import gleam/option.{Some}
 import gleam/string
+import gleamunison/ast
+import gleamunison/cli_find
+import gleamunison/codebase
+import gleamunison/identity.{Ref, hash_to_debug_string}
 import gleamunison/mcp_session
+import gleamunison/namespace
+import gleamunison/storage
 import gleeunit/should
+import simplifile
+
+@external(erlang, "gleamunison_ffi_test", "set_env")
+fn set_env(key: String, value: String) -> Nil
+
+@external(erlang, "gleamunison_ffi_test", "unset_env")
+fn unset_env(key: String) -> Nil
+
+@external(erlang, "gleamunison_ffi_test", "without_active_storage")
+fn without_active_storage(check: fn() -> a) -> a
+
+pub fn find_boots_from_the_selected_durable_branch_test() {
+  let dir = "/tmp/gleamunison-find-cli-test"
+  let path = dir <> "/store.dets"
+  let _ = storage.dets_delete_file(path)
+  let assert Ok(_) = simplifile.create_directory_all(dir)
+  let assert Ok(adapter) = storage.dets(path)
+  let definition = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
+  let ref = Ref(codebase.hash_of_definition(definition))
+  let assert Ok(_) =
+    codebase.insert(
+      codebase.with_adapter(adapter),
+      ast.Unit(ref, [#(ref, definition)]),
+    )
+  let assert Ok(_) =
+    namespace.commit(
+      adapter,
+      "factory",
+      namespace.set(namespace.empty(), "published-answer", ref),
+    )
+  let assert Ok(_) = adapter.close()
+  set_env("GLEAMUNISON_STORE_DIR", dir)
+  set_env("GLEAMUNISON_BRANCH", "factory")
+  let #(state, command_result) =
+    without_active_storage(fn() {
+      let assert Ok(selected) = mcp_session.boot_configured()
+      #(selected, cli_find.command(["published-answer"]))
+    })
+  command_result |> should.equal(Ok(Nil))
+  let assert Ok(hit) =
+    list.find(mcp_session.search(state, "published-answer"), fn(hit) {
+      hit.name == "published-answer"
+    })
+  hit.origin |> should.equal("branch")
+  hit.branch |> should.equal(Some("factory"))
+  let Ref(hash) = ref
+  hit.content_ref_hex |> should.equal(Some(hash_to_debug_string(hash)))
+  unset_env("GLEAMUNISON_STORE_DIR")
+  unset_env("GLEAMUNISON_BRANCH")
+  let assert Ok(_) = storage.dets_delete_file(path)
+  let assert Ok(_) = simplifile.delete(dir)
+}
 
 pub fn find_bootstrap_definition_by_name_test() {
   let state = mcp_session.boot()

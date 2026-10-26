@@ -178,6 +178,10 @@ unload_binary(Mod) ->
         true -> erlang:binary_to_atom(Mod, utf8);
         false -> Mod
     end,
+    %% A previous reload may already have left an old version. Retire it before
+    %% making the current version old, then finish the unload; delete-first
+    %% reports "must be purged" and leaves the supposedly unloaded code behind.
+    code:purge(ModuleAtom),
     code:delete(ModuleAtom),
     code:purge(ModuleAtom),
     {ok, nil}.
