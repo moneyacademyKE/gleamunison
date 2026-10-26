@@ -30,8 +30,9 @@ next execution without changing the dependent's content hash.
 
 1. **A generation plan is typed data.** It contains a prompt template, raw
    variables, an `ast.Type` signature, and 1–8 attempts. The public MCP
-   vocabulary is deliberately small: `int`, `float`, `string`, `bool`, and
-   `(parameters) -> result`. Internal callers may construct richer core types.
+   vocabulary is deliberately small: `int`, `float`, `string`, `bool`, `list`,
+   and `(parameters) -> result`. Internal callers may construct richer core
+   types.
 2. **The prompt has checked content identity.** `prompt.put_checked` stores the
    complete template, including generation instructions, and reports CAS
    failures instead of returning a valid-looking ref after a failed write.
