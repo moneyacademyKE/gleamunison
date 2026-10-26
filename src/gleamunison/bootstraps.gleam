@@ -28,6 +28,11 @@ pub fn get_init_defs_data() -> List(BootstrapDef) {
       BOp("get", [BTText], BTText),
       BOp("set", [BTText, BTText], BTText),
     ]),
+    BAbility("Db", [
+      BOp("transact", [BTList, BTList], BTInt),
+      BOp("get", [BTText, BTText], BTList),
+      BOp("find", [BTText, BTText], BTList),
+    ]),
     BAbility("Math", [
       BOp("add", [BTInt, BTInt], BTInt),
       BOp("sub", [BTInt, BTInt], BTInt),

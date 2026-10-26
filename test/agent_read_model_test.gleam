@@ -39,7 +39,7 @@ pub fn selected_branch_controls_stored_dependencies_test() {
 
 pub fn scratch_shadows_branch_without_mutating_cas_test() {
   let #(adapter, caller_ref, _, _) = seeded_branches()
-  let assert Ok(published) = mcp_session.from_store(adapter, "main")
+  let assert Ok(_) = mcp_session.from_store(adapter, "main")
   // A second durable boot reloads the same generated modules. Scratch must
   // still replace the name cleanly when an old BEAM version exists.
   let assert Ok(published) = mcp_session.from_store(adapter, "main")

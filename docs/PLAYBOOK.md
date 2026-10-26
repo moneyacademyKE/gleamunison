@@ -124,6 +124,20 @@ Always pre-verify all remote transfers:
 - DETS write and close errors must propagate. A validated batch is not a
   multi-record crash transaction, and validation is not an execution sandbox.
 
+### Durable application data
+
+- Use [ADR 0069](adr/0069-durable-db-ability.md). `Db.transact`, `Db.get`, and
+  `Db.find` are the only V1 application-fact surface; facts use the EAV pair
+  shape with text values, and transactions are atomic DETS journal records.
+- Application facts live in `application.dets` beside the configured code
+  store, not in definition CAS. The supervised owner replays committed records
+  after restart; it does not invent durable state from a process dictionary.
+- `Db` calls are effectful and type-checked at the ability boundary. Capability
+  denial must happen before a storage handler runs. This is not an OS sandbox;
+  untrusted execution still follows the external-executor refusal contract.
+- V1 exact reads are deliberate. Do not claim arbitrary Datalog joins,
+  temporal queries, or multi-node database behavior without new proofs.
+
 ### Interactive REPL
 
 Start the interactive loop to dogfood the codebase:

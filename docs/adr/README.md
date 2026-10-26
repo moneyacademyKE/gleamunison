@@ -74,6 +74,7 @@ For paths that were considered and *declined*, with the reasoning, see [`unimple
 | [ADR-0066](0066-bounded-readiness-and-metrics.md) | Bounded readiness and supervised in-process metrics | Accepted |
 | [ADR-0067](0067-production-boundaries.md) | Production boundaries and execution profiles | Accepted contract; enforcement pending |
 | [ADR-0068](0068-durable-agent-read-model.md) | Durable agent read model with explicit scratch overlays | Accepted |
+| [ADR-0069](0069-durable-db-ability.md) | Durable application data through one Db ability | Accepted |
 
 
 

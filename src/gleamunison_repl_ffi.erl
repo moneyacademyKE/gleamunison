@@ -23,6 +23,7 @@ eval_module_inner(Mod) ->
 %% The error path reads the same table (`baseline_names/0`), so an ability can
 %% never be handled in one projection and unnamed in the other.
 baseline_abilities() ->
+    DbKey = gleamunison@db:key(),
     [
         {<<"m_74eafa15">>, <<"Console">>, #{
             0 => fun([Arg], Cont) ->
@@ -43,6 +44,8 @@ baseline_abilities() ->
                 Cont(Val)
             end
         }},
+        {DbKey, <<"Db">>, gleamunison@db:operations()},
+        {DbKey, <<"Db">>, gleamunison@db:operations()},
         {<<"m_b514a6e3">>, <<"Math">>, #{
             0 => fun([X, Y], Cont) -> Cont(X + Y) end,
             1 => fun([X, Y], Cont) -> Cont(X - Y) end,

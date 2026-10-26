@@ -218,6 +218,7 @@ fn help_text() -> String {
   <> "FFI:      json-parse http-get file-read\n"
   <> "Abilities: Console(print) State(get set) Math(add sub mul) Show(show)\n"
   <> "          LLM(complete complete_with_system) — live via env keys\n"
+  <> "          Db(transact get find) — durable application facts\n"
   <> "Forms:    (define name val) (define (f x) body) (lam (x) body)\n"
   <> "          (do Ability op args...) (handle comp handler Ability)\n"
   <> "          (match val cases...) (chain ((x m) ...) body)\n"

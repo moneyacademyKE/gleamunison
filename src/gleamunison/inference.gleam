@@ -2,6 +2,7 @@ import gleam/dict
 import gleam/list
 import gleam/option
 import gleam/result
+import gleamunison/ability_inference
 import gleamunison/ast
 import gleamunison/bootstrap_types
 import gleamunison/identity.{Local}
@@ -96,11 +97,18 @@ pub fn infer_term(
         _ -> Ok(ast.TypeVar(-1))
       }
     }
-    ast.Do(ability, Local(op_idx), _) -> {
+    ast.Do(ability, Local(op_idx), args) -> {
       case dict.get(cache.entries, ability) {
         Ok(CTAbility(ops)) -> {
           case list.drop(ops, op_idx) |> list.first {
-            Ok(op_typ) -> Ok(op_typ.output)
+            Ok(op_typ) ->
+              ability_inference.check_args(
+                args,
+                op_typ.inputs,
+                cache,
+                infer_term,
+              )
+              |> result.map(fn(_) { op_typ.output })
             Error(_) ->
               Error(TypeMismatch(
                 ast.TypeVar(-1),
