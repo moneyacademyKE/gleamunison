@@ -1,180 +1,126 @@
-# Production Roadmap
+# Roadmap
 
-From architectural specification to production-grade content-addressed runtime.
+## Current baseline
 
-**Current State:** Fully certified Lisp-style surface parser, typechecker, compiler, and VM runner. Certified against 934 executable playbook conformance levels (all passed; 238 further levels are prose-only and recorded as exclusions). **v3.10.0**: Safe FFI deserialization, local HTTP bind checks, Cowboy port monitoring socket safeguards, builtin constant extraction for strict <250 LOC compliance, and fully data-driven test runner framework — all implemented.
+Gleamunison v3.24.0 has a verified **local, authenticated, single-node factory
+loop**: bounded MCP generation → signed admitted definition → durable Db write
+→ supervised Db-owner restart → HTTP `/app` read.
 
----
+The acceptance evidence is
+[Factory readiness — 2026-10-26](verification/factory-readiness-2026-10-26.md),
+with the machine-readable gate results in the matching production witness.
+Those dated documents own counts, artifact hashes, environment details, and
+exclusions. This roadmap owns remaining design scope, not a claim that future
+work is implemented.
 
-## Phase 0: Genesis bootstrap ✓
-- **Status:** COMPLETE. Core pipeline compiles and executes.
+Old phase-by-phase implementation history remains in git and in the ADR/audit
+record. It is not repeated here as a list of current capabilities.
 
-## Phase 1: Core Language Runtime ✓
-- **Status:** COMPLETE. Full term compilation, algebraic effects (Console, State), and handler stacks.
+## Explicit current boundaries
 
-## Phase 2: Surface Language & REPL Tooling ✓
-- **Status:** COMPLETE. S-expression parser, name resolution, error propagation, interactive REPL loop, and dynamic module hot-purging.
+These are not unfinished documentation; they are real product boundaries:
 
-## Phase 3: Persistence & Sync Protocol ✓
-- **Status:** COMPLETE. Durable DETS storage adapter, ETS table ownership, and pull-based peer synchronization.
+- No OS/container isolation for hostile code. `untrusted-execution` refuses
+  transport-facing work without an approved external executor.
+- No native HTTP TLS/mTLS. Remote transport protection is an external operator
+  responsibility; the startup gate cannot verify a proxy or certificate.
+- No supported multi-node production topology or multi-tenant isolation claim.
+- No live process migration or general serializable-continuation implementation.
+- No complete package identity/revocation system beyond the current evidence
+  and manifest policy.
+- No external-provider quality benchmark. Repository generation acceptance uses
+  deterministic/local provider fixtures and proves runtime composition, not
+  model intelligence.
+- Playbook exclusions remain exclusions, not passing conformance.
 
-## Phase 4: Production Hardening ✓
-- **Status:** COMPLETE. SHA256 identity hashing, stack-safe effects FFI, and Algorithm W type propagation.
+## Candidate next increments
 
----
+Each item needs its own ADR/specification, regression-first implementation,
+and verification evidence before its status changes. Ordering here expresses
+dependency, not a delivery date.
 
-## Phase 5: Distributed Topology & Concurrency ✓
-- **Status:** COMPLETE. Added `Remote` ability with `forkAt`, `await`, and `here` operations, Mnesia replicated storage adapter, dynamic OTP supervision trees (`gleamunison_sup`), and serializable continuations using Erlang's binary serialization engine.
+### 1. Richer admitted generation
 
----
+**Goal:** compose useful applications without weakening admission.
 
-## Phase 6: Ecosystem & Developer Ergonomics
+Potential scope:
 
-**Goal:** Enable product development and authoring tooling.
+- Explicit multi-definition/helper generation requests and receipts.
+- Schema vocabulary beyond the current scalar/list and scalar-function subset.
+- Dependency-aware patch application without inventing stored source.
+- Semantic evaluation fixtures beyond “the candidate passed its own tests.”
 
-| Priority | Item | Description | Status | Effort |
-|---|---|---|---|
-| **6.1 (P0)** | **Dynamic Web Dashboard** | Full-featured admin UI with SSE real-time push, process inspector, module browser, definition editor, sync status, activity logs. Static file serving from priv/static/. | ✓ DONE (v0.9.0) | S |
-| **6.2 (P1)** | **LSP / IDE Support** | Language Server Protocol backend: stdio JSON-RPC, diagnostics, hover (inferred type), go-to-definition, completion. | ✓ DONE (v3.15.0–v3.17.0) | L |
-| **6.3 (P2)** | **Package Registry** | P2P hash-verified package manager. Content-addressed manifests, evidence-gated publish, integrity-checked install. | ✓ DONE (v3.18.0) | L |
+Entry constraints: one publication authority; bounded attempts/input/output;
+server-owned provider configuration; inferred-type checks; unchanged branches
+on exhaustion; exact-hash evidence for effectful definitions.
 
----
+### 2. Application Db queries and lifecycle
 
-## Phase 7: Language Features & Type System Enhancements
+**Goal:** grow the durable application model without turning it into a second
+code namespace or an untyped host-value bag.
 
-**Goal:** Deepen expressiveness without sacrificing type safety or Erlang interop. Can run in parallel with Phase 6.
+Potential scope:
 
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|
-| 7.1 | Exhaustiveness-checked tagged unions | ✓ DONE (v0.9.0) | `Construct` term + `PatConstructor` pattern with Erlang tuple compilation. Type definition form `(type Name ctors...)` parsed. |
-| 7.2 | Labeled arguments with defaults | ✓ DONE (v1.1.0) | `(fn* ((x 1) (y 2)) body)` — curried lambda sugar with defaults. Parser + elaborator desugaring. |
-| 7.3 | Guard clauses in `case`/`fn` | ✓ DONE (v1.1.0) | `(match x ((n (< n 5)) body))` — AST `Guard` type, parser support, Erlang `when` clause emission. |
-| 7.4 | `use` expression (monadic sugar) | ✓ DONE (v1.1.0) | `(use x <- call body)` — desugars to `call(fn(x) { body })` at AST level. |
-| 7.5 | `pub opaque type` | ✓ DONE (v1.1.0) | `SurfacePubTypeAlias` variant in elaborator. Constructor visibility controlled at definition level. |
-| 7.6 | Type alias export control | ✓ DONE (v1.1.0) | `SurfaceTypeAlias` and `SurfacePubTypeAlias` in surface defs. Full elaboration pipeline support. |
-| 7.7 | Monadic syntax bindings | ✓ DONE (v3.19.0) | S | Monadic S-expression sequencing (`let*` or `do` block bindings) desugaring to nested lambdas during elaboration. |
+- Compositional query/read operations over the existing journal.
+- Explicit schema evolution and migration proofs.
+- Backup/restore fixtures covering code and application state together.
+- More application acceptance examples using generated code.
 
----
+Entry constraints: preserve the typed effect boundary, one journal authority,
+atomic transactions, restart recovery, and separation from the self-hosted
+Datalog engine's in-process model.
 
-## Phase 8: Standard Library & Core Packages
+### 3. Remote-service hardening
 
-**Goal:** Curated stdlib covering 80% of BEAM development needs. Depends on Phase 7 type features.
+**Goal:** make the operational transport contract verifiable rather than assumed.
 
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|
-| 8.1 | `gleamunison/http` client | ✓ DONE (v1.1.0) | Typed HTTP client (`get`, `post`, `put`, `delete`) wrapping Erlang `httpc`. Opaque `HttpResponse` type. |
-| 8.2 | `gleamunison/json` codec | ✓ DONE (v1.1.0) | JSON encode/decode wrapping Erlang `json`. Free-standing FFI for dynamic deserialization. |
-| 8.3 | `gleamunison/datetime` | ✓ DONE (v1.1.0) | Opaque `DateTime` type, ISO 8601 parse/format, arithmetic (`add_seconds`, `diff_seconds`). |
-| 8.4 | `gleamunison/filepath` | REMOVED | Local wrapper deleted; use the `filepath` Hex package instead. |
-| 8.5 | `gleamunison/crypto` | ✓ DONE (v1.1.0) | `hash` (SHA256/512/MD5), `hmac`, `random_bytes`, `hash_hex` wrapping Erlang `crypto`. |
-| 8.6 | `gleamunison/template` | REMOVED | Deleted; no interpolation module exists. |
-| 8.7 | Stdlib documentation generation | ✓ DONE (v1.1.0) | `scripts/generate_docs.sh` → `docs/stdlib/index.html`. Module/function-level HTML docs. |
+Potential scope:
 
----
+- A documented and testable trusted-proxy identity contract, or native TLS in
+  a separately reviewed design.
+- Sync/distribution exposure guidance and executable refusal probes.
+- Durable/exported operational observability where an operator needs it.
+- Recovery drills against the actual deployed artifact/configuration.
 
-## Phase 9: Developer Tooling & IDE Integration
+Entry constraints: request authentication is not transport encryption; a token
+is not a proxy identity; an authenticated request is not permission to execute
+hostile code.
 
-**Goal:** Polished DX rivaling Rust/Go/Elixir. Depends on Phase 6 LSP infrastructure.
+### 4. External untrusted executor
 
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|
-| 9.1 | LSP: completion, hover, go-to-def | ✓ DONE (v3.17.0) | stdio server: hover with inferred types, goto-def by line scan, completion from namespace. |
-| 9.2 | `gleam format` | ✓ DONE (v3.20.0) | M | `gleam run -- fmt <file>`: one-rule formatter (flat-if-fits, 72 cols), idempotent by construction. |
-| 9.3 | Debugger integration | PENDING | L | BEAM debugger via `:debugger`, step through Gleam source |
-| 9.4 | Property-based testing | REMOVED | `gleamunison_property` was deleted; tests use `gleeunit` and the playbook levels. |
-| 9.5 | `gleam watch` | ✓ DONE (v1.1.0) | `scripts/watch.sh` — file watcher, auto-rebuild on change, optional `--test` mode. |
-| 9.6 | Error message improvement | ✓ DONE (v1.1.0) | Elm/Rust-style: `[P001]`–`[P004]` parse errors, `[E001]`–`[E005]` type errors with suggested fixes. |
-| 9.7 | Scratch-file watcher loop | ✓ DONE (v3.14.0) | S | `gleam run -- watch <file.lisp>`: mtime-polled re-verify on save (foreground). |
-| 9.8 | REPL Code Graph Queries | ✓ DONE (v3.20.0) | S | `view`, `dependents`, `dependencies` in REPL, datalog-index backed. |
+**Goal:** evaluate hostile code outside the trusted BEAM/host process.
 
----
+Required design evidence:
 
-## Phase 10: Production Runtime & Operations
+- Executor identity and approved configuration.
+- Filesystem, network, kernel/process, and descendant isolation.
+- CPU/memory/reduction/concurrency limits and cancellation.
+- Secret redaction and cleanup proof after timeout/crash.
+- End-to-end refusal when any required control is absent.
 
-**Goal:** Operable, observable, maintainable in production without OTP expertise.
+Entry constraint: an in-process ability handler or supervisor is not the
+executor. Do not relabel `authenticated-remote` as a sandbox while this work
+is absent.
 
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|
-| 10.1 | Structured logging | ✓ DONE (v1.1.0) | `gleamunison_log.erl`: `log_entry/4` into a bounded ETS ring, served by `/api/logs`. |
-| 10.2 | Metrics & telemetry | ✓ DONE (v1.1.0) | `gleamunison_metrics.erl`: `counter`/`gauge`/`histogram` with `:telemetry` events. Recorded at the HTTP response boundary. |
-| 10.3 | `gleam release` (replaces escript) | PENDING | L | Standalone tarball with ERTS, no Erlang pre-install required |
-| 10.4 | Configuration management | REMOVED | Environment variables are read at the point of use; there is no config loader. |
-| 10.5 | Health checks & readiness probes | ✓ DONE (v1.1.0) | `gleamunison_readiness.erl`: `report/0`, `ready/0`, `http_response/0`. `/api/health` and `/api/ready`. |
-| 10.6 | Distributed tracing | PENDING | L | OpenTelemetry integration, typed span propagation |
-| 10.7 | Operations runbook | ✓ DONE (v1.1.0) | `docs/OPERATIONS.md`: deploy, configure, monitor, upgrade, troubleshoot, backup. |
+### 5. Distribution and migration
 
----
+**Goal:** define a supported topology only after identity, storage, transport,
+and recovery semantics are designed together.
 
-## Phase 11: Advanced Paradigms (Urbit, Koka, & Hazel Integrations)
+Potential scope: branch convergence, application-state ownership, cluster
+authentication/encryption, schema migration, rollback, and process/continuation
+migration if independently justified.
 
-**Goal:** Incorporate bleeding-edge optimization, correctness, and live development paradigms into the core compiler and runtime.
+Entry constraint: Mnesia adapter availability, TCP sync, and hash-named modules
+do not by themselves constitute a safe distributed production platform.
 
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|
-| 11.1 | FFI Compiler Jets | ✓ DONE | S | Map pure content-addressed function hashes directly to native Erlang/Gleam overrides, avoiding dynamic compilation overhead. |
-| 11.2 | Linearity-Enforced Continuations | ✓ DONE (v1.1.0) | `check_linearity/2` in inference engine — validates continuation variables are used exactly once in handler branches. |
-| 11.3 | First-Class Typed Holes | ✓ DONE (v1.1.0) | `ast.Hole` variant — `?` parses to hole, compiles to runtime `erlang:error({hole, ...})`. Enables live fill-and-resume workflows. |
+## Working rule for roadmap changes
 
-### Phase Dependency Graph
+A roadmap item becomes “implemented” only with source, tests, current-guide
+updates, and dated evidence. A design or accepted ADR remains a design until
+those exist. Do not backfill old release tables with new counts or mark an item
+complete because a same-named data type exists.
 
-```
-Phase 5 (Distributed) ──┐
-                         ├──→ Phase 6 (Ecosystem: LSP, Registry, Dashboard)
-                         │         │
-                         │         ├──→ Phase 9 (Tooling: depends on LSP from P6)
-                         │         │
-                         │         └──→ Phase 12 (Operations/DX: needs Dashboard from P6)
-                         │
-                         ├──→ Phase 7 (Language: independent; can parallel P6)
-                         │         │
-                         │         └──→ Phase 8 (Stdlib: needs P7 type features)
-                         │                   │
-                         │                   └──→ Phase 10 (Operations: needs P8 stdlib)
-                         │
-                         └──→ Phase 11 (Advanced: FFI Jets, Linearity, Holes)
-```
-
----
-
-## Phase 12: Integrated DX & Operations (Darklang Integrations)
-
-**Goal:** Close the feedback loop between live execution context and developer editing experience.
-
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|
-| 12.1 | Trace-Driven Request Interception | ✓ DONE (v1.1.0) | `gleamunison_trace.erl` — captures HTTP method/path/headers to ETS table, SSE push to dashboard. |
-| 12.2 | In-Dashboard Trace Inspector | ✓ DONE (v1.1.0) | `/api/traces` and `/api/traces/:id` endpoints. Full trace list + detail view. |
-| 12.3 | Lazy CAS Type Adapters | ✓ DONE (v1.1.0) | `gleamunison_adapters.erl` — ETS-based adapter registry. `register`/`find`/`adapt`. ADR-0048 docs. |
-
-Effort key: **S** = Small (days), **M** = Medium (weeks), **L** = Large (month+).
-
----
-
-## Phase 13: Security Hardening & Codebase Refactoring ✓
-- **Status:** COMPLETE. Secured FFI serialization, local loopback checks, port-based network socket monitors, extracted modular builtins, and refactored the 5600+ level dogfooding suite into a data-driven JSON VM runner. All files fully adhere to the <250 LOC constraint.
-
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|---|
-| 13.1 | **Harden FFI Serialization (P0)** | ✓ DONE (v3.10.0) | S | Modify `binary_to_term` in `gleamunison_ffi_io.erl` and `gleamunison_tcp_sync.erl` to use `binary_to_term(Bin, [safe])` to prevent remote code execution and atom table exhaustion. |
-| 13.2 | **Fix SSE Socket Monitor (P0)** | ✓ DONE (v3.10.0) | S | Resolve process-monitor crash in static routing where socket port references are monitored as process IDs. |
-| 13.3 | **Fix Undef eval_expression FFI (P0)** | ✓ DONE (v3.10.0) | S | Implement and export `eval_expression` in `gleamunison_ffi.erl` to fix HTTP route invocation crash. |
-| 13.4 | **Secure HTTP Endpoints (P0)** | ✓ DONE (v3.10.0) | S | Bind HTTP listener default to `127.0.0.1` and restrict the `/eval` and `/define` routes to prevent open-network remote execution. |
-| 13.5 | **Extract range and builtins (P1)** | ✓ DONE (v3.10.0) | S | Move duplicated `range` function from all 112+ modules into `gleamunison/util.gleam`. Consolidate `init_defs` from `repl.gleam` and `verify.gleam` to `gleamunison/identity.gleam`. |
-| 13.6 | **Data-Driven Dogfooding (P1)** | ✓ DONE (v3.10.0) | M | Refactor the `generate_levels.clj` pipeline to emit a single database/data-structure representation of levels, removing 90k lines of generated boilerplate. |
-| 13.7 | **Fix Metric/Docs Inconsistencies (P2)**| ✓ DONE (v3.10.0) | S | Align all level and module metrics across README, Architecture, and Playbook docs. Correct duplicate numbering in `LEARNINGS.md`. |
-
----
-
-## Phase 14: Native Content-Addressed Datalog Database Engine ✓
-- **Status:** COMPLETE. Pure S-expression immutable database engine running entirely in GleamUnison user-space, documented in ADR-0062 and verified via `datalog_test.gleam`.
-
-| # | Feature | Status | Effort | Description |
-|---|---|---|---|---|
-| 14.1 | **EAVT / AVET Dual Indexing** | ✓ DONE (v3.11.0) | S | Pure dictionary-backed immutable index store supporting instant attribute lookups and entity queries. |
-| 14.2 | **Pattern Unification Solver** | ✓ DONE (v3.11.0) | M | Datalog triple clause conjunction solver with recursive variable binding and substitution. |
-| 14.3 | **Temporal & History Indexing** | ✓ DONE (v3.11.0) | S | `db-history`, `db-as-of`, `db-since`, and `db-diff` replaying transaction datoms across historic markers. |
-| 14.4 | **Stratified Deductive Rules** | ✓ DONE (v3.11.0) | M | Fixpoint recursive logic rules engine for graph reachability and transitive relation resolution. |
-| 14.5 | **Graph Algorithms & PageRank** | ✓ DONE (v3.11.0) | S | Graph BFS, DFS, shortest path finding, and Power-Iteration PageRank over datom relationships. |
-| 14.6 | **Vector Similarity & BM25 Search** | ✓ DONE (v3.11.0) | S | Cosine similarity k-NN search and BM25 term frequency / inverse document frequency ranking. |
-| 14.7 | **Actor Transactor Process** | ✓ DONE (v3.11.0) | S | Stateful actor loop managing transactional serializability via Erlang message passing (`spawn`/`send`/`recv`). |
-
+The preferred increment is the smallest one that composes existing identity,
+evidence, storage, effect, and service contracts. A parallel write path,
+ambient storage authority, or sandbox-shaped flag is complexity, not progress.
