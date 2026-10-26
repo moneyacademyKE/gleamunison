@@ -1,120 +1,210 @@
-# Gleamunison Architecture
+# Gleamunison architecture
 
-## Overview
-gleamunison is a content-addressed language runtime with algebraic effects running on the Erlang BEAM, implemented in Gleam.
-1. **Content-addressed code**: identity = SHA256 hash of serialized AST.
-2. **Algebraic effects**: dynamic scope dispatch with resumable continuations via process dictionary.
-3. **BEAM runtime**: hot code swapping, process isolation, and OTP 29 compatibility.
-4. **Standard Library**: typed modules for http, json, datetime, filepath, crypto, template.
-5. **Production Operations**: structured logging, metrics/telemetry, health checks, config management.
+## Scope
 
-## Pipeline
+Gleamunison is a content-addressed language runtime on the Erlang BEAM,
+implemented in Gleam with Erlang FFI at host boundaries. This guide describes
+the current runtime. Dated design decisions live in `docs/adr/`; measured
+release claims live in `docs/verification/`.
+
+The central rule is separation of concerns: immutable code, mutable names,
+application facts, evidence, provider configuration, and deployment authority
+are different values with different owners.
+
+## Identity and execution
+
+A definition's identity is SHA256 over its canonical term and inferred type.
+Alpha-equivalent terms share an identity; a name or branch does not silently
+become part of the content hash. Builtins have declared types, so inference
+does not place an unknown-type sentinel in a stored identity.
+
+```text
+source text
+  → lexer/parser → surface AST
+  → elaboration + Hindley–Milner inference → canonical term + type
+  → definition codec + SHA256 → content ref
+  → verified CAS admission and selected-branch name binding
+  → dependency closure → Erlang source/BEAM → code:load_binary
+  → $eval, optionally applying run arguments
 ```
-Text (S-Expr) → AST (Gleam types) → Hash (SHA256) → Codebase (DETS/in-mem)
-                                                    → Compile (Erlang → BEAM)
-                                                    → Load (code:load_binary)
-                                                    → Call $eval()
+
+`identity`, `definition_codec`, `definition_refs`, and `run_closure` own the
+identity/dependency vocabulary. `compile` and `loader` emit and load hash-named
+modules such as `m_e8e52932`. Genesis `m_*.erl` modules are checked-in native
+implementations, not arbitrary scratch output.
+
+Running by content ref does not fetch from a peer implicitly. The selected
+branch resolves named dependencies; missing or unreadable content is an error,
+not an empty program.
+
+## Codebase, storage, and branches
+
+`storage.StorageAdapter` provides the primitive key/value interface. Current
+adapters use ETS, DETS, partitioned DETS, or Mnesia. Adapter availability is
+not a claim of a supported multi-node production topology.
+
+Three storage shapes must not be confused:
+
+| Value | Identity | Mutation |
+|---|---|---|
+| Definition bytes | Content hash of canonical definition | Immutable while retained |
+| Namespace/history chunks | Content hash | Immutable snapshots |
+| Branch pointer cell | Name-derived key | Updated by a branch commit |
+
+A branch maps names to content refs. The same content ref can be bound on many
+branches, while one stored caller can resolve a named dependency differently
+on different branches. `namespace` owns values, history, diff, and merge;
+`namespace_codec` owns canonical snapshot/head bytes; `branch_scope` owns
+cross-branch read/retraction scope.
+
+Content is verified before CAS admission and checked again where execution
+requires it. `publish`, admitted MCP writes, and `pkg install` enforce evidence;
+sync verifies that received bytes match their refs, while `run` enforces the
+execution evidence policy. Explicit retraction and purge can remove content
+when dependency/branch rules permit it, so the codebase is not an unconditional
+append-only log.
+
+## Effects and bounded evaluation
+
+The surface language supports abilities, handlers, `do`, `handle`, holes,
+guards, and `use`. `gleamunison_effets.erl` owns the process-local ability
+handler stack. `Do` dispatches to the selected frame; this is not a general
+serializable-continuation or live-process-migration implementation.
+
+Evaluation runs behind execution-profile admission and resource budgets.
+The evaluator owns its scope and descendant cleanup on timeout/cancellation.
+These controls reduce in-process risk; they do not isolate the host kernel,
+filesystem, or VM from hostile native code.
+
+`local` and `authenticated-remote` execution use the in-process evaluator.
+Transport-facing `untrusted-execution` admission refuses because no approved
+external executor is configured. Direct host capabilities such as `file-read`
+and `http-get` remain separate from application `Db` writes and must not be
+described as covered by that one effect.
+
+## Durable agent read model
+
+MCP and HTTP use the supervised web session rather than independent immutable
+bootstrap catalogs. `agent_read_model` projects the selected durable branch
+and CAS into entries that retain actual content refs, stored types, origins,
+and branch metadata.
+
+Scratch definitions are an explicit session overlay. They shadow durable names
+without changing the branch or CAS. MCP is a bounded gateway over the session's
+snapshots; it does not promote scratch or maintain a second session authority.
+Stored dependencies are loaded before scratch evaluation.
+
+The design and its rejected source-reconstruction shortcut are recorded in
+[ADR 0068](adr/0068-durable-agent-read-model.md).
+
+## Admitted writes and bounded generation
+
+`agent_publish` accepts source, not a caller-selected hash, branch, or storage
+path. Its pipeline is:
+
+```text
+source → definitions-only load → elaboration → tests/evidence
+       → trust turnstile → CAS insert + selected-branch binding
+       → fresh durable snapshot + preserved scratch overlay
 ```
 
-## Component Flow
+The supervised session serializes publication. Untrusted execution is refused
+before storage opens. A successful receipt contains real content refs that the
+same runtime can execute; see [ADR 0070](adr/0070-admitted-agent-writes.md).
 
-### 1. Identity & Hashing
-```
-AST → Serialize → crypto:hash(sha256) → Hash (256-bit) → DefinitionRef
-```
-The hash IS the identity. Uses Erlang's built-in crypto module to generate 256-bit OpenSSL-backed SHA256 hashes. Genesis stubs are padded to the 256-bit boundary (`<<1:256>>`). Includes hashing for Guard, Hole, and Use AST variants.
+`agent_generate` composes the existing modules instead of creating a parallel
+write system:
 
-### 2. Codebase Storage
-Pluggable storage adapter supporting:
-- `inmemory()`: volatile ETS-backed storage.
-- `dets(path)`: durable disk-based storage with clean `close` and `dets_delete_file` controls.
-- `mnesia(table)`: ACID replicated storage across clustered nodes.
-- `partitioned_dets(path)`: hash-prefix split across 16 partition files (up to 32GB).
-- **CAS Type Adapters**: `gleamunison_adapters.erl` — ETS-based registry mapping old→new type hashes for lazy schema migration.
+- `prompt` stores a checked content-addressed template.
+- `schema_printer` renders the requested and inferred type shapes.
+- `sap` parses bounded near-miss candidate envelopes.
+- `generation_loop` retries with feedback within hard size/attempt limits.
+- `agent_publish` performs every admission.
+- `patch` reports direct stored dependents; it does not fabricate source or
+  automatically regenerate applications.
 
-### 3. Compilation & Loading
-- **Compiler**: `emit_term` concatenates Erlang source code from AST, invoking `compile:file/2`. Supports all Term variants including Guard clauses (Erlang `when`), Hole (`erlang:error`), and Use (lambda-passing desugaring).
-- **FFI Jets**: Pre-loaded native functions mapped to content-addressed hashes via `gleamunison_jets.erl`, bypassing dynamic compilation for known builtins.
-- **OTP 29**: Handles `{ok, Mod, []}` return, reading BEAM files directly from disk.
-- **Loader**: Threaded compilation and load results, caching loaded and failed refs. LRU eviction with explicit `code:purge/1`.
-- **Module Names**: Maps `DefinitionRef` to `m_<last_8_hex_chars>` (e.g. `'m_e8e52932'`), preventing collisions.
+The provider is server-owned. Candidate source, inferred type, evidence, and
+branch admission are checked independently. Exhaustion leaves branch bindings
+unchanged, although an immutable prompt may remain as an audit artifact.
+The public generator handles one target term per candidate; it is not a claim
+of arbitrary multi-definition application synthesis. See
+[ADR 0072](adr/0072-bounded-agent-generation.md).
 
-### 4. AST & Language Features (v1.1.0)
-- **Guard Clauses**: `Guard` type on `Case` with Erlang `when` clause emission.
-- **Holes**: `ast.Hole` variant — `?` parse, compiles to `erlang:error({hole, ...})`.
-- **`use` Expression**: `ast.Use` — desugars to lambda-passing: `(use x <- f body)` → `f(fn(x) { body })`.
-- **Labeled Arguments**: `(fn* ((x default) ...) body)` — parser/elaborator sugar → curried lambdas.
-- **Type Aliases**: `SurfaceTypeAlias` / `SurfacePubTypeAlias` through full elaboration.
+## Application state and Datalog
 
-### 5. Effects Runtime (`gleamunison_effets.erl`)
-Thread-local scope stack managed via process dictionary (`$ability_stack`):
-- `push_frame` / `pop_frame` / `find_frame`
-- `do_op(AbilityMod, OpIndex, Args, Cont)`: dispatch operation to stack handler.
-- `handle_comp({AbilityKey, Handler}, Thunk)`: push handler, run computation, pop handler.
+Application facts are not code CAS. The typed `Db` ability currently provides
+`transact`, exact `get`, and exact `find` over text-valued EAV facts.
+`gleamunison_app_db` supervises one durable journal, `application.dets`, beside
+the configured code store. Each valid transaction is one journal record;
+restart derives current state and the next transaction id by replay.
 
-### 5. Pull-based Node Syncing
-Advertises local refs, retrieves remote difference, requests missing definition binaries, and persists them via codebase insertions. Supports two transports:
-- **Erlang Distribution** (node names containing `@`): uses `net_adm:ping/1` + `rpc:call/4` for peer-to-peer sync.
-- **TCP Protocol** (non-`@` names parsed as `host:port`): length-prefixed binary protocol over TCP via `gleamunison_tcp_sync.erl`. Uses `term_to_binary`/`binary_to_term` for serialization with 4-byte big-endian length framing. Server runs as a `gen_server` on an ephemeral port (default 9876), registered via `persistent_term`. One-shot request-response per operation.
+This V1 is deliberately smaller than a general database server. It has no
+ambient HTTP database-write API, arbitrary Datalog joins through `Db`, or
+multi-node application-store claim. See
+[ADR 0069](adr/0069-durable-db-ability.md).
 
-### 6. Distributed Topology & Concurrency (Phase 5)
-- **Concurrency Primitives**: `spawn`, `send`, `recv`, `self`, `sleep`, `now` — native Erlang process model with content-addressed module dispatch.
-- **Remote Ability**: `forkAt`, `await`, `here` — location-transparent distributed compute. `Location` wraps Erlang node names; code shipping via pull-based sync protocol.
-- **Mnesia Storage Adapter**: Replicated ACID storage across clustered nodes. Replaces single-node ETS/DETS for multi-node deployments.
-- **Supervision Trees**: `gleamunison_sup.erl` — OTP supervisor with isolated link topology. Workers spawned in dedicated processes to prevent cascading termination signals.
-- **Serializable Continuations**: Erlang `term_to_binary/1` and `binary_to_term/1` enable cross-node closure serialization. Content-addressed module naming (`m_<hash>`) guarantees identical module versions across nodes.
+The separate `gleamunison_datalog/` engine is written in Gleamunison's own
+S-expression language. It supplies immutable EAV indexes, transactions,
+queries, temporal operations, rules, graph/search functions, and an in-process
+transactor model. It is not automatically the durable `Db` journal.
 
-### 7. Production Operations (v1.1.0)
-- **Structured Logging**: `gleamunison_log.erl` — debug/info/warn/error entries in a bounded ETS ring, served by `/api/logs`.
-- **Metrics**: `gleamunison_metrics.erl` — counter/gauge/histogram with `:telemetry` events, fed by `gleamunison_http_metrics` at the response boundary.
-- **Health Checks**: `gleamunison_readiness.erl` — `/api/health` and `/api/ready`, required vs observational checks.
-- **Configuration**: environment variables read at the point of use (`GLEAMUNISON_PROFILE`, `GLEAMUNISON_BIND_ADDRESS`, `GLEAMUNISON_HTTP_TOKEN`, `GLEAMUNISON_REQUIRED_SERVICES`).
-- **Trace Inspector**: `gleamunison_trace.erl` — DETS-backed HTTP request capture, SSE push, `/api/traces` endpoint.
-- **Admitted application routes**: `gleamunison/app_route` resolves only selected-branch names or bound content refs; `app_path` owns strict route-segment decoding, `app_response` owns bounded JSON envelopes, and `run_ref` remains the sole evidence/evaluation authority. `POST /app/:name` and `/app/ref/:content-ref` share HTTP data-write and execution-profile admission with MCP.
-- **Bounded agent generation**: `generation_loop` composes checked content-addressed prompts, schema rendering, SAP candidate envelopes, bounded provider retries, and inferred-type checks with `agent_publish`. The supervised session owns provider calls and refreshes after admission. `agent_generate` accepts no caller-selected store, branch, credentials, or provider; patch analysis reports direct name-ref dependents without fabricating stored source or automatic regeneration.
-- **Namespace codecs**: `gleamunison/namespace_codec` owns canonical namespace-snapshot and branch-head bytes; `namespace` owns values, branches, history, diff, merge, and synchronization.
+## Services and admitted application routes
 
-### 8. Standard Library (v1.1.0)
-- **HTTP Client**: `gleamunison/http_client` — get/post/put/delete, opaque `HttpResponse`.
-- **JSON**: `gleamunison/json` — encode/decode wrapping Erlang `json`.
-- **DateTime**: `gleamunison/datetime` — opaque `DateTime`, ISO 8601, arithmetic.
-- **Crypto**: `gleamunison/crypto` — SHA256/512, HMAC, random bytes.
-- **File paths**: the `filepath` Hex package (the local `gleamunison/filepath` wrapper was removed).
+HTTP and MCP run under OTP supervisors. Readiness and observability expose
+storage, process, queue, and bounded-resource state. `mcp_session`,
+`mcp_write`, and `session_refresh` separate RPC, admission, and snapshot
+refresh responsibilities.
 
-### 9. Native Datalog Database Engine (`gleamunison_datalog/`)
-Pure S-expression immutable database engine running entirely in GleamUnison user-space (ADR-0062):
-- **EAVT / AVET Indexing**: Dual persistent map indexes mapping `[Entity -> Attr -> Values]` and `[Attr -> Value -> Entities]`.
-- **Transaction Engine**: Pure immutable state transitions (`db-assert`, `db-retract`, `db-cas`, `db-assert-many`).
-- **Query Solver**: Pattern unification over Datalog triple clauses `(?e ?a ?v)` with variable bindings.
-- **Temporal Queries**: `db-history`, `db-as-of`, `db-since`, `db-diff` replaying transaction logs.
-- **Recursive Rules**: Stratified fixpoint evaluation for transitive and deductive relations.
-- **Graph & Search**: BFS, DFS, shortest path, PageRank, k-NN cosine vector similarity, and BM25 document ranking.
-- **Transactor Actor**: Concurrent process loop (`spawn`/`send`/`recv`) serializing atomic database updates.
+`POST /app/:name` and `POST /app/ref/:content-ref` execute only admitted
+content on the server-selected branch. `app_path` performs strict segment
+decoding; `app_route` resolves targets and validates bounded JSON arguments;
+`app_response` renders bounded JSON results; `run_ref` remains the execution
+and evidence authority. Scratch and arbitrary unbound CAS content are not
+routes. See [ADR 0071](adr/0071-admitted-app-routes.md).
 
-### 10. Security & FFI Boundaries (v3.11.0)
-- **Safe Deserialization**: All incoming Erlang binaries decoded with `binary_to_term(Bin, [safe])` in TCP sync and FFI channels, preventing atom table exhaustion and code injection.
-- **Network Boundaries**: HTTP server and TCP sync server bind strictly to loopback (`127.0.0.1`) with a 1MB payload length guard.
-- **Deterministic Storage Atoms**: Storage table names derived via SHA256 hashing (`stable_name`) to eliminate dynamic atom generation during runtime.
+## Sync, security, and deployment
 
-## Dogfood Infrastructure
+`sync`/`sync_types` define the protocol, with TCP and Erlang-distribution
+FFI at the transport boundary. TCP v2 uses authenticated handshake/replay
+controls. These mechanisms do not supply TLS for HTTP, secure an Erlang
+cluster automatically, or establish a multi-tenant trust boundary.
 
-### Scripts
-- `scripts/run_playbook_tests.clj` — Executes all conformance levels against the runtime.
-- `scripts/verify_production_boundaries.clj` — The integrated gate; produces the witness in `docs/verification/`.
-- `scripts/test_cli_errors.clj` and `scripts/test_artifact.sh` — CLI error contract and the shipped-artifact contract, including the Datalog engine's presence in the escript.
-- All scripts are pure Clojure/Babashka (`bb`) — zero Python or npm dependencies.
+The verified deployment classification is **authenticated single-node
+service**. Bind/profile checks, request authorization, evidence policy,
+execution budgets, bounded observability, and LLM controls are separate
+boundaries with separate proofs. TLS/mTLS, an OS/container executor, complete
+package provenance/revocation, live migration, and production multi-node
+isolation are not claimed.
 
-### Conformance Coverage
+See [Deployment profiles](operations/deployment-profiles.md),
+[Production operations](OPERATIONS.md), and
+[ADR 0067](adr/0067-production-boundaries.md). Where an older ADR records a
+pending contract, current source and the latest verification witness decide
+what is implemented.
 
-- **Unit tests**: 54 Erlang/Gleam unit test suites covering hashing, codebase, inference, elaboration, typechecking, compilation, storage, sync, effects, jets, and native Datalog.
-- **Playbook conformance levels**: 1172 levels are defined across `docs/playbook/`; 934 execute and pass through the playbook runner (`scripts/run_playbook_tests.clj`), and the remaining 238 are prose-only levels recorded as explicit exclusions in `scripts/playbook_exclusions.edn`, sha-pinned so they self-invalidate when a level gains executable cases.
-- **File constraints**: All files strictly conform to the `<500 LOC` constraint (all Gleam core files $< 250$ LOC).
+## Artifact and verification
 
-## Invariants
-- **Type-Inclusive Hash**: The AST term and its inferred type compile to the hash.
-- **Append-only Codebase**: Once inserted, definitions never change.
-- **Process Isolation**: Ability stack bound to processes.
-- **Standalone escript**: zero-dependency ~1.2 MB binary.
-- **Content-Addressed Continuations**: Identical hashes guarantee identical module versions across nodes, enabling native Erlang closure serialization.
-- **Supervisor Link Isolation**: Supervisor trees spawned in dedicated workers to prevent cascading termination signals.
+`build_escript.sh` packages the runtime and BEAM dependencies into an escript.
+The Erlang VM is a runtime dependency. Artifact contents, declared version,
+Datalog inclusion, test exclusion, and clean-build reproducibility are gate
+checks; artifact size is not an architectural invariant.
 
+Use `gleam test`, `gleam format --check src test`, the playbook runner, and
+`bb scripts/verify_production_boundaries.clj` for their distinct jobs.
+`docs/operations/verification-matrix.md` and the latest dated witness record
+what was actually proved. Local macOS/OTP results do not stand in for every
+configured hosted OTP/OS matrix leg.
+
+## Invariants worth preserving
+
+1. A content ref identifies canonical content and type, never a mutable name.
+2. Scratch never becomes durable without the ordinary evidence/admission path.
+3. Generation proposes source; publication alone admits it.
+4. Code CAS, application facts, and provider credentials have independent
+   lifecycles and owners.
+5. A name route resolves only the selected branch; a ref route must also be
+   bound there.
+6. Capability denial, request authentication, transport encryption, and OS
+   isolation answer different questions and cannot substitute for one another.
+7. Dated evidence reports measurements; current documentation reports
+   contracts.
