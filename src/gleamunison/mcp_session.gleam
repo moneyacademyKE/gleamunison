@@ -10,6 +10,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/float
 import gleam/list
+import gleam/option.{type Option}
 import gleam/order
 import gleam/result
 import gleam/string
@@ -18,6 +19,7 @@ import gleamunison/elab_types.{type SurfaceDef, SurfaceTermDef}
 import gleamunison/lexer
 import gleamunison/lisp_literal
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
+import gleamunison/mcp_definition
 import gleamunison/parser
 import gleamunison/rank
 import gleamunison/repl_eval
@@ -176,7 +178,7 @@ fn tools(state: SessionState) -> List(Tool) {
     Tool(
       name: "list_definitions",
       description: "List every definition in the session (name, kind, ref)",
-      handler: fn(_) { Ok(defs_json(state.defs)) },
+      handler: fn(_) { Ok(mcp_definition.defs_json(state.cache, state.defs)) },
     ),
     Tool(
       name: "get_definition",
@@ -295,7 +297,7 @@ fn get_definition(
     Ok(name) ->
       case list.key_find(state.defs, name) {
         Error(_) -> Error("definition not found: " <> name)
-        Ok(def) -> Ok(def_json(name, def))
+        Ok(def) -> Ok(mcp_definition.json(state.cache, state.defs, name, def))
       }
   }
 }
@@ -318,6 +320,8 @@ fn hits_json(hits: List(SearchHit)) -> String {
       <> ",\"kind\":"
       <> mcp.json_string(h.kind)
       <> ",\"ref\":"
+      <> mcp_definition.nullable_json_string(h.content_ref_hex)
+      <> ",\"name_ref\":"
       <> mcp.json_string(h.ref_hex)
       <> ",\"score\":"
       <> float.to_string(h.score)
@@ -364,9 +368,17 @@ fn string_arg(
   }
 }
 
-/// One search hit: the triple a CLI or an agent actually needs.
+/// One search hit with distinct content and dependency identities.
 pub type SearchHit {
-  SearchHit(name: String, kind: String, ref_hex: String, score: Float)
+  SearchHit(
+    name: String,
+    kind: String,
+    // Stable dependency/module handle, NOT a content hash.
+    ref_hex: String,
+    // None when no elaborated content definition is available.
+    content_ref_hex: Option(String),
+    score: Float,
+  )
 }
 
 /// BM25-ranked search over definition names and bodies. Name tokens count
@@ -402,6 +414,11 @@ pub fn search(state: SessionState, query: String) -> List(SearchHit) {
       name: def_pair.0,
       kind: codebase_index.kind_of(def_pair.1),
       ref_hex: codebase_index.ref_hex(def_pair.0, def_pair.1),
+      content_ref_hex: mcp_definition.content_hex(
+        state.cache,
+        state.defs,
+        def_pair.0,
+      ),
       score: pair.0,
     )
   })
@@ -467,19 +484,4 @@ fn term_tokens(term: elab_types.SurfaceTerm) -> List(String) {
     elab_types.SList(items) -> list.flat_map(items, term_tokens)
     _ -> []
   }
-}
-
-fn defs_json(defs: List(#(String, SurfaceDef))) -> String {
-  let parts = list.map(defs, fn(pair) { def_json(pair.0, pair.1) })
-  "[" <> string.join(parts, ",") <> "]"
-}
-
-fn def_json(name: String, def: SurfaceDef) -> String {
-  "{\"name\":"
-  <> mcp.json_string(name)
-  <> ",\"kind\":"
-  <> mcp.json_string(codebase_index.kind_of(def))
-  <> ",\"ref\":"
-  <> mcp.json_string(codebase_index.ref_hex(name, def))
-  <> "}"
 }
