@@ -11,6 +11,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import gleamunison/ast
+import gleamunison/bootstrap_types
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 
 pub type NameResolver =
@@ -52,6 +53,18 @@ fn join_types(types: List(ast.Type), resolver: NameResolver) -> String {
   |> string.join(", ")
 }
 
+fn builtin_type_name(ref: DefinitionRef) -> String {
+  let names = ["List", "Dict", "Set", "Pair", "Either", "Process", "HostValue"]
+  case list.find(names, fn(name) { bootstrap_types.named(name) == ref }) {
+    Ok(name) -> name
+    Error(_) -> {
+      let Ref(h) = ref
+      let hex = hash_to_debug_string(h)
+      "type@" <> string.slice(hex, 0, 8)
+    }
+  }
+}
+
 fn app_name(
   ref: DefinitionRef,
   args: List(ast.Type),
@@ -59,11 +72,7 @@ fn app_name(
 ) -> String {
   let name = case resolver(ref) {
     Some(n) -> n
-    None -> {
-      let Ref(h) = ref
-      let hex = hash_to_debug_string(h)
-      "type@" <> string.slice(hex, 0, 8)
-    }
+    None -> builtin_type_name(ref)
   }
   case args {
     [] -> name

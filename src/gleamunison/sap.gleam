@@ -13,6 +13,7 @@ import gleam/int
 import gleam/list
 import gleam/string
 import gleamunison/ast
+import gleamunison/bootstrap_types
 import gleamunison/json
 
 pub type Schema {
@@ -71,6 +72,11 @@ pub fn schema_from_type(t: ast.Type) -> Schema {
     ast.Builtin(ast.TextType) -> SText
     ast.Builtin(ast.BoolType) -> SBool
     ast.Builtin(ast.ListType) -> SList(SAny)
+    ast.App(ref, [element]) ->
+      case ref == bootstrap_types.named("List") {
+        True -> SList(schema_from_type(element))
+        False -> SAny
+      }
     _ -> SAny
   }
 }

@@ -1,5 +1,6 @@
 import gleam/list
-import gleamunison/genesis
+import gleamunison/ast
+import gleamunison/bootstrap_terms
 import gleamunison/identity.{type DefinitionRef}
 
 pub type BootstrapType {
@@ -16,11 +17,11 @@ pub type BootstrapOp {
 
 pub type BootstrapDef {
   BAbility(name: String, ops: List(BootstrapOp))
-  BTerm(name: String, ref: DefinitionRef)
+  BTerm(name: String, ref: DefinitionRef, typ: ast.Type)
 }
 
 pub fn get_init_defs_data() -> List(BootstrapDef) {
-  [
+  let abilities = [
     BAbility("Console", [BOp("print", [BTText], BTInt)]),
     BAbility("Test", [BOp("expect", [BTInt], BTInt)]),
     BAbility("State", [
@@ -42,82 +43,35 @@ pub fn get_init_defs_data() -> List(BootstrapDef) {
       BOp("complete", [BTText], BTText),
       BOp("complete_with_system", [BTText, BTText], BTText),
     ]),
-    BTerm("add", genesis.builtin_int_add()),
-    BTerm("+", genesis.builtin_int_add()),
-    BTerm("read_line", genesis.builtin_io_read_line()),
-    BTerm("spawn", genesis.builtin_process_spawn()),
-    BTerm("self", genesis.builtin_process_self()),
-    BTerm("send", genesis.builtin_process_send()),
-    BTerm("recv", genesis.builtin_process_recv()),
-    BTerm("sleep", genesis.builtin_timer_sleep()),
-    BTerm("now", genesis.builtin_timer_now()),
-    BTerm("sub", genesis.builtin_sub()),
-    BTerm("mul", genesis.builtin_mul()),
-    BTerm("div", genesis.builtin_div()),
-    BTerm("mod", genesis.builtin_mod()),
-    BTerm("eq?", genesis.builtin_eq()),
-    BTerm("lt?", genesis.builtin_lt()),
-    BTerm("gt?", genesis.builtin_gt()),
-    BTerm("and", genesis.builtin_and()),
-    BTerm("or", genesis.builtin_or()),
-    BTerm("not", genesis.builtin_not()),
-    BTerm("string-concat", genesis.builtin_string_concat()),
-    BTerm("string-length", genesis.builtin_string_length()),
-    BTerm("string-contains?", genesis.builtin_string_contains()),
-    BTerm("string-slice", genesis.builtin_string_slice()),
-    BTerm("string-upcase", genesis.builtin_string_upcase()),
-    BTerm("string-downcase", genesis.builtin_string_downcase()),
-    BTerm("string-replace", genesis.builtin_string_replace()),
-    BTerm("string-split", genesis.builtin_string_split()),
-    BTerm("string-trim", genesis.builtin_string_trim()),
-    BTerm("string->int", genesis.builtin_string_to_int()),
-    BTerm("list-length", genesis.builtin_list_length()),
-    BTerm("list-reverse", genesis.builtin_list_reverse()),
-    BTerm("list-map", genesis.builtin_list_map()),
-    BTerm("list-filter", genesis.builtin_list_filter()),
-    BTerm("list-fold", genesis.builtin_list_fold()),
-    BTerm("list-append", genesis.builtin_list_append()),
-    BTerm("list-flatten", genesis.builtin_list_flatten()),
-    BTerm("list-member?", genesis.builtin_list_member()),
-    BTerm("range", genesis.builtin_list_range()),
-    BTerm("list-sort", genesis.builtin_list_sort()),
-    BTerm("pair", genesis.builtin_pair()),
-    BTerm("fst", genesis.builtin_fst()),
-    BTerm("snd", genesis.builtin_snd()),
-    BTerm("left", genesis.builtin_left()),
-    BTerm("right", genesis.builtin_right()),
-    BTerm("dict-new", genesis.builtin_dict_new()),
-    BTerm("dict-get", genesis.builtin_dict_get()),
-    BTerm("dict-set", genesis.builtin_dict_set()),
-    BTerm("dict-keys", genesis.builtin_dict_keys()),
-    BTerm("set-new", genesis.builtin_set_new()),
-    BTerm("set-insert", genesis.builtin_set_insert()),
-    BTerm("json-parse", genesis.builtin_json_parse()),
-    BTerm("http-get", genesis.builtin_http_get()),
-    BTerm("file-read", genesis.builtin_file_read()),
+    BAbility("Host", [BOp("ambient", [BTVar("a")], BTVar("a"))]),
+    BAbility("File", [BOp("read", [BTText], BTText)]),
+    BAbility("Http", [BOp("get", [BTText], BTText)]),
   ]
+  list.append(
+    abilities,
+    list.map(bootstrap_terms.entries(), fn(entry) {
+      BTerm(entry.0, entry.1, entry.2)
+    }),
+  )
 }
 
 /// Whether this ref is one of the synthetic handles the runtime uses to name a
-/// builtin's definition (`<<1:256>>`, `<<2:256>>`, ...). It is internal: no
-/// elaborated term points at it, and its hex is not a content hash — printing it
-/// as one told a caller that `list-map` lives at `#000000000000`.
+/// builtin's definition. Its hex is not a content hash.
 pub fn is_synthetic_ref(ref: DefinitionRef) -> Bool {
   list.any(get_init_defs_data(), fn(definition) {
     case definition {
-      BTerm(_, known) -> known == ref
+      BTerm(_, known, _) -> known == ref
       BAbility(_, _) -> False
     }
   })
 }
 
-/// The name of the builtin a synthetic ref belongs to, if any. The name ref is
-/// what the elaborator actually emits, so it is the reference a caller can use.
+/// The name of the builtin a synthetic ref belongs to, if any.
 pub fn builtin_name_for(ref: DefinitionRef) -> Result(String, Nil) {
   case
     list.find_map(get_init_defs_data(), fn(definition) {
       case definition {
-        BTerm(name, known) if known == ref -> Ok(name)
+        BTerm(name, known, _) if known == ref -> Ok(name)
         _ -> Error(Nil)
       }
     })

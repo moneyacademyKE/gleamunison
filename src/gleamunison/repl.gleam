@@ -189,7 +189,7 @@ fn convert_bootstrap_def(
         ),
       )
     }
-    bootstraps.BTerm(name, ref) -> {
+    bootstraps.BTerm(name, ref, _) -> {
       #(name, elab_types.SurfaceTermDef(elab_types.SRef(ref)))
     }
   }

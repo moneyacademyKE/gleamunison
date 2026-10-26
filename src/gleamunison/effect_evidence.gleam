@@ -12,6 +12,7 @@
 import gleam/list
 import gleam/option
 import gleamunison/ast
+import gleamunison/bootstrap_terms
 
 pub fn definition_is_effectful(definition: ast.Definition) -> Bool {
   case definition {
@@ -23,12 +24,9 @@ pub fn definition_is_effectful(definition: ast.Definition) -> Bool {
 pub fn term_is_effectful(term: ast.Term) -> Bool {
   case term {
     ast.Do(..) -> True
-    ast.RefTo(_)
-    | ast.LocalVarRef(_)
-    | ast.Int(_)
-    | ast.Float(_)
-    | ast.Text(_)
-    | ast.Hole -> False
+    ast.RefTo(ref) -> bootstrap_terms.is_host_ref(ref)
+    ast.LocalVarRef(_) | ast.Int(_) | ast.Float(_) | ast.Text(_) | ast.Hole ->
+      False
     ast.List(items) -> list.any(items, term_is_effectful)
     ast.Apply(f, a) -> term_is_effectful(f) || term_is_effectful(a)
     ast.Lambda(_, body) -> term_is_effectful(body)

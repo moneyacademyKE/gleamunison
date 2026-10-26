@@ -11,6 +11,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleamunison/ast
+import gleamunison/bootstrap_types
 import gleamunison/bootstraps
 import gleamunison/codebase
 import gleamunison/definition_refs
@@ -93,7 +94,7 @@ pub fn is_bootstrap_ref(ref: DefinitionRef) -> Bool {
   list.any(bootstraps.get_init_defs_data(), fn(definition) {
     case definition {
       bootstraps.BAbility(name, _) -> repl_eval.ref_for_name(name) == ref
-      bootstraps.BTerm(name, known_ref) ->
+      bootstraps.BTerm(name, known_ref, _) ->
         known_ref == ref || repl_eval.ref_for_name(name) == ref
     }
   })
@@ -108,7 +109,10 @@ fn resolve_runtime_ref(
       loader.ensure_loaded_jet(ld, ref)
       |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
     option.None ->
-      case is_bootstrap_ref(ref) && loader.module_available(ref) {
+      case
+        bootstrap_types.is_type_ref(ref)
+        || { is_bootstrap_ref(ref) && loader.module_available(ref) }
+      {
         True -> Ok(ld)
         False -> Error(Missing(ref))
       }

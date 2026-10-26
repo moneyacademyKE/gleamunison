@@ -80,8 +80,14 @@ pub fn list_all_match(
     [first, ..rest] -> {
       case infer_fn(first, cache) {
         Ok(t2) ->
-          normalize_type(t) == normalize_type(t2)
-          && list_all_match(rest, t, cache, infer_fn)
+          case t2 {
+            // A local variable's type is deferred, just as it is for a
+            // function argument. It is not evidence that the list is mixed.
+            ast.TypeVar(_) -> list_all_match(rest, t, cache, infer_fn)
+            _ ->
+              normalize_type(t) == normalize_type(t2)
+              && list_all_match(rest, t, cache, infer_fn)
+          }
         Error(_) -> False
       }
     }

@@ -3,8 +3,10 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleamunison/ast
+import gleamunison/bootstrap_types
 import gleamunison/identity.{Local}
-import gleamunison/infer_helper.{list_all_match, substitute}
+import gleamunison/infer_helper.{list_all_match}
+import gleamunison/infer_unify
 import gleamunison/types.{
   type InferenceError, type TypeCache, CTAbility, CTTerm, TypeMismatch,
 }
@@ -51,52 +53,37 @@ pub fn infer_term(
       case ft {
         ast.Fn([param_typ, ..rest], ret, req) -> {
           use arg_typ <- result.try(infer_term(a, cache))
-          case param_typ {
-            ast.TypeVar(i) -> {
-              let ret2 = substitute(ret, i, arg_typ)
-              let rest2 = list.map(rest, substitute(_, i, arg_typ))
+          case infer_unify.unify(param_typ, arg_typ) {
+            Ok(bindings) -> {
+              let ret2 = infer_unify.substitute_all(ret, bindings)
+              let rest2 =
+                list.map(rest, infer_unify.substitute_all(_, bindings))
               case rest2 {
                 [] -> Ok(ret2)
                 _ -> Ok(ast.Fn(rest2, ret2, req))
               }
             }
-            _ ->
-              case arg_typ == param_typ {
-                True ->
-                  case rest {
-                    [] -> Ok(ret)
-                    _ -> Ok(ast.Fn(rest, ret, req))
-                  }
-                False ->
-                  // A type-variable argument is not a mismatch: the checker
-                  // rejects only *definitely wrong* code (concrete vs
-                  // concrete). Var-vs-concrete is deferred — false positives
-                  // would send agents into repair loops on correct code.
-                  case arg_typ {
-                    ast.TypeVar(_) ->
-                      case rest {
-                        [] -> Ok(ret)
-                        _ -> Ok(ast.Fn(rest, ret, req))
-                      }
-                    _ ->
-                      Error(TypeMismatch(
-                        param_typ,
-                        arg_typ,
-                        "argument type mismatch",
-                        option.Some(a),
-                      ))
-                  }
-              }
+            Error(_) ->
+              Error(TypeMismatch(
+                param_typ,
+                arg_typ,
+                "argument type mismatch",
+                option.Some(a),
+              ))
           }
         }
         ast.TypeVar(_) -> Ok(ast.TypeVar(-1))
         other ->
-          Error(TypeMismatch(
-            ast.Fn([], ast.TypeVar(0), ast.Required([])),
-            other,
-            "not a function",
-            option.Some(f),
-          ))
+          case other == bootstrap_types.host_value() {
+            True -> Ok(bootstrap_types.host_value())
+            False ->
+              Error(TypeMismatch(
+                ast.Fn([], ast.TypeVar(0), ast.Required([])),
+                other,
+                "not a function",
+                option.Some(f),
+              ))
+          }
       }
     }
     ast.Let(binder: Local(_), value: v, body: b) -> {

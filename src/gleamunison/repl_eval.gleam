@@ -4,6 +4,7 @@ import gleam/io
 import gleam/list
 import gleam/string
 import gleamunison/ast
+import gleamunison/bootstraps
 import gleamunison/compile.{
   compile_definition, module_name_for, new as new_compiler,
 }
@@ -11,7 +12,6 @@ import gleamunison/elab_types.{
   type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
 }
 import gleamunison/elaborate as elab
-import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/types.{type TypeCache, CTTerm, TypeCache}
 
@@ -290,24 +290,14 @@ pub fn bootstrap_defs(
   })
 }
 
-/// Bootstrap terms (add, sub, mul, ...) dual-register as Math ability ops
-/// whose signatures carry the real types. Elaborating a term as SRef to a
-/// genesis ref would otherwise cache TypeVar(-1), leaving the checker blind
-/// to builtin misuse. Seed the genesis refs with the declared op types so
-/// every RefTo resolves honestly. This is a pure data move: the op table is
-/// the source of truth, the cache just stops dropping it.
+/// Every builtin signature comes from the bootstrap table. A partial seed
+/// here used to leave all but three builtins with the unknown TypeVar(-1).
 pub fn seed_builtin_term_types(cache: TypeCache) -> TypeCache {
-  let seeds = [
-    #(genesis.builtin_int_add(), int_int_int()),
-    #(genesis.builtin_sub(), int_int_int()),
-    #(genesis.builtin_mul(), int_int_int()),
-  ]
-  list.fold(seeds, cache, fn(acc, pair) {
-    TypeCache(dict.insert(acc.entries, pair.0, CTTerm(pair.1)))
+  list.fold(bootstraps.get_init_defs_data(), cache, fn(acc, definition) {
+    case definition {
+      bootstraps.BTerm(_, ref, typ) ->
+        TypeCache(dict.insert(acc.entries, ref, CTTerm(typ)))
+      bootstraps.BAbility(_, _) -> acc
+    }
   })
-}
-
-fn int_int_int() -> ast.Type {
-  let int = ast.Builtin(ast.IntType)
-  ast.Fn([int, int], int, ast.Required([]))
 }
