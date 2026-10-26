@@ -9,9 +9,9 @@ install, and rolls back, with receipts. This document is the operator half.
 An installed artifact proves what it is from its packaged metadata:
 
 ```sh
-unzip -p ./gleamunison gleamunison.app | grep vsn
-./gleamunison version          # v3.23.0 and later
-./gleamunison schema-version   # storage/codec schema integer
+unzip -p ./gleamunison_escript gleamunison.app | grep vsn
+./gleamunison_escript version          # v3.23.0 and later
+./gleamunison_escript schema-version   # storage/codec schema integer
 ```
 
 ## Storage compatibility gate
@@ -24,7 +24,9 @@ turns red until it exists.
 
 ## Upgrade
 
-1. Back up the installed binary (`cp gleamunison gleamunison.prev`).
+1. Back up the installed binary (`cp gleamunison_escript gleamunison_escript.prev`).
+   Keep the backup as data; the escript entry module is filename-sensitive, so
+   do not run it under the backup name.
 2. Build the new artifact: `./build_escript.sh` (atomic — a failed build
    never touches the previous artifact).
 3. Gate it: `bb scripts/test_release_contract.clj`.
@@ -40,7 +42,8 @@ truncates the install and requires a non-zero exit.
 ## Rollback
 
 1. Stop the service.
-2. Restore the backup over the install (`cp gleamunison.prev gleamunison`).
+2. Restore the backup under the original executable name
+   (`cp gleamunison_escript.prev gleamunison_escript`).
 3. Start, verify identity (`unzip -p ... vsn`) and liveness.
 4. If the upgrade changed `schema-version` (it must not without a migration
    step), the store may already be migrated forward; rollback then requires

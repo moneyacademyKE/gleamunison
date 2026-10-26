@@ -2,7 +2,15 @@
 
 This log catalogs all architectural decision records (ADRs) for the `gleamunison` codebase in chronological order.
 
-For paths that were considered and *declined*, with the reasoning, see [`unimplemented-architectural-paths.md`](../unimplemented-architectural-paths.md) — an index of proposals that never became ADRs.
+**How to read the status:** Accepted/Proposed/Deferred describes the decision,
+not a guarantee that every proposed implementation step exists today. Older
+ADRs may name modules or boundaries that later changed. Use
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) and the current operations guides
+for the runtime contract, and dated verification witnesses for measured proof.
+An implementation-status note may be appended without rewriting the original
+decision.
+
+For paths that were considered and *declined*, with the reasoning, see [`unimplemented-architectural-paths.md`](../unimplemented-architectural-paths.md) — a historical index of proposals that never became ADRs.
 
 | ID | Title | Status |
 |---|---|---|
@@ -72,7 +80,7 @@ For paths that were considered and *declined*, with the reasoning, see [`unimple
 | [ADR-0064](0064-s-expression-syntax-rationale.md) | S-expression syntax rationale — why Lisp, its costs, and the front-end escape hatch | Accepted |
 | [ADR-0065](0065-verified-cas-admission.md) | Verified CAS admission and recoverable definition payloads | Accepted |
 | [ADR-0066](0066-bounded-readiness-and-metrics.md) | Bounded readiness and supervised in-process metrics | Accepted |
-| [ADR-0067](0067-production-boundaries.md) | Production boundaries and execution profiles | Accepted contract; enforcement pending |
+| [ADR-0067](0067-production-boundaries.md) | Production boundaries and execution profiles | Accepted; current limits in implementation note |
 | [ADR-0068](0068-durable-agent-read-model.md) | Durable agent read model with explicit scratch overlays | Accepted |
 | [ADR-0069](0069-durable-db-ability.md) | Durable application data through one Db ability | Accepted |
 | [ADR-0070](0070-admitted-agent-writes.md) | Admitted agent writes through one MCP publication tool | Accepted |

@@ -1,6 +1,6 @@
 # ADR 0067: Production boundaries and execution profiles
 
-- **Status:** Accepted as the release contract; enforcement is pending in plan tasks 2–8
+- **Status:** Accepted; current implementation limits tracked below and in the deployment guide
 - **Date:** 2026-10-20 (EAT)
 - **Tracking:** Bankai `bk-c7bb`; GitHub issue [#25](https://github.com/moneyacademyKE/gleamunison/issues/25)
 - **Related:** [ADR 0001](0001-content-addressed-identity.md), [ADR 0021](0021-runtime-tradeoffs-and-robustness-safeguards.md), [ADR 0065](0065-verified-cas-admission.md), [ADR 0066](0066-bounded-readiness-and-metrics.md)
@@ -102,5 +102,23 @@ The minimum final classification is:
 ## Scope and non-goals
 
 This ADR does not implement TLS, mTLS, an OS executor, signatures, quotas, a durable telemetry exporter, or LLM redaction. Those are the subsequent plan tasks. It does not authorize a tag, Hex publish, merge, deployment, or public production claim.
+
+## Current implementation note (2026-10-26)
+
+The original contract above remains the design record. Current source now
+implements the bind/profile gate, bearer scopes, authenticated TCP sync,
+evidence policy, bounded evaluation/resources, readiness/observability,
+artifact/release checks, and LLM controls described in
+[Deployment profiles](../operations/deployment-profiles.md) and the
+[verification matrix](../operations/verification-matrix.md).
+
+The non-loopback gate checks profile and admin-token presence; it does not
+prove TLS or proxy identity. Native HTTP TLS/mTLS, an approved external
+executor, and production multi-node/untrusted isolation remain unimplemented.
+Transport-facing `untrusted-execution` therefore refuses. The verified local
+classification is `authenticated-single-node-service`, with actual receipts in
+[the 2026-10-26 witness](../verification/production-boundaries-2026-10-26.md).
+
+This note records implementation status, not a new architectural decision.
 
 **Rich Hickey check:** one policy owner per boundary, one explicit refusal path, and one proof index. The rejected alternative is a universal “production” abstraction that complects unrelated authority and makes the system harder to reason about.

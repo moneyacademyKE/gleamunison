@@ -1,99 +1,127 @@
-# Deployment profiles and production boundary contract
+# Deployment profiles and execution boundaries
 
-**Date:** 2026-10-20 (EAT)
-**Status:** Contract frozen; enforcement is sequenced in the remaining production-gaps plan.
-**Tracking:** Bankai `bk-c7bb`; GitHub issue [#25](https://github.com/moneyacademyKE/gleamunison/issues/25)
+A profile selects an execution/deployment contract; it is not a universal
+“production” switch. Request authentication, transport encryption, effect
+handlers, and OS isolation answer different questions.
 
-This document prevents a local research runtime from being mistaken for a remotely exposed or untrusted-code service. A profile is a startup contract, not a marketing label. If a required control is absent, the profile refuses instead of silently downgrading.
+The current verified classification is **authenticated single-node service**.
+Read [Operations](../OPERATIONS.md) for setup and the latest dated production
+witness for evidence. This guide describes the implemented gates and the
+external obligations they do not replace.
 
-## Profiles
+## `local`
 
-### `local`
+Intended for one operator, loopback development, local agents, and CLI use.
 
-**Purpose:** one operator, one node, loopback development, research, and local CLI use.
+- HTTP binds to `127.0.0.1` by default.
+- With no HTTP tokens configured, protected routes are allowed behind the
+  loopback bind contract. This is not remote authentication.
+- Evaluation uses the in-process scope, effect handlers, and resource budgets.
+- The VM, host FFI, configured storage, and loaded definitions remain inside
+  the operator's trusted computing base.
 
-**Allowed boundary:** the local OS user and explicitly configured local storage/provider credentials. The VM, FFI, and loaded definitions are trusted by this profile; this profile makes no claim to isolate hostile code from the host.
+Useful checks:
 
-**Required behavior:**
+```sh
+curl -fsS http://127.0.0.1:8080/api/live
+curl -fsS http://127.0.0.1:8080/api/ready
+```
 
-- Bind loopback by default.
-- Keep remote sync and administrative routes disabled unless explicitly enabled.
-- Use bounded request bodies, frames, workers, readiness checks, and in-process metrics.
-- Treat evidence and CAS verification as integrity checks, not proof of authorship or safety.
+Liveness answers only whether HTTP can respond. Readiness returns 503 when a
+required storage, version/schema, memory, configuration, or required-service
+check fails.
 
-**Refuse when:** a configuration requests a non-loopback bind without selecting `authenticated-remote`; a required local store/provider/recovery check fails; or an invalid resource limit is supplied.
+A non-loopback bind under `local` refuses with
+`non_loopback_requires_authenticated_remote_profile`.
 
-**Proof:**
+## `authenticated-remote`
 
-- `curl -fsS http://127.0.0.1:<port>/api/live` must return HTTP 200 and `{"live":true}`.
-- `curl -fsS http://127.0.0.1:<port>/api/ready` must return HTTP 200 only when required checks pass.
-- The final witness will record the exact startup configuration and `scripts/verify_production_boundaries.clj` result.
+Intended for an explicitly operated single node exposed through an externally
+secured transport.
 
-### `authenticated-remote`
+### Implemented startup and request gates
 
-**Purpose:** an explicitly operated remote single-node service.
+A non-loopback HTTP bind requires:
 
-**Allowed boundary:** authenticated clients and sync peers with declared scopes, encrypted transport, bounded frames, and replay/session binding. Authentication answers “who”; authorization answers “what”; encryption answers “can an observer read or alter the connection.” They are separate controls.
+- `GLEAMUNISON_PROFILE=authenticated-remote`
+- a non-empty `GLEAMUNISON_HTTP_TOKEN`
 
-**Required behavior:**
+Without both, startup refuses. The admin token is also the credential checked
+by the current bind gate; read/write tokens alone do not satisfy it.
 
-- Require TLS/mTLS or a documented authenticated reverse-proxy contract before any non-loopback bind.
-- Authenticate HTTP, MCP, admin, data, and sync routes consistently; no powerful route is exempt by accident.
-- Bind request identity and scopes to the session/request and reject replay or missing identity.
-- Keep the Erlang distribution cookie/epmd host-trust boundary explicit; TLS on an HTTP port does not secure distribution automatically.
-- Keep local development available through the `local` profile rather than weakening this profile.
+Configured bearer credentials resolve to scopes:
 
-**Refuse when:** TLS/mTLS or the authenticated proxy contract is absent; route authorization is incomplete; sync peer identity cannot be authenticated; frames or sessions are unbounded; or the requested bind is non-loopback without this profile.
+| Credential | Scopes |
+|---|---|
+| `GLEAMUNISON_HTTP_TOKEN` | `admin` |
+| `GLEAMUNISON_HTTP_WRITE_TOKEN` | `public`, `data-read`, `data-write` |
+| `GLEAMUNISON_HTTP_READ_TOKEN` | `public`, `data-read` |
 
-**Proof:**
+`auth.required_scope` owns route classification. Public probes/static assets,
+data-write application routes, and admin `/api/*` routes are distinct.
+Evaluation, definition, MCP, and `/app` writes require data-write; admin
+observability requires admin. A read-scoped token cannot authorize those
+writes or admin routes.
 
-- A focused transport-auth test must show unauthenticated rejection, insufficient-scope rejection, and authorized success.
-- A live startup probe must show non-loopback refusal with missing transport/auth configuration.
-- A loopback/authorized probe must show the same request succeeds with the declared scope.
-- `test/transport_auth_test.gleam` and `test/tls_sync_test.gleam` are the planned focused gates; the integrated command is `bb scripts/verify_production_boundaries.clj`.
+TCP sync has its own `GLEAMUNISON_SYNC_TOKEN` and authenticated v2 handshake.
+HTTP authentication does not authenticate a sync peer, and neither one secures
+Erlang distribution/epmd automatically.
 
-### `untrusted-execution`
+### External obligations the process cannot prove
 
-**Purpose:** evaluate code supplied by a party that is not trusted with the node.
+The runtime does **not** terminate TLS or discover/validate a reverse proxy.
+The startup gate checks profile and token presence, not certificate validity,
+proxy identity, client certificate policy, or Internet exposure. The operator
+must therefore provide and verify:
 
-**Allowed boundary:** an approved OS/container executor owns the actual process, filesystem, network, CPU, memory, and descendant boundary. A BEAM scope, capability handler, or worker supervisor is an additional containment layer, not a complete sandbox.
+1. TLS or an equivalent protected transport before remote exposure.
+2. Proxy/network authentication and forwarding rules appropriate to the
+   deployment, without treating arbitrary forwarded headers as identity.
+3. Firewall/network policy for every listener, sync port, and Erlang
+   distribution endpoint.
+4. Secret storage, rotation, logging, and certificate/proxy health checks.
 
-**Required behavior:**
+`authenticated-remote` still uses in-process evaluation. It does not make
+hostile code safe and is not a multi-tenant isolation claim.
 
-- Refuse execution unless the approved external executor is configured and its health/identity is verified.
-- Assign every evaluation a scope with permitted descendants, deadline, cancellation, reduction/memory/concurrency budgets, and cleanup ownership.
-- Deny direct FFI/jets and host authority by default.
-- Redact secrets and sensitive inputs from errors, logs, traces, evidence, and transcripts.
-- Make timeout/cancellation and executor failure machine-readable and non-successful.
+## `untrusted-execution`
 
-**Refuse when:** the executor is missing, unapproved, unreachable, unauthenticated, or unable to enforce the requested limits; direct host FFI is requested; or cleanup cannot prove the evaluation scope is drained.
+This profile is not an available sandbox mode. The transport-facing admission
+policy constructs it without an approved external executor and refuses
+execution/write admission with `missing_external_executor`.
 
-**Proof:**
+MCP publication/generation checks this refusal before opening storage.
+`/eval`, `/define`, `/mcp`, and `/app/*` pass the same execution-profile
+admission. In-process budgets and effect frames cannot substitute for a
+kernel/container boundary.
 
-- `test/execution_scope_test.gleam` must show child/grandchild cleanup after deadline and explicit cancellation.
-- `test/sandbox_boundary_test.gleam` must show capability denial, resource refusal, and refusal when the executor is absent.
-- The final witness must include the executor identity/configuration without including its secret and must label any manual OS/container check.
+A future implementation would need an approved external executor with verified
+identity, filesystem/network isolation, descendant cleanup, cancellation,
+resource limits, and redaction evidence. Those capabilities are not claimed by
+naming the profile or by having a data type for an executor.
 
-## Profile selection and downgrade rules
+## Identity and trust remain separate
 
-- `local` is the only default convenience profile.
-- Selecting `authenticated-remote` or `untrusted-execution` is explicit and visible in startup/readiness output.
-- Missing controls are failures. There is no automatic fallback from `authenticated-remote` to `local`, or from `untrusted-execution` to in-process evaluation.
-- A process-scope timeout proves cleanup of the owned scope only. It does not prove kernel isolation.
-- A signed evidence record proves that a signer attested to a subject under a policy. It does not prove that the subject is safe, correct, or authorized for every deployment.
+| Object | What it proves |
+|---|---|
+| Content ref | Which canonical term/type is being executed |
+| Branch pointer | Which names the selected branch currently binds |
+| Evidence | What a signer attested about a subject under policy |
+| Bearer identity/scope | Which routes a caller may use |
+| Deployment profile | Which execution/startup boundary was selected |
+| External executor | Where hostile code would actually be isolated, if implemented |
 
-## Operator checklist
+None substitutes for another. A valid hash is not authorization; a signature
+is not semantic correctness; an authenticated request is not sandboxed code.
 
-Before calling a node production-capable, record:
+## Verification and release language
 
-1. Selected profile and bind address.
-2. Request/sync identity and authorization scopes.
-3. TLS/mTLS or reverse-proxy termination contract, if remote.
-4. External executor identity and enforced limits, if untrusted execution is enabled.
-5. Storage, schema, recovery, version, and readiness results.
-6. Artifact hash and verification witness path.
-7. Explicit exclusions and unresolved risks.
+Use `test/transport_auth_test.gleam` for scope and bind decisions and
+`bb scripts/verify_production_boundaries.clj` for the integrated local battery.
+Record the selected profile, bind address, credential scopes (never secret
+values), store path, artifact hash, and actual command results.
 
-The profile contract does not authorize a tag, Hex publish, merge, deployment, or public release.
-
-**Rich Hickey check:** three profiles with explicit refusal paths are simpler than one “production” switch that complects transport, authority, and sandboxing. Keep the boundaries separate so each can be tested and composed.
+Do not upgrade “configured locally” to “safe remotely,” or “remote authenticated”
+to “untrusted multi-tenant.” The current labels and exclusions are deliberate.
+A contract, test, or witness does not authorize a deployment, tag, merge, or
+release.

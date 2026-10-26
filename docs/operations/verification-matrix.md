@@ -1,50 +1,60 @@
 # Production-boundary verification matrix
 
-**Date:** 2026-10-20 (EAT)
-**Status:** Matrix frozen for the remaining production-gaps plan; rows become release evidence only when their command has a real receipt.
-**Tracking:** Bankai `bk-c7bb`; GitHub issue [#25](https://github.com/moneyacademyKE/gleamunison/issues/25)
+This matrix maps a current boundary claim to its executable proof. It is a
+guide to what to run, not a claim that a command ran in this checkout. Dated
+witnesses under `docs/verification/` record actual source/artifact revisions,
+exit codes, durations, and exclusions.
 
-This matrix is the index from a boundary claim to a runnable refusal/success proof. A row marked **planned** is not evidence of a passing implementation. Every final witness must record the command, exit code, source/artifact revision, and any manual or environmental exclusion.
+Most domain suites run through `gleam test`; the integrated
+`bb scripts/verify_production_boundaries.clj` battery separately covers format,
+artifact, CLI, HTTP, release, playbook, and related process contracts.
 
-| Boundary | Profile(s) | Claim to prove | Runnable proof | Expected refusal/success | Status at 2026-10-20 |
-|---|---|---|---|---|---|
-| Loopback liveness | `local` | A live local process answers without implying readiness | `curl -i http://127.0.0.1:<port>/api/live` | HTTP 200 and `live=true` while the HTTP process answers | Existing v3.23.0 probe; re-run in integrated gate |
-| Required-resource readiness | `local`, `authenticated-remote` | Readiness fails when required storage, version/schema, memory, provider, supervisor, or listener checks fail | `curl -i http://127.0.0.1:<port>/api/ready` plus `test/production_readiness_test.gleam` | HTTP 200 only for all required checks; HTTP 503 with bounded JSON otherwise | Existing; observational supervisors/queues/codebase/provider checks added in task 5 (`65f463f`) |
-| Non-loopback bind gate | `authenticated-remote` | Remote binding cannot silently use local trust | `bb scripts/verify_production_boundaries.clj --transport` | Startup refuses without TLS/mTLS or an authenticated reverse-proxy contract; configured remote profile starts | Planned in task 3 |
-| HTTP/MCP identity and scopes | `authenticated-remote` | Powerful routes reject missing/insufficient identity and admit authorized requests | `test/transport_auth_test.gleam` and live authorized/unauthorized probes | 401/403 for missing or insufficient scope; success for the declared scope | Planned in task 3 |
-| Authenticated sync peer | `authenticated-remote` | Sync peers are typed, authenticated, replay-bound, and frame-bounded | `test/tls_sync_test.gleam` | Bad peer, bad identity, replay, oversized frame, or missing TLS refuses; authorized handshake succeeds | Planned in task 3 |
-| Content admission | all | Immutable bytes bind to the requested content ref before admission | `test/trust_policy_test.gleam` and CAS recovery probe | Tamper, cross-subject, malformed, expired, revoked, or unsigned production input refuses | CAS integrity exists; signatures/policy planned in task 4 |
-| Branch/pointer separation | all | Mutable branch pointers cannot masquerade as content identity | `test/trust_policy_test.gleam` | Cross-branch, replayed, or mismatched pointer refuses; valid pointer preserves requested branch | Namespace identity closed in v3.23.0; trust policy planned |
-| Evidence provenance | all | Evidence names signer, subject, dependencies, expiry, and policy without becoming content identity | `test/trust_policy_test.gleam` | Missing signer, wrong subject, expired/revoked key, or replay refuses in production; valid rotated key succeeds | Planned in task 4 |
-| Evaluation scope | `local`, `untrusted-execution` | Deadline/cancellation owns and drains permitted descendants | `test/execution_scope_test.gleam` | Child and grandchild are absent after timeout/cancel; normal success also cleans up | Prior timeout fix exists; new typed policy planned in task 2 |
-| External sandbox requirement | `untrusted-execution` | Hostile code never runs in-process when the approved executor is absent | `test/sandbox_boundary_test.gleam` | Missing/unapproved executor, direct FFI/jet, or unenforceable limit refuses | Planned in task 2 |
-| Resource saturation | all | Request/evaluation/MCP/SSE/sync queues and payloads are bounded | `test/resource_policy_test.gleam` plus saturation probe | Bounded rejection/backpressure; no unbounded mailbox, body, frame, or worker growth | Closed in task 5 (`bk-0b4e`, commit `65f463f`) |
-| Crash/restart and drain | all | Supervisors recover predictably and drain without false readiness | `test/observability_recovery_test.gleam` | Kill/restart, drain, readiness failure, and recovery are visible and bounded | Closed in task 5 (`bk-0b4e`, commit `65f463f`) |
-| Redacted observability | all | Metrics/logs/traces are machine-readable, bounded, and secret-free | `test/observability_recovery_test.gleam` plus export probe | Retention/cardinality caps hold; secrets/prompts are absent or redacted | Closed in task 5 (`bk-0b4e`, commit `65f463f`) |
-| Artifact contract | all | Shipped artifact identifies its version/app closure and excludes test-only modules | `./build_escript.sh`; `bb scripts/test_release_contract.clj` | Build succeeds; declared version/app are present; disallowed BEAMs are absent | Closed in task 6 (`bk-a778`); reproducibility pinned and proven |
-| Upgrade/rollback | all | Previous release, migration failure, drain, and rollback are isolated and reversible | `bb scripts/test_upgrade_rollback.clj` | Failed upgrade does not corrupt the fixture store; rollback restores the declared prior state | Closed in task 6 (`bk-a778`); v3.22.0 → v3.23.0 round-trip proven |
-| LLM budget/cancellation | all | Provider calls have real time/token/cost/retry/concurrency limits and cancellation | `test/llm_budget_test.gleam` | Timeout/cancel stops transport; budget/circuit limits refuse further work; rotation succeeds without restart | Closed in task 7 (`bk-82d7`) |
-| LLM privacy | all | Secret and sensitive prompt/response data do not enter durable diagnostics | `test/llm_budget_test.gleam` plus redaction scan | No configured secret appears in logs, traces, metrics, evidence, or transcripts | Closed in task 7 (`bk-82d7`); transcripts redact at capture, provider error bodies omitted |
-| Integrated boundary witness | all | Release classification matches evidence and exclusions | `bb scripts/verify_production_boundaries.clj` | Exit 0 only when required rows pass; manual/skipped rows are explicit; no publish/tag/merge/deploy | Planned in task 8 |
+| Boundary | Runnable proof | What green means / does not mean |
+|---|---|---|
+| Loopback liveness and readiness | `test/production_readiness_test.gleam`; `curl /api/live` and `/api/ready` on a local server | Public liveness is distinct from required-resource readiness; a readiness 503 names failed checks. It is not a full CAS or backup audit. |
+| Non-loopback bind gate | `test/transport_auth_test.gleam` | Missing authenticated-remote profile/admin token refuses. Token/profile presence does not prove TLS or proxy health. |
+| HTTP/MCP identity and scopes | `test/transport_auth_test.gleam`; HTTP route integration tests | Public, data-read, data-write, and admin scopes are separated. No external proxy identity or TLS is inferred. |
+| Authenticated TCP sync | `test/sync_auth_test.gleam`, `sync_accept_test.gleam`, `sync_test.gleam` | Missing/wrong proof, replay, oversized frames, and invalid content are refused; valid authenticated sync works. This is not a native-TLS or Erlang-cluster security proof. |
+| Content identity and admission | `test/trust_policy_test.gleam`, `codebase_test.gleam`, `definition_codec_test.gleam`, `storage_test.gleam` | Content bytes bind to canonical identity; tampering and malformed/untrusted input refuse. Integrity alone is not provenance or semantic correctness. |
+| Branch/pointer separation | `test/namespace_test.gleam`, `cli_branch_scope_test.gleam`, `retraction_branch_scope_test.gleam`, agent/read-model and route tests | Mutable pointers are not content refs; wrong/missing branches and stale overlays are visible. This is not distributed branch consensus. |
+| Evidence and key policy | `test/trust_policy_test.gleam`, `evidence_test.gleam`, `evidence_io_test.gleam`, `signed_cli_evidence_test.gleam` | Signer/subject/policy and rotation/revocation/expiry rules are enforced at the documented gates. The production runtime's configured signer boundary remains narrower than library overlap helpers. |
+| Evaluation scope and budgets | `test/execution_scope_test.gleam`, `evaluation_timeout_test.gleam`, `resource_policy_test.gleam` | In-process scopes have deadlines, resource limits, and descendant cleanup. This is not kernel/OS isolation. |
+| External executor refusal | `test/sandbox_boundary_test.gleam`, admitted-write and `/app` profile tests | Transport-facing untrusted execution refuses before work/storage when no approved executor exists. It does not prove an external executor exists. |
+| Resource saturation | `test/resource_policy_test.gleam`, `observability_recovery_test.gleam` | Request/worker/frame/cache/cardinality limits fail closed or saturate visibly. In-process caches are not durable telemetry. |
+| Crash/restart and drain | `test/observability_recovery_test.gleam`, HTTP/service tests | Supervised workers recover and listeners drain without false success. A process restart is not by itself a store-restore proof. |
+| Durable agent read model | `test/agent_read_model_test.gleam`, MCP/session refresh tests | Durable and scratch entries stay distinct and services converge on the selected branch. Scratch is not silently admitted. |
+| Admitted writes and generation | `test/agent_publish_test.gleam`, `generation_loop_test.gleam`, `generation_request_test.gleam`, `mcp_http_test.gleam` | Source/candidates pass inferred-type, evidence, trust, and branch admission; invalid/exhausted generation does not add bindings. Fixture success is not model-quality evidence. |
+| Durable application Db | `test/db_ability_test.gleam`, application route/integration tests | Typed facts commit to the journal and survive owner restart. V1 exact EAV reads are not full Datalog or multi-node state replication. |
+| Admitted `/app` routes | `test/app_route_test.gleam`, `app_route_http_test.gleam` | Only selected-branch admitted content executes with bounded JSON; scratch/unbound CAS/untrusted work refuses. |
+| Artifact contract | `./build_escript.sh`; `bash scripts/test_artifact.sh` | Packaged version/dependencies/assets match the declared contract and test modules are absent. Existence of an old artifact is not a fresh build proof. |
+| Release reproducibility | `bb scripts/test_release_contract.clj` | Two clean builds of the same source are byte-identical and the release contract passes. It is not a hosted CI-matrix receipt. |
+| Upgrade/rollback | `bb scripts/test_upgrade_rollback.clj` | The tested prior/current artifact and corrupt-install recovery paths are reversible and loud. A new schema still needs an explicit migration design. |
+| CLI truth and errors | `bb scripts/test_cli_truth.clj`; `bb scripts/test_cli_errors.clj` | Help, process exits, stderr/stdout, and bad invocations match the shipped CLI. It is not an external-provider test. |
+| HTTP static boundary and dashboard | `bash scripts/test_http_boundary.sh`; `bun scripts/test_dashboard_safety.mjs` | Traversal/static and hostile-markup cases stay bounded/inert. This is not a complete application security audit. |
+| Playbook conformance | `bb scripts/run_playbook_tests.clj`; `bb scripts/test_parser.clj`; `bb scripts/test_playbook_runner.clj` | Parsed executable cases pass, exclusions stay pinned, and crash/timeout/stale policy fails closed. Exclusions are not passes. |
+| LSP transport | `bb scripts/test_lsp_stdio.clj` | Stdio framing, UTF-8, and malformed-input behavior pass. It is not an editor-specific certification. |
+| Integrated witness | `bb scripts/verify_production_boundaries.clj` | Every required integrated battery exited 0 and the witness records its scope/exclusions. Domain tests above are included through `gleam test`; this table itself does not execute anything. |
 
-## Required final classifications
+## Classification
 
-The final witness must emit exactly one of these classifications for the tested artifact/configuration:
+The current dated witness reports `authenticated-single-node-service` for its
+tested artifact/configuration. That label does not assert native TLS, external
+untrusted execution, safe multi-tenancy, or a supported multi-node deployment.
+Those require separate implementation and evidence, not a documentation rename.
 
-- `safe-local-research-runtime`: loopback/local trust proven; no untrusted-code isolation claim.
-- `authenticated-single-node-service`: remote transport, identity, scopes, and sync policy proven; untrusted execution remains disabled unless its separate proof passes.
-- `untrusted-code-production-platform`: **forbidden** until external OS/container isolation, identity/trust, resource, recovery, compatibility, and privacy rows all pass.
+Local macOS/OTP results do not prove every OTP 27/28/29 × Ubuntu/macOS hosted
+CI leg. Record the CI result separately from the local witness.
 
 ## Evidence format
 
-Each receipt should include:
+A useful witness records:
 
-- date/time in EAT;
-- repository revision and artifact hash where applicable;
-- exact command and environment/profile (without secrets);
-- exit code and relevant bounded output;
-- row IDs covered;
-- manual checks, skips, or environmental blockers;
-- explicit statement that the run performed no tag, Hex publish, merge, deployment, or public release.
+- date/time in EAT and the source revision;
+- artifact hash where applicable;
+- exact command, profile/environment shape, and no secret values;
+- exit code and bounded relevant output;
+- manual checks, skips, exclusions, and unresolved risks;
+- whether any push, tag, publish, merge, deployment, or release occurred.
 
-**Rich Hickey check:** the matrix is a data table from boundary to proof, not a second orchestration framework. One claim, one owner, one runnable result; anything else stays an unresolved risk.
+Keep current contracts in this matrix and measured results in dated witnesses.
+Do not change an old witness's numbers to describe a newer tree.

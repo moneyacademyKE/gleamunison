@@ -1,15 +1,15 @@
 # Compatibility Matrix
 
-What "supported" means here: the full test suite and both release gates
-(`test_release_contract.clj`, `test_upgrade_rollback.clj`) run green in CI on
-the combination. Anything else may work; it is not claimed.
+What “supported” means here: the configured CI workflow exercises the
+combination, or a dated local witness explicitly names the environment. A green
+local run on one OTP/OS pair does not certify the rest of the matrix.
 
 | Component | Supported | Notes |
 |---|---|---|
 | Erlang/OTP | 27, 28, 29 | 27 is the floor: the readiness report uses the OTP 27 `json` module |
-| Gleam | 1.19.x | pinned in CI as 1.19.1 |
-| macOS | arm64 (Apple Silicon) | local development target |
-| Linux | x86_64, arm64 | CI runs ubuntu-latest |
+| Gleam | 1.19.1 | pinned in CI |
+| macOS | `macos-latest` in CI; arm64 locally verified | local witness records the exact OTP/toolchain |
+| Linux | `ubuntu-latest` in CI | release gates run on this target / OTP 29; no separate arm64 CI claim |
 | Windows | unsupported | no CI, no claim |
 | Hex deps | gleam_stdlib <2, gleamy_structures <3, simplifile <3, glam <3 | runtime closure; birdie/gleeunit are dev-only and never ship in the artifact |
 
