@@ -3,12 +3,15 @@
 
 %% One supervised owner for HTTP scratch and the snapshots MCP reads. Durable
 %% branch/CAS entries and mutable source overlays remain distinct in the value.
--export([start_link/0, start_link/1, eval/1, define/2, publish/1, definitions/0,
+-export([start_link/0, start_link/1, eval/1, define/2, publish/1, generate/1, definitions/0,
          definition_catalog/0, snapshot/0, stop/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SERVER, ?MODULE).
 -define(CALL_TIMEOUT, 30000).
+%% Eight attempts at the provider's 180-second ceiling, plus local admission.
+%% The owner stays occupied; the caller must not time out and abandon live work.
+-define(GENERATION_TIMEOUT, 1500000).
 
 start_link() -> start_link([]).
 start_link(LoadFiles) ->
@@ -18,6 +21,7 @@ eval(Source) when is_binary(Source) -> call({eval, Source}).
 define(Name, Source) when is_binary(Name), is_binary(Source) ->
     call({define, Name, Source}).
 publish(Source) when is_binary(Source) -> call({publish, Source}).
+generate(Plan) -> call({generate, Plan}, ?GENERATION_TIMEOUT).
 definitions() -> call(definitions).
 definition_catalog() -> call(definition_catalog).
 snapshot() -> call(snapshot).
@@ -28,14 +32,16 @@ stop() ->
         _ -> gen_server:call(?SERVER, stop, ?CALL_TIMEOUT)
     end.
 
-call(Message) ->
+call(Message) -> call(Message, ?CALL_TIMEOUT).
+
+call(Message, Timeout) ->
     case whereis(?SERVER) of
         undefined -> {error, <<"session not running">>};
-        _ -> do_call(Message)
+        _ -> do_call(Message, Timeout)
     end.
 
-do_call(Message) ->
-    try gen_server:call(?SERVER, Message, ?CALL_TIMEOUT) of
+do_call(Message, Timeout) ->
+    try gen_server:call(?SERVER, Message, Timeout) of
         Reply -> Reply
     catch
         exit:{timeout, _} -> {error, <<"session timeout">>};
@@ -68,6 +74,9 @@ handle_call({define, Name, Source}, _From, State) ->
     {reply, Reply, Next};
 handle_call({publish, Source}, _From, State) ->
     {Reply, Next} = run(State, gleamunison@session_refresh:publish(State, Source)),
+    {reply, Reply, Next};
+handle_call({generate, Plan}, _From, State) ->
+    {Reply, Next} = run(State, gleamunison@session_refresh:generate(State, Plan)),
     {reply, Reply, Next};
 handle_call(definitions, _From, State) ->
     {reply, {ok, gleamunison@mcp_session:defined_names(State)}, State};

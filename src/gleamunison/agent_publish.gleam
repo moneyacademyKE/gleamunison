@@ -3,12 +3,15 @@
 
 import gleam/int
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
+import gleamunison/ast
 import gleamunison/cli_test
 import gleamunison/evidence
 import gleamunison/mcp
 import gleamunison/publication
+import gleamunison/schema_printer
 import gleamunison/source_loader
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/test_runner
@@ -28,6 +31,37 @@ pub fn publish_source(
   untrusted: Bool,
   log_directory: String,
 ) -> Result(Publication, String) {
+  publish(adapter, source, branch, untrusted, log_directory, None)
+}
+
+/// A generation request names one target value shape. Check the elaborated
+/// type, not the candidate's self-description, before evidence or admission.
+pub fn publish_source_with_signature(
+  adapter: StorageAdapter,
+  source: String,
+  branch: String,
+  untrusted: Bool,
+  log_directory: String,
+  expected_signature: String,
+) -> Result(Publication, String) {
+  publish(
+    adapter,
+    source,
+    branch,
+    untrusted,
+    log_directory,
+    Some(expected_signature),
+  )
+}
+
+fn publish(
+  adapter: StorageAdapter,
+  source: String,
+  branch: String,
+  untrusted: Bool,
+  log_directory: String,
+  expected_signature: Option(String),
+) -> Result(Publication, String) {
   case untrusted {
     True -> Error("agent_publish_refused: untrusted profile cannot write")
     False -> {
@@ -43,6 +77,7 @@ pub fn publish_source(
             loaded.definitions,
             loaded.cache,
           ))
+          use _ <- result.try(check_signature(subjects, expected_signature))
           use _ <- result.try(test_and_attest(adapter, loaded))
           use _ <- result.try(publication.admit(
             adapter,
@@ -60,6 +95,36 @@ pub fn publish_source(
         }
       }
     }
+  }
+}
+
+fn check_signature(
+  subjects: List(publication.Subject),
+  expected: Option(String),
+) -> Result(Nil, String) {
+  case expected, subjects {
+    None, _ -> Ok(Nil)
+    Some(_), [] | Some(_), [_, _, ..] ->
+      Error(
+        "publish: signature-constrained generation requires one target term",
+      )
+    Some(wanted), [subject] ->
+      case subject.definition {
+        ast.TermDef(typ:, ..) ->
+          case schema_printer.to_schema(typ) == wanted {
+            True -> Ok(Nil)
+            False ->
+              Error(
+                "publish: signature mismatch for "
+                <> subject.name
+                <> ": inferred "
+                <> schema_printer.to_schema(typ)
+                <> ", requested "
+                <> wanted,
+              )
+          }
+        _ -> Error("publish: signature-constrained generation requires a term")
+      }
   }
 }
 

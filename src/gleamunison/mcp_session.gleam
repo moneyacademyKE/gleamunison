@@ -14,6 +14,7 @@ import gleamunison/lexer
 import gleamunison/lisp_literal
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/mcp_definition
+import gleamunison/mcp_generation
 import gleamunison/mcp_search
 import gleamunison/mcp_tools
 import gleamunison/mcp_write
@@ -363,6 +364,7 @@ fn tools(state: SessionState) -> List(Tool) {
       },
     ),
     mcp_write.tool(),
+    mcp_generation.tool(),
     names_tool("callers_of", "name", callers_of(state, _)),
     names_tool("deps_of", "name", deps_of(state, _)),
     names_tool("defs_by_kind", "kind", defs_by_kind(state, _)),

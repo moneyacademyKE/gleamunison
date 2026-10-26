@@ -144,6 +144,8 @@ fn tool_schema(name: String) -> String {
       "{\"type\":\"object\",\"required\":[\"expr\"],\"properties\":{\"expr\":{\"type\":\"string\"}}}"
     "agent_publish" ->
       "{\"type\":\"object\",\"required\":[\"source\"],\"properties\":{\"source\":{\"type\":\"string\"}},\"additionalProperties\":false}"
+    "agent_generate" ->
+      "{\"type\":\"object\",\"required\":[\"template\",\"signature\"],\"properties\":{\"template\":{\"type\":\"string\"},\"variables\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"string\"}},\"signature\":{\"type\":\"string\",\"description\":\"int, float, string, bool, or (parameters) -> result\"},\"max_attempts\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":8}},\"additionalProperties\":false}"
     "callers_of" ->
       "{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"}}}"
     "deps_of" ->

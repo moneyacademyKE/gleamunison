@@ -1,9 +1,11 @@
 import gleam/bit_array
 import gleam/dynamic/decode
+import gleam/int
 import gleam/string
 import gleamunison/cli_run
 import gleamunison/identity
 import gleamunison/json
+import gleamunison/mcp_generation
 import gleamunison/mcp_server
 import gleamunison/mcp_write
 import gleamunison/run_ref
@@ -208,6 +210,89 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
   cli_execution |> should.equal(Ok("42"))
 }
 
+pub fn mcp_generation_reaches_configured_provider_and_app_test() {
+  let root = "/tmp/gleamunison-mcp-generation-test"
+  let path = root <> "/store.dets"
+  let _ = storage.dets_delete_file(path)
+  let assert Ok(_) = simplifile.create_directory_all(root)
+  let candidate =
+    "```json\n{source: '(define generated-number 42)\\n(define test_generated-number (do Test expect 1))', signature: 'int',}\n```"
+  let assert Ok(provider_port) = start_completion_server(candidate)
+  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
+  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
+  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-generation-test-key")
+  ffi_set_env("OPENAI_API_KEY", "local-test-only")
+  ffi_set_env(
+    "OPENAI_BASE_URL",
+    "http://127.0.0.1:" <> int.to_string(provider_port) <> "/v1",
+  )
+  ffi_set_env("OPENAI_MODEL", "local-test")
+  ffi_set_env("LLM_HTTP_TIMEOUT_MS", "5000")
+  let result =
+    without_active_storage(fn() {
+      let assert Ok(Nil) = mcp_server.start([])
+      ffi_start_http_server(18_104)
+      let body =
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"agent_generate\",\"arguments\":{\"template\":\"Create a numeric answer with schema {{signature}}\",\"signature\":\"int\",\"max_attempts\":1}}}"
+      let generated = ffi_http_post(18_104, "/mcp", body)
+      let app = ffi_http_post(18_104, "/app/generated-number", "{\"args\":[]}")
+      mcp_server.stop()
+      ffi_stop_http_server()
+      #(generated, app)
+    })
+  unset_generation_env()
+  let #(generated, app) = result
+  let assert Ok(#(200, generated_body)) = generated
+  string.contains(generated_body, "\\\"attempts\\\":1") |> should.be_true
+  let generated_ref = generation_content_ref(generated_body)
+  string.length(generated_ref) |> should.equal(64)
+  let assert Ok(#(200, app_body)) = app
+  string.contains(app_body, "42") |> should.be_true
+  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-generation-test-key")
+  let assert Ok(adapter) = storage.dets(path)
+  let assert Ok(ref) = identity.parse_ref_hex(generated_ref)
+  run_ref.run_verified_on_branch(adapter, ref, "factory", [], False)
+  |> should.equal(Ok("42"))
+  let assert Ok(Nil) = adapter.close()
+  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  let _ = storage.dets_delete_file(path)
+}
+
+@external(erlang, "gleamunison_generation_test", "start_completion_server")
+fn start_completion_server(content: String) -> Result(Int, String)
+
+fn unset_generation_env() -> Nil {
+  ffi_unset_env("GLEAMUNISON_STORE_DIR")
+  ffi_unset_env("GLEAMUNISON_BRANCH")
+  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  ffi_unset_env("OPENAI_API_KEY")
+  ffi_unset_env("OPENAI_BASE_URL")
+  ffi_unset_env("OPENAI_MODEL")
+  ffi_unset_env("LLM_HTTP_TIMEOUT_MS")
+}
+
+pub fn mcp_generation_rejects_untrusted_before_storage_test() {
+  let root = "/tmp/gleamunison-mcp-untrusted-generation-test"
+  let path = root <> "/store.dets"
+  let _ = storage.dets_delete_file(path)
+  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
+  ffi_set_env("GLEAMUNISON_PROFILE", "untrusted-execution")
+  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
+  let assert Ok(decoded) =
+    json.decode(bit_array.from_string(
+      "{\"template\":\"generate\",\"signature\":\"int\",\"max_attempts\":1}",
+    ))
+  let assert Ok(args) =
+    decode.run(decoded, decode.dict(decode.string, decode.dynamic))
+  let result = without_active_storage(fn() { mcp_generation.generate(args) })
+  ffi_unset_env("GLEAMUNISON_STORE_DIR")
+  ffi_unset_env("GLEAMUNISON_PROFILE")
+  ffi_unset_env("GLEAMUNISON_BRANCH")
+  let assert Error(message) = result
+  string.contains(message, "untrusted") |> should.be_true
+  simplifile.is_file(path) |> should.equal(Ok(False))
+}
+
 pub fn mcp_untrusted_write_is_refused_before_storage_test() {
   let root = "/tmp/gleamunison-mcp-untrusted-write-test"
   let path = root <> "/store.dets"
@@ -223,6 +308,27 @@ pub fn mcp_untrusted_write_is_refused_before_storage_test() {
   let assert Error(message) = result
   string.contains(message, "untrusted") |> should.be_true
   simplifile.is_file(path) |> should.equal(Ok(False))
+}
+
+fn generation_content_ref(response: String) -> String {
+  let payload = tool_payload(response)
+  let assert Ok(decoded) = json.decode(bit_array.from_string(payload))
+  let decoder = {
+    use definitions <- decode.field(
+      "publication",
+      decode.field(
+        "definitions",
+        decode.list({
+          use content_ref <- decode.field("content_ref", decode.string)
+          decode.success(content_ref)
+        }),
+        decode.success,
+      ),
+    )
+    decode.success(definitions)
+  }
+  let assert Ok([content_ref]) = decode.run(decoded, decoder)
+  content_ref
 }
 
 fn publish_content_ref(response: String) -> String {
