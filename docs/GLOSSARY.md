@@ -1,137 +1,173 @@
 # Glossary
 
-Terms specific to the gleamunison project.
+Project terms in their current sense. The linked source or ADR is authoritative
+when an older document uses a term differently.
 
 ## A
 
-**ADR** — Architecture Decision Record. A document in `docs/adr/` that records a significant design decision, its context, and consequences. 38 records as of v0.8.0.
+**ADR** — Architecture Decision Record. A dated decision and its context in
+`docs/adr/`; not automatically a statement that every proposed step is built.
 
-**Algebraic Effects** — A mechanism for side effects where operations are declared as abilities and handled by dynamically scoped handler functions. Implemented via process dictionary stack in `gleamunison_effets.erl`.
+**Ability / algebraic effect** — A declared operation surface whose `Do` calls
+are handled by dynamically scoped process-local handler frames.
 
-**AST** — Abstract Syntax Tree. The internal representation of code after parsing. Defined in `src/gleamunison/ast.gleam` with 12 term constructors.
+**Agent generation** — Bounded composition of prompt storage, schema rendering,
+SAP candidate parsing, retry feedback, inferred-type checking, and the ordinary
+admitted publication path. It is not a direct model-to-CAS write.
+
+**AST** — Abstract syntax tree. The internal program representation defined in
+`src/gleamunison/ast.gleam`; constructor inventory belongs to that source file.
+
+**Authenticated single-node service** — The current verified deployment
+classification. It does not include an OS sandbox, native TLS, or a supported
+multi-node production topology.
 
 ## B
 
-**BEAM** — Bogdan's/Björn's Erlang Abstract Machine. The Erlang virtual machine. gleamunison targets BEAM bytecode.
+**BEAM** — The Erlang virtual machine targeted by the compiler and runtime.
 
-**Build Escript** — The process of packaging all BEAM bytecode into a standalone executable. Run via `./build_escript.sh`. See `docs/BUILD_ESCRIPT.md`.
+**Branch** — A mutable pointer to an immutable namespace snapshot. It selects
+name bindings; it does not change a definition's content identity.
 
 ## C
 
-**Content-Addressing** — The core architectural principle: identity = SHA256 hash of serialized form. A definition's hash IS its identity. Two identical definitions always have the same hash.
+**CAS** — Content-addressed storage. Immutable bytes are verified against the
+hash under which they are stored.
 
-**Codebase** — The content-addressed Merkle store where definitions live. Implemented in `src/gleamunison/codebase.gleam`. Append-only: once inserted, definitions never change.
+**Codebase** — Definitions, codec/evidence data, namespace snapshots, and branch
+pointers managed through the codebase/storage modules. It is not an unconditional
+append-only store: explicit retraction and purge have dependency rules.
+
+**Content ref** — A `DefinitionRef` identifying canonical definition content
+and inferred type. Distinct from a name ref or branch pointer.
 
 ## D
 
-**de Bruijn Index** — A positional variable reference where names are replaced by the distance from the binding site. Used for alpha-equivalence and stable hashing.
+**de Bruijn index** — A positional lexical-variable representation used for
+alpha-equivalence and stable identity.
 
-**De-Complection** — The central design discipline (Rich Hickey): if two concerns can be separated, they must be separated. Every type and function signature is a binding contract.
+**DefinitionRef** — The content-reference type in `identity.gleam`.
 
-**DefinitionRef** — A content-addressed reference to a definition. Contains a SHA256 `Hash`. Defined in `src/gleamunison/identity.gleam`.
+**DETS** — Erlang disk term storage used by durable adapters and journals.
 
-**DETS** — Disk Erlang Term Storage. Erlang's native disk persistence engine. Used for durable codebase storage.
+**Dogfood level** — A numbered playbook case exercising runtime behavior.
+Executable cases and explicit exclusions are counted separately by the runner.
 
-**Dogfood Level** — A single conformance test case in the playbook. Each level exercises a specific runtime capability (parse, elaborate, typecheck, compile, load, eval). 1000 levels total.
-
-**Dogfooding** — The practice of using the gleamunison runtime to test itself. The runtime compiles and evaluates its own test expressions.
+**Db ability** — The typed application-fact effect: `transact`, exact `get`,
+and exact `find` over text-valued EAV facts. Smaller than the full Datalog
+engine and backed by its own durable journal.
 
 ## E
 
-**Elaboration** — The phase that transforms surface syntax into core terms: resolves names to DefinitionRefs, assigns de Bruijn indices, maps abilities to types. Orchestrated by `src/gleamunison/elaborate.gleam`.
+**Elaboration** — Surface-to-core transformation: name resolution, lexical
+binding, ability/type processing, and construction of canonical terms.
 
-**Erlang FFI** — Foreign Function Interface to Erlang. `.erl` files in `src/` that expose Erlang runtime capabilities to Gleam code. Named `gleamunison_*.erl`.
+**Escript** — An executable Erlang archive. Gleamunison's artifact needs
+Erlang/OTP at runtime; it does not bundle the VM.
 
-**Escript** — Erlang's standalone executable format. A shebang line + zip archive of BEAM files. The built escript is `gleamunison_escript`.
+**Evidence** — An attestation bound to content identity and policy. Evidence
+is not a proof of semantic correctness, authorship, authorization, or safety.
 
-**ETS** — Erlang Term Storage. In-memory key-value store with process ownership. Used for volatile codebase storage and global counters.
+**ETS** — Erlang in-memory term storage used by volatile stores and bounded
+runtime registries.
 
 ## G
 
-**Genesis Block** — The set of pre-computed builtin definitions seeded into every codebase. Each builtin has a SHA256 hash and a corresponding BEAM module.
-
-**Genesis Module** — A raw Erlang module (`src/m_*.erl`) implementing a builtin primitive. 53 modules as of v3.24.0. See `docs/genesis-modules.md`.
+**Genesis module** — A checked-in `src/m_*.erl` implementation for a genesis
+builtin. Not arbitrary generated scratch and not a filename-based identity
+alternative.
 
 ## H
 
-**Hindley-Milner** — The type inference algorithm used for polymorphic types. Implemented in `src/gleamunison/inference.gleam`.
+**Hindley–Milner inference** — The polymorphic type inference approach used to
+compute the type that participates in definition identity.
+
+**Handler frame** — A process-local ability handler on the runtime stack. It is
+not an OS isolation boundary or a serializable continuation by itself.
+
+**Hole** — A typed incomplete expression (`?`) that fails loudly if executed.
 
 ## L
 
-**LOC** — Lines of Code. The project enforces a strict <250 LOC limit per file. Modules approaching this limit must be decomposed.
+**LOC policy** — A 250-line cohesion target and an enforced below-500-line
+ceiling for touched production files; test files are exempt.
 
-**Lowering** — The phase that transforms elaborated types into core type references with unique de Bruijn indices. Implemented in `src/gleamunison/lower.gleam`.
+**Loader** — The component that compiles/loads hash-addressed BEAM modules and
+tracks their lifecycle.
 
-**LRU** — Least Recently Used. The cache eviction strategy used for BEAM module lifecycle management.
+**LSP** — Language Server Protocol support over stdio; see `docs/LSP.md`.
 
 ## M
 
-**Mnesia** — Erlang's distributed DBMS. Used as a storage adapter for multi-node replicated codebase storage (Phase 5).
+**MCP** — Model Context Protocol surface for discovery, evaluation, admitted
+source publication, and bounded generation through the supervised session.
 
-**Module Purging** — The process of unloading old BEAM module versions from the Erlang code server (`code:delete/1` + `code:purge/1`) to allow redefinition without collision.
+**Mnesia** — An available storage adapter technology. Its presence is not a
+supported production-cluster or application-Db replication claim.
+
+## N
+
+**Name ref** — A reference resolved through the selected branch namespace.
+A stored caller's content ref can stay fixed while its name-ref dependency
+resolves differently after a branch rebind.
+
+**Namespace** — Immutable name-to-content-ref bindings plus branch/history
+machinery. Namespace names are not content identities.
 
 ## O
 
-**OTP 29** — Open Telecom Platform version 29. gleamunison targets OTP 29+ for specific API compatibility (`compile:file/2` return format, removed `erlang:type/1`).
+**OTP 27/28/29** — The Erlang/OTP releases in the configured CI matrix. Local
+verification on one release does not prove every hosted matrix leg.
 
 ## P
 
-**Playbook** — The development methodology: spec-first design, dogfood testing, de-complection discipline. Documented in `docs/PLAYBOOK.md`. Conformance levels in `docs/playbook/`.
+**Playbook** — The development/conformance methodology in `docs/PLAYBOOK.md`,
+with numbered cases in `docs/playbook/` and explicit exclusion policy.
 
-**Process Dictionary** — Per-process key-value store in Erlang. Used for dynamic scope stack (`$ability_stack`) and stateful FFI operations.
+**Process dictionary** — Per-process Erlang state used for the ability stack
+and selected runtime mechanisms. It is not durable application storage.
 
-**Pull Sync** — The three-phase synchronization protocol: advertise local refs → receive remote diff → request missing definitions. Implemented in `src/gleamunison/sync.gleam`.
+**Profile** — `local`, `authenticated-remote`, or `untrusted-execution`.
+Profiles select explicit admission/startup behavior, not a universal sandbox.
+
+**Prompt ref** — Content identity of a checked generation template. A stored
+prompt is an audit artifact, not an admitted application definition.
 
 ## R
 
-**REPL** — Read-Eval-Print Loop. The interactive command-line interface for dogfooding the runtime. Start with `./gleamunison_escript repl`.
+**REPL** — Interactive read/eval/print loop started with
+`./gleamunison_escript repl`.
+
+**Run ref** — The verified stored-execution path shared by CLI and admitted
+application routes; route resolution never replaces execution admission.
 
 ## S
 
-**SHA256** — The cryptographic hash function used for content-addressing. Replaced 32-bit `erlang:phash2` in Phase 4 for collision resistance.
+**SAP** — Schema-aligned parsing of bounded near-miss model output. A parsed
+candidate is data for checking, never write authority.
 
-**Supervision Tree** — OTP process hierarchy for fault tolerance. Implemented in `src/gleamunison_sup.erl`. Workers automatically restarted on failure.
+**Scratch overlay** — Session-local definitions that shadow durable names
+without modifying branch or CAS state. Publication does not silently absorb
+or discard the overlay.
 
-**S-Expression** — The surface syntax format: `(let x 42 (add x 1))`. Parsed by `src/gleamunison/parser.gleam`.
+**SHA256** — The cryptographic hash used for canonical content identity and
+byte-integrity checks.
+
+**Sync** — Pull-based transfer of missing content over TCP or Erlang
+distribution. Sync verifies bytes; execution still applies evidence policy.
 
 ## T
 
-**Type Inference** — The process of determining types without explicit annotations. Uses Hindley-Milner algorithm W. Implemented in `src/gleamunison/inference.gleam`. Includes `check_linearity/2` for continuation safety.
+**Trace** — A bounded operational HTTP observation, redacted at capture. Not a
+durable audit log or distributed-tracing system.
 
-## G (continued)
-
-**Guard Clause** — A condition on a match case: `(match x ((n (< n 5)) body))`. Guards are restricted to BEAM-guard-safe operations. AST `Guard` type, compiled to Erlang `when` clauses.
-
-## H (continued)
-
-**Hole** — An incomplete expression placeholder (`?`). First-class typed holes compile to `erlang:error({hole, ...})`, enabling live fill-and-resume workflows (Hazel paradigm).
-
-**HTTP Client** — `gleamunison/http_client` — typed HTTP with `get`, `post`, `put`, `delete` wrapping Erlang `httpc`.
-
-## L (continued)
-
-**Labeled Arguments** — Sugar for curried lambdas with defaults: `(fn* ((x 1) (y 2)) body)`. Desugars to nested lambdas with let-bound defaults.
-
-**Linearity Enforcement** — Static validation that continuation variables in algebraic effect handlers are resumed exactly once. Implemented in `check_linearity/2`.
-
-**LSP** — Language Server Protocol. Spec documented in `docs/LSP.md`. Provides autocomplete, hover, go-to-def, diagnostics for IDE integration.
-
-## M (continued)
-
-**Metrics** — `gleamunison_metrics.erl` — counter, gauge, and histogram operations emitting `:telemetry` events for Prometheus/StatsD integration. Recorded at the HTTP response boundary by `gleamunison_http_metrics`.
-
-## P (continued)
-
-**Property-Based Testing** — Not implemented. `gleamunison_property` was removed; tests use `gleeunit` assertions.
-
-## T (continued)
-
-**Template** — Not implemented. `gleamunison/template` was removed; there is no `{{var}}` interpolation module.
-
-**Trace Inspector** — Darklang-style live request capture. `gleamunison_trace.erl` stores HTTP request traces in ETS, exposed via `/api/traces` dashboard endpoints with SSE push.
-
-**Type Alias** — Named reference to another type: `(type alias Id Int)`. `SurfaceTypeAlias` and `SurfacePubTypeAlias` control export visibility.
+**Turnstile** — The evidence/trust admission policy through which publication
+passes. Agent writes do not get a second turnstile or a bypass.
 
 ## U
 
-**`use` Expression** — Monadic sugar: `(use x <- call body)` desugars to `call(fn(x) { body })`. AST `Use` variant, compiled to lambda-passing Erlang.
+**Untrusted execution** — A refused transport-facing profile in the current
+runtime because no approved external OS/container executor is configured.
+
+**`use`** — Lambda-passing surface sugar for sequencing computations; not a
+claim of a separate monadic runtime.

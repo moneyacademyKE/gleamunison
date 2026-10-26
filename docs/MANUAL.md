@@ -1,299 +1,238 @@
-# Gleamunison Reference Manual
+# Gleamunison reference manual
 
-Gleamunison is a content-addressed runtime with algebraic effects running on the Erlang BEAM, implemented in Gleam.
+Gleamunison is a content-addressed language runtime with algebraic effects,
+implemented in Gleam on the Erlang BEAM. This manual covers the current user
+surface. [Architecture](ARCHITECTURE.md) explains internals;
+[Operations](OPERATIONS.md) covers deployment; dated witnesses record tests.
 
----
+## 1. Identity and code
 
-## 1. Core Philosophy & Concepts
+A definition's identity is SHA256 over its canonical term **and inferred type**.
+Names are mutable metadata bound to immutable content refs. A branch selects
+which content ref a name resolves to; it does not change that content's hash.
 
-### 1.1 Content-Addressability
-Definitions (terms, type declarations, abilities) are identified by the **SHA256 hash** of their serialized AST structure.
-- **Identity = Hash**: Unchanged implementations retain identical hashes.
-- **Decoupled Names**: Names are merely metadata mappings pointing to hashes.
-- **No Builds**: Once compiled to BEAM bytecode, a definition is immutable and cached.
+Compilation produces hash-named BEAM modules. Old and new definitions can
+coexist, but application upgrade semantics, evidence, and deployment authority
+remain separate from code loading.
 
-### 1.2 Algebraic Effects (Abilities)
-Side effects and environment operations are declared as **Abilities**.
-- **Resumable Continuations**: triggers via `Do` yield to the nearest stack handler.
-- **Process Dictionary**: Handlers are thread-locally scoped in process dictionaries.
+Code admission and execution are different gates:
 
----
+- `publish`, admitted MCP writes, and `pkg install` enforce evidence/trust.
+- Sync verifies that transferred bytes match their content refs.
+- `run` and `/app` enforce execution evidence, selected-branch resolution,
+  profile admission, and evaluation budgets.
 
-## 2. Command Line Interface (CLI) & S-Expression Parser
-The standalone binary runs with zero dependencies on any Erlang/OTP environment.
+Scratch definitions in an agent/HTTP session are not admitted content. They
+remain an explicit overlay until source passes the ordinary publication path.
+
+## 2. Toolchain and CLI
+
+Build with Gleam 1.19.1 on Erlang/OTP 27, 28, or 29:
+
 ```sh
-./build_escript.sh && ./gleamunison_escript
+gleam deps download
+./build_escript.sh
+./gleamunison_escript --help
 ```
 
-### 2.1 S-Expression Syntax
-Gleamunison supports text input via a recursive-descent S-expression parser:
-- Literals: `42`, `"hello"`
-- Symbols: `x`, `y`
-- Lists: `(1 2 3)`
-- Scoped variables: `(let x 42 (add x 1))`
-- Lambdas: `(lam x (add x 1))`
+The escript includes the application and BEAM dependencies but **requires
+Erlang/OTP at runtime**. Gleam is not needed to run the packaged artifact.
 
----
+Common commands:
 
-## 3. Language AST & Definition Model
-Definitions exist in three forms, represented in `ast.gleam`:
-```gleam
-pub type Definition {
-  TermDef(term: Term, typ: Type)
-  TypeDef(TypeDeclaration)
-  AbilityDecl(AbilityDeclaration)
-}
-```
-AST defines 15 term constructors: literals, homogenous lists, variables, function applications, lambdas, let bindings, case matching, handlers, holes, and use expressions.
-
-### 3.1 Guard Clauses (v1.1.0)
-Match cases support guard clauses for conditional pattern matching:
-```
-(match x ((n (< n 5)) (println "small"))
-          ((n (> n 10)) (println "large"))
-          (_ (println "medium")))
-```
-Guards are restricted to BEAM-guard-safe operations and compile to Erlang `when` clauses.
-
-### 3.2 First-Class Typed Holes (v1.1.0)
-Incomplete expressions can use `?` as a placeholder:
-```
-(lam x ?)
-```
-Holes compile to `erlang:error({hole, incomplete_expression})` at runtime, enabling live fill-and-resume workflows.
-
-### 3.3 `use` Expression (v1.1.0)
-Monadic sugar that desugars to lambda-passing:
-```
-(use x <- (some-monad 42) body)
-;; equivalently: ((some-monad 42) (lam x body))
+```sh
+./gleamunison_escript repl [file.lisp ...]
+./gleamunison_escript server 8080
+./gleamunison_escript verify file.lisp
+./gleamunison_escript test file.lisp
+./gleamunison_escript publish file.lisp
+./gleamunison_escript run <content-ref> [args...] [--json]
+./gleamunison_escript run <content-ref> --inspect
+./gleamunison_escript find <intent> [--load file.lisp] [--limit N]
+./gleamunison_escript mcp 8099
+./gleamunison_escript lsp
 ```
 
-### 3.4 Labeled Arguments (v1.1.0)
-Curried lambdas with named parameters and defaults:
-```
-(fn* ((host "localhost") (port 8080)) (connect host port))
-;; desugars to: (lam host (lam port (connect host port))) with defaults
-```
+`--help` is the authoritative command list, including evidence, replay,
+packages, sync, formatting, Datalog, watch, and playbook-level commands.
+`run --json` executes and renders JSON; `run --inspect` reads exports without
+calling the definition.
 
-### 3.5 Type Aliases (v1.1.0)
-Named type references with visibility control:
-```
-(type alias Id Int)         ;; private alias
-(pub type alias UserId Int) ;; public alias
-```
+The default store is `.gleamunison/store.dets`. `GLEAMUNISON_STORE_DIR` selects
+another directory and must be absolute when explicitly set.
+`GLEAMUNISON_BRANCH` selects the namespace, defaulting to `main`.
 
----
+`unpublish` retracts a branch name and removes bytes only when branch and
+dependency rules permit. `purge <hash>` is a dry run until `--yes`; both avoid
+leaving dependent content or another live branch pointing at missing bytes.
+Use `log content`, `log exec`, or `log all` to inspect the durable journals.
 
-## 4. Hashing & Codebase Persistence
+## 3. Surface language
 
-### 4.1 Verification on Insert
-Insertions verify that `hash_of_definition(def)` matches the target `DefinitionRef`.
+The parser accepts S-expressions. Typical forms include:
 
-### 4.2 Storage Backends (DETS, ETS, Mnesia)
-Persistence is managed via the `StorageAdapter` record, which supports disk-based DETS, in-memory ETS, and distributed Mnesia:
-```gleam
-pub type StorageAdapter {
-  StorageAdapter(
-    insert: fn(DefinitionRef, BitArray) -> Result(Nil, StorageError),
-    lookup: fn(DefinitionRef) -> Result(Option(BitArray), StorageError),
-    list_refs: fn() -> Result(List(DefinitionRef), StorageError),
-    close: fn() -> Result(Nil, StorageError),
-  )
-}
-```
-
----
-
-## 5. Pull-based Node Syncing & Network Transport
-1. **Advertise**: Exchange lists of local hashes (`sync_send_refs`).
-2. **Calculate Diff**: Peer computes missing hashes (`sync_receive_diff`).
-3. **Request & Persist**: Request missing definition binaries (`sync_request_defs`) and insert them into local storage (`codebase.insert_raw`).
-4. **Transport**: Supported via native Erlang Distribution (for `@` cluster peers) or framed TCP protocol (`gleamunison_tcp_sync.erl` with 1MB payload limits and safe decoding).
-
----
-
-## 6. Concurrency & Distributed Features
-
-### 6.1 Concurrency Primitives
-Gleamunison exposes Erlang's native process model through typed abilities:
-- **spawn**: `(do Remote spawn (lam () body))` — creates a new process executing `body`. Returns a `Task`.
-- **send**: `(do Remote send task value)` — sends `value` to the process identified by `task`.
-- **recv**: `(do Remote recv)` — blocks until a message arrives, returns the received value.
-- **self**: Returns the current process identifier.
-- **sleep**: `(do Remote sleep ms)` — suspends the current process for `ms` milliseconds.
-- **now**: Returns the current system time.
-
-### 6.2 Distributed Compute
-- **Remote ability**: `forkAt` ships a computation to a remote node by content-hash, `await` blocks on its result, `here` returns the current node location.
-- **Location transparency**: `Location` wraps Erlang node names (e.g., `node@host`). Computations are location-agnostic until executed.
-- **Code shipping**: Uses the pull-based sync protocol to verify and transfer content-addressed BEAM modules to remote nodes.
-- **Serializable continuations**: Erlang's `term_to_binary/1` serializes closures; identical module hashes across nodes guarantee correct deserialization.
-
-### 6.3 Supervision Trees
-- **OTP integration**: `gleamunison_sup` manages worker process lifecycles with standard Erlang supervisor behavior.
-- **Link isolation**: Supervisor processes are spawned in dedicated workers to prevent cascading termination during testing.
-
----
-
-## 7. Standard Library (v1.1.0)
-
-### 7.1 HTTP Client
-```gleam
-import gleamunison/http_client
-
-let assert Ok(HttpResponse(status: 200, body: b)) =
-  http_client.get("https://api.example.com/data")
-```
-
-### 7.2 JSON
-```gleam
-import gleamunison/json
-
-let encoded = json.encode(term)
-let decoded = json.decode(binary)
-```
-
-### 7.3 DateTime
-```gleam
-import gleamunison/datetime
-
-let now = datetime.now()
-let iso = datetime.to_iso8601(now)
-```
-
-### 7.4 File paths
-
-There is no `gleamunison/filepath` module. Use the `filepath` Hex package:
-
-```gleam
-import filepath
-
-let p = filepath.from_string("/home/user/file.txt")
-```
-
-### 7.5 Crypto
-```gleam
-import gleamunison/crypto
-
-let digest = crypto.hash(crypto.Sha256, data)
-let key = crypto.random_bytes(32)
-```
-
-### 7.6 Template
-
-There is no `gleamunison/template` module; the local wrapper was removed.
-
-### 7.7 Structured Logging
-
-Logging is Erlang-side: `gleamunison_log:log_entry/4` writes into a bounded ETS
-ring that `/api/logs` serves. There is no Gleam wrapper module.
-
-### 7.8 Configuration
-
-Configuration is read from the environment at the point of use — there is no
-config file loader and no typed getter module.
-
-### 7.9 Health Checks
-
-Readiness is `gleamunison_readiness.erl`: `report/0`, `ready/0` and
-`http_response/0`, served at `/api/health` and `/api/ready`. There is no Gleam
-health module.
-
-### 7.10 Metrics
-
-Metrics are Erlang-side: `gleamunison_metrics:counter/2`, `gauge/2` and
-`histogram/2`, recorded at the HTTP response boundary by
-`gleamunison_http_metrics`. There is no Gleam metrics module.
-
----
-
-## 8. Native Content-Addressed Datalog Engine (`gleamunison_datalog/`)
-
-Pure S-expression immutable database engine running entirely in GleamUnison user-space (ADR-0062):
-- **EAVT / AVET Indexing**: Dual persistent map indexes mapping `[Entity -> Attr -> Values]` and `[Attr -> Value -> Entities]`.
-- **Pure Transactions**: Functional assertions, retractions, and Compare-and-Swap:
 ```lisp
-(let db1 (db-assert db-empty 1 "name" "Alice")
-  (let db2 (db-assert db1 1 "age" 30)
-    (db-query db2 (list (pair (q-var "?e") (pair "name" (q-val "Alice")))))))
+42
+"hello"
+(1 2 3)
+(let x 42 (add x 1))
+(lam x (add x 1))
+(define answer 42)
 ```
-- **Temporal & Historical Queries**: `db-history`, `db-as-of`, `db-since`, `db-diff`.
-- **Deductive Logic Rules**: Fixpoint recursive rule solver for graph reachability and transitive relationships.
-- **Graph & Search**: BFS, DFS, shortest path finding, PageRank, k-NN cosine vector similarity, and BM25 document ranking.
-- **Actor Model Transactor**: Concurrency and serializability via Erlang actors (`spawn`, `send`, `recv`).
 
----
+The elaborator resolves names, assigns lexical variable indices, checks
+abilities, and infers types before canonical identity is computed. The AST
+supports terms, type declarations, abilities, tagged construction, patterns,
+guards, effects, holes, and `use` desugaring. See `src/gleamunison/ast.gleam`
+for constructors rather than relying on a manually maintained count.
 
-## 9. Web Dashboard & Tracing
+### Guards
+
+Match cases may carry guard expressions, emitted as Erlang guards:
+
+```lisp
+(match x ((n (< n 5)) small)
+          (_ other))
+```
+
+Only guard-safe operations are valid in that position.
+
+### Holes
+
+`?` is a typed incomplete expression. It compiles to a loud runtime error;
+it is not a promise of automatic live programming or continuation migration.
+
+### `use`
+
+`use` is lambda-passing sugar:
+
+```lisp
+(use x <- call body)
+;; conceptually: call (lam x body)
+```
+
+### Labeled arguments and type aliases
+
+`(fn* ((x default) ...) body)` provides curried-lambda/default sugar.
+Surface type aliases and public aliases elaborate through the ordinary type
+pipeline; visibility does not create a second content identity system.
+
+## 4. Effects and host capabilities
+
+`Do` dispatches an operation to the current process-local ability handler.
+`Handle` installs a handler for a computation. The runtime validates operation
+shapes and effect requirements, but this stack is not a general serializable
+continuation API.
+
+Builtins include ambient process/IO operations such as `spawn`, `self`, `send`,
+`recv`, `sleep`, `now`, `read_line`, `json-parse`, `http-get`, and `file-read`.
+These host capabilities are distinct from the application `Db` effect and are
+not made safe for hostile code merely by running in a BEAM process.
+
+The bootstrap vocabulary also contains a `Remote` ability declaration. Do not
+infer a supported location-transparent compute, live migration, or serializable
+continuation implementation from that declaration. Current production claims
+are single-node; sync and process primitives do not change that boundary.
+
+## 5. Storage and synchronization
+
+`StorageAdapter` supports ETS, DETS, partitioned DETS, and Mnesia primitives.
+Its trusted key/value interface is not itself an untrusted CAS write API:
+`storage.insert_content` verifies immutable content, while mutable branch
+pointers use a separate name-derived key.
+
+A branch pointer selects an immutable namespace snapshot. Namespace/history
+chunks are content-addressed. Application `Db` facts and operational logs have
+their own mutable/durable lifecycles.
+
+Sync supports framed TCP and Erlang-distribution transports. TCP v2 uses an
+authenticated handshake and replay controls. Execution does not fetch missing
+peers implicitly; transfer the dependency closure explicitly before running.
+No supported multi-node production cluster is claimed.
+
+## 6. Datalog and application Db
+
+The self-hosted engine under `gleamunison_datalog/` provides immutable EAV
+indexes, transactions, Datalog queries, temporal operations, recursive rules,
+graph functions, BM25/vector search, and an in-process transactor model.
+
+The durable application `Db` ability is intentionally smaller:
+
+- `Db.transact(assertions, retractions)` commits one journal transaction.
+- `Db.get(entity, attribute)` performs an exact read.
+- `Db.find(attribute, value)` performs an exact match.
+
+Facts use the EAV pair shape with text values. `application.dets` is the durable
+journal beside the configured code store. Current `Db` does not expose arbitrary
+Datalog joins, temporal queries, a general HTTP database API, or multi-node
+state replication.
+
+## 7. Agent interfaces
+
+MCP and HTTP share the supervised durable/scratch read model. Discovery returns
+actual content refs separately from name refs; stored terms are not turned into
+fabricated source for display or identity.
+
+`agent_publish` accepts `{source: string}` and returns admitted content refs.
+It does not accept a storage key, branch, store path, evidence bypass, or
+provider credential. Untrusted execution refuses before storage opens.
+
+`agent_generate` accepts a bounded template/variables/signature/attempt request.
+The server owns provider configuration. SAP may repair a near-miss candidate
+envelope, but inferred type, tests, signed evidence, trust, CAS, and selected-
+branch admission are checked by the ordinary publication path. Exhaustion does
+not add branch bindings. The public generator handles one target term per
+candidate, not arbitrary multi-definition applications.
+
+## 8. HTTP application routes
+
+```text
+POST /app/:name
+POST /app/ref/:content-ref
+```
+
+The body is empty or exactly `{"args":[...]}` with at most eight bounded JSON
+values. Named routes resolve the selected branch; ref routes additionally
+require that ref to be bound there. Scratch and arbitrary unbound CAS content
+return 404.
+
+The response contains the real `ref`, selected `branch`, and bounded JSON
+`value`. Evidence, profile, authorization, dependency loading, and evaluation
+remain enforced. See [ADR 0071](adr/0071-admitted-app-routes.md).
+
+## 9. Services and libraries
+
+- HTTP client, JSON, DateTime, and crypto Gleam modules live under
+  `src/gleamunison/`.
+- Use the `filepath` Hex package; the local Gleamunison filepath wrapper and
+  template module were removed.
+- Logging, metrics, readiness, traces, supervision, and several transport
+  boundaries are Erlang-side modules, not removed features and not necessarily
+  wrapped by a same-named Gleam module.
+- LSP uses stdio; see [LSP](LSP.md).
+- In-process logs/traces/metrics are bounded caches, not durable telemetry.
+  See [Observability](operations/observability.md).
+
+## 10. Verification and errors
 
 ```sh
-./gleamunison_escript server   # Starts on http://127.0.0.1:8080
+gleam test
+gleam format --check src test
+gleam check --target erlang
+bb scripts/run_playbook_tests.clj
+bb scripts/verify_production_boundaries.clj
 ```
 
-The embedded HTTP dashboard provides:
-- **Node status**: Running processes, loaded module count, synced hashes.
-- **Trace Inspector**: DETS-backed HTTP request capture, SSE push, `/api/traces` endpoint.
-- **Mnesia table keys**: Browse all stored content-addressed definitions.
+The unit/integration suite, playbook conformance, artifact contract, and
+production-boundary battery are different proofs. Playbook exclusions are not
+passing tests; local OTP results are not the entire hosted CI matrix.
 
----
+Parser/elaboration errors retain structured codes such as `P001` and `E001`
+where the owning modules define them. CLI execution uses nonzero exits for
+refusals and resolution failures; stderr carries diagnostics so successful
+`run --json` stdout remains machine-readable.
 
-## 10. REPL Features
-
-### 10.1 Multi-line Input
-The REPL supports multi-line expressions, accumulating lines until parentheses balance:
-```
-> (define factorial
-|   (lam n
-|     (if (eq? n 0) 1
-|       (mul n (factorial (sub n 1))))))
-```
-
-### 10.2 Spelling Suggestions
-On name resolution errors, the REPL provides spelling suggestions using depth-limited Levenshtein distance.
-
-### 10.3 Module Purging
-Redefining a name in the REPL automatically purges old BEAM modules (`code:delete/1` + `code:purge/1`) before loading new compilations.
-
----
-
-## 11. Property-Based Testing
-
-Not implemented. `gleamunison_property` was removed; tests use `gleeunit`
-assertions and the playbook conformance levels.
-
----
-
-## 12. Error Code Reference (v1.1.0)
-
-| Code | Description |
-|---|---|
-| `[P001]` | Unexpected end of input — missing closing parenthesis |
-| `[P002]` | Empty expression — type an S-expression |
-| `[P003]` | Unclosed parentheses — every `(` needs `)` |
-| `[P004]` | General parse error with line/column |
-| `[E001]` | Undefined variable — with spelling suggestions |
-| `[E002]` | Unknown operation in ability |
-| `[E003]` | Undefined ability declaration |
-| `[E004]` | Type error — could not type-check |
-| `[E005]` | Unsupported type reference |
-
----
-
-## 13. Library Integration Guide
-Host applications must target Erlang (`--target erlang`) and use OTP 29+.
-```gleam
-import gleamunison/ast
-import gleamunison/codebase
-import gleamunison/loader
-
-pub fn run_plugin(def: ast.Definition) {
-  let cb = codebase.empty()
-  let ld = loader.new_loader()
-  let ref = codebase.hash_of_definition(def)
-  case loader.ensure_loaded(ld, ref, def) {
-    Ok(ld_updated) -> Ok(ld_updated)
-    Error(err) -> Error(err)
-  }
-}
-```
+For library integration, target Erlang and read the actual public signatures
+in `ast`, `codebase`, `pipeline`, `loader`, and `run_ref`. Content construction,
+loading, evidence, and execution have distinct contracts; do not reduce them
+to a guessed `empty()`/`ensure_loaded()` snippet from an older manual.

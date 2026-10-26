@@ -5,7 +5,7 @@ How definitions get their content address, and what that buys us.
 ## The scheme
 
 `codebase.hash_of_definition` hashes the **elaborated** core term
-(`ast.Term`), never surface syntax:
+(`ast.Term`) together with its inferred `ast.Type`, never surface syntax:
 
 1. **Elaboration erases names.** Surface binders become de Bruijn
    indices (`LocalVar = Local(index)`), assigned by a flat counter in
@@ -26,7 +26,7 @@ How definitions get their content address, and what that buys us.
   (renamed binders, nested binders, and shadowing all hash
   identically; different bodies hash differently).
 - **Referential transparency of identity**: a hash depends only on the
-  term's structure and the (recursive) hashes of its references.
+  canonical term, its inferred type, and the (recursive) hashes of references.
 - **Per-definition determinism**: a definition's hash is independent
   of what else is in the file or unit.
 

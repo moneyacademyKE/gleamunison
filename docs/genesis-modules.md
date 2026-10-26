@@ -1,6 +1,8 @@
 # Genesis Modules
 
-**53 content-addressed builtin modules** (`src/m_*.erl`) found at `src/m_00000001.erl` through `src/m_00000038.erl`, plus `src/m_state.erl`.
+**Checked-in Erlang genesis implementations** (`src/m_*.erl`), including the
+numbered builtins and the `m_state` helper. The source directory and artifact
+contract are the inventory; this page explains their role and naming scheme.
 
 ## What Are Genesis Modules?
 
@@ -119,11 +121,19 @@ Module names use the `m_<last_8_hex_chars>` format (ADR-0011). For genesis modul
 - Produces valid Erlang atoms without quoting
 - Ensures content-addressing: identical functionality → identical hash → identical module name across all deployments
 
-## Adding New Genesis Modules
+## Adding or changing genesis builtins
 
-1. Create `src/m_XXXXXXXX.erl` with the new primitive
-2. Export `'$eval'/0` returning the primitive value
-3. Pre-compute the SHA256 hash and set the module name to the last 8 hex chars
-4. Run `./build_escript.sh` to compile the new module into the escript
-5. Add the hash to the genesis bootstrap in `elaborate.gleam`
-6. Test via the dogfood playbook (add a new level exercising the new builtin)
+1. Read `genesis.gleam`, `bootstrap_terms.gleam`, `bootstrap_types.gleam`, and
+   the relevant bootstrap declaration in `bootstraps.gleam` first.
+2. Add/change the `src/m_*.erl` implementation and its `'$eval'/0` contract.
+3. Wire its ref, surface name, and **declared type** through the owning bootstrap
+   modules. Do not add only a file and assume it becomes an admitted builtin.
+4. Add identity, inference, compile/load, publication, and execution tests as
+   appropriate. Builtin-dependent definitions must not acquire an unknown-type
+   sentinel or fail CAS decoding.
+5. Build and run the artifact contract so the implementation and Datalog/static
+   assets are packaged correctly.
+
+Changing an existing genesis implementation is not an ordinary local edit: it
+can alter the meaning of content that already has a ref. Treat it as an
+identity/compatibility decision with an ADR and migration analysis.

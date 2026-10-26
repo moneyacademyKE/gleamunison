@@ -20,12 +20,15 @@
    Everything that exists has a hash. Primitives are seeded into every codebase
    via a genesis block with pre-computed hashes.
 
-5. **The BEAM is not just a target — it's a constraint.** Hot code swapping,
-   process isolation, process dictionary, `code:load_binary/3`,
-   `compile:file/2` with OTP 29's `{ok, Mod, []}` return format, distribution
-   via EPMD — these are part of the design, not implementation details.
+5. **The BEAM is not just a target — it's a constraint.** Hash-named code
+   loading, process-local state, OTP supervisors, and compiler differences across
+   the supported OTP 27–29 matrix shape the design. Process isolation is useful
+   fault containment, not an operating-system sandbox.
 
-6. **Sandboxed Target Constraints (Cloudflare/WASM).** For non-BEAM sandboxed environments (such as Cloudflare Workers or WebAssembly isolates), dynamic code compilation and loading are blocked by the security sandbox. Code execution in these environments must use static-worker AST interpreters rather than dynamic compilers.
+6. **Alternative targets need their own proof.** Non-BEAM environments such as
+   WASM isolates may forbid dynamic compilation/loading and require a different
+   execution design. Existing analyses are design records, not a claim that a
+   Cloudflare/WASM target is currently shipped.
 
 ### Workflow
 
@@ -41,37 +44,39 @@
 
 ### Code conventions
 
-- `pub opaque type` for anything that must maintain invariants (Hash, Codebase, Loader)
-- `pub type` for value types (Term, Definition, Type)
+- `pub opaque type` where an invariant needs protection; plain value types elsewhere
 - Functions return `Result(Ok, Error)` for fallible operations
-- All error types are defined as custom types, never bare strings
+- Preserve structured domain errors; host FFI boundaries may use strings without
+  turning that into a rule that every domain error must be a bare string
 - FFI functions use `@external(erlang, ...)` with named parameters
 - Erlang FFI modules are files named `gleamunison_*.erl` in `src/`
-- OTP 29 quirks: `compile:file/2` returns `{ok, Mod, []}`, use catch-all guards
+- Keep compiler/load compatibility checks explicit across supported OTP releases
 
 ### Pipeline
 
 ```
-Text (S-Expr) → AST (Gleam types) → Hash (SHA256) → Codebase (DETS / in-memory)
-                                                    → Compile (Erlang source → BEAM binary)
-                                                    → Load (code:load_binary into VM)
-                                                    → Call $eval()
+Text (S-Expr) → Surface AST → Elaboration + inference → Canonical term + type
+              → Hash (SHA256) → Codebase (DETS / in-memory)
+              → Compile (Erlang source → BEAM binary)
+              → Load (code:load_binary into VM)
+              → Call $eval()
 ```
 
 ### Building standalone binary
 
 ```sh
-./build_escript.sh             # Produces ./gleamunison_escript (~1.2 MB escript)
-./gleamunison_escript          # Run without Gleam, just Erlang/OTP
+./build_escript.sh             # Produces ./gleamunison_escript
+./gleamunison_escript          # Run with Erlang/OTP; no Gleam needed
 ./gleamunison_escript repl     # Start interactive REPL
 ./gleamunison_escript server   # Start HTTP dashboard
 ```
 
 ### Decision records
 
-Every significant design decision is recorded as an ADR in `docs/adr/`.
-Before making a change, read the relevant ADRs. After making a change,
-write a new ADR or update an existing one. Currently 71 ADRs are cataloged.
+Significant design decisions are recorded in `docs/adr/`. Read the relevant
+ADRs before a change and add a new ADR when a durable decision changes. Do not
+rewrite dated decisions or evidence to make history look current; current
+implementation status belongs in the guides and verification witnesses.
 
 ### Agent read model and scratch overlays
 
@@ -146,12 +151,13 @@ write a new ADR or update an existing one. Currently 71 ADRs are cataloged.
   must restart the Db owner between an HTTP write and read; a warm process
   cache is not durability evidence.
 
-### Deployment and Synchronization
+### Deployment and synchronization
 
-Always pre-verify all remote transfers:
-1. Execute a dry run (`env -u GITHUB_TOKEN git push --dry-run`).
-2. Run standard pushes (`env -u GITHUB_TOKEN git push`).
-3. Never use standard `--force`. If history rewriting is required, use `--force-with-lease --force-if-includes`.
+Remote actions are not part of local conformance verification. Do not push,
+tag, publish, merge, or deploy as a side effect of making tests pass; those are
+separate, explicitly approved operations. Sync tests use the configured local
+fixtures and verify content/refusal behavior without treating a dry run as
+production evidence.
 
 ### Production profiles and release claims
 
@@ -208,10 +214,21 @@ The REPL bootstraps `"Console"`, `"add"`, and `"read_line"`, and supports:
 - expressions (like `(add 1 2)`) to evaluate them
 - `(do Console print "hello")` to trigger algebraic effects.
 
-### LOC Constraints
-All Gleam/Erlang source files MUST be strictly under 250 LOC, and all Lisp/script files strictly under 500 LOC. If any module grows close to this limit, decompose it into high-cohesion, low-coupling sub-modules. Keep type definitions separated from logic files where necessary to avoid circular dependency imports.
+### LOC constraints and conformance
 
-Current conformance: 1172 playbook levels are defined, of which 934 have executable cases and pass. The other 238 are prose-only and are recorded as explicit, sha-pinned exclusions (`scripts/playbook_exclusions.edn`) rather than counted as passing. The suite also runs 54 unit test suites, all green. Includes the native content-addressed Datalog database engine with temporal querying, graph algorithms, and BM25/vector search.
+Keep modules cohesive: target 250 LOC, and keep touched production files below
+the enforced 500-LOC ceiling. Test files are exempt. Split along ownership and
+composition boundaries, not into arbitrary tiny-file confetti.
+
+The playbook runner parses every numbered level and distinguishes executable
+passes, failures, skips/timeouts, and explicit SHA-pinned exclusions. Exclusions
+are not passes. Run `bb scripts/run_playbook_tests.clj`; use `--strict` only as
+a completeness report, because it intentionally rejects every exclusion.
+
+Current test counts, playbook totals, artifact measurements, and environment
+exclusions belong in the latest dated verification witness, not in a permanent
+scoreboard here. The self-hosted Datalog engine and durable application `Db`
+are related in vocabulary but have separate execution and persistence contracts.
 
 
 
