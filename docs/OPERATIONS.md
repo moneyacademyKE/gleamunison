@@ -1,155 +1,166 @@
-# Gleamunison Operations Runbook
+# Gleamunison operations runbook
 
-## Deploy
+## Supported boundary
 
-### Prerequisites
-- Erlang/OTP 26+ installed on target machine
-- The `gleamunison_escript` binary (~1.2 MB)
+The verified classification is **authenticated single-node service** for the
+local factory/runtime loop. It is not an untrusted-code sandbox, a TLS server,
+or a supported multi-node production cluster.
 
-### Deploy Steps
+Use Erlang/OTP 27, 28, or 29 and a verified `gleamunison_escript`. See
+[Build Escript](BUILD_ESCRIPT.md) for build/artifact checks and the latest
+`docs/verification/production-boundaries-*.md` witness for measured results.
+
+## Start locally
+
 ```sh
-# 1. Copy escript to target
-scp gleamunison_escript user@host:/opt/gleamunison/bin/gleamunison_escript
-
-# 2. Make executable
-chmod +x /opt/gleamunison/bin/gleamunison_escript
-
-# 3. Start server (binds to 127.0.0.1 by default)
-/opt/gleamunison/bin/gleamunison_escript server 8080
+./gleamunison_escript --help
+./gleamunison_escript server 8080
 ```
 
-### Systemd Service (optional)
-```ini
-[Unit]
-Description=Gleamunison Runtime
-After=network.target
+The port is the `server` argument; there is no `--port`, `--log-level`, or
+`--loader-cache` server option. Loopback (`127.0.0.1`) and the `local` profile
+are the defaults. With no HTTP tokens configured, protected routes are allowed
+only behind the loopback bind contract; this is convenient local access, not
+remote authentication.
 
-[Service]
-Type=simple
-ExecStart=/opt/gleamunison/bin/gleamunison_escript server 8080
-Restart=always
-RestartSec=10
-Environment=GLEAM_LOG_LEVEL=info
+Check the public probes:
 
-[Install]
-WantedBy=multi-user.target
-```
-
-## Configure
-
-### Environment Variables
-| Variable | Type | Default | Description |
-|---|---|---|---|
-| `GLEAM_LOG_LEVEL` | String | `info` | Log level: debug/info/warn/error |
-| `GLEAM_SERVER_PORT` | Int | `8080` | HTTP server port |
-| `GLEAM_SYNC_PEERS` | String | `-` | Comma-separated peer node names |
-| `GLEAM_STORAGE_PATH` | String | `/tmp` | DETS/Mnesia storage path |
-
-### Runtime Config
-Use the CLI to override config at startup:
 ```sh
-./gleamunison_escript server 9090
-./gleamunison_escript --port 9090 --log-level debug
+curl -fsS http://127.0.0.1:8080/api/live
+curl -fsS http://127.0.0.1:8080/api/ready
 ```
 
-## Monitor
+`/api/health` exposes the structured readiness report for compatibility.
+Readiness returning 503 is a failed dependency/configuration check, not a
+liveness contradiction.
 
-### Health and readiness
+## Configuration
 
-The runtime exposes three deliberately different probes:
+The server and CLI read configuration from the environment. Important values:
 
-- `GET /api/live` is liveness only and returns `200` while the HTTP process can answer.
-- `GET /api/ready` is required-resource readiness. It returns `200` only when storage, application version, definition-codec schema, memory, and configured required services pass; failure is structured JSON with HTTP `503`.
-- `GET /api/health` is the same structured readiness report for compatibility. It no longer returns a false-green `200`.
+| Variable | Default / purpose |
+|---|---|
+| `GLEAMUNISON_STORE_DIR` | `.gleamunison`; an explicit override must be absolute |
+| `GLEAMUNISON_BRANCH` | `main`; server-selected durable branch |
+| `GLEAMUNISON_BIND_ADDRESS` | `127.0.0.1` |
+| `GLEAMUNISON_PROFILE` | `local`; also `authenticated-remote` or refusing `untrusted-execution` |
+| `GLEAMUNISON_HTTP_TOKEN` | Admin bearer token; required by the non-loopback bind gate |
+| `GLEAMUNISON_HTTP_WRITE_TOKEN` | Bearer scopes for public, data-read, and data-write routes |
+| `GLEAMUNISON_HTTP_READ_TOKEN` | Bearer scopes for public and data-read routes |
+| `GLEAMUNISON_SYNC_TOKEN` | TCP sync peer authentication |
+| `GLEAMUNISON_REQUIRED_SERVICES` | Optional comma-separated required `http,mcp,sync` checks |
+| `GLEAMUNISON_EVAL_TIMEOUT_MS` | Evaluation wall-clock budget |
+| `GLEAMUNISON_MAX_MEMORY_MB` | Memory/readiness limit |
+| `GLEAMUNISON_EVIDENCE_SIGNING_KEY` | Evidence signing/verification policy input |
+| `GLEAMUNISON_STORE_ALLOW_UNVERIFIED` | Explicit local-only execution hatch; not a production default |
 
-The JSON report contains `ready`, `status`, `version`, `schema_version`, and bounded `checks` entries with `name`, `required`, `ok`, and a safe detail. Set `GLEAMUNISON_REQUIRED_SERVICES` to a comma-separated subset of `http,mcp,sync` when those listeners are required for this deployment. Invalid service names fail closed. `GLEAMUNISON_MAX_MEMORY_MB` defaults to `4096`; invalid or non-positive values fail readiness.
+The LLM and evidence/key-rotation variables are documented in
+[LLM policy](operations/llm-policy.md) and
+[Trust and key rotation](operations/trust-and-key-rotation.md). Keep secrets in
+the service manager's protected environment mechanism, not in source, branch
+names, prompts, docs, or tickets.
 
-Readiness is not a backup check, a full CAS audit, a code-execution test, or provenance proof. Each sequential worker has a 150 ms timeout (seven timed probes, plus configuration parsing). Closed stores and unresponsive services fail their checks. Partitioned DETS currently checks directory availability, not every shard; Mnesia checks that the local table is available. `schema_version` describes runtime codec support, not an audited on-disk migration level.
+## Remote exposure
 
-### Bounded in-process metrics
+A non-loopback bind requires both:
 
-`metrics.counter`, `metrics.gauge`, and `metrics.histogram` use a dedicated supervised registry rather than ETS owned by the first caller. The registry admits at most **256 kind/name series**, names of **1–128 bytes**, and the most recent **128 histogram samples per series**. New series beyond the cap and invalid names are dropped; existing admitted series continue updating. Counters use ETS atomic increments. `gleamunison_metrics:list_metrics/0` is the bounded in-process inspection surface.
-
-Telemetry events, when the optional telemetry module is present, use fixed `[gleamunison, counter|gauge|histogram]` event names with numeric `value` measurements and `name` metadata. No Prometheus/StatsD exporter, durable metric history, or external monitoring service is shipped. Registry restart recovers the worker but resets its in-memory observations; survival of short-lived callers is not durability.
-
-## Upgrade
-
-### Hot Upgrade (content-addressed)
-1. Push new definitions to the codebase via REPL or HTTP API
-2. Content-addressed hashing ensures no recompilation of unchanged code
-3. `code:load_binary/3` loads new modules; old modules soft-purged when unused
-
-### Rolling Upgrade (multi-node)
-1. Start new nodes with updated escript
-2. Join cluster: `net_adm:ping('newnode@host')`
-3. Mnesia replicates definitions automatically
-4. Drain old nodes: terminate after all processes migrated
-
-### Rollback
-- Content-addressed: previous definitions remain in storage; just load old hash
-- Escript: replace binary and restart
-
-## Troubleshoot
-
-### REPL hangs
 ```sh
-# Kill and restart REPL
-./gleamunison_escript repl
+GLEAMUNISON_PROFILE=authenticated-remote
+GLEAMUNISON_HTTP_TOKEN=<protected-admin-token>
 ```
 
-### Server not responding
+Otherwise startup refuses. Configure `GLEAMUNISON_SYNC_TOKEN` separately when
+sync is enabled; an HTTP credential does not authenticate a sync peer.
+
+The runtime does not terminate TLS. A remote deployment needs an externally
+managed TLS/authenticating proxy or equivalent trusted transport, plus network
+policy appropriate to its exposure. The `authenticated-remote` profile still
+executes in-process: it does not make hostile definitions safe.
+
+Do not select `untrusted-execution` as a way to harden a normal remote server.
+Its transport-facing admission currently refuses with
+`missing_external_executor`; no approved external executor is configured.
+
+## Application and agent surfaces
+
+- `POST /mcp` uses the supervised durable/scratch session and server-selected
+  store and branch.
+- `agent_publish` and `agent_generate` pass the ordinary evidence/admission
+  path; they are not direct storage writes.
+- `POST /app/:name` and `POST /app/ref/:content-ref` execute selected-branch
+  admitted definitions with bounded JSON arguments/results.
+- Application `Db` facts live in `application.dets` beside the configured code
+  store. Code content and application facts have separate lifecycles.
+
+Request authorization is checked before these handlers, and execution-profile
+admission is checked again at the execution/write boundary. See
+[Deployment profiles](operations/deployment-profiles.md) and ADRs 0068–0072.
+
+## Observability
+
+- `GET /api/ready` — required-resource readiness; 503 on failure.
+- `GET /api/live` — HTTP process liveness only.
+- `GET /api/observability` — bounded metrics, saturation, recent logs/traces,
+  and readiness.
+- `GET /api/logs`, `/api/processes`, `/api/sync-status`, `/api/traces` —
+  administrative inspection surfaces.
+
+Admin routes require an admin-scoped bearer when tokens are configured:
+
 ```sh
-# Check process
-curl http://localhost:8080/api/health
-
-# View logs
-curl http://localhost:8080/api/logs
-
-# Check processes
-curl http://localhost:8080/api/processes
+curl -fsS -H "Authorization: Bearer $GLEAMUNISON_HTTP_TOKEN" \
+  http://127.0.0.1:8080/api/observability
 ```
 
-### Module load failures
-```sh
-# List loaded modules
-./gleamunison_escript repl
-> (list-loaded-modules)
+In-process logs, traces, and metrics are bounded caches, not durable history
+or a monitoring/exporter service. Read
+[Observability](operations/observability.md) for limits and saturation behavior.
 
-# Purge and reload
-> (purge-module "m_abc12345")
-> (define my-fn (lam x x))
-```
+## Backup and restore
 
-### Memory pressure
-- Restart server to clear accumulated definitions
-- Reduce LRU cache size via `--loader-cache 100`
-- Clear ETS tables: `ets:delete_all_objects(gleamunison_logs)`
+The default store directory is `.gleamunison` under the service working
+directory; an explicit `GLEAMUNISON_STORE_DIR` is absolute. Do not assume
+`/tmp/gleamunison_*` or back up a live store with a wildcard copy.
 
-### Sync failures
-```sh
-# Check cluster connectivity
-net_adm:ping('peer@host')
+1. Drain and stop writers/service so DETS and journal state are quiescent.
+2. Preserve the entire configured store directory, including code, branch,
+   evidence/log, and `application.dets` files that are present.
+3. Record the artifact hash, `version`, `schema-version`, branch, and store
+   path. Keep credentials separate and protected.
+4. Restore into the same selected store path with the service stopped, then
+   start and verify readiness plus an application read.
 
-# View sync status
-curl http://localhost:8080/api/sync-status
-```
+Test recovery on an isolated copy before relying on it. A successful process
+restart alone is not a backup restoration proof.
 
-## Backup & Restore
+## Upgrade and rollback
 
-### Backup
-DETS files are stored in `/tmp/gleamunison_*` by default.
-```sh
-cp /tmp/gleamunison_* /backup/
-```
+Drain and restart to replace the runtime artifact. Content-addressed loading
+of user definitions is not a rolling upgrade mechanism for the runtime,
+supervisors, evaluator, or CLI.
 
-### Restore
-```sh
-cp /backup/gleamunison_* /tmp/
-# Restart server; DETS auto-repairs
-```
+Follow [Upgrade and rollback](operations/upgrade-and-rollback.md) and run
+`bb scripts/test_upgrade_rollback.clj` for the executable artifact/recovery
+contract. Keep the previous verified binary and a quiesced store backup.
+Schema equality is required unless a release supplies an explicit migration.
 
-## Security
+There is no documented supported rolling multi-node procedure here. Do not
+join nodes, assume Mnesia replication is a production topology, or migrate
+processes as though those boundaries were implemented.
 
-- The HTTP server binds to `localhost` by default; use a reverse proxy for internet exposure
-- Content-addressed definitions are cryptographically immutable
-- No authentication built into v1.0; use firewall + reverse proxy for access control
+## Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Startup refuses a non-loopback bind | Profile, admin token, bind address; read the refusal rather than weakening it |
+| 401 | Bearer presence and token class |
+| 403 | Required scope or execution-profile refusal |
+| 404 on `/app` | Selected branch, admitted binding, exact name/ref; scratch is not routable |
+| 503 readiness | The named failed checks in the JSON report |
+| Missing definition after restart | Actual absolute store path and selected branch; a different working directory can select a different default store |
+| Stale agent view | Publication outcome and supervised session refresh; scratch may intentionally shadow a durable name |
+| Missing application facts | `application.dets` recovery/journal and store path, not code CAS alone |
+
+Run `bb scripts/verify_production_boundaries.clj` for the full local gate. Its
+witness is evidence for that source/artifact/environment, not a substitute for
+investigating the current live configuration.
