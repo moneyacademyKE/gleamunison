@@ -5,9 +5,8 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleamunison/identity.{
-  type DefinitionRef, Ref, hash_bytes, hash_to_debug_string, parse_ref_hex,
-}
+import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes, parse_ref_hex}
+import gleamunison/namespace_codec.{ref_hex}
 import gleamunison/storage.{type StorageAdapter}
 
 /// The name layer as data. A namespace maps names to definition refs;
@@ -34,6 +33,11 @@ pub fn get(ns: Namespace, name: String) -> Result(DefinitionRef, Nil) {
   dict.get(ns.bindings, name)
 }
 
+/// Whether this selected namespace binds a content ref under any name.
+pub fn binds(ns: Namespace, ref: DefinitionRef) -> Bool {
+  dict.values(ns.bindings) |> list.any(fn(bound) { bound == ref })
+}
+
 pub fn remove(ns: Namespace, name: String) -> Namespace {
   Namespace(dict.delete(ns.bindings, name))
 }
@@ -42,61 +46,11 @@ pub fn names(ns: Namespace) -> List(String) {
   dict.keys(ns.bindings) |> list.sort(string.compare)
 }
 
-// --- Canonical serialization ------------------------------------------------
-
-fn b64(s: String) -> String {
-  bit_array.base64_encode(bit_array.from_string(s), True)
-}
-
-fn unb64(s: String) -> Result(String, Nil) {
-  use bits <- result.try(bit_array.base64_decode(s))
-  bit_array.to_string(bits)
-}
-
-fn ref_hex(r: DefinitionRef) -> String {
-  let Ref(h) = r
-  hash_to_debug_string(h)
-}
-
-fn hex_ref(s: String) -> Result(DefinitionRef, Nil) {
-  parse_ref_hex(s) |> result.replace_error(Nil)
-}
-
-fn serialize_ns(ns: Namespace) -> BitArray {
-  let lines =
-    dict.to_list(ns.bindings)
-    |> list.sort(fn(a, b) { string.compare(a.0, b.0) })
-    |> list.map(fn(kv) { b64(kv.0) <> ":" <> ref_hex(kv.1) })
-  bit_array.from_string(string.join(["ns", "1", ..lines], "\n"))
-}
-
-fn parse_ns(bytes: BitArray) -> Result(Namespace, Nil) {
-  use text <- result.try(bit_array.to_string(bytes))
-  case string.split(text, "\n") {
-    ["ns", "1", ..lines] -> {
-      use pairs <- result.try(
-        list.try_fold(lines, [], fn(acc, line) {
-          case string.split(line, ":") {
-            [name_b64, hex] -> {
-              use name <- result.try(unb64(name_b64))
-              use ref <- result.try(hex_ref(hex))
-              Ok([#(name, ref), ..acc])
-            }
-            _ -> Error(Nil)
-          }
-        }),
-      )
-      Ok(Namespace(dict.from_list(pairs)))
-    }
-    _ -> Error(Nil)
-  }
-}
-
 pub fn save(
   adapter: StorageAdapter,
   ns: Namespace,
 ) -> Result(DefinitionRef, String) {
-  let bytes = serialize_ns(ns)
+  let bytes = namespace_codec.serialize_bindings(ns.bindings)
   let ref = Ref(hash_bytes(bytes))
   adapter.insert(ref, bytes)
   |> result.map(fn(_) { ref })
@@ -111,7 +65,9 @@ pub fn load(
     Ok(Some(bytes)) ->
       case Ref(hash_bytes(bytes)) == ref {
         True ->
-          parse_ns(bytes) |> result.replace_error("corrupt namespace chunk")
+          namespace_codec.parse_bindings(bytes)
+          |> result.map(Namespace)
+          |> result.replace_error("corrupt namespace chunk")
         False -> Error("namespace integrity failure")
       }
     Ok(None) -> Error("namespace not found")
@@ -123,41 +79,6 @@ pub fn load(
 
 pub fn branch_pointer_ref(branch: String) -> DefinitionRef {
   Ref(hash_bytes(bit_array.from_string("branchptr:" <> branch)))
-}
-
-fn serialize_head(
-  branch: String,
-  seq: Int,
-  ns_ref: DefinitionRef,
-  prev: Option(DefinitionRef),
-) -> BitArray {
-  let prev_hex = case prev {
-    Some(r) -> ref_hex(r)
-    None -> "-"
-  }
-  bit_array.from_string(string.join(
-    ["head", "1", b64(branch), int.to_string(seq), ref_hex(ns_ref), prev_hex],
-    ":",
-  ))
-}
-
-fn parse_head(
-  bytes: BitArray,
-) -> Result(#(String, Int, DefinitionRef, Option(DefinitionRef)), Nil) {
-  use text <- result.try(bit_array.to_string(bytes))
-  case string.split(text, ":") {
-    ["head", "1", branch_b64, seq_s, ns_hex, prev_hex] -> {
-      use branch <- result.try(unb64(branch_b64))
-      use seq <- result.try(int.parse(seq_s) |> result.replace_error(Nil))
-      use ns_ref <- result.try(hex_ref(ns_hex))
-      use prev <- result.try(case prev_hex {
-        "-" -> Ok(None)
-        hex -> hex_ref(hex) |> result.map(Some)
-      })
-      Ok(#(branch, seq, ns_ref, prev))
-    }
-    _ -> Error(Nil)
-  }
 }
 
 /// Current head of a branch: #(sequence number, namespace ref).
@@ -175,7 +96,7 @@ pub fn branch_head(
 /// The branch a pointer chunk names: the embedded name and the name-derived
 /// key must agree, so a stray chunk cannot invent a branch.
 pub fn branch_name_of(ref: DefinitionRef, bytes: BitArray) -> Option(String) {
-  case parse_head(bytes) {
+  case namespace_codec.parse_head(bytes) {
     Ok(#(branch, seq, _, _)) if seq > 0 ->
       case branch_pointer_ref(branch) == ref {
         True -> Some(branch)
@@ -206,7 +127,7 @@ pub fn commit(
     None -> #(1, None)
   }
   use ns_ref <- result.try(save(adapter, ns))
-  let head_bytes = serialize_head(branch, seq, ns_ref, prev)
+  let head_bytes = namespace_codec.serialize_head(branch, seq, ns_ref, prev)
   let head_ref = Ref(hash_bytes(head_bytes))
   use _ <- result.try(
     adapter.insert(head_ref, head_bytes)
@@ -226,7 +147,7 @@ fn read_head(
 ) -> Result(Option(#(Int, DefinitionRef, DefinitionRef)), String) {
   case adapter.lookup(branch_pointer_ref(branch)) {
     Ok(Some(bytes)) ->
-      case parse_head(bytes) {
+      case namespace_codec.parse_head(bytes) {
         Ok(#(name, seq, ns_ref, _)) if name == branch && seq > 0 ->
           Ok(Some(#(seq, ns_ref, Ref(hash_bytes(bytes)))))
         _ -> Error("corrupt branch head or branch identity mismatch")
@@ -278,11 +199,11 @@ fn walk(
 ) -> List(#(Int, DefinitionRef)) {
   case adapter.lookup(ptr) {
     Ok(Some(bytes)) ->
-      case parse_head(bytes) {
+      case namespace_codec.parse_head(bytes) {
         Ok(#(_, _, _, Some(prev_head_ref))) ->
           case adapter.lookup(prev_head_ref) {
             Ok(Some(prev_bytes)) ->
-              case parse_head(prev_bytes) {
+              case namespace_codec.parse_head(prev_bytes) {
                 Ok(#(_, pseq, pns, _)) ->
                   walk(adapter, prev_head_ref, [#(pseq, pns), ..acc])
                 Error(_) -> acc
@@ -386,7 +307,7 @@ fn walk_head_chain(
   List(#(String, Int, DefinitionRef, Option(DefinitionRef), BitArray)),
   String,
 ) {
-  case parse_head(head_bytes) {
+  case namespace_codec.parse_head(head_bytes) {
     Error(_) -> Error("corrupt head chunk")
     Ok(#(b, seq, ns_ref, prev)) -> {
       let next = [#(b, seq, ns_ref, prev, head_bytes), ..acc]
@@ -456,7 +377,7 @@ fn verify_chunk(pair: #(String, BitArray)) -> Result(Nil, String) {
   case string.starts_with(key, "pointer:") {
     True -> {
       let branch = string.drop_start(key, 8)
-      case parse_head(bytes) {
+      case namespace_codec.parse_head(bytes) {
         Ok(#(name, seq, _, _)) if name == branch && seq > 0 -> Ok(Nil)
         _ -> Error("pointer branch identity mismatch or invalid head")
       }
@@ -485,7 +406,7 @@ pub fn pointer_ref_hex(branch: String) -> String {
 pub fn parse_head_hexes(
   bytes: BitArray,
 ) -> Result(#(String, String, Option(String)), String) {
-  case parse_head(bytes) {
+  case namespace_codec.parse_head(bytes) {
     Error(_) -> Error("corrupt head chunk")
     Ok(#(_, _, ns_ref, prev)) -> {
       let self_hex = ref_hex(Ref(hash_bytes(bytes)))

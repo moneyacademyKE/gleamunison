@@ -4,7 +4,7 @@
          handle_mcp_route/2, serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
          handle_processes_route/1, handle_sync_status_route/1, handle_redefinitions_route/1,
          handle_logs_route/1, handle_enhanced_modules_route/1, handle_observability_route/1,
-         handle_traces_route/1, handle_trace_detail_route/2]).
+         handle_traces_route/1, handle_trace_detail_route/2, handle_app_route/3]).
 
 -define(MAX_SSE_CLIENTS, 32).
 
@@ -66,6 +66,21 @@ admit_execution(Socket, Work) ->
                 <<"{\"error\":\"sandbox_refused\",\"detail\":", (gleamunison_http_util:escape_json(Refusal))/binary, "}">>);
         ok -> Work()
     end.
+
+handle_app_route(Socket, Target, Body) ->
+    %% The same execution profile as /eval and /mcp, checked before storage.
+    admit_execution(Socket, fun() ->
+        case gleamunison@active_storage:active_or_open() of
+            {ok, Adapter} ->
+                Branch = gleamunison@mcp_session:selected_branch(),
+                {response, Status, Json} =
+                    gleamunison@app_route:request(Adapter, Branch, Target, Body),
+                gleamunison_http_util:send_json(Socket, Status, Json);
+            {error, _Reason} ->
+                gleamunison_http_util:send_json(Socket, 503,
+                    <<"{\"error\":\"storage_unavailable\"}">>)
+        end
+    end).
 
 handle_mcp_route(Socket, Body) ->
     admit_execution(Socket, fun() -> handle_mcp_admitted(Socket, Body) end).
@@ -343,4 +358,3 @@ encode_headers(Headers) ->
         iolist_to_binary(io_lib:format("\"~s\":\"~s\"", [K, V]))
     end || H <- Headers],
     <<"{", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "}">>.
-

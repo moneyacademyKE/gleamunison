@@ -14,7 +14,9 @@ pub fn write_routes_require_data_write_test() {
   auth.required_scope("/eval") |> should.equal(auth.DataWrite)
   auth.required_scope("/define") |> should.equal(auth.DataWrite)
   auth.required_scope("/mcp") |> should.equal(auth.DataWrite)
+  auth.required_scope("/app/greeting") |> should.equal(auth.DataWrite)
   auth.authorize(auth.Anonymous, "/eval") |> should.be_error
+  auth.authorize(auth.Anonymous, "/app/greeting") |> should.be_error
 }
 
 pub fn api_routes_require_admin_test() {

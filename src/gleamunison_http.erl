@@ -416,6 +416,8 @@ send_error(Socket, Status, Message) ->
 
 handle_post_route(Socket, <<"/mcp">>, Body) ->
     gleamunison_http_routes:handle_mcp_route(Socket, Body);
+handle_post_route(Socket, <<"/app/", Target/binary>>, Body) ->
+    gleamunison_http_routes:handle_app_route(Socket, Target, Body);
 handle_post_route(Socket, _Path, _Body) ->
     gleamunison_http_util:send_json(Socket, 404, <<"{\"error\":\"not found\"}">>).
 
