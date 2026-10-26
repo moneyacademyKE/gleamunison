@@ -3,15 +3,16 @@
 **Content-addressed language runtime on the BEAM, built in Gleam.**
 
 A working implementation of a Unison-style content-addressed programming
-language: a definition is identified by the hash of its structure, compiled on
-demand to BEAM bytecode, and loaded into a running VM by hash. Not a filename,
-not a module path, not a package — the hash *is* the identity.
+language: a definition is identified by its canonical structure and inferred
+type, compiled on demand to BEAM bytecode, and loaded into a running VM by
+hash. Not a filename, not a module path, not a package — the hash *is* the
+identity.
 
 - **Version:** 3.24.0
-- **Suite:** 649 tests, 0 failures
+- **Verified local suite:** 736 tests, no failures ([factory acceptance](docs/verification/factory-readiness-2026-10-26.md))
 - **CI:** Erlang/OTP 27, 28, 29 × Ubuntu, macOS — matrix configured; local receipts are not a substitute for every hosted leg
 - **Classification:** `authenticated-single-node-service`
-  ([verification witness](docs/verification/production-boundaries-2026-10-24.md))
+  ([production witness](docs/verification/production-boundaries-2026-10-26.md))
 
 ## Status: what this is, and what it is not
 
@@ -44,9 +45,11 @@ codebase: it refuses to admit work until a real OS-level sandbox exists.
 
 ### Why Gleamunison?
 
-Gleamunison combines the type-safe concurrency of the BEAM (via Gleam) with
-Unison's content-addressed codebase and algebraic effects, enabling zero-downtime
-hot upgrades and dynamic sandboxing.
+Gleamunison combines BEAM concurrency with Unison-style content identity and
+algebraic effects. Its verified factory loop turns bounded model output into
+admitted definitions, durable application facts, and HTTP results. Hot code
+loading and effect handlers do not by themselves provide zero-downtime
+application upgrades or an operating-system sandbox.
 
 ### Feature Set Differences (Gleamunison vs Unison)
 
@@ -110,37 +113,41 @@ down.
 3. **Dynamic loading** — the VM loads the binary with `code:load_binary/3` and
    calls the entrypoint `'m_ff45e8':'$eval'()`.
 
-This is what enables zero-downtime upgrades (swap to a new root hash) and
-conflict-free dependency resolution (identity is the hash, so there are no name
-collisions to resolve).
+Hash-named modules allow old and new definitions to coexist without filename
+collisions. Branch namespaces select names; content refs select immutable
+definitions. Application upgrade semantics remain the caller's responsibility.
 
 ## What works today
 
 These are implemented and exercised by the suite or the playbook — not
 aspirations.
 
-- **Zero-downtime hot upgrades.** Compile new logic to a new hash-named module
-  and swap the root hash; existing processes keep their state. Hash-named
-  modules mean no `code:purge` collisions with the old version.
-- **Content-addressed distribution.** Nodes exchange root hashes and pull only
-  missing definitions, so patching is incremental by construction.
-- **Effects as authority.** File, network, time, and randomness operations go
-  through abilities; the host decides what a handler is allowed to do. This is
-  how evaluation is sandboxed today — at the effect layer, in a bounded process.
+- **Hash-named code loading.** Compile new logic to a new hash-named module;
+  old and new definitions can coexist while callers choose which root or branch
+  to invoke.
+- **Content-addressed sync.** Peers exchange refs and pull missing definitions;
+  production deployment remains single-node unless an external design supplies
+  the missing trust and transport boundaries.
+- **Effect handlers and execution profiles.** In-process ability frames and
+  profile admission constrain evaluation. They are not OS/container isolation;
+  the runtime and its host FFI remain inside the trusted computing base.
 - **Bounded evaluation.** Every evaluation runs in a scope process with a wall
   clock deadline, a reduction ceiling, and a memory ceiling. Descendant process
   trees are owned and drained on timeout rather than leaked.
 - **Supervised services.** HTTP and MCP run under supervisors with graceful
   drain; readiness reports storage, supervisors, and queues, and returns 503
   when any of them is unhealthy.
-- **Reproducible verification.** Tests, evidence, and trace capture are
-  content-addressed: evidence binds to definition hashes, so a claim of "this
-  passed" names exactly which code passed.
+- **Reproducible evidence.** Attestations bind results to definition hashes, so
+  a claim of "this passed" names exactly which code passed.
 - **Self-hosted Datalog.** The database engine is written in Gleamunison's own
   language (13 `.lisp` modules under `gleamunison_datalog/src/`), not in Gleam —
   the runtime dogfoods itself.
-- **Agent interfaces.** MCP server, LSP server, and an HTTP API for eval,
-  definitions, traces, modules, and observability.
+- **Agent interfaces and admitted writes.** MCP, LSP, and HTTP share the
+  selected durable branch/CAS read model with explicit scratch overlays.
+  `agent_generate` composes bounded generation with the existing publication
+  gate; it does not create a second write authority.
+- **Durable applications.** The typed `Db` ability journals application facts,
+  and admitted definitions execute through `/app/:name` or a bound content ref.
 
 ### Designed, not implemented
 
@@ -153,8 +160,8 @@ Named here so nobody plans around them by accident:
 
 ## Production boundaries
 
-v3.24.0 closed the operational gaps that separated "implemented" from
-"operable". Each boundary has one policy module, one owner, and a proof.
+The verified release classification is `authenticated-single-node-service`.
+Each boundary has one policy owner and executable evidence.
 
 | Boundary | Enforcement | Documentation |
 |---|---|---|
@@ -177,37 +184,27 @@ them at the infrastructure layer.
 
 ## Project state
 
-Measured, not asserted — the numbers below come from the tree and the suite at
-v3.24.0.
+At v3.24.0, the local factory acceptance proof covers generation, signed
+admission, durable Db recovery, and `/app` execution. Its 736-test result and
+full battery are recorded in the
+[factory readiness witness](docs/verification/factory-readiness-2026-10-26.md).
+The hosted CI matrix remains a separate check, not a local claim.
 
-| Metric | Value |
+| Subsystem | Current contract |
 |---|---|
-| Tests | 649 passing, 0 failures |
-| Test suites | 105 files under `test/` |
-| Playbook levels defined | 934 executable passes plus 238 explicit exclusions in the default run |
-| Gleam modules | 109 (102 in `src/gleamunison/`, 7 top-level) |
-| Erlang modules | 46 production (plus 53 genesis `m_*.erl`) |
-| Datalog engine | 13 self-hosted `.lisp` modules |
-| ADRs | 68 |
-| Escript | ~1.3 MB standalone |
+| Identity and execution | SHA256 of canonical term + inferred type; compile, load, and run by content ref |
+| Codebase | Branch-scoped names over immutable CAS content; DETS/ETS/Mnesia adapters |
+| Agent factory | Bounded candidates, schema/type checks, supervised admitted publication |
+| Application state | Typed Db effects with a durable journal and supervised recovery |
+| Datalog | Self-hosted temporal queries, rules, BM25, and vector search |
+| Artifact | Standalone escript; Erlang/OTP required at runtime |
 
-| Pipeline step | Status |
-|---|---|
-| AST → hash (SHA256) | ✓ Content-addressed identity |
-| Codebase insert with hash verification | ✓ DETS/ETS/Mnesia, dedup |
-| Compile to BEAM (all Term variants) | ✓ Int/Float/Text/List/Lambda/Apply/Let/Match |
-| Load into VM (`code:load_binary/3`) | ✓ OTP 27–29 |
-| Type inference | ✓ Hindley-Milner style |
-| Elaboration (surface → core) | ✓ Two-phase with name resolution |
-| Effects runtime (process-dict stack) | ✓ do / handle / push / pop |
-| Sync | ✓ TCP v2 (HMAC) + Erlang distribution |
-| Native Datalog | ✓ Self-hosted, temporal, rules, BM25, vector |
-| Escript | ✓ ~1.3 MB, Erlang/OTP only at runtime |
+Dated witnesses own counts and measurements. This guide owns durable contracts.
 
 ## Modules
 
-109 Gleam modules, 46 production Erlang modules, 53 genesis `m_*.erl` modules,
-and 13 self-hosted Datalog modules. Grouped by concern:
+The source tree is grouped by concern; `src/` is the authoritative module
+inventory rather than a second, manually maintained count:
 
 | Area | Key modules |
 |---|---|
@@ -218,12 +215,12 @@ and 13 self-hosted Datalog modules. Grouped by concern:
 | **Codebase & storage** | `codebase`, `codebase_index`, `storage`, `namespace` |
 | **Effects & capabilities** | `effects`, `capability`, `turnstile` |
 | **Policy & trust** | `auth`, `trust`, `sandbox_policy`, `cancellation`, `evidence` |
-| **Services** | `http`, `http_client`, `mcp`, `mcp_server`, `mcp_session`, `lsp`, `lsp_features`, `lsp_types`, `readiness` |
+| **Services** | `http`, `http_client`, `mcp`, `mcp_server`, `mcp_session`, `lsp`, `lsp_features`, `lsp_types`, plus the Erlang readiness/HTTP boundary |
 | **LLM integration** | `llm`, `llm_types`, `llm_wire`, `llm_budget`, `llm_controls`, `llm_middleware` |
 | **Sync** | `sync`, `sync_types`, `gleamunison_tcp_sync.erl`, `gleamunison_peer.erl` |
-| **REPL & CLI** | `repl`, `repl_eval`, `repl_io`, `repl_graph`, and 16 `cli_*` modules |
+| **REPL & CLI** | `repl`, `repl_eval`, `repl_io`, `repl_graph`, and the `cli_*` modules |
 | **Testing & verification** | `test_runner`, `verify`, `transcript`, `rank`, `manifest` |
-| **Genesis** | `genesis`, `bootstraps`, plus 53 `m_*.erl` modules |
+| **Agent applications** | `agent_publish`, `agent_read_model`, `generation_loop`, `db`, `app_route`, `run_ref` |
 | **Datalog** | 13 self-hosted `.lisp` modules: core, index, transact, schema, query, aggregate, pull, temporal, rules, graph, vector, bm25, actor |
 
 ### Library and CLI boundaries
@@ -253,18 +250,18 @@ Kept in lockstep with the CI matrix:
 | Component | Version |
 |---|---|
 | Gleam | 1.19.1 |
-| Erlang/OTP | 27, 28, 29 (all tested) |
+| Erlang/OTP | 27, 28, 29 (configured CI matrix) |
 | rebar3 | 3 |
 
-Every push runs the full matrix on Ubuntu and macOS for each OTP version:
-`gleam deps download`, `gleam test`, `gleam format --check src test`, plus a
-release-gates job that builds the escript and checks the artifact contract.
+Pushes to `main`/`master` and pull requests run the OTP/OS matrix. Separate
+jobs cover release gates and the remaining boundary batteries; see
+`.github/workflows/test.yml` for the authoritative job list.
 
 ```sh
-gleam test                                    # 649 tests
+gleam test                                    # unit and integration suite
 gleam format --check src test                 # formatting gate
 ./build_escript.sh                            # standalone artifact
-bb scripts/run_playbook_tests.clj             # 934 passes + 238 explicit exclusions
+bb scripts/run_playbook_tests.clj             # default playbook gate
 bb scripts/verify_production_boundaries.clj   # full boundary gate + witness
 ```
 
@@ -289,7 +286,7 @@ gleamunison <command>
   repl                   interactive REPL (optionally preload a .lisp file)
   verify [file]          verify a scratch file
   publish <file.lisp>    publish definitions behind the evidence gate
-  unpublish <name>       retract a name: index line, binding, and bytes
+  unpublish <name>       retract a branch name; preserve bytes still in use
   purge <hash> [--yes]   remove a definition and the deps only it kept alive
   log [content|exec|all]  what the store has seen (--tail N)
   test <file.lisp>       run the test forms in a file
@@ -377,11 +374,13 @@ too, because the attempt you need to see is the one that did not happen.
 
 ### What admits content
 
-Three paths write to the store, and each has exactly one gate:
+Three admission mechanisms write code to the store. MCP `agent_publish` and
+successful `agent_generate` calls use the publication path, not a separate
+storage authority:
 
 | Path | Gate | What it proves |
 |---|---|---|
-| `publish` | evidence turnstile | every definition carries a passing attestation |
+| `publish` / admitted MCP writes | evidence turnstile | every definition carries a passing attestation |
 | `sync` | content addressing | the bytes hash to the ref they arrived under |
 | `pkg install` | evidence turnstile | the manifest's definitions are attested |
 
@@ -442,48 +441,26 @@ and arbitrary unbound CAS content return 404. The normal evidence, request
 authorization, execution-profile, and evaluation gates still apply; see
 [ADR 0071](docs/adr/0071-admitted-app-routes.md).
 
-## Why the escript is only ~1.3 MB
+## Escript runtime
 
-The standalone binary contains the full runtime — parser, elaborator,
-typechecker, compiler, loader, codebase, effects system, web server, REPL, 53
-genesis modules, and dependencies — in about 1.3 MB, because:
-
-**BEAM bytecode is dense.** The compiled `.beam` files are a few MB
-uncompressed; zip compression brings the artifact to ~1.3 MB.
-
-**No VM bundled.** Unlike Go or Rust binaries that statically link a runtime, the
-escript relies on the system Erlang/OTP installation. The artifact itself is a
-zip archive with a small launcher header.
-
-| Format | Size | Dependencies |
-|---|---|---|
-| gleamunison escript | **1.3 MB** | Erlang/OTP |
-| Go binary | 10–20 MB | None |
-| Rust binary | 5–15 MB | None |
-| Node.js app + deps | 100–500 MB | Node.js |
-
-If Erlang/OTP is already installed, this is close to a zero-install language
-runtime.
+The standalone escript contains the runtime and its BEAM dependencies, but not
+the Erlang VM. Run it on a supported Erlang/OTP release; no Gleam installation
+is needed at runtime. Its size is an artifact measurement, not an API contract.
+See [Build Escript](docs/BUILD_ESCRIPT.md) for the build and reproducibility
+gates.
 
 ## Documentation
 
-- [Playbook](docs/PLAYBOOK.md) — how to work on this project
-- [Architecture](docs/ARCHITECTURE.md) — design deep dive
-- [Roadmap](docs/ROADMAP.md) — phase plan from spec to production
-- [Operations Runbook](docs/OPERATIONS.md) — deploy, configure, monitor, upgrade
-- [Deployment profiles](docs/operations/deployment-profiles.md) — bind gate, auth, trust levels
-- [Observability](docs/operations/observability.md) — readiness, metrics, trace retention
-- [Trust and key rotation](docs/operations/trust-and-key-rotation.md) — evidence keys, revocation
-- [LLM policy](docs/operations/llm-policy.md) — budgets, cancellation, redaction
-- [Compatibility](docs/operations/compatibility.md) — schema versions and migration
-- [Upgrade and rollback](docs/operations/upgrade-and-rollback.md) — artifact gates
-- [Verification matrix](docs/operations/verification-matrix.md) — what each gate proves
-- [Verification witness](docs/verification/production-boundaries-2026-10-24.md) — the machine-readable proof
-- [ADRs](docs/adr/) — 71 Architecture Decision Records
-- [Learnings](docs/LEARNINGS.md) — architectural insights discovered
-- [Patterns](docs/PATTERNS.md) — design patterns used
-- [Reference Manual](docs/MANUAL.md) — complete user guide
-- [Archive](docs/archive/README.md) — superseded analyses and walkthroughs, kept for the record
+- [Documentation index](docs/README.md) — current references, evidence, and history
+- [Reference Manual](docs/MANUAL.md) — language and CLI guide
+- [Architecture](docs/ARCHITECTURE.md) — runtime design and boundaries
+- [Operations Runbook](docs/OPERATIONS.md) — configure, run, monitor, upgrade
+- [Playbook](docs/PLAYBOOK.md) — development and conformance workflow
+- [Roadmap](docs/ROADMAP.md) — remaining work and explicit non-goals
+- [ADRs](docs/adr/README.md) — architecture decision history
+- [Factory acceptance](docs/verification/factory-readiness-2026-10-26.md) — dated end-to-end proof
+- [Production witness](docs/verification/production-boundaries-2026-10-26.md) — machine-readable gate results
+- [Archive](docs/archive/README.md) — superseded analyses and walkthroughs
 
 ## License
 

@@ -1,114 +1,118 @@
 # Contributing to gleamunison
 
-## Development Environment
+## Development environment
 
-**Requirements:**
-- Erlang/OTP 29+
-- Gleam 1.0+
-- Babashka (for Clojure utility scripts)
+Use the toolchain exercised by CI:
+
+- Erlang/OTP 27, 28, or 29
+- Gleam 1.19.1 and rebar3 3
+- Babashka for the conformance and verification scripts
 - Git
+- Bun only when running the dashboard-safety battery on its own
 
-**Setup:**
 ```sh
 git clone https://github.com/moneyacademyKE/gleamunison.git
 cd gleamunison
-gleam test          # verify everything works
+gleam deps download
+gleam test
 ```
 
-## Running Conformance Tests
+The OTP/OS matrix is defined in `.github/workflows/test.yml`. A local run on
+one OTP release is not proof that every hosted matrix leg passed.
 
-The dogfood playbook contains 1000 conformance levels:
+## Verification
+
+Run the narrowest useful test first, then the relevant gates:
 
 ```sh
-# Run all levels via Gleam
-gleam run -- all
-
-# Run a specific level range
-gleam run -- level42
-
-# Run via Babashka (includes timeout management)
+gleam test
+gleam format --check src test
+gleam check --target erlang
 bb scripts/run_playbook_tests.clj
+bb scripts/verify_production_boundaries.clj
 ```
 
-## Project Architecture
+`gleam test` is not the playbook conformance runner. Use
+`bb scripts/run_playbook_tests.clj` for the default playbook gate; explicit
+exclusions are not passing coverage. `gleam run -- level42` runs one playbook
+level directly, while `gleam run -- all` runs the levels available through the
+CLI.
 
-gleamunison is a content-addressed language runtime on the BEAM. The pipeline:
+The integrated boundary gate builds the artifact and writes a dated witness
+under `docs/verification/`. Review that generated change separately from source
+changes. See `scripts/README.md` for individual batteries and
+`docs/operations/verification-matrix.md` for what each gate proves.
 
-```
-Text (S-Expr) → AST (Gleam types) → Hash (SHA256) → Codebase (DETS/in-memory)
-                                                    → Compile (Erlang → BEAM)
-                                                    → Load (code:load_binary)
-                                                    → Call $eval()
-```
+Add a regression test before fixing a defect. For boundary work, prove the
+refusal as well as the success path: wrong branch, wrong profile, malformed
+input, exhausted budget, and restart behavior where relevant.
 
-**Key directories:**
-- `src/gleamunison/` — 27 Gleam core library modules (parser, typechecker, compiler, etc.)
-- `src/*.erl` — Erlang FFI: HTTP server, storage (DETS/Mnesia), escript entry point, supervisor
-- `src/m_*.erl` — 52 content-addressed genesis modules (hash-addressed builtins)
-- `test/` — Unit and snapshot tests (birdie)
-- `docs/adr/` — 34 Architecture Decision Records
-- `docs/playbook/` — 1000-step dogfood development playbook in 10 volumes
-- `scripts/` — Clojure/Babashka utility scripts
+## Project layout
 
-## Code Conventions
+The execution pipeline is:
 
-- **LOC limit**: All Gleam/Erlang source files strictly under 250 lines. Decompose before crossing the limit.
-- **Opaque types**: Use `pub opaque type` for types that maintain invariants (Hash, Codebase, Loader)
-- **Error types**: All error types are custom types, never bare strings
-- **FFI**: External functions use `@external(erlang, ...)` with named parameters
-- **Erlang modules**: Named `gleamunison_*.erl` in `src/`
-- **Module names**: Content-addressed modules use `m_<last_8_hex_chars>` format
-
-## Development Workflow
-
-1. **Design**: Types and signatures first in Gleam source
-2. **Implement**: Fill in functions one at a time
-3. **Test**: `gleam test` runs the unit suite; `gleam run -- all` runs dogfood levels
-4. **Document**: Every architectural change follows the Hickey loop:
-   - Identify the gap
-   - Analyze what's complected
-   - Propose the fix
-   - Update all affected types and signatures
-   - Update documentation (ADRs, README, ARCHITECTURE)
-
-## Architecture Decision Records
-
-Every significant design decision is recorded as an ADR in `docs/adr/`.
-Before making a change, read the relevant ADRs. After making a change,
-write a new ADR or update an existing one. ADRs use the format:
-
-```markdown
-# ADR-NNNN: Brief Title
-
-Status: Proposed | Accepted | Superseded | Amended
-
-## Context
-...
-
-## Decision
-...
-
-## Consequences
-...
+```text
+Text (S-Expr) → surface AST → elaboration/type inference → canonical term + type
+              → SHA256 content ref → codebase → BEAM compile/load → $eval
 ```
 
-## Build Standalone Binary
+- `src/gleamunison/` — Gleam compiler, runtime, storage, services, and CLI modules
+- `src/*.gleam` — top-level executable and dogfood entry points
+- `src/gleamunison_*.erl` — Erlang FFI, supervisors, storage, and service boundaries
+- `src/m_*.erl` — checked-in content-addressed genesis modules
+- `test/` — unit, integration, and snapshot tests
+- `gleamunison_datalog/` — self-hosted Datalog engine
+- `docs/adr/` — architecture decision history
+- `docs/playbook/` — executable and explicitly excluded conformance levels
+- `scripts/` — Babashka/shell verification and operational tooling
+
+Start with `docs/README.md` and `docs/ARCHITECTURE.md`; the source tree, not a
+hand-maintained module count, is the inventory.
+
+## Code conventions
+
+- Keep modules cohesive and intention-revealing. Aim for at most 250 LOC;
+  production files touched by a change must stay below the enforced 500-LOC
+  ceiling. Test files are exempt.
+- Use opaque types where they protect an invariant, not as decoration.
+- Preserve typed errors at module boundaries; do not flatten useful causes into
+  log strings.
+- Erlang FFI modules use `gleamunison_*.erl`; external functions use explicit
+  `@external(erlang, ...)` declarations.
+- Content-addressed runtime modules use `m_<last_8_hex_chars>`.
+- Keep content identity, branch names, evidence, application state, provider
+  configuration, and deployment authority separate.
+- Format Gleam changes with `gleam format src test` before the format check.
+
+## Design and documentation
+
+For significant changes, read the relevant ADRs and name the trade-off before
+implementation. Record a new accepted decision in `docs/adr/` when architecture,
+storage, API authority, runtime boundaries, or operational policy changes. Do
+not rewrite a dated ADR or verification witness to make history look current.
+
+Update the current guide affected by the change. Keep volatile test counts and
+artifact measurements in dated witnesses rather than copying them across the
+documentation set.
+
+## Build the standalone artifact
 
 ```sh
-./build_escript.sh    # Produces ./gleamunison_escript
-./gleamunison_escript repl   # Start REPL
-./gleamunison_escript server # Start web dashboard on :8080
+./build_escript.sh
+./gleamunison_escript repl
+./gleamunison_escript server 8080
 ```
 
-## Pull Request Process
+The escript needs Erlang/OTP at runtime. `docs/BUILD_ESCRIPT.md` covers the
+artifact and reproducibility contract.
 
-1. Create a branch from `main`
-2. Ensure `gleam test` passes
-3. Ensure `gleam run -- all` passes (or note known skips)
-4. Write or update ADRs for design decisions
-5. Update CHANGELOG.md if the change is user-visible
-6. Open a PR with a clear description of the change and rationale
+## Pull requests
 
-## Questions?
+1. Create a focused branch and keep commits atomic.
+2. Run the relevant tests and verification gates; report actual results and
+   exclusions rather than claiming an unrun matrix.
+3. Add or update ADRs and current documentation when the contract changes.
+4. Update `CHANGELOG.md` for user-visible changes.
+5. Open a PR with the rationale, verification evidence, and linked issue.
 
-Open an issue on GitHub or start from `docs/PLAYBOOK.md` for the full development playbook.
+For development conventions and conformance policy, see `docs/PLAYBOOK.md`.
