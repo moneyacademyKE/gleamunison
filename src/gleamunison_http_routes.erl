@@ -1,7 +1,7 @@
 -module(gleamunison_http_routes).
 -include_lib("kernel/include/file.hrl").
 -export([handle_eval_route/2, handle_counter_route/1, handle_define_route/2, handle_browse_route/1,
-         serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
+         handle_mcp_route/2, serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
          handle_processes_route/1, handle_sync_status_route/1, handle_redefinitions_route/1,
          handle_logs_route/1, handle_enhanced_modules_route/1, handle_observability_route/1,
          handle_traces_route/1, handle_trace_detail_route/2]).
@@ -18,13 +18,7 @@ is_localhost(Socket) ->
 handle_eval_route(Socket, <<"?expr=", Expr/binary>>) ->
     handle_eval_route(Socket, Expr);
 handle_eval_route(Socket, Expr) when is_binary(Expr) ->
-    case sandbox_admits() of
-        {error, Refusal} ->
-            gleamunison_http_util:send_json(Socket, 403,
-                <<"{\"error\":\"sandbox_refused\",\"detail\":", (gleamunison_http_util:escape_json(Refusal))/binary, "}">>);
-        ok ->
-            handle_eval_admitted(Socket, Expr)
-    end;
+    admit_execution(Socket, fun() -> handle_eval_admitted(Socket, Expr) end);
 handle_eval_route(Socket, _) ->
     gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing expr parameter\"}">>).
 
@@ -65,19 +59,44 @@ handle_eval_admitted(Socket, Expr) ->
             gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
     end.
 
+admit_execution(Socket, Work) ->
+    case sandbox_admits() of
+        {error, Refusal} ->
+            gleamunison_http_util:send_json(Socket, 403,
+                <<"{\"error\":\"sandbox_refused\",\"detail\":", (gleamunison_http_util:escape_json(Refusal))/binary, "}">>);
+        ok -> Work()
+    end.
+
+handle_mcp_route(Socket, Body) ->
+    admit_execution(Socket, fun() -> handle_mcp_admitted(Socket, Body) end).
+
+handle_mcp_admitted(Socket, Body) ->
+    case whereis(gleamunison_mcp_session) of
+        undefined ->
+            gleamunison_http_util:send_json(
+                Socket, 503, <<"{\"error\":\"mcp session not running\"}">>);
+        _Pid ->
+            case catch gen_server:call(gleamunison_mcp_session, {rpc, Body}, 30000) of
+                {ok, {respond, Reply}} ->
+                    gleamunison_http_util:send_json(Socket, 200, Reply);
+                {ok, no_reply} ->
+                    gleamunison_http_util:send_json(Socket, 202, <<>>);
+                {error, busy} ->
+                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session busy\"}">>);
+                {'EXIT', _} ->
+                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session unavailable\"}">>);
+                _ ->
+                    gleamunison_http_util:send_json(Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
+            end
+    end.
+
 handle_counter_route(Socket) ->
     Val = try ets:update_counter(gleamunison_http_counter, count, {2, 1}, {count, 0}) catch _:_ -> 0 end,
     Json = iolist_to_binary(io_lib:format("{\"count\":~p}", [Val])),
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_define_route(Socket, <<"?name=", Rest/binary>>) ->
-    case sandbox_admits() of
-        {error, Refusal} ->
-            gleamunison_http_util:send_json(Socket, 403,
-                <<"{\"error\":\"sandbox_refused\",\"detail\":", (gleamunison_http_util:escape_json(Refusal))/binary, "}">>);
-        ok ->
-            handle_define_admitted(Socket, Rest)
-    end;
+    admit_execution(Socket, fun() -> handle_define_admitted(Socket, Rest) end);
 handle_define_route(Socket, _) ->
     gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>).
 

@@ -37,6 +37,12 @@ fn ffi_set_http_token(token: String) -> Nil
 @external(erlang, "gleamunison_ffi_test", "clear_http_token")
 fn ffi_clear_http_token() -> Nil
 
+@external(erlang, "gleamunison_ffi_test", "set_env")
+fn ffi_set_env(key: String, value: String) -> Nil
+
+@external(erlang, "gleamunison_ffi_test", "unset_env")
+fn ffi_unset_env(key: String) -> Nil
+
 pub fn mcp_http_end_to_end_test() {
   let assert Ok(Nil) = mcp_server.start([])
   ffi_start_http_server(18_099)
@@ -83,4 +89,22 @@ pub fn mcp_http_auth_and_limit_test() {
   ffi_clear_http_token()
   mcp_server.stop()
   ffi_stop_http_server()
+}
+
+pub fn mcp_authority_untrusted_execution_refuses_eval_test() {
+  let assert Ok(Nil) = mcp_server.start([])
+  ffi_set_env("GLEAMUNISON_PROFILE", "untrusted-execution")
+  ffi_start_http_server(18_101)
+
+  let call_body =
+    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"(add 20 22)\"}}}"
+  let response = ffi_http_post(18_101, "/mcp", call_body)
+
+  ffi_unset_env("GLEAMUNISON_PROFILE")
+  mcp_server.stop()
+  ffi_stop_http_server()
+
+  let assert Ok(#(403, body)) = response
+  let assert True = string.contains(body, "sandbox_refused")
+  let assert True = string.contains(body, "missing_external_executor")
 }

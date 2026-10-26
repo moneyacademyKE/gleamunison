@@ -415,29 +415,9 @@ send_error(Socket, Status, Message) ->
     gleamunison_http_util:send_json(Socket, Status, Json).
 
 handle_post_route(Socket, <<"/mcp">>, Body) ->
-    handle_mcp_route(Socket, Body);
+    gleamunison_http_routes:handle_mcp_route(Socket, Body);
 handle_post_route(Socket, _Path, _Body) ->
     gleamunison_http_util:send_json(Socket, 404, <<"{\"error\":\"not found\"}">>).
-
-handle_mcp_route(Socket, Body) ->
-    case whereis(gleamunison_mcp_session) of
-        undefined ->
-            gleamunison_http_util:send_json(
-                Socket, 503, <<"{\"error\":\"mcp session not running\"}">>);
-        _Pid ->
-            case catch gen_server:call(gleamunison_mcp_session, {rpc, Body}, 30000) of
-                {ok, {respond, Reply}} ->
-                    gleamunison_http_util:send_json(Socket, 200, Reply);
-                {ok, no_reply} ->
-                    gleamunison_http_util:send_json(Socket, 202, <<>>);
-                {error, busy} ->
-                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session busy\"}">>);
-                {'EXIT', _} ->
-                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session unavailable\"}">>);
-                _ ->
-                    gleamunison_http_util:send_json(Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
-            end
-    end.
 
 handle_route(Socket, <<"/eval", Rest/binary>>) ->
     gleamunison_http_routes:handle_eval_route(Socket, Rest);
