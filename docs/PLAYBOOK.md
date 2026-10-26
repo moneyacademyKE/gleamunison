@@ -71,7 +71,7 @@ Text (S-Expr) → AST (Gleam types) → Hash (SHA256) → Codebase (DETS / in-me
 
 Every significant design decision is recorded as an ADR in `docs/adr/`.
 Before making a change, read the relevant ADRs. After making a change,
-write a new ADR or update an existing one. Currently 70 ADRs are cataloged.
+write a new ADR or update an existing one. Currently 71 ADRs are cataloged.
 
 ### Agent read model and scratch overlays
 
@@ -104,6 +104,25 @@ write a new ADR or update an existing one. Currently 70 ADRs are cataloged.
   win for stored names; scratch shadows by name but stale stored types must
   never survive a refresh. Publication never erases scratch and never
   absorbs it into CAS.
+
+### Admitted application routes
+
+- Use [ADR 0071](adr/0071-admitted-app-routes.md). `POST /app/<name>` and
+  `POST /app/ref/<content-ref>` execute only definitions bound on the
+  server-selected branch. The request cannot select a branch or store, and
+  scratch or unbound CAS content returns 404.
+- Requests are exactly `{"args":[...]}` with at most eight arguments and
+  65,536 bytes. Responses carry the real `ref`, selected `branch`, and JSON
+  `value` from the shared `run --json` renderer. Empty input means no args.
+- Route resolution is not execution admission. `run_ref` still owns evidence,
+  closure loading, and evaluation with unverified execution disabled. `/app/*`
+  uses the existing data-write and execution-profile gates before storage.
+- Preserve the failure distinction: 400 invalid request/arguments, 413 input
+  too large, 404 absent route/content, 403 evidence/profile refusal, and 422
+  evaluation failure. Do not flatten these into a generic success envelope.
+- Application Db facts use ADR 0069 and remain outside CAS. The route proof
+  must restart the Db owner between an HTTP write and read; a warm process
+  cache is not durability evidence.
 
 ### Deployment and Synchronization
 

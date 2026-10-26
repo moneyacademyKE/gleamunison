@@ -241,8 +241,9 @@ policy gate; its multi-key overlap constructor remains a library/test surface.
 | `gleamunison/prompt` | Content-addressed prompts as definitions | No |
 | `gleamunison/schema_printer` | Type → compact prompt schema | No |
 
-`sandbox_policy` **is** wired: `/eval` and `/define` admit through it, and the
-`untrusted-execution` profile refuses with `403 missing_external_executor`.
+`sandbox_policy` **is** wired: `/eval`, `/define`, `/mcp`, and `/app/*` admit
+through it, and the `untrusted-execution` profile refuses with
+`403 missing_external_executor`.
 
 ## Toolchain and CI
 
@@ -425,10 +426,20 @@ liveness are always available for orchestrators.
 | `GET /eval?expr=`, `GET /define?name=&expr=` | Evaluate or install a definition |
 | `GET /browse`, `GET /counter` | Inspect the codebase |
 | `POST /mcp` | MCP over HTTP |
+| `POST /app/:name`, `POST /app/ref/:content-ref` | Execute an admitted definition on the selected branch |
 | `GET /api/status`, `/api/events`, `/api/processes`, `/api/sync-status` | Runtime state |
 | `GET /api/logs`, `/api/modules`, `/api/traces`, `/api/traces/:id` | Observability |
 | `GET /api/health`, `/api/observability` | Detailed health and resource report |
 | `GET /api/ready`, `/api/live` | Readiness (503 when unhealthy) and liveness |
+
+Application routes accept exactly `{"args":[...]}` (at most eight values) and
+return `{"ref":"…","branch":"factory","value":…}`. An empty body means no
+arguments. `GLEAMUNISON_BRANCH` selects the namespace, defaulting to `main`;
+the request cannot override it. Named routes resolve that branch's binding,
+and content-ref routes additionally require the ref to be bound there. Scratch
+and arbitrary unbound CAS content return 404. The normal evidence, request
+authorization, execution-profile, and evaluation gates still apply; see
+[ADR 0071](docs/adr/0071-admitted-app-routes.md).
 
 ## Why the escript is only ~1.3 MB
 
@@ -467,7 +478,7 @@ runtime.
 - [Upgrade and rollback](docs/operations/upgrade-and-rollback.md) — artifact gates
 - [Verification matrix](docs/operations/verification-matrix.md) — what each gate proves
 - [Verification witness](docs/verification/production-boundaries-2026-10-24.md) — the machine-readable proof
-- [ADRs](docs/adr/) — 68 Architecture Decision Records
+- [ADRs](docs/adr/) — 71 Architecture Decision Records
 - [Learnings](docs/LEARNINGS.md) — architectural insights discovered
 - [Patterns](docs/PATTERNS.md) — design patterns used
 - [Reference Manual](docs/MANUAL.md) — complete user guide

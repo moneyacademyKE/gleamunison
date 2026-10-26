@@ -70,6 +70,8 @@ Advertises local refs, retrieves remote difference, requests missing definition 
 - **Health Checks**: `gleamunison_readiness.erl` — `/api/health` and `/api/ready`, required vs observational checks.
 - **Configuration**: environment variables read at the point of use (`GLEAMUNISON_PROFILE`, `GLEAMUNISON_BIND_ADDRESS`, `GLEAMUNISON_HTTP_TOKEN`, `GLEAMUNISON_REQUIRED_SERVICES`).
 - **Trace Inspector**: `gleamunison_trace.erl` — DETS-backed HTTP request capture, SSE push, `/api/traces` endpoint.
+- **Admitted application routes**: `gleamunison/app_route` resolves only selected-branch names or bound content refs; `app_path` owns strict route-segment decoding, `app_response` owns bounded JSON envelopes, and `run_ref` remains the sole evidence/evaluation authority. `POST /app/:name` and `/app/ref/:content-ref` share HTTP data-write and execution-profile admission with MCP.
+- **Namespace codecs**: `gleamunison/namespace_codec` owns canonical namespace-snapshot and branch-head bytes; `namespace` owns values, branches, history, diff, merge, and synchronization.
 
 ### 8. Standard Library (v1.1.0)
 - **HTTP Client**: `gleamunison/http_client` — get/post/put/delete, opaque `HttpResponse`.
