@@ -1,9 +1,13 @@
 import gleam/list
+import gleam/result
 import gleam/string
 import gleamunison/mcp
 import gleamunison/mcp_session
 import gleeunit/should
 import simplifile
+
+@external(erlang, "gleamunison_graph_probe", "index_eval_calls")
+fn count_index_evaluations(query: fn() -> a) -> #(a, Int)
 
 fn test_state() -> mcp_session.SessionState {
   let path = "/tmp/mcp_graph_test.lisp"
@@ -57,4 +61,51 @@ pub fn graph_tools_registered_test() {
     mcp.Respond(content) -> string.contains(content, "inc") |> should.be_true
     mcp.NoReply -> should.fail()
   }
+}
+
+/// Fixed graph filters are data operations, not Datalog evaluations.
+pub fn graph_queries_do_not_evaluate_datalog_test() {
+  let state = test_state()
+  let #(callers, deps, kinds, evaluations) = case
+    count_index_evaluations(fn() {
+      use callers <- result.try(mcp_session.callers_of(state, "one"))
+      use deps <- result.try(mcp_session.deps_of(state, "inc2"))
+      use kinds <- result.try(mcp_session.defs_by_kind(state, "term"))
+      Ok([callers, deps, kinds])
+    })
+  {
+    #(Ok([callers, deps, kinds]), evaluations) -> #(
+      callers,
+      deps,
+      kinds,
+      evaluations,
+    )
+    #(Error(_), _) -> panic as "graph query failed"
+    #(Ok(_), _) -> panic as "unexpected graph result shape"
+  }
+  callers |> should.equal(["inc"])
+  deps |> should.equal(["inc"])
+  list.contains(kinds, "inc") |> should.be_true
+  evaluations |> should.equal(0)
+}
+
+/// Preserve the established result order and dependency de-duplication.
+pub fn graph_results_preserve_order_and_deduplication_test() {
+  let source =
+    "
+(define target 1)
+(define zeta (lam x target))
+(define alpha (lam x target))
+(define repeat (lam x (pair target target)))
+"
+  let assert Ok(#(_, state)) =
+    mcp_session.eval_source(mcp_session.boot(), source)
+  mcp_session.callers_of(state, "target")
+  |> should.equal(Ok(["repeat", "alpha", "zeta"]))
+  mcp_session.deps_of(state, "repeat")
+  |> should.equal(Ok(["pair", "target"]))
+  let assert Ok(terms) = mcp_session.defs_by_kind(state, "term")
+  let fixture_names = ["target", "zeta", "alpha", "repeat"]
+  list.filter(terms, list.contains(fixture_names, _))
+  |> should.equal(["repeat", "alpha", "zeta", "target"])
 }

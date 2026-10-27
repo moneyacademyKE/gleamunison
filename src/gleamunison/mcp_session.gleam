@@ -8,10 +8,9 @@ import gleam/result
 import gleam/string
 import gleamunison/active_storage
 import gleamunison/agent_read_model
-import gleamunison/codebase_index
+import gleamunison/codebase_graph
 import gleamunison/elab_types.{type SurfaceDef}
 import gleamunison/lexer
-import gleamunison/lisp_literal
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/mcp_definition
 import gleamunison/mcp_generation
@@ -377,8 +376,7 @@ fn names_tool(
   query: fn(String) -> Result(List(String), String),
 ) -> Tool {
   let description = case name {
-    "callers_of" ->
-      "List definitions that reference the given name (datalog index)"
+    "callers_of" -> "List definitions that reference the given name"
     "deps_of" -> "List in-corpus names the given definition references"
     _ -> "List definitions of a kind (term, type, ability, type-alias)"
   }
@@ -388,18 +386,12 @@ fn names_tool(
   })
 }
 
-/// Callers of a name: every definition with a def/dep edge pointing at it.
-/// Answered by the native datalog engine over the session index.
+/// Callers of a name: every visible definition with a dependency edge to it.
 pub fn callers_of(
   state: SessionState,
   name: String,
 ) -> Result(List(String), String) {
-  index_names(
-    state,
-    "\n(define q (list (pair (q-var \"?e\") (pair \"def/dep\" (q-val "
-      <> lisp_literal.text(name)
-      <> "))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
-  )
+  Ok(codebase_graph.callers_of(visible_entries(state), name))
 }
 
 /// Dependencies of a definition: in-corpus names its body references.
@@ -407,12 +399,7 @@ pub fn deps_of(
   state: SessionState,
   name: String,
 ) -> Result(List(String), String) {
-  index_names(
-    state,
-    "\n(define q (list (pair (q-var \"?e\") (pair \"def/name\" (q-val "
-      <> lisp_literal.text(name)
-      <> "))) (pair (q-var \"?e\") (pair \"def/dep\" (q-var \"?d\")))))\n(binding-values (db-query db q) \"?d\")\n",
-  )
+  Ok(codebase_graph.deps_of(visible_entries(state), name))
 }
 
 /// Definitions filtered by kind (term, type, ability, type-alias).
@@ -420,25 +407,7 @@ pub fn defs_by_kind(
   state: SessionState,
   kind: String,
 ) -> Result(List(String), String) {
-  index_names(
-    state,
-    "\n(define q (list (pair (q-var \"?e\") (pair \"def/kind\" (q-val "
-      <> lisp_literal.text(kind)
-      <> "))) (pair (q-var \"?e\") (pair \"def/name\" (q-var \"?n\")))))\n(binding-values (db-query db q) \"?n\")\n",
-  )
-}
-
-/// Validate the engine's result as a complete list of UTF-8 text values.
-@external(erlang, "gleamunison_index_result", "strings")
-fn decode_index_names(output: String) -> Result(List(String), String)
-
-fn index_names(
-  state: SessionState,
-  tail: String,
-) -> Result(List(String), String) {
-  let script = codebase_index.index_entries(visible_entries(state)) <> tail
-  use output <- result.try(codebase_index.eval_index_source(script))
-  decode_index_names(output)
+  Ok(codebase_graph.defs_by_kind(visible_entries(state), kind))
 }
 
 fn get_definition(state: SessionState, name: String) -> Result(String, String) {
