@@ -272,7 +272,7 @@ fn elaborate_all(
 /// term performs an ability op, or it references (directly or through
 /// other batch defs) one that does. Conservative by design: a `Do` under a
 /// `Handle` still counts — discharged-in-term handlers are rare enough
-/// that the safe direction wins. Ambient jets (`now`, `read_line`) are
+/// that the safe direction wins. Ambient builtins (`now`, `read_line`) are
 /// invisible to the term walk — a documented limit of the current effect
 /// system, not a loophole: their users still need Test or Io evidence.
 fn compute_effectful(

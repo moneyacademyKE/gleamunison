@@ -31,7 +31,6 @@ pub fn untrusted_denies_direct_host_ffi_test() {
       budget: sandbox_policy.default_budget(),
       abilities: capability.allow([]),
       direct_host_ffi: True,
-      native_jets: False,
       external_executor: Some(
         sandbox_policy.ExternalExecutor(
           name: "test",
@@ -41,25 +40,6 @@ pub fn untrusted_denies_direct_host_ffi_test() {
     )
   let assert Error(refusal) = sandbox_policy.admit(policy)
   sandbox_policy.refusal_name(refusal) |> should.equal("direct_host_ffi_denied")
-}
-
-pub fn untrusted_denies_native_jets_test() {
-  let policy =
-    sandbox_policy.SandboxPolicy(
-      profile: sandbox_policy.UntrustedExecution,
-      budget: sandbox_policy.default_budget(),
-      abilities: capability.allow([]),
-      direct_host_ffi: False,
-      native_jets: True,
-      external_executor: Some(
-        sandbox_policy.ExternalExecutor(
-          name: "test",
-          launcher: fn(_input, _budget) { Ok("external") },
-        ),
-      ),
-    )
-  let assert Error(refusal) = sandbox_policy.admit(policy)
-  sandbox_policy.refusal_name(refusal) |> should.equal("native_jet_denied")
 }
 
 pub fn invalid_budget_refuses_before_executor_check_test() {
@@ -77,7 +57,6 @@ pub fn invalid_budget_refuses_before_executor_check_test() {
       budget: budget,
       abilities: capability.allow([]),
       direct_host_ffi: False,
-      native_jets: False,
       external_executor: None,
     )
   let assert Error(refusal) = sandbox_policy.admit(policy)

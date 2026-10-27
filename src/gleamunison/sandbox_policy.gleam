@@ -42,7 +42,6 @@ pub type SandboxPolicy {
     budget: ResourceBudget,
     abilities: capability.Policy,
     direct_host_ffi: Bool,
-    native_jets: Bool,
     external_executor: Option(ExternalExecutor),
   )
 }
@@ -50,7 +49,6 @@ pub type SandboxPolicy {
 pub type BoundaryRefusal {
   MissingExternalExecutor
   DirectHostFfiDenied
-  NativeJetDenied
   InvalidResourceBudget
 }
 
@@ -70,7 +68,6 @@ pub fn local(abilities: capability.Policy) -> SandboxPolicy {
     budget: default_budget(),
     abilities: abilities,
     direct_host_ffi: True,
-    native_jets: True,
     external_executor: None,
   )
 }
@@ -81,7 +78,6 @@ pub fn authenticated_remote(abilities: capability.Policy) -> SandboxPolicy {
     budget: default_budget(),
     abilities: abilities,
     direct_host_ffi: True,
-    native_jets: True,
     external_executor: None,
   )
 }
@@ -95,7 +91,6 @@ pub fn untrusted(
     budget: default_budget(),
     abilities: abilities,
     direct_host_ffi: False,
-    native_jets: False,
     external_executor: external_executor,
   )
 }
@@ -109,8 +104,6 @@ pub fn admit(policy: SandboxPolicy) -> Result(SandboxPolicy, BoundaryRefusal) {
           Error(MissingExternalExecutor)
         SandboxPolicy(profile: UntrustedExecution, direct_host_ffi: True, ..) ->
           Error(DirectHostFfiDenied)
-        SandboxPolicy(profile: UntrustedExecution, native_jets: True, ..) ->
-          Error(NativeJetDenied)
         _ -> Ok(policy)
       }
   }
@@ -154,7 +147,6 @@ pub fn refusal_name(refusal: BoundaryRefusal) -> String {
   case refusal {
     MissingExternalExecutor -> "missing_external_executor"
     DirectHostFfiDenied -> "direct_host_ffi_denied"
-    NativeJetDenied -> "native_jet_denied"
     InvalidResourceBudget -> "invalid_resource_budget"
   }
 }
@@ -207,8 +199,8 @@ pub fn require_no_host_authority(keys: List(String)) -> Result(Nil, String) {
 /// work; Error carries the refusal name.
 ///
 /// This is the enforcement point the README claims: the untrusted-execution
-/// profile refuses until a real external executor exists, and it refuses host
-/// FFI and native jets by construction.
+/// profile refuses until a real external executor exists, and it refuses
+/// direct host FFI by construction.
 pub fn admit_profile(profile: String) -> Result(Nil, String) {
   let policy = case profile {
     "untrusted-execution" -> untrusted(capability.allow([]), None)
@@ -226,5 +218,5 @@ pub fn denies_untrusted_execution(profile: String) -> Bool {
 }
 
 fn is_host_authority_key(key: String) -> Bool {
-  string.contains(key, "ffi") || string.contains(key, "jet")
+  string.contains(key, "ffi")
 }
