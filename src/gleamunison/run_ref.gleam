@@ -1,9 +1,9 @@
 //// Run a definition by content hash: the store is the program.
 ////
 //// Resolve the dependency closure first, then load it, then execute. A ref
-//// whose module is already in the runtime (a genesis builtin, or a jet) needs
-//// no store entry, so a stored definition that adds two numbers does not have
-//// to carry the definition of `+`.
+//// whose module is already in the runtime as a genesis builtin needs no store
+//// entry, so a stored definition that adds two numbers does not have to carry
+//// the definition of `+`.
 
 import gleam/dynamic.{type Dynamic}
 import gleam/list

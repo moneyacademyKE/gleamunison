@@ -7,7 +7,6 @@ import gleamunison/ast
 import gleamunison/identity.{
   type DefinitionRef, Local, Ref, hash_to_debug_string,
 }
-import gleamunison/jets
 
 pub type Compiler {
   Compiler
@@ -39,12 +38,7 @@ fn emit_term(t: ast.Term) -> String {
     ast.Int(n) -> int.to_string(n)
     ast.Float(f) -> float.to_string(f)
     ast.Text(b) -> ffi_binary_to_erl_literal(b)
-    ast.RefTo(ref) -> {
-      case jets.get_jet(ref) {
-        option.Some(jet_body) -> jet_body
-        option.None -> "'" <> module_name_for(ref) <> "':'$eval'()"
-      }
-    }
+    ast.RefTo(ref) -> "'" <> module_name_for(ref) <> "':'$eval'()"
     ast.LocalVarRef(Local(i)) -> "V" <> int.to_string(i)
     ast.Apply(function: f, arg: a) ->
       "erlang:apply(" <> emit_term(f) <> ", [" <> emit_term(a) <> "])"
@@ -148,15 +142,10 @@ pub fn compile_definition(
   ref: DefinitionRef,
 ) -> Result(BitArray, CompileError) {
   let m = module_name_for(ref)
-  let body = case jets.get_jet(ref) {
-    option.Some(jet_body) -> jet_body
-    option.None -> {
-      case def {
-        ast.TermDef(term:, typ: _) -> emit_term(term)
-        ast.TypeDef(_) -> "ok"
-        ast.AbilityDecl(_) -> "ok"
-      }
-    }
+  let body = case def {
+    ast.TermDef(term:, typ: _) -> emit_term(term)
+    ast.TypeDef(_) -> "ok"
+    ast.AbilityDecl(_) -> "ok"
   }
   let #(exports, stubs) = case def {
     ast.AbilityDecl(ast.AbilityDeclaration(name: _, operations: ops)) -> {

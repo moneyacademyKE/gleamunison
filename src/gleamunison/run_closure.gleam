@@ -8,7 +8,6 @@
 
 import gleam/dict
 import gleam/list
-import gleam/option
 import gleam/result
 import gleamunison/ast
 import gleamunison/bootstrap_types
@@ -16,7 +15,6 @@ import gleamunison/bootstraps
 import gleamunison/codebase
 import gleamunison/definition_refs
 import gleamunison/identity.{type DefinitionRef}
-import gleamunison/jets
 import gleamunison/loader
 import gleamunison/name_snapshot
 import gleamunison/repl_eval
@@ -104,17 +102,11 @@ fn resolve_runtime_ref(
   ld: loader.Loader,
   ref: DefinitionRef,
 ) -> Result(loader.Loader, RunError) {
-  case jets.get_jet(ref) {
-    option.Some(_) ->
-      loader.ensure_loaded_jet(ld, ref)
-      |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
-    option.None ->
-      case
-        bootstrap_types.is_type_ref(ref)
-        || { is_bootstrap_ref(ref) && loader.module_available(ref) }
-      {
-        True -> Ok(ld)
-        False -> Error(Missing(ref))
-      }
+  case
+    bootstrap_types.is_type_ref(ref)
+    || { is_bootstrap_ref(ref) && loader.module_available(ref) }
+  {
+    True -> Ok(ld)
+    False -> Error(Missing(ref))
   }
 }

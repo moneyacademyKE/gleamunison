@@ -1,13 +1,11 @@
 import gleam/dict.{type Dict}
 import gleam/list
-import gleam/option
 import gleam/set.{type Set}
 import gleamunison/ast
 import gleamunison/compile.{
   type Compiler, compile_definition, module_name_for, new as new_compiler,
 }
 import gleamunison/identity.{type DefinitionRef}
-import gleamunison/jets
 import gleamy/bimap
 
 @external(erlang, "gleamunison_ffi", "load_binary")
@@ -76,24 +74,6 @@ fn module_exports_ffi(mod_name: String) -> Result(List(#(String, Int)), String)
 /// stubs) and backs introspection such as `run --json` on a function.
 pub fn exports(ref: DefinitionRef) -> Result(List(#(String, Int)), String) {
   module_exports_ffi(module_name_for(ref))
-}
-
-/// Load a ref whose body lives in the jet table rather than the store.
-/// compile_definition consults the jet table before the definition argument,
-/// so the argument here is inert; it exists so there is one load path.
-pub fn ensure_loaded_jet(
-  ld: Loader,
-  ref: DefinitionRef,
-) -> Result(Loader, #(Loader, LoaderError)) {
-  case jets.get_jet(ref) {
-    option.None -> Error(#(ld, CompileFailed(ref, "no jet registered")))
-    option.Some(_) ->
-      ensure_loaded(
-        ld,
-        ref,
-        ast.TermDef(term: ast.Int(0), typ: ast.Builtin(ast.IntType)),
-      )
-  }
 }
 
 fn retry_pending_purges(ld: Loader) -> Loader {

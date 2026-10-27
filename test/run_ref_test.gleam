@@ -4,6 +4,7 @@
 import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/ast
+import gleamunison/bootstrap_types
 import gleamunison/codebase
 import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Local, Ref, hash_bytes}
@@ -79,6 +80,30 @@ pub fn a_builtin_reached_by_name_ref_needs_no_store_entry_test() {
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
   run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("3"))
+}
+
+pub fn a_stored_process_round_trip_uses_genesis_builtins_test() {
+  let self_ref = repl_eval.ref_for_name("self")
+  let send_ref = repl_eval.ref_for_name("send")
+  let recv_ref = repl_eval.ref_for_name("recv")
+  let main =
+    ast.TermDef(
+      term: ast.Let(
+        binder: Local(0),
+        value: ast.Apply(
+          function: ast.Apply(
+            function: ast.RefTo(send_ref),
+            arg: ast.RefTo(self_ref),
+          ),
+          arg: ast.Text(<<"jet-removal:stored-round-trip">>),
+        ),
+        body: ast.RefTo(recv_ref),
+      ),
+      typ: bootstrap_types.host_value(),
+    )
+  let #(cb, main_ref) = insert(codebase.empty(), main)
+  run_ref.run(codebase.get_adapter(cb), main_ref, [])
+  |> should.equal(Ok("<<\"jet-removal:stored-round-trip\">>"))
 }
 
 pub fn a_missing_dependency_names_the_ref_test() {
