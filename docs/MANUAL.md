@@ -177,12 +177,15 @@ fabricated source for display or identity.
 It does not accept a storage key, branch, store path, evidence bypass, or
 provider credential. Untrusted execution refuses before storage opens.
 
-`agent_generate` accepts a bounded template/variables/signature/attempt request.
+`agent_generate` accepts a bounded template/variables/signature/attempt request
+with an optional non-empty `target`. Without `target`, one target term is
+required. With `target`, the candidate may define that target plus helper
+terms; the named target's inferred type must match the requested signature.
 The server owns provider configuration. SAP may repair a near-miss candidate
 envelope, but inferred type, tests, signed evidence, trust, CAS, and selected-
 branch admission are checked by the ordinary publication path. Exhaustion does
-not add branch bindings. The public generator handles one target term per
-candidate, not arbitrary multi-definition applications.
+not add branch bindings. Helper bundles are explicit and receipted; they are
+not arbitrary multi-definition application synthesis.
 
 ## 8. HTTP application routes
 

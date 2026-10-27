@@ -43,12 +43,19 @@ dependency, not a delivery date.
 
 **Goal:** compose useful applications without weakening admission.
 
-Potential scope:
+Implemented slice: explicit target-selected helper requests and receipts. An
+optional `target` names the definition that owns the requested signature; that
+candidate may include admitted helper definitions and reports real content
+refs. See [ADR 0073](adr/0073-target-selected-helper-generation.md) and the
+[2026-10-27 production witness](verification/production-boundaries-2026-10-27.md).
 
-- Explicit multi-definition/helper generation requests and receipts.
+Remaining potential scope:
+
 - Schema vocabulary beyond the current scalar/list and scalar-function subset.
 - Dependency-aware patch application without inventing stored source.
 - Semantic evaluation fixtures beyond “the candidate passed its own tests.”
+- Reachability constraints for helper bundles, rather than explicit bundle
+  admission alone.
 
 Entry constraints: one publication authority; bounded attempts/input/output;
 server-owned provider configuration; inferred-type checks; unchanged branches

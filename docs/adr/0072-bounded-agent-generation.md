@@ -4,7 +4,7 @@
 - **Date:** 2026-10-26 (EAT)
 - **Tracking:** Bankai `bk-6e13`
 - **Implementation:** `75083d8`
-- **Related:** [ADR 0065](0065-verified-cas-admission.md), [ADR 0068](0068-durable-agent-read-model.md), [ADR 0070](0070-admitted-agent-writes.md), [ADR 0071](0071-admitted-app-routes.md)
+- **Related:** [ADR 0065](0065-verified-cas-admission.md), [ADR 0068](0068-durable-agent-read-model.md), [ADR 0070](0070-admitted-agent-writes.md), [ADR 0071](0071-admitted-app-routes.md), [ADR 0073](0073-target-selected-helper-generation.md)
 
 ## Context
 
@@ -76,8 +76,9 @@ next execution without changing the dependent's content hash.
 - MCP `agent_generate` closes the loop from model text to a real content ref
   and an `/app` route, while `agent_publish` remains available for direct source.
 - The first public contract admits one target term plus its tests per attempt.
-  Multi-definition applications and helper generation need an explicit later
-  design, not silent admission through a single-signature request.
+  [ADR 0073](0073-target-selected-helper-generation.md) later added explicit
+  target-selected helper bundles; requests without a target keep this
+  single-term behavior.
 - Signature schemas describe value shape, not effect discharge. Effectful code
   still requires the existing signed `io` evidence. Generated tests are evidence
   under the existing policy, not proof of functional correctness.

@@ -46,6 +46,7 @@ Read these together when changing the agent/application path:
 5. [ADR 0070 — admitted agent writes](adr/0070-admitted-agent-writes.md)
 6. [ADR 0071 — admitted app routes](adr/0071-admitted-app-routes.md)
 7. [ADR 0072 — bounded agent generation](adr/0072-bounded-agent-generation.md)
+8. [ADR 0073 — target-selected helper generation](adr/0073-target-selected-helper-generation.md)
 
 The [ADR index](adr/README.md) contains the complete decision history. An
 accepted decision is not by itself evidence that all of its proposed steps are
@@ -59,13 +60,15 @@ numbers; add a new witness for a new verified tree.
 - [Factory readiness — 2026-10-26](verification/factory-readiness-2026-10-26.md)
 - [Bounded agent generation — 2026-10-26](verification/bounded-agent-generation-2026-10-26.md)
 - [Production-boundary witness — 2026-10-26](verification/production-boundaries-2026-10-26.md)
+- [Production-boundary witness — 2026-10-27](verification/production-boundaries-2026-10-27.md)
 - [Run identity proofs](verification/run-identity-proofs.md)
 - [Audits](audit/) — findings and reproductions at their recorded revisions.
 - [Plans](plans/) — implementation plans and walkthroughs for specific changes.
 
-The latest production witness reports 736 local tests passing and the completed
-factory acceptance loop at `5746656`; that is evidence for that revision, not a
-permanent suite counter. Hosted CI results are separate evidence.
+The latest production witness reports 740 local tests passing and the
+target-selected helper generation loop at `d36f32e`; that is evidence for that
+revision, not a permanent suite counter. Hosted CI results are separate
+evidence.
 
 ## Language and implementation notes
 

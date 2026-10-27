@@ -126,9 +126,12 @@ write system:
 The provider is server-owned. Candidate source, inferred type, evidence, and
 branch admission are checked independently. Exhaustion leaves branch bindings
 unchanged, although an immutable prompt may remain as an audit artifact.
-The public generator handles one target term per candidate; it is not a claim
-of arbitrary multi-definition application synthesis. See
-[ADR 0072](adr/0072-bounded-agent-generation.md).
+A request without `target` handles one target term. An explicit `target`
+names the definition that owns the requested signature and permits admitted
+helper definitions in the same candidate; every definition receives a content
+ref. This is not arbitrary multi-definition application synthesis. See
+[ADR 0072](adr/0072-bounded-agent-generation.md) and
+[ADR 0073](adr/0073-target-selected-helper-generation.md).
 
 ## Application state and Datalog
 

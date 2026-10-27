@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-27 (EAT)
 - **Tracking:** Bankai `bk-da31`
-- **Implementation:** pending
+- **Implementation:** `d36f32e`
 - **Related:** [ADR 0072](0072-bounded-agent-generation.md), [ADR 0070](0070-admitted-agent-writes.md), [ADR 0068](0068-durable-agent-read-model.md)
 
 ## Context
@@ -97,16 +97,26 @@ power without changing storage, evidence, branch, or provider authority.
 
 ## Verification
 
-Pending implementation. Required evidence:
+At implementation commit `d36f32e`:
 
-- A red-then-green generation regression proving target plus helper admission,
-  distinct content refs, verified target execution, and `/app` execution.
-- Missing/wrong-typed target refusal without a new branch binding.
-- Request/schema coverage for optional target and rejection of invalid input.
-- Real MCP → loopback provider → admitted helper bundle → `/app` coverage.
-- Legacy single-term generation coverage remains green.
-- `gleam test`, `gleam format --check src test`,
-  `gleam check --target erlang`, and `git diff --check` exit 0.
+- The request-boundary regression was red first: `target` was rejected as an
+  unknown argument (**736 passed, 1 failure**).
+- The generation regressions were red for the intended missing behavior
+  (**738 passed, 2 failures**): a helper bundle was refused as
+  `requires one target term`, and a candidate missing the requested target was
+  admitted anyway.
+- After implementation, `gleam test` reports **740 passed, no failures**.
+  Target and helper definitions receive distinct content refs; both execute by
+  ref and the target executes through `/app`; missing or wrong-typed targets
+  preserve the branch.
+- The real MCP HTTP path uses the loopback provider: target request → helper
+  bundle → SAP near-miss repair → signed admission → two content refs →
+  `/app` execution. No external provider account is involved.
+- The full integrated gate at `d36f32e` passes **15/15**, including playbook
+  **934 passed / 0 failed / 238 excluded**:
+  [production-boundary witness — 2026-10-27](../verification/production-boundaries-2026-10-27.md).
+- `gleam format --check src test`, `gleam check --target erlang`, and
+  `git diff --check` exit 0. Every touched production module is under 500 LOC.
 
 **Rich Hickey check:** one new optional value selects a subject in the existing
 publication data. The rejected alternatives complect signature ownership with
