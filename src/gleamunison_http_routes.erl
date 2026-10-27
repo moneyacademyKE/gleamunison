@@ -91,7 +91,11 @@ handle_mcp_admitted(Socket, Body) ->
             gleamunison_http_util:send_json(
                 Socket, 503, <<"{\"error\":\"mcp session not running\"}">>);
         _Pid ->
-            case catch gen_server:call(gleamunison_mcp_session, {rpc, Body}, 30000) of
+            case try gen_server:call(gleamunison_mcp_session, {rpc, Body}, 30000) of
+                RpcResult -> RpcResult
+            catch
+                exit:Reason -> {'EXIT', Reason}
+            end of
                 {ok, {respond, Reply}} ->
                     gleamunison_http_util:send_json(Socket, 200, Reply);
                 {ok, no_reply} ->

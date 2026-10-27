@@ -129,8 +129,8 @@ handle_cast(_, State) -> {noreply, State}.
 handle_info(_, State) -> {noreply, State}.
 
 terminate(_Reason, #{tab := Tab}) ->
-    _ = catch dets:sync(Tab),
-    _ = catch dets:close(Tab),
+    _ = try dets:sync(Tab) catch _:_ -> ok end,
+    _ = try dets:close(Tab) catch _:_ -> ok end,
     ok;
 terminate(_, _) -> ok.
 

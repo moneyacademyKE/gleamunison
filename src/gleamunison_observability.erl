@@ -1,5 +1,4 @@
 -module(gleamunison_observability).
--compile(nowarn_deprecated_catch).
 -export([export/0, export_json/0, saturation/0]).
 
 %% Redaction is by construction: this module never reads raw trace headers,
@@ -23,7 +22,11 @@ timestamp() ->
         erlang:system_time(millisecond), [{unit, millisecond}, {offset, "Z"}])).
 
 metrics_snapshot() ->
-    Entries = case catch gleamunison_metrics:list_metrics() of
+    Entries = case try gleamunison_metrics:list_metrics() of
+        Result -> Result
+    catch
+        _:_ -> []
+    end of
         L when is_list(L) -> L;
         _ -> []
     end,
@@ -90,7 +93,11 @@ saturation() ->
 http_worker_count() ->
     case persistent_term:get({gleamunison_http, listener}, undefined) of
         {Pid, _Socket} when is_pid(Pid) ->
-            case catch gleamunison_http:worker_count(Pid) of
+            case try gleamunison_http:worker_count(Pid) of
+                Count -> Count
+            catch
+                _:_ -> 0
+            end of
                 N when is_integer(N) -> N;
                 _ -> 0
             end;
@@ -101,7 +108,11 @@ mcp_active_count() ->
     case whereis(gleamunison_mcp_session) of
         undefined -> 0;
         Pid ->
-            case catch sys:get_state(Pid, 200) of
+            case try sys:get_state(Pid, 200) of
+                State -> State
+            catch
+                _:_ -> []
+            end of
                 #{active := N} when is_integer(N) -> N;
                 _ -> 0
             end

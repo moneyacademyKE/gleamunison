@@ -1,5 +1,4 @@
 -module(gleamunison_readiness).
--compile(nowarn_deprecated_catch).
 -export([report/0, ready/0, http_response/0]).
 
 %% Readiness observes required resources; it never executes stored code,
@@ -127,7 +126,11 @@ service_check(mcp) ->
             case process_info(Pid, status) of
                 {status, suspended} -> {false, <<"check_timeout">>};
                 _ ->
-                    case catch gen_server:call(Pid, readiness, 100) of
+                    case try gen_server:call(Pid, readiness, 100) of
+                        ReadinessResult -> ReadinessResult
+                    catch
+                        exit:Reason -> {'EXIT', Reason}
+                    end of
                         true -> {true, <<"mcp_responsive">>};
                         _ -> {false, <<"mcp_unavailable">>}
                     end

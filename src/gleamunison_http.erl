@@ -1,5 +1,4 @@
 -module(gleamunison_http).
--compile(nowarn_deprecated_catch).
 -behaviour(gen_server).
 -export([start_link/1, start_server/1, stop_server/0, drain/1, init/1, handle_call/3,
          handle_cast/2, handle_info/2, terminate/2, worker_count/1, ensure_storage/0]).
@@ -34,7 +33,11 @@ ensure_storage() ->
     end.
 
 open_store() ->
-    case catch gleamunison@cli_lifecycle:resolve_store_path() of
+    case try gleamunison@cli_lifecycle:resolve_store_path() of
+        Result -> Result
+    catch
+        _:_ -> {error, store_path_unavailable}
+    end of
         {ok, Path} ->
             _ = filelib:ensure_dir(binary_to_list(Path)),
             case gleamunison_storage:dets_new(Path) of
@@ -190,7 +193,7 @@ handle_call({drain, Timeout}, _From, #{socket := Socket, acceptor := Acceptor, w
     %% Worker DOWNs are consumed here so the wait observes real progress
     %% instead of a frozen map.
     unlink(Acceptor),
-    catch gen_tcp:close(Socket),
+    _ = try gen_tcp:close(Socket) catch _:_ -> ok end,
     exit(Acceptor, shutdown),
     persistent_term:erase({gleamunison_http, listener}),
     Deadline = erlang:monotonic_time(millisecond) + Timeout,
@@ -220,7 +223,7 @@ terminate(_, #{socket := Socket, acceptor := Acceptor, workers := Workers}) ->
     %% Same unlink as in drain: the acceptor's shutdown must not backfire
     %% through the link and rewrite the reason this server terminates with.
     unlink(Acceptor),
-    catch gen_tcp:close(Socket),
+    _ = try gen_tcp:close(Socket) catch _:_ -> ok end,
     exit(Acceptor, shutdown),
     maps:foreach(fun(Pid, _) -> exit(Pid, shutdown) end, Workers),
     persistent_term:erase({gleamunison_http, listener}),

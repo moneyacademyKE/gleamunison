@@ -1,5 +1,4 @@
 -module(gleamunison_http_client).
--compile(nowarn_deprecated_catch).
 -export([request/4, request_with_options/6, get/1, post/2, put/2, delete/1]).
 
 request(Method, Url, Headers, Body) ->
@@ -62,7 +61,7 @@ wait_for_response(RequestId, Deadline, Cancellation) ->
     end.
 
 cancel_request(RequestId, Reason) ->
-    _ = catch httpc:cancel_request(RequestId),
+    _ = try httpc:cancel_request(RequestId) catch _:_ -> ok end,
     {error, Reason}.
 
 cancelled(none) -> false;
