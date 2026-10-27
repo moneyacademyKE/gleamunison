@@ -158,6 +158,12 @@ S-expression language. It supplies immutable EAV indexes, transactions,
 queries, temporal operations, rules, graph/search functions, and an in-process
 transactor model. It is not automatically the durable `Db` journal.
 
+The MCP graph tools (`callers_of`, `deps_of`, `defs_by_kind`) do not use that
+engine. They are fixed joins over the selected session's definition datoms,
+answered directly by `codebase_graph`. The engine is user-space software;
+runtime introspection never generates or evaluates a Datalog program. See
+[ADR 0075](adr/0075-mcp-graph-queries-direct-datoms.md).
+
 ## Services and admitted application routes
 
 HTTP and MCP run under OTP supervisors. Readiness and observability expose

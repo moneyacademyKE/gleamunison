@@ -88,6 +88,7 @@ For paths that were considered and *declined*, with the reasoning, see [`unimple
 | [ADR-0072](0072-bounded-agent-generation.md) | Bounded generation through admitted publication | Accepted |
 | [ADR-0073](0073-target-selected-helper-generation.md) | Target-selected helper generation through admitted publication | Accepted; implemented |
 | [ADR-0074](0074-stored-definition-execution-authority.md) | Stored definitions are the only execution authority | Accepted; implemented |
+| [ADR-0075](0075-mcp-graph-queries-direct-datoms.md) | MCP graph queries are direct datom operations | Accepted; implemented |
 
 
 
