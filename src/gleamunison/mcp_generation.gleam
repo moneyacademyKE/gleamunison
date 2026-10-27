@@ -15,7 +15,7 @@ fn owner_generate(plan: generation_loop.Plan) -> Result(String, String)
 pub fn tool() -> Tool {
   Tool(
     name: "agent_generate",
-    description: "Generate, repair, test, attest, and publish one signature-typed term; server-owned provider and bounded attempts",
+    description: "Generate, repair, test, attest, and publish one signature-typed term with optional named helpers; server-owned provider and bounded attempts",
     handler: generate,
   )
 }

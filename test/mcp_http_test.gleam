@@ -2,6 +2,7 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
+import gleam/list
 import gleam/string
 import gleamunison/cli_run
 import gleamunison/evidence
@@ -226,7 +227,11 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
   let _ = storage.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   let candidate =
-    "```json\n{source: '(define generated-number 42)\\n(define test_generated-number (do Test expect 1))', signature: 'int',}\n```"
+    "```json\n{source: '"
+    <> "(define generated-base 40)\\n"
+    <> "(define test_generated-base (do Test expect (eq? generated-base 40)))\\n"
+    <> "(define generated-number (+ generated-base 2))\\n"
+    <> "(define test_generated-number (do Test expect (eq? generated-number 42)))', signature: 'int',}\n```"
   let assert Ok(provider_port) = start_completion_server(candidate)
   ffi_set_env("GLEAMUNISON_STORE_DIR", root)
   ffi_set_env("GLEAMUNISON_BRANCH", "factory")
@@ -243,7 +248,7 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
       let assert Ok(Nil) = mcp_server.start([])
       ffi_start_http_server(18_104)
       let body =
-        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"agent_generate\",\"arguments\":{\"template\":\"Create a numeric answer with schema {{signature}}\",\"signature\":\"int\",\"max_attempts\":1}}}"
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"agent_generate\",\"arguments\":{\"template\":\"Create a numeric answer with schema {{signature}}\",\"signature\":\"int\",\"target\":\"generated-number\",\"max_attempts\":1}}}"
       let generated = ffi_http_post(18_104, "/mcp", body)
       let app = ffi_http_post(18_104, "/app/generated-number", "{\"args\":[]}")
       mcp_server.stop()
@@ -254,15 +259,23 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
   let #(generated, app) = result
   let assert Ok(#(200, generated_body)) = generated
   string.contains(generated_body, "\\\"attempts\\\":1") |> should.be_true
-  let generated_ref = generation_content_ref(generated_body)
+  string.contains(generated_body, "\\\"admitted\\\":2") |> should.be_true
+  response_field(generated_body, "target")
+  |> should.equal("generated-number")
+  let generated_ref = generation_content_ref(generated_body, "generated-number")
+  let helper_ref = generation_content_ref(generated_body, "generated-base")
   string.length(generated_ref) |> should.equal(64)
+  generated_ref |> should.not_equal(helper_ref)
   let assert Ok(#(200, app_body)) = app
   string.contains(app_body, "42") |> should.be_true
   ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-generation-test-key")
   let assert Ok(adapter) = storage.dets(path)
   let assert Ok(ref) = identity.parse_ref_hex(generated_ref)
+  let assert Ok(helper) = identity.parse_ref_hex(helper_ref)
   run_ref.run_verified_on_branch(adapter, ref, "factory", [], False)
   |> should.equal(Ok("42"))
+  run_ref.run_verified_on_branch(adapter, helper, "factory", [], False)
+  |> should.equal(Ok("40"))
   let assert Ok(Nil) = adapter.close()
   ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   let _ = storage.dets_delete_file(path)
@@ -415,7 +428,7 @@ pub fn mcp_untrusted_write_is_refused_before_storage_test() {
   simplifile.is_file(path) |> should.equal(Ok(False))
 }
 
-fn generation_content_ref(response: String) -> String {
+fn generation_content_ref(response: String, name: String) -> String {
   let payload = tool_payload(response)
   let assert Ok(decoded) = json.decode(bit_array.from_string(payload))
   let decoder = {
@@ -424,15 +437,17 @@ fn generation_content_ref(response: String) -> String {
       decode.field(
         "definitions",
         decode.list({
+          use definition_name <- decode.field("name", decode.string)
           use content_ref <- decode.field("content_ref", decode.string)
-          decode.success(content_ref)
+          decode.success(#(definition_name, content_ref))
         }),
         decode.success,
       ),
     )
     decode.success(definitions)
   }
-  let assert Ok([content_ref]) = decode.run(decoded, decoder)
+  let assert Ok(definitions) = decode.run(decoded, decoder)
+  let assert Ok(content_ref) = list.key_find(definitions, name)
   content_ref
 }
 

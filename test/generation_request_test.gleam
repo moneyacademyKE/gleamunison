@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/option.{Some}
 import gleam/string
 import gleamunison/generation_request
 import gleamunison/schema_printer
@@ -24,6 +25,31 @@ pub fn request_rejects_storage_controls_and_unknown_signatures_test() {
     ])
   let assert Error(signature_error) = generation_request.plan(signature_args)
   string.contains(signature_error, "signature must use") |> should.be_true
+}
+
+pub fn request_decodes_explicit_generation_target_test() {
+  let args =
+    dict.from_list([
+      #("template", dynamic("generate a target and its helpers")),
+      #("signature", dynamic("int")),
+      #("target", dynamic("generated-number")),
+    ])
+  let assert Ok(plan) = generation_request.plan(args)
+  plan.max_attempts |> should.equal(3)
+  plan.target |> should.equal(Some("generated-number"))
+  string.contains(plan.template, "target term named generated-number")
+  |> should.be_true
+}
+
+pub fn request_rejects_empty_generation_target_test() {
+  let args =
+    dict.from_list([
+      #("template", dynamic("generate")),
+      #("signature", dynamic("int")),
+      #("target", dynamic("  ")),
+    ])
+  let assert Error(message) = generation_request.plan(args)
+  string.contains(message, "empty argument: target") |> should.be_true
 }
 
 pub fn request_decodes_function_signature_and_budget_test() {

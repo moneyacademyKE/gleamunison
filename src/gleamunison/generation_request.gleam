@@ -5,12 +5,15 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/ast
 import gleamunison/generation_loop
 
-const allowed_fields = ["template", "variables", "signature", "max_attempts"]
+const allowed_fields = [
+  "template", "variables", "signature", "max_attempts", "target",
+]
 
 pub fn plan(
   args: Dict(String, Dynamic),
@@ -20,7 +23,7 @@ pub fn plan(
       True -> Ok(Nil)
       False ->
         Error(
-          "agent_generate: unknown argument; expected template, variables, signature, max_attempts",
+          "agent_generate: unknown argument; expected template, variables, signature, max_attempts, target",
         )
     },
   )
@@ -29,19 +32,39 @@ pub fn plan(
   use typ <- result.try(signature_type(signature))
   use variables <- result.try(optional_variables(args))
   use attempts <- result.try(optional_attempts(args))
+  use target <- result.try(optional_target(args))
   Ok(generation_loop.Plan(
-    template: instructions(template),
+    template: instructions(template, target),
     variables:,
     signature: typ,
     max_attempts: attempts,
+    target:,
   ))
 }
 
-fn instructions(template: String) -> String {
+fn instructions(template: String, target: Option(String)) -> String {
+  let bundle = case target {
+    None ->
+      "Source must define one target term and its passing test_<name>. "
+      <> "Use no unadmitted helpers. "
+    Some(name) ->
+      "Source must define the target term named "
+      <> name
+      <> ", any helper terms, and passing test_<name> definitions. "
+  }
   template
   <> "\n\nReturn only a JSON object with exactly source and signature. "
-  <> "Source must define one target term and its passing test_<name>. "
-  <> "Use no unadmitted helpers. Repeat this requested signature exactly: {{signature}}."
+  <> bundle
+  <> "Repeat this requested signature exactly: {{signature}}."
+}
+
+fn optional_target(
+  args: Dict(String, Dynamic),
+) -> Result(Option(String), String) {
+  case dict.get(args, "target") {
+    Error(Nil) -> Ok(None)
+    Ok(_) -> required_string(args, "target") |> result.map(Some)
+  }
 }
 
 fn required_string(

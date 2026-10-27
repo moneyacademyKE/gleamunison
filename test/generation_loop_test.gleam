@@ -1,4 +1,5 @@
 import gleam/list
+import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/agent_publish
 import gleamunison/app_route
@@ -30,6 +31,7 @@ pub fn near_miss_generation_is_admitted_and_runnable_test() {
         variables: [#("task", "a greeting")],
         signature: text_to_text(),
         max_attempts: 2,
+        target: None,
       )
     let assert Ok(outcome) =
       generation_loop.generate_and_publish(
@@ -80,6 +82,7 @@ pub fn retry_receives_feedback_and_exhaustion_preserves_branch_test() {
         variables: [],
         signature: ast.Builtin(ast.IntType),
         max_attempts: 2,
+        target: None,
       )
     let source =
       "(define generated-number 42)\n(define test_generated-number (do Test expect 1))"
@@ -145,6 +148,7 @@ pub fn signature_mismatch_is_refused_before_publication_test() {
         variables: [],
         signature: ast.Builtin(ast.IntType),
         max_attempts: 1,
+        target: None,
       )
     let source =
       "(define wrong-type \"oops\")\n(define test_wrong-type (do Test expect 1))"
@@ -171,6 +175,7 @@ pub fn untrusted_generation_refuses_before_candidate_or_branch_write_test() {
         variables: [],
         signature: ast.Builtin(ast.IntType),
         max_attempts: 1,
+        target: None,
       )
     let assert Error(message) =
       generation_loop.generate_and_publish(
@@ -184,6 +189,107 @@ pub fn untrusted_generation_refuses_before_candidate_or_branch_write_test() {
     string.contains(message, "untrusted") |> should.be_true
     let assert Ok(ns) = namespace.load_current_or_empty(adapter, "factory")
     namespace.names(ns) |> should.equal([])
+  })
+}
+
+pub fn explicit_target_admits_helpers_and_runs_test() {
+  with_store(fn(adapter, root) {
+    let plan =
+      generation_loop.Plan(
+        template: "Generate {{signature}} with a local helper",
+        variables: [],
+        signature: ast.Builtin(ast.IntType),
+        max_attempts: 1,
+        target: Some("generated-number"),
+      )
+    let source =
+      "(define generated-base 40)\n"
+      <> "(define test_generated-base (do Test expect (eq? generated-base 40)))\n"
+      <> "(define generated-number (+ generated-base 2))\n"
+      <> "(define test_generated-number (do Test expect (eq? generated-number 42)))\n"
+    let assert Ok(outcome) =
+      generation_loop.generate_and_publish(
+        adapter,
+        root,
+        "factory",
+        False,
+        plan,
+        fn(_) { "{\"source\":" <> quoted(source) <> ",\"signature\":\"int\"}" },
+      )
+    outcome.publication.admitted |> should.equal(2)
+    let assert Ok(helper) = published(outcome.publication, "generated-base")
+    let assert Ok(target) = published(outcome.publication, "generated-number")
+    helper.content_ref |> should.not_equal(target.content_ref)
+    run_ref.run_verified_on_branch(
+      adapter,
+      ref(target.content_ref),
+      "factory",
+      [],
+      False,
+    )
+    |> should.equal(Ok("42"))
+    let response =
+      app_route.request(adapter, "factory", "generated-number", "{\"args\":[]}")
+    response.status |> should.equal(200)
+    string.contains(response.body, "42") |> should.be_true
+  })
+}
+
+pub fn invalid_explicit_target_preserves_existing_branch_test() {
+  with_store(fn(adapter, root) {
+    let baseline =
+      "(define stable-number 7)\n"
+      <> "(define test_stable-number (do Test expect (eq? stable-number 7)))\n"
+    let assert Ok(_) =
+      agent_publish.publish_source(adapter, baseline, "factory", False, root)
+    let assert Ok(before) = namespace.load_current(adapter, "factory")
+    let plan =
+      generation_loop.Plan(
+        template: "Generate {{signature}} with a helper",
+        variables: [],
+        signature: ast.Builtin(ast.IntType),
+        max_attempts: 1,
+        target: Some("generated-number"),
+      )
+    let missing_source =
+      "(define generated-base 40)\n"
+      <> "(define test_generated-base (do Test expect (eq? generated-base 40)))\n"
+    let assert Error(missing) =
+      generation_loop.generate_and_publish(
+        adapter,
+        root,
+        "factory",
+        False,
+        plan,
+        fn(_) {
+          "{\"source\":" <> quoted(missing_source) <> ",\"signature\":\"int\"}"
+        },
+      )
+    string.contains(missing, "target") |> should.be_true
+    let assert Ok(after_missing) = namespace.load_current(adapter, "factory")
+    namespace.names(after_missing) |> should.equal(namespace.names(before))
+
+    let wrong_source =
+      "(define generated-base 40)\n"
+      <> "(define test_generated-base (do Test expect (eq? generated-base 40)))\n"
+      <> "(define generated-number \"wrong\")\n"
+      <> "(define test_generated-number (do Test expect (eq? generated-number \"wrong\")))\n"
+    let assert Error(wrong_type) =
+      generation_loop.generate_and_publish(
+        adapter,
+        root,
+        "factory",
+        False,
+        plan,
+        fn(_) {
+          "{\"source\":" <> quoted(wrong_source) <> ",\"signature\":\"int\"}"
+        },
+      )
+    string.contains(wrong_type, "signature mismatch") |> should.be_true
+    let assert Ok(after_wrong) = namespace.load_current(adapter, "factory")
+    namespace.names(after_wrong) |> should.equal(namespace.names(before))
+    namespace.get(after_wrong, "stable-number")
+    |> should.equal(namespace.get(before, "stable-number"))
   })
 }
 
@@ -210,6 +316,7 @@ pub fn patch_reports_dependents_without_rewriting_stored_code_test() {
           variables: [],
           signature: ast.Builtin(ast.IntType),
           max_attempts: 1,
+          target: None,
         ),
         fn(_) {
           "{\"source\":" <> quoted(updated_source) <> ",\"signature\":\"int\"}"

@@ -31,6 +31,7 @@ pub type Plan {
     variables: List(#(String, String)),
     signature: ast.Type,
     max_attempts: Int,
+    target: Option(String),
   )
 }
 
@@ -51,6 +52,7 @@ pub type Outcome {
     rendered_prompt: String,
     publication: agent_publish.Publication,
     dependents: List(String),
+    target: Option(String),
   )
 }
 
@@ -63,6 +65,7 @@ type Context {
     prompt_ref: String,
     rendered_prompt: String,
     signature: String,
+    target: Option(String),
     previous: List(agent_read_model.Entry),
     generator: Provider,
   )
@@ -136,6 +139,7 @@ fn prepare(
       prompt_ref: prompt.ref_hex(prompt_ref),
       rendered_prompt: rendered,
       signature:,
+      target: plan.target,
       previous:,
       generator: provider,
     ),
@@ -145,17 +149,25 @@ fn prepare(
 }
 
 fn validate_plan(plan: Plan) -> Result(Nil, String) {
-  case plan.max_attempts {
+  use Nil <- result.try(case plan.max_attempts {
     n if n < 1 || n > max_attempts ->
       Error("generation attempts must be between 1 and 8")
-    _ ->
-      case string.trim(plan.template) {
-        "" -> Error("generation prompt template is empty")
-        _ ->
-          case list.key_find(plan.variables, "signature") {
-            Ok(_) -> Error("generation variable signature is reserved")
-            Error(Nil) -> Ok(Nil)
-          }
+    _ -> Ok(Nil)
+  })
+  use Nil <- result.try(case string.trim(plan.template) {
+    "" -> Error("generation prompt template is empty")
+    _ -> Ok(Nil)
+  })
+  use Nil <- result.try(case list.key_find(plan.variables, "signature") {
+    Ok(_) -> Error("generation variable signature is reserved")
+    Error(Nil) -> Ok(Nil)
+  })
+  case plan.target {
+    None -> Ok(Nil)
+    Some(name) ->
+      case string.trim(name) {
+        "" -> Error("generation target is empty")
+        _ -> Ok(Nil)
       }
   }
 }
@@ -185,6 +197,7 @@ fn attempt(
             rendered_prompt: context.rendered_prompt,
             publication:,
             dependents: direct_dependents(context.previous, publication),
+            target: context.target,
           ))
         Error(reason) -> attempt(context, number + 1, Some(reason))
       }
@@ -216,12 +229,13 @@ fn attempt_candidate(
     "generation candidate exceeds 1048576 bytes",
   ))
   use source <- result.try(generation_candidate.decode(raw, context.signature))
-  agent_publish.publish_source_with_signature(
+  agent_publish.publish_target_with_signature(
     context.adapter,
     source,
     context.branch,
     False,
     context.log_directory,
+    context.target,
     context.signature,
   )
 }
@@ -257,10 +271,16 @@ fn exhausted(limit: Int, previous_error: Option(String)) -> String {
 pub fn json(outcome: Outcome) -> String {
   let dependents =
     outcome.dependents |> list.map(mcp.json_string) |> string.join(",")
+  let target = case outcome.target {
+    None -> "null"
+    Some(name) -> mcp.json_string(name)
+  }
   "{\"attempts\":"
   <> int.to_string(outcome.attempts)
   <> ",\"prompt_ref\":"
   <> mcp.json_string(outcome.prompt_ref)
+  <> ",\"target\":"
+  <> target
   <> ",\"publication\":"
   <> agent_publish.json(outcome.publication)
   <> ",\"dependents\":["

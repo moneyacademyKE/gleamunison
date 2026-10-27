@@ -24,6 +24,11 @@ pub type Publication {
   Publication(branch: String, definitions: List(Published), admitted: Int)
 }
 
+type SignatureCheck {
+  Single(String)
+  Target(String, String)
+}
+
 pub fn publish_source(
   adapter: StorageAdapter,
   source: String,
@@ -50,8 +55,26 @@ pub fn publish_source_with_signature(
     branch,
     untrusted,
     log_directory,
-    Some(expected_signature),
+    Some(Single(expected_signature)),
   )
+}
+
+/// A target-selected request may admit helpers, but only the named target
+/// supplies the signature contract. All subjects use the same admission path.
+pub fn publish_target_with_signature(
+  adapter: StorageAdapter,
+  source: String,
+  branch: String,
+  untrusted: Bool,
+  log_directory: String,
+  target: Option(String),
+  expected_signature: String,
+) -> Result(Publication, String) {
+  let check = case target {
+    None -> Single(expected_signature)
+    Some(name) -> Target(name, expected_signature)
+  }
+  publish(adapter, source, branch, untrusted, log_directory, Some(check))
 }
 
 fn publish(
@@ -60,7 +83,7 @@ fn publish(
   branch: String,
   untrusted: Bool,
   log_directory: String,
-  expected_signature: Option(String),
+  expected_signature: Option(SignatureCheck),
 ) -> Result(Publication, String) {
   case untrusted {
     True -> Error("agent_publish_refused: untrusted profile cannot write")
@@ -100,31 +123,49 @@ fn publish(
 
 fn check_signature(
   subjects: List(publication.Subject),
-  expected: Option(String),
+  expected: Option(SignatureCheck),
 ) -> Result(Nil, String) {
-  case expected, subjects {
-    None, _ -> Ok(Nil)
-    Some(_), [] | Some(_), [_, _, ..] ->
-      Error(
-        "publish: signature-constrained generation requires one target term",
-      )
-    Some(wanted), [subject] ->
-      case subject.definition {
-        ast.TermDef(typ:, ..) ->
-          case schema_printer.to_schema(typ) == wanted {
-            True -> Ok(Nil)
-            False ->
-              Error(
-                "publish: signature mismatch for "
-                <> subject.name
-                <> ": inferred "
-                <> schema_printer.to_schema(typ)
-                <> ", requested "
-                <> wanted,
-              )
-          }
-        _ -> Error("publish: signature-constrained generation requires a term")
+  case expected {
+    None -> Ok(Nil)
+    Some(Single(wanted)) ->
+      case subjects {
+        [subject] -> check_subject_signature(subject, wanted)
+        _ ->
+          Error(
+            "publish: signature-constrained generation requires one target term",
+          )
       }
+    Some(Target(name, wanted)) -> {
+      use subject <- result.try(
+        list.find(subjects, fn(subject) { subject.name == name })
+        |> result.replace_error(
+          "publish: generation target not supplied: " <> name,
+        ),
+      )
+      check_subject_signature(subject, wanted)
+    }
+  }
+}
+
+fn check_subject_signature(
+  subject: publication.Subject,
+  wanted: String,
+) -> Result(Nil, String) {
+  case subject.definition {
+    ast.TermDef(typ:, ..) ->
+      case schema_printer.to_schema(typ) == wanted {
+        True -> Ok(Nil)
+        False ->
+          Error(
+            "publish: signature mismatch for "
+            <> subject.name
+            <> ": inferred "
+            <> schema_printer.to_schema(typ)
+            <> ", requested "
+            <> wanted,
+          )
+      }
+    _ -> Error("publish: signature-constrained generation requires a term")
   }
 }
 
