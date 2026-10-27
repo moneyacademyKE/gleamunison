@@ -211,7 +211,7 @@ inventory rather than a second, manually maintained count:
 | **Identity & AST** | `identity`, `ast`, `types`, `definition_codec` |
 | **Parsing & elaboration** | `lexer`, `parser`, `elaborate`, `elab_def`, `elab_term`, `elab_types`, `elab_pat`, `elab_ctx`, `lower` |
 | **Types** | `inference`, `infer_helper`, `typecheck`, `type_pretty` |
-| **Compilation & loading** | `compile`, `loader`, `pipeline`, `jets` |
+| **Compilation & loading** | `compile`, `loader`, `pipeline`, `run_closure` |
 | **Codebase & storage** | `codebase`, `codebase_index`, `storage`, `namespace` |
 | **Effects & capabilities** | `effects`, `capability`, `turnstile` |
 | **Policy & trust** | `auth`, `trust`, `sandbox_policy`, `cancellation`, `evidence` |

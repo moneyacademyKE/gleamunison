@@ -3,8 +3,8 @@
 Tests covering TCP sync protocol deep (pull/push with data and error paths),
 compile all 15 AST variants, inference helper functions (substitute, list_all_match),
 loader edge cases (CompileFailed caching, multi-eviction LRU, known-loaded idempotent, limit 1),
-ability definition elaboration, effects multi-op handler dispatch, jet bypass verification,
-REPL define+eval roundtrip, property checking, parser pattern forms, elaboration context,
+ability definition elaboration, effects multi-op handler dispatch,
+stored-definition authority verification, REPL define+eval roundtrip, property checking, parser pattern forms, elaboration context,
 codebase HashMismatch error, and cross-module integration.
 
 All levels are real implementations in `src/dogfood_v9.gleam`.
@@ -116,10 +116,10 @@ All levels are real implementations in `src/dogfood_v9.gleam`.
 
 ---
 
-## Level 1378–1380: Jet + REPL + Property
+## Level 1378–1380: Definition Authority + REPL + Property
 
-**Level 1378** — `get_jet` with fib hash (123 in 256-bit).
-- **Expected:** Returns `Some(body)` where body contains `"fib"`.
+**Level 1378** — Compile a stored lambda at the former Fibonacci jet hash and apply it from a second definition.
+- **Expected:** Returns the stored `42`; neither compilation path emits the legacy Fibonacci body.
 
 **Level 1379** — `handle_define("x", 42)` → verify define succeeds.
 - **Expected:** Returns `Ok(#(cache, defs))` with updated cache.
@@ -191,8 +191,8 @@ All levels are real implementations in `src/dogfood_v9.gleam`.
 **Level 1396** — Parse → Elaborate → Infer: `(let x 42 (lam y (add x y)))` through full pipeline.
 - **Expected:** Inferred type printed.
 
-**Level 1397** — Effects + Jet + Loader: empty effects run, jet lookup, identity lambda load.
-- **Expected:** All 3 modules exercise without crash.
+**Level 1397** — Effects + Genesis + Loader: empty effects run, genesis process module availability, stored identity lambda load.
+- **Expected:** All three behaviors succeed without a registry-specific load path.
 
 **Level 1398** — Tokenize + Hash + Typecheck: tokenize input, hash definition, infer type.
 - **Expected:** Token count, hash prefix, and inferred type printed.

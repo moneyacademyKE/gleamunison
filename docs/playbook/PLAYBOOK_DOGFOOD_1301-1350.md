@@ -3,8 +3,8 @@
 Integration tests covering HTTP client against live server, parser special forms,
 config precedence chain, health check variants, datetime deep edges, filepath edges,
 inference error paths, elaboration gaps (TypeAlias, SRef, empty unit, PubTypeAlias),
-codebase insert_raw/multi-def/AbilityDecl, lower TFun error, jet miss, partitioned
-DETS lifecycle, and cross-module certification.
+codebase insert_raw/multi-def/AbilityDecl, lower TFun error, missing-ref refusal,
+partitioned DETS lifecycle, and cross-module certification.
 
 All levels are real implementations in `src/dogfood_v8.gleam`.
 
@@ -166,16 +166,16 @@ All levels are real implementations in `src/dogfood_v8.gleam`.
 
 ---
 
-## Level 1341–1344: Lower + Jets + Pipeline
+## Level 1341–1344: Lower + Definition Authority + Pipeline
 
 **Level 1341** — `lower_type_ref(TFun([], TVar("x")), dict.new())`.
 - **Expected:** Returns `Error(UnsupportedTypeRef("TFun not supported"))`.
 
-**Level 1342** — `get_jet` with non-jet (random hash).
-- **Expected:** Returns `None`.
+**Level 1342** — Resolve a random unbound ref with no genesis module.
+- **Expected:** Returns `Missing`; no substitute implementation is loaded.
 
-**Level 1343** — `get_jet` with fib jet hash (123 in 256-bit).
-- **Expected:** Returns `Some("fun(N) -> gleamunison_jets:fib(N) end")`.
+**Level 1343** — Compile and apply a stored lambda at the former Fibonacci jet hash.
+- **Expected:** Returns the stored lambda's `42`, not the deleted jet's `55`.
 
 **Level 1344** — `parse_only("{no}")` — invalid syntax.
 - **Expected:** Returns parse error.

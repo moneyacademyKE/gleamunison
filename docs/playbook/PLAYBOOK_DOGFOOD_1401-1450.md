@@ -7,7 +7,7 @@ deep nesting >100, define as SList), codebase/storage stress (200 defs, DETS reo
 500-insert), SConstruct elaboration, binding shadow, multi-input ability ops, SRef,
 compile edges (empty list, nested Let, TypeDef, empty Match), inference deeper
 (list_all_match heterogeneous, check_linearity, Do op bounds), sync multi-ref,
-jet miss, property check, full pipeline roundtrip, loader soft purge,
+missing-ref refusal, property check, full pipeline roundtrip, loader soft purge,
 and cross-module integration.
 
 All levels are real implementations in `src/dogfood_v10.gleam`.
@@ -173,13 +173,13 @@ All levels are real implementations in `src/dogfood_v10.gleam`.
 
 ---
 
-## Level 1442–1444: Sync + Jet + Property
+## Level 1442–1444: Sync + Runtime Refs + Property
 
 **Level 1442** — Pull sync with 2 definitions in codebase.
 - **Expected:** Returns refs list (may be 0–2 depending on server state).
 
-**Level 1443** — `get_jet` on random (non-jet) hash.
-- **Expected:** Returns `None`.
+**Level 1443** — Resolve a random unbound ref outside the store and genesis environment.
+- **Expected:** Returns `Missing`; no registry or fabricated definition fallback exists.
 
 **Level 1444** — Property check with `fn() { 42 }` and `x == 42`.
 - **Expected:** Returns `Ok` result.

@@ -1,8 +1,8 @@
 # Dogfooding Playbook — Levels 1151–1200
 
-Tests covering loader lifecycle, storage endurance, jets, sync protocol deeply,
-concurrency stress, error stress, effect chains, distributed topology, and
-full v1.1.0 certification.
+Tests covering loader lifecycle, storage endurance, definition authority,
+sync protocol deeply, concurrency stress, error stress, effect chains,
+distributed topology, and full v1.1.0 certification.
 
 All levels are real implementations in `src/dogfood_v5.gleam`.
 
@@ -46,16 +46,16 @@ All levels are real implementations in `src/dogfood_v5.gleam`.
 
 ---
 
-## Level 1161–1163: Jets
+## Level 1161–1163: Stored-definition authority
 
-**Level 1161** — Jet registry lookup: known hash returns jet code.
-- **Expected:** Returns `Some("fun(N) -> gleamunison_jets:fib(N) end")` for hash 123.
+**Level 1161** — Compile a stored lambda at the former Fibonacci jet hash.
+- **Expected:** Applying the compiled definition returns its stored `42`, never the legacy jet's `55`.
 
-**Level 1162** — Jet miss: unknown hash returns None.
-- **Expected:** Returns `None`.
+**Level 1162** — Resolve an unknown ref with no store entry or genesis module.
+- **Expected:** Returns `Missing`; no hidden native body is synthesized.
 
-**Level 1163** — Jet hash stability: same hash returns same jet.
-- **Expected:** Two lookups of identical hash return equal.
+**Level 1163** — Compile and evaluate one stored definition twice at the same ref.
+- **Expected:** Both evaluations return the same stored result.
 
 ---
 
@@ -140,8 +140,8 @@ All levels are real implementations in `src/dogfood_v5.gleam`.
 
 ## Level 1185–1189: Distributed topology
 
-**Level 1185** — Process spawn + send builtins.
-- **Expected:** All resolve.
+**Level 1185** — Evaluate `(spawn (lam ignored 42))` through the ordinary evaluator.
+- **Expected:** Returns a process id; the genesis spawn implementation remains available.
 
 **Level 1186** — Timer builtins: sleep, now.
 - **Expected:** All resolve.
@@ -152,8 +152,8 @@ All levels are real implementations in `src/dogfood_v5.gleam`.
 **Level 1188** — Distributed codebase: 4 definitions inserted.
 - **Expected:** All 4 inserted.
 
-**Level 1189** — Node self-identification: self, recv builtins.
-- **Expected:** All resolve.
+**Level 1189** — Evaluate a `self` → `send` → `recv` round trip through the ordinary evaluator and through `run_ref` on stored content.
+- **Expected:** Both paths return the sent message; `self` is a pid, not a function.
 
 ---
 
@@ -162,8 +162,8 @@ All levels are real implementations in `src/dogfood_v5.gleam`.
 **Level 1190** — Loader + storage integration.
 - **Expected:** Both work without conflict.
 
-**Level 1191** — Jet + codebase integration: insert ref, lookup jet.
-- **Expected:** Jet returns None for codebase-inserted ref.
+**Level 1191** — Stored-definition + codebase integration: insert a definition, load it, and evaluate its own AST.
+- **Expected:** The stored body executes; no registry lookup or substitute native body participates.
 
 **Level 1192** — Sync + storage integration.
 - **Expected:** Both work without conflict.

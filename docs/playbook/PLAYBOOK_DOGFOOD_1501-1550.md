@@ -1,6 +1,6 @@
 # Dogfooding Playbook — Levels 1501–1550
 
-Tests covering all remaining builtins (string-downcase, string-replace, string-trim, string->int, string-split, list-append, list-member?, list-flatten, list-fold, list-sort, range, left/right, dict-new/get/set, set-new/insert, json-parse), recursive functions (factorial, sum-to, mutual recursion even/odd), higher-order functions (apply-twice, compose, lambda capture), compile pattern edges (PatText, unused var, PatCons, PatEmptyList), guard elaboration, push sync adapter filtering, idempotent insert, 1000-def stress, multiple define, effects handler args, complex nested eval, multi-line lexer, loader 10-module stress, DETS list_refs, jet misses, all pattern types compilation, and cross-module integration.
+Tests covering all remaining builtins (string-downcase, string-replace, string-trim, string->int, string-split, list-append, list-member?, list-flatten, list-fold, list-sort, range, left/right, dict-new/get/set, set-new/insert, json-parse), recursive functions (factorial, sum-to, mutual recursion even/odd), higher-order functions (apply-twice, compose, lambda capture), compile pattern edges (PatText, unused var, PatCons, PatEmptyList), guard elaboration, push sync adapter filtering, idempotent insert, 1000-def stress, multiple define, effects handler args, complex nested eval, multi-line lexer, loader 10-module stress, DETS list_refs, stored-definition authority, all pattern types compilation, and cross-module integration.
 
 All levels are real implementations in `src/dogfood_v12.gleam`.
 
@@ -130,7 +130,7 @@ All levels are real implementations in `src/dogfood_v12.gleam`.
 
 ---
 
-## Level 1533–1536: Loader + Storage + Jets + Patterns
+## Level 1533–1536: Loader + Storage + Definitions + Patterns
 
 **Level 1533** — Loader: load 10 identity lambda modules.
 - **Expected:** All 10 loads succeed.
@@ -138,8 +138,8 @@ All levels are real implementations in `src/dogfood_v12.gleam`.
 **Level 1534** — DETS list_refs after 2 inserts.
 - **Expected:** Returns at least 2 refs.
 
-**Level 1535** — Jet miss on 3 random hashes.
-- **Expected:** All 3 return None.
+**Level 1535** — Compile and evaluate 3 distinct stored definitions, including one at a former jet hash.
+- **Expected:** Every ref executes its own stored body; no hash receives special treatment.
 
 **Level 1536** — Compile match with all 5 pattern types (Int, Text, Cons, EmptyList, Var).
 - **Expected:** Produces BEAM bytes.

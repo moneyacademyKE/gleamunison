@@ -1,6 +1,6 @@
 # Dogfooding Playbook — Levels 1701–1750
 
-Batch 16: HTTP server integration, health variants, effects stacking, datetime pipelines, template, config, sync error recovery, storage stress, compile stress, loader error cache, jets, inference edges, and 14 cross-module integration chains.
+Batch 16: HTTP server integration, health variants, effects stacking, datetime pipelines, template, config, sync error recovery, storage stress, compile stress, loader error cache, definition authority, inference edges, and 14 cross-module integration chains.
 
 ---
 
@@ -56,10 +56,10 @@ Batch 16: HTTP server integration, health variants, effects stacking, datetime p
 **1727** — 100 simple defs compiled sequentially
 **1728** — Loader compile-failed error cache + retry detection
 
-## Jets + Inference (1729–1732)
+## Genesis + Inference (1729–1732)
 
-**1729** — get_jet on nonexistent ref → None
-**1730** — get_jet on known ref → Some(...) or None
+**1729** — genesis spawn/self/send/recv modules are available without store entries
+**1730** — a stored lambda at the former Fibonacci jet hash executes its own `42` body
 **1731** — check_linearity on Let
 **1732** — check_linearity on Apply
 
@@ -82,7 +82,7 @@ Batch 16: HTTP server integration, health variants, effects stacking, datetime p
 **1744** — Inference + Codebase
 **1745** — Loader + Storage
 **1746** — Property + Metrics + Log
-**1747** — Jets + Compile + REPL
+**1747** — Stored definitions + Compile + REPL
 **1748** — Filepath + Template + Config
 
 ## Certification (1749–1750)

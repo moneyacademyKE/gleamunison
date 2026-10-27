@@ -57,7 +57,7 @@ For paths that were considered and *declined*, with the reasoning, see [`unimple
 | [ADR-0041](0041-robust-supervisor-testing-and-handler-validation-tradeoffs.md) | Robust Supervisor Testing & Handler Validation Tradeoffs | Accepted |
 | [ADR-0042](0042-supervised-ets-ownership-for-peer-sync.md) | Supervised ETS Table Ownership for Peer Sync | Accepted |
 | [ADR-0043](0043-dynamic-code-shipping-for-process-migration.md) | Dynamic Code Shipping for Process Migration | Accepted |
-| [ADR-0044](0044-content-addressed-jet-registry.md) | Content-Addressed Jet Registry | Proposed |
+| [ADR-0044](0044-content-addressed-jet-registry.md) | Content-Addressed Jet Registry | Superseded by ADR 0074 |
 | [ADR-0045](0045-linearity-enforced-single-shot-continuations.md) | Linearity-Enforced Single-Shot Continuations | Proposed |
 | [ADR-0046](0046-first-class-typed-holes-and-dynamic-closures.md) | First-Class Typed Holes and Dynamic Closures | Proposed |
 | [ADR-0047](0047-trace-driven-request-interception-and-analysis.md) | Trace-Driven Request Interception and Analysis | Proposed |
@@ -87,6 +87,7 @@ For paths that were considered and *declined*, with the reasoning, see [`unimple
 | [ADR-0071](0071-admitted-app-routes.md) | Admitted definitions served through application routes | Accepted |
 | [ADR-0072](0072-bounded-agent-generation.md) | Bounded generation through admitted publication | Accepted |
 | [ADR-0073](0073-target-selected-helper-generation.md) | Target-selected helper generation through admitted publication | Accepted; implemented |
+| [ADR-0074](0074-stored-definition-execution-authority.md) | Stored definitions are the only execution authority | Accepted; implemented |
 
 
 

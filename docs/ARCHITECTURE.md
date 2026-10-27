@@ -33,6 +33,13 @@ identity/dependency vocabulary. `compile` and `loader` emit and load hash-named
 modules such as `m_e8e52932`. Genesis `m_*.erl` modules are checked-in native
 implementations, not arbitrary scratch output.
 
+The supplied definition is the only execution authority. Compilation never
+replaces a stored AST or reference with a registry-selected host body, and a
+missing definition has no fallback beyond declared bootstrap types and
+available genesis builtins. The former jet registry and its policy switch were
+removed by [ADR 0074](adr/0074-stored-definition-execution-authority.md);
+native FFI remains at the explicit genesis boundary.
+
 Running by content ref does not fetch from a peer implicitly. The selected
 branch resolves named dependencies; missing or unreadable content is an error,
 not an empty program.

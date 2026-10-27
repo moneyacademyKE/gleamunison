@@ -1,6 +1,6 @@
 # Dogfooding Playbook — Levels 1601–1650
 
-Tests covering guard error fix verification, ability dispatch through stacked handlers, pattern elaboration depth, compile deep edges (nested Let+Match, closure-of-closure, PatConstructor guard), lexer multi-line strings, property test failure path, complex REPL expressions, Mnesia bulk insert, typecheck with ability references, jet miss verification, HTTP deeper routes, storage 3000-insert stress, and cross-module integration.
+Tests covering guard error fix verification, ability dispatch through stacked handlers, pattern elaboration depth, compile deep edges (nested Let+Match, closure-of-closure, PatConstructor guard), lexer multi-line strings, property test failure path, complex REPL expressions, Mnesia bulk insert, typecheck with ability references, missing-ref verification, HTTP deeper routes, storage 3000-insert stress, and cross-module integration.
 
 All levels are real implementations in `src/dogfood_v14.gleam`.
 
@@ -97,7 +97,7 @@ All levels are real implementations in `src/dogfood_v14.gleam`.
 
 ---
 
-## Level 1622–1626: Storage + Typecheck + Jet Edges
+## Level 1622–1626: Storage + Typecheck + Definition Edges
 
 **Level 1622** — Mnesia bulk: insert 100 refs, verify `list_refs`.
 - **Expected:** Returns 100 refs.
@@ -108,8 +108,8 @@ All levels are real implementations in `src/dogfood_v14.gleam`.
 **Level 1624** — `infer_term` for `Do` with ability in type cache.
 - **Expected:** Returns inferred type from operation output.
 
-**Level 1625** — `get_jet` on random hash (miss).
-- **Expected:** Returns `None`.
+**Level 1625** — Compile a caller whose dependency exists only as stored content.
+- **Expected:** The reference emits the dependency module's ordinary `$eval` call and executes the stored body.
 
 **Level 1626** — Typecheck cross-def with AbilityDecl + TermDef referencing it.
 - **Expected:** Typecheck processes both defs.

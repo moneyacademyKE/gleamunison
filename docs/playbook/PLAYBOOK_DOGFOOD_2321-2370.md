@@ -84,6 +84,7 @@ All 50 levels pass. New coverage:
 - Pipeline: multi-def Unit elaborate (0→2 levels)
 - Storage stress: 1000 inserts (new scale)
 - **Key findings**: Handle+Do requires continuation-returning handlers (badfun error documented); jet refs are genesis hash-locked
+- **Current execution note:** [ADR 0074](../adr/0074-stored-definition-execution-authority.md) removed the separate jet registry. Genesis native modules remain; stored definitions have no hash-selected override.
 
 ### Version
 
