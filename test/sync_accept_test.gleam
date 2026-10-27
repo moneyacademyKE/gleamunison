@@ -1,5 +1,5 @@
 import gleam/bit_array
-import gleam/option.{None, Some}
+import gleam/option.{Some}
 import gleamunison/codebase
 import gleamunison/identity.{Ref}
 import gleamunison/sync
