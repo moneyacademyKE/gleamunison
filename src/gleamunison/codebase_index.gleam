@@ -182,10 +182,6 @@ pub fn index_source(defs: List(#(String, SurfaceDef))) -> String {
   render_index(datoms_of(defs))
 }
 
-pub fn index_entries(entries: List(agent_read_model.Entry)) -> String {
-  render_index(datoms_of_entries(entries))
-}
-
 fn render_index(datoms: List(Datom)) -> String {
   let triples =
     list.map(datoms, fn(d) {

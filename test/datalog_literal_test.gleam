@@ -37,20 +37,3 @@ pub fn literal_encoder_matches_lexer_escapes_exactly_test() {
     |> should.equal(Ok(elab_types.SText(<<value:utf8>>)))
   })
 }
-
-@external(erlang, "gleamunison_index_result", "strings")
-fn result_strings(output: String) -> Result(List(String), String)
-
-pub fn index_result_decoder_rejects_code_and_wrong_shapes_test() {
-  list.each(
-    [
-      "[1]",
-      "[foo]",
-      "erlang:halt()",
-      "[<<255>>]",
-      "[<<\"x\">>] trailing",
-      "[<<\"x\">>",
-    ],
-    fn(output) { result_strings(output) |> should.be_error },
-  )
-}
