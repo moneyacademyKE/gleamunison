@@ -62,20 +62,12 @@ pub fn dependents_checked_on_branch(
   |> result.map_error(convert)
 }
 
-/// Read-only legacy shape. Retraction must use read/checked queries instead.
-pub fn dependents(
+pub fn other_names_checked(
   adapter: storage.StorageAdapter,
   target: DefinitionRef,
-) -> List(DefinitionRef) {
-  dependents_on_branch(adapter, default_branch, target)
-}
-
-pub fn dependents_on_branch(
-  adapter: storage.StorageAdapter,
-  branch: String,
-  target: DefinitionRef,
-) -> List(DefinitionRef) {
-  dependents_checked_on_branch(adapter, branch, target) |> result.unwrap([])
+  retracting: String,
+) -> Result(List(String), DependencyError) {
+  other_names_checked_on_branch(adapter, default_branch, target, retracting)
 }
 
 pub fn other_names_checked_on_branch(
@@ -92,75 +84,57 @@ pub fn other_names_checked_on_branch(
   |> result.map_error(convert)
 }
 
-pub fn other_names(
-  adapter: storage.StorageAdapter,
-  target: DefinitionRef,
-  retracting: String,
-) -> List(String) {
-  other_names_on_branch(adapter, default_branch, target, retracting)
-}
-
-pub fn other_names_on_branch(
-  adapter: storage.StorageAdapter,
-  branch: String,
-  target: DefinitionRef,
-  retracting: String,
-) -> List(String) {
-  other_names_checked_on_branch(adapter, branch, target, retracting)
-  |> result.unwrap([])
-}
-
-pub fn stored_dependencies(
+pub fn stored_dependencies_checked(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
-) -> List(DefinitionRef) {
-  stored_dependencies_on_branch(adapter, default_branch, ref)
+) -> Result(List(DefinitionRef), DependencyError) {
+  stored_dependencies_checked_on_branch(adapter, default_branch, ref)
 }
 
-pub fn stored_dependencies_on_branch(
+pub fn stored_dependencies_checked_on_branch(
   adapter: storage.StorageAdapter,
   branch: String,
   ref: DefinitionRef,
-) -> List(DefinitionRef) {
+) -> Result(List(DefinitionRef), DependencyError) {
   dependency_snapshot.read(adapter, branch)
   |> result.map(fn(snapshot) { dependency_snapshot.dependencies(snapshot, ref) })
-  |> result.unwrap([])
+  |> result.map_error(convert)
 }
 
-pub fn exclusive_closure(
+pub fn exclusive_closure_checked(
   adapter: storage.StorageAdapter,
   root: DefinitionRef,
-) -> List(DefinitionRef) {
-  exclusive_closure_on_branch(adapter, default_branch, root)
+) -> Result(List(DefinitionRef), DependencyError) {
+  exclusive_closure_checked_on_branch(adapter, default_branch, root)
 }
 
-pub fn exclusive_closure_on_branch(
+pub fn exclusive_closure_checked_on_branch(
   adapter: storage.StorageAdapter,
   branch: String,
   root: DefinitionRef,
-) -> List(DefinitionRef) {
+) -> Result(List(DefinitionRef), DependencyError) {
   dependency_snapshot.read(adapter, branch)
   |> result.map(fn(snapshot) {
     dependency_snapshot.exclusive_closure(snapshot, root)
   })
-  |> result.unwrap([])
+  |> result.map_error(convert)
 }
 
-pub fn names_for(
+pub fn names_for_checked(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
-) -> List(String) {
-  names_for_on_branch(adapter, default_branch, ref)
+) -> Result(List(String), DependencyError) {
+  names_for_checked_on_branch(adapter, default_branch, ref)
 }
 
-pub fn names_for_on_branch(
+pub fn names_for_checked_on_branch(
   adapter: storage.StorageAdapter,
   branch: String,
   ref: DefinitionRef,
-) -> List(String) {
+) -> Result(List(String), DependencyError) {
   dependency_snapshot.read(adapter, branch)
   |> result.map(fn(snapshot) { dependency_snapshot.names(snapshot, ref) })
-  |> result.unwrap([])
+  |> result.map_error(convert)
 }
 
 /// Content is shared by every branch, so a retraction decision needs to know

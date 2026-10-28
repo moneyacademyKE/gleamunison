@@ -40,8 +40,8 @@ fn int_fn_returning(value: Int) -> ast.Definition {
 
 pub fn a_definition_with_no_users_has_no_dependents_test() {
   let #(cb, ref) = insert(codebase.empty(), int_fn_returning(1))
-  store_deps.dependents(codebase.get_adapter(cb), ref)
-  |> should.equal([])
+  store_deps.dependents_checked(codebase.get_adapter(cb), ref)
+  |> should.equal(Ok([]))
 }
 
 pub fn a_content_ref_dependent_is_found_test() {
@@ -52,8 +52,8 @@ pub fn a_content_ref_dependent_is_found_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, caller_ref) = insert(cb, caller)
-  store_deps.dependents(codebase.get_adapter(cb), dep_ref)
-  |> should.equal([caller_ref])
+  store_deps.dependents_checked(codebase.get_adapter(cb), dep_ref)
+  |> should.equal(Ok([caller_ref]))
 }
 
 pub fn a_name_ref_dependent_is_found_test() {
@@ -75,7 +75,8 @@ pub fn a_name_ref_dependent_is_found_test() {
       "main",
       namespace.set(namespace.empty(), "named-dep", dep_ref),
     )
-  store_deps.dependents(adapter, dep_ref) |> should.equal([caller_ref])
+  store_deps.dependents_checked(adapter, dep_ref)
+  |> should.equal(Ok([caller_ref]))
 }
 
 pub fn a_name_ref_dependent_is_found_on_the_selected_branch_test() {
@@ -94,15 +95,15 @@ pub fn a_name_ref_dependent_is_found_on_the_selected_branch_test() {
       "release",
       namespace.set(namespace.empty(), "release-dep", dep_ref),
     )
-  store_deps.dependents_on_branch(adapter, "release", dep_ref)
-  |> should.equal([caller_ref])
-  store_deps.dependents(adapter, dep_ref) |> should.equal([])
+  store_deps.dependents_checked_on_branch(adapter, "release", dep_ref)
+  |> should.equal(Ok([caller_ref]))
+  store_deps.dependents_checked(adapter, dep_ref) |> should.equal(Ok([]))
 }
 
 pub fn the_ref_itself_is_not_its_own_dependent_test() {
   let #(cb, ref) = insert(codebase.empty(), int_fn_returning(4))
-  store_deps.dependents(codebase.get_adapter(cb), ref)
-  |> should.equal([])
+  store_deps.dependents_checked(codebase.get_adapter(cb), ref)
+  |> should.equal(Ok([]))
 }
 
 pub fn another_name_binding_the_same_content_is_reported_test() {
@@ -113,7 +114,8 @@ pub fn another_name_binding_the_same_content_is_reported_test() {
     |> namespace.set("first", ref)
     |> namespace.set("second", ref)
   let assert Ok(_) = namespace.commit(adapter, "main", ns)
-  store_deps.other_names(adapter, ref, "first") |> should.equal(["second"])
+  store_deps.other_names_checked(adapter, ref, "first")
+  |> should.equal(Ok(["second"]))
 }
 
 pub fn the_only_name_binding_the_content_is_not_another_test() {
@@ -125,7 +127,7 @@ pub fn the_only_name_binding_the_content_is_not_another_test() {
       "main",
       namespace.set(namespace.empty(), "only", ref),
     )
-  store_deps.other_names(adapter, ref, "only") |> should.equal([])
+  store_deps.other_names_checked(adapter, ref, "only") |> should.equal(Ok([]))
 }
 
 pub fn a_store_delete_removes_the_binding_test() {
@@ -151,8 +153,11 @@ pub fn a_caller_of_a_genesis_builtin_is_its_dependent_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, caller_ref) = insert(codebase.empty(), caller)
-  store_deps.dependents(codebase.get_adapter(cb), genesis.builtin_int_add())
-  |> should.equal([caller_ref])
+  store_deps.dependents_checked(
+    codebase.get_adapter(cb),
+    genesis.builtin_int_add(),
+  )
+  |> should.equal(Ok([caller_ref]))
 }
 
 pub fn the_definition_refs_walker_agrees_with_the_scan_test() {
@@ -176,8 +181,8 @@ pub fn the_closure_is_just_the_root_when_nothing_is_exclusive_test() {
   }
   let #(cb, first) = insert(cb, caller(0))
   let #(cb, _second) = insert(cb, caller(1))
-  store_deps.exclusive_closure(codebase.get_adapter(cb), first)
-  |> should.equal([first])
+  store_deps.exclusive_closure_checked(codebase.get_adapter(cb), first)
+  |> should.equal(Ok([first]))
 }
 
 pub fn an_exclusive_dependency_joins_the_closure_test() {
@@ -188,8 +193,8 @@ pub fn an_exclusive_dependency_joins_the_closure_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, caller_ref) = insert(cb, caller)
-  store_deps.exclusive_closure(codebase.get_adapter(cb), caller_ref)
-  |> should.equal([caller_ref, dep_ref])
+  store_deps.exclusive_closure_checked(codebase.get_adapter(cb), caller_ref)
+  |> should.equal(Ok([caller_ref, dep_ref]))
 }
 
 pub fn a_shared_transitive_dependency_stays_test() {
@@ -213,7 +218,8 @@ pub fn a_shared_transitive_dependency_stays_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, _other_ref) = insert(cb, other)
-  let closure = store_deps.exclusive_closure(codebase.get_adapter(cb), root_ref)
+  let assert Ok(closure) =
+    store_deps.exclusive_closure_checked(codebase.get_adapter(cb), root_ref)
   closure |> should.equal([root_ref, mid_ref])
   closure |> should_not_contain(base_ref)
 }

@@ -42,6 +42,19 @@ pub fn failed_listing_is_not_an_empty_dependency_set_test() {
   )
 }
 
+pub fn failed_listing_is_not_an_empty_exclusive_closure_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(_) = namespace.commit(adapter, "main", namespace.empty())
+  let broken =
+    storage.StorageAdapter(..adapter, list_refs: fn() {
+      Error(storage.IoError("closure scan failed"))
+    })
+  store_deps.exclusive_closure_checked(broken, target())
+  |> should.equal(
+    Error(store_deps.StoreFailure(storage.IoError("closure scan failed"))),
+  )
+}
+
 pub fn failed_branch_lookup_is_not_no_aliases_test() {
   let adapter = storage.inmemory()
   let broken =
