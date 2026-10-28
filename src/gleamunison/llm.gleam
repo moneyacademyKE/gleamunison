@@ -24,6 +24,7 @@ import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/json
 import gleamunison/llm_budget
 import gleamunison/llm_controls
+import gleamunison/llm_settlement
 import gleamunison/llm_types.{
   type Completion, type LlmError, type Provider, type ProviderConfig, Anthropic,
   DecodeError, HttpError, Message, OpenAI, ProviderConfig, TransportError, User,
@@ -97,7 +98,7 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
           }
       }
       // Release the concurrency slot exactly once, then meter and report.
-      let assert Ok(Nil) = budget_release(provider_name)
+      use Nil <- result.try(llm_settlement.release(provider_name))
       case completion {
         Ok(c) -> {
           let rates = rate_config(get_env)
@@ -108,13 +109,15 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
               rates.0,
               rates.1,
             )
-          let assert Ok(Nil) =
-            budget_spend(provider_name, c.input_tokens + c.output_tokens, cost)
-          let assert Ok(Nil) = budget_report_success(provider_name)
+          use Nil <- result.try(llm_settlement.success(
+            provider_name,
+            c.input_tokens + c.output_tokens,
+            cost,
+          ))
           Ok(c.content)
         }
         Error(msg) -> {
-          let assert Ok(Nil) = budget_report_failure(provider_name)
+          use Nil <- result.try(llm_settlement.failure(provider_name))
           Error(msg)
         }
       }
@@ -124,22 +127,6 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
 
 @external(erlang, "gleamunison_llm_budget", "admit")
 fn budget_admit(provider: String, model: String) -> Result(Nil, String)
-
-@external(erlang, "gleamunison_llm_budget", "release")
-fn budget_release(provider: String) -> Result(Nil, Nil)
-
-@external(erlang, "gleamunison_llm_budget", "spend")
-fn budget_spend(
-  provider: String,
-  tokens: Int,
-  cost_micro_usd: Int,
-) -> Result(Nil, Nil)
-
-@external(erlang, "gleamunison_llm_budget", "report_success")
-fn budget_report_success(provider: String) -> Result(Nil, Nil)
-
-@external(erlang, "gleamunison_llm_budget", "report_failure")
-fn budget_report_failure(provider: String) -> Result(Nil, Nil)
 
 /// Rates are data, not policy: micro-USD per 1M tokens from the environment,
 /// defaulting to zero (metering on, cost accounting estimate-only).

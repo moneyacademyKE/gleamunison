@@ -14,6 +14,7 @@ import gleamunison/json
 import gleamunison/llm
 import gleamunison/llm_budget
 import gleamunison/llm_controls
+import gleamunison/llm_settlement
 import gleamunison/llm_types.{type Completion}
 import gleamunison/llm_wire
 
@@ -32,26 +33,14 @@ fn sleep(ms: Int) -> Nil
 @external(erlang, "gleamunison_llm_budget", "admit")
 fn budget_admit(provider: String, model: String) -> Result(Nil, String)
 
-@external(erlang, "gleamunison_llm_budget", "release")
-fn budget_release(provider: String) -> Result(Nil, Nil)
-
-@external(erlang, "gleamunison_llm_budget", "spend")
-fn budget_spend(
-  provider: String,
-  tokens: Int,
-  cost_micro_usd: Int,
-) -> Result(Nil, Nil)
-
-@external(erlang, "gleamunison_llm_budget", "report_success")
-fn budget_report_success(provider: String) -> Result(Nil, Nil)
-
-@external(erlang, "gleamunison_llm_budget", "report_failure")
-fn budget_report_failure(provider: String) -> Result(Nil, Nil)
-
 /// Budget/circuit gate as handler composition. Admit before the call,
 /// release the concurrency slot exactly once, then meter actuals and
 /// report the outcome. Refusals return the typed refusal name as the
 /// handler error; the inner handler never runs.
+///
+/// Settlement errors are reported, not asserted: a bookkeeping failure must
+/// not crash a call whose completion already succeeded, and the inner
+/// handler's result is always what the continuation receives.
 pub fn budget_handler(
   inner: OpHandler,
   provider: llm_types.Provider,
@@ -63,29 +52,19 @@ pub fn budget_handler(
       Error(refusal) -> cont(to_dynamic(Error(bit_array.from_string(refusal))))
       Ok(Nil) -> {
         let result = inner(args, fn(d) { d })
-        let assert Ok(Nil) = budget_release(name)
+        llm_settlement.report(llm_settlement.release(name))
         case as_result(result) {
-          Ok(json_bin) -> {
+          Ok(json_bin) ->
             case meter_completion(provider, json_bin) {
-              Ok(#(tokens, cost)) -> {
-                let assert Ok(Nil) = budget_spend(name, tokens, cost)
-                let assert Ok(Nil) = budget_report_success(name)
-                Nil
-              }
+              Ok(#(tokens, cost)) ->
+                llm_settlement.report(llm_settlement.success(name, tokens, cost))
               // An unparseable completion cannot be metered; it still
               // counts as a failure for the circuit.
-              Error(_) -> {
-                let assert Ok(Nil) = budget_report_failure(name)
-                Nil
-              }
+              Error(_) -> llm_settlement.report(llm_settlement.failure(name))
             }
-            cont(result)
-          }
-          Error(_) -> {
-            let assert Ok(Nil) = budget_report_failure(name)
-            cont(result)
-          }
+          Error(_) -> llm_settlement.report(llm_settlement.failure(name))
         }
+        cont(result)
       }
     }
   }
