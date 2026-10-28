@@ -6,9 +6,7 @@ import gleam/result
 import gleam/string
 import gleamunison/branch_scope
 import gleamunison/dependency_snapshot
-import gleamunison/identity.{
-  type DefinitionRef, Ref, hash_to_debug_string, ref_hex as canonical_ref_hex,
-}
+import gleamunison/identity.{type DefinitionRef, ref_hex as canonical_ref_hex}
 import gleamunison/storage
 
 const default_branch = "main"
