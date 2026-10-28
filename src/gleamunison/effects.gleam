@@ -1,8 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list
-import gleam/string
-import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/identity.{type DefinitionRef, runtime_module_name}
 
 pub type HandlerFrame {
   HandlerFrame(ability: DefinitionRef, ops: Dict(Int, OpHandler))
@@ -25,9 +24,7 @@ fn to_dynamic(val: any) -> Dynamic
 /// Public so tooling (transcripts, capability gates) keys frames the same
 /// way the runtime does.
 pub fn ability_key(ref: DefinitionRef) -> String {
-  let Ref(h) = ref
-  let full = hash_to_debug_string(h)
-  "m_" <> string.slice(full, string.length(full) - 8, 8)
+  runtime_module_name(ref)
 }
 
 pub fn run(cfg: RuntimeConfig, entry: fn() -> Dynamic) -> Dynamic {

@@ -18,7 +18,7 @@ import gleamunison/cli_result
 import gleamunison/codebase
 import gleamunison/effect_evidence
 import gleamunison/elab_types.{SurfaceTermDef}
-import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex}
+import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex, ref_hex}
 import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
@@ -362,11 +362,6 @@ fn do_term_deps(t: ast.Term, acc: List(String)) -> List(String) {
     ast.Use(_, call, body) -> do_term_deps(body, do_term_deps(call, acc))
     ast.Located(inner, _) -> do_term_deps(inner, acc)
   }
-}
-
-fn ref_hex(ref: identity.DefinitionRef) -> String {
-  let identity.Ref(h) = ref
-  hash_to_debug_string(h)
 }
 
 fn write_manifest(path: String, pairs: List(#(String, String, Bool))) -> Nil {

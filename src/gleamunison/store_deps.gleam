@@ -6,7 +6,9 @@ import gleam/result
 import gleam/string
 import gleamunison/branch_scope
 import gleamunison/dependency_snapshot
-import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/identity.{
+  type DefinitionRef, Ref, hash_to_debug_string, ref_hex as canonical_ref_hex,
+}
 import gleamunison/storage
 
 const default_branch = "main"
@@ -198,6 +200,5 @@ pub fn describe_branch_bindings(held: List(#(String, String))) -> String {
 }
 
 pub fn hex(ref: DefinitionRef) -> String {
-  let Ref(hash) = ref
-  hash_to_debug_string(hash)
+  canonical_ref_hex(ref)
 }

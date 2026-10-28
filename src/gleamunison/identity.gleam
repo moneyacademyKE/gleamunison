@@ -68,6 +68,17 @@ pub fn hash_to_debug_string(h: Hash) -> String {
   string.join(parts, "")
 }
 
+/// The canonical external representation of a definition reference.
+pub fn ref_hex(ref: DefinitionRef) -> String {
+  let Ref(hash) = ref
+  hash_to_debug_string(hash)
+}
+
+/// Runtime module identity: "m_" plus the final eight hash digits.
+pub fn runtime_module_name(ref: DefinitionRef) -> String {
+  "m_" <> string.drop_start(ref_hex(ref), 56)
+}
+
 /// Produce a short hash prefix for display.
 pub fn hash_to_short_string(h: Hash) -> String {
   let s = hash_to_debug_string(h)

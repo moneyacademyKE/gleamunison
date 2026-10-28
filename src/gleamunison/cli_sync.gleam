@@ -68,8 +68,7 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
 }
 
 fn ref_hex(ref: identity.DefinitionRef) -> String {
-  let identity.Ref(hash) = ref
-  identity.hash_to_debug_string(hash)
+  identity.ref_hex(ref)
 }
 
 fn parse_args(

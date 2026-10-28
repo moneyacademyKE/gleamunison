@@ -16,7 +16,7 @@ import gleamunison/elab_types.{
   SMatch, SRef, SText, SUse, SVar, SurfaceAbilityDef, SurfacePubTypeAlias,
   SurfaceTermDef, SurfaceTypeAlias, SurfaceTypeDef,
 }
-import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/identity.{type DefinitionRef, ref_hex as canonical_ref_hex}
 import gleamunison/lisp_literal
 import gleamunison/repl_eval
 
@@ -76,8 +76,7 @@ pub fn ref_hex_entry(entry: agent_read_model.Entry) -> String {
 }
 
 fn ref_to_hex(r: DefinitionRef) -> String {
-  let Ref(h) = r
-  hash_to_debug_string(h)
+  canonical_ref_hex(r)
 }
 
 /// The index schema: one entity per definition, carrying name/hash/kind,

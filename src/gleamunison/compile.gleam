@@ -4,9 +4,7 @@ import gleam/list
 import gleam/option
 import gleam/string
 import gleamunison/ast
-import gleamunison/identity.{
-  type DefinitionRef, Local, Ref, hash_to_debug_string,
-}
+import gleamunison/identity.{type DefinitionRef, Local, runtime_module_name}
 
 pub type Compiler {
   Compiler
@@ -27,9 +25,7 @@ fn ffi_compile_source(source: String) -> Result(BitArray, String)
 fn ffi_binary_to_erl_literal(b: BitArray) -> String
 
 pub fn module_name_for(ref: DefinitionRef) -> String {
-  let Ref(hash) = ref
-  let full = hash_to_debug_string(hash)
-  "m_" <> string.slice(full, string.length(full) - 8, 8)
+  runtime_module_name(ref)
 }
 
 fn emit_term(t: ast.Term) -> String {

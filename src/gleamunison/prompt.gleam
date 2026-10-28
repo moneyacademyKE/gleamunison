@@ -16,7 +16,7 @@ import gleam/result
 import gleam/string
 import gleamunison/codebase.{type Codebase}
 import gleamunison/identity.{
-  type DefinitionRef, Ref, hash_bytes, hash_to_debug_string,
+  type DefinitionRef, Ref, hash_bytes, ref_hex as canonical_ref_hex,
 }
 
 pub type PromptError {
@@ -28,8 +28,7 @@ pub type PromptError {
 
 /// Displayable hash identity for traces and pins.
 pub fn ref_hex(ref: DefinitionRef) -> String {
-  let Ref(h) = ref
-  hash_to_debug_string(h)
+  canonical_ref_hex(ref)
 }
 
 /// Store a prompt template; returns the codebase and its content hash.

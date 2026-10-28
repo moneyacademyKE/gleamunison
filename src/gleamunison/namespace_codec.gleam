@@ -9,12 +9,11 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/identity.{
-  type DefinitionRef, Ref, hash_to_debug_string, parse_ref_hex,
+  type DefinitionRef, parse_ref_hex, ref_hex as canonical_ref_hex,
 }
 
 pub fn ref_hex(ref: DefinitionRef) -> String {
-  let Ref(hash) = ref
-  hash_to_debug_string(hash)
+  canonical_ref_hex(ref)
 }
 
 fn hex_ref(text: String) -> Result(DefinitionRef, Nil) {

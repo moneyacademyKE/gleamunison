@@ -24,7 +24,7 @@ import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/dependency_snapshot
-import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
+import gleamunison/identity.{type DefinitionRef, ref_hex}
 import gleamunison/namespace
 import gleamunison/storage
 import gleamunison/store_deps
@@ -317,8 +317,7 @@ fn short(ref: DefinitionRef) -> String {
 }
 
 fn full_hex(ref: DefinitionRef) -> String {
-  let Ref(hash) = ref
-  hash_to_debug_string(hash)
+  ref_hex(ref)
 }
 
 fn describe(error: storage.StorageError) -> String {
