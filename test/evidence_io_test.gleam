@@ -21,7 +21,8 @@ pub fn io_kind_roundtrips_through_the_store_test() {
       payload: "played the game; win and EOF paths both work",
       ts: 1_760_000_000,
     )
-  let assert [record] = evidence.for_subject(adapter, subject_hex)
+  let assert Ok(snapshot) = evidence.snapshot(adapter)
+  let assert [record] = evidence.from_snapshot(snapshot, subject_hex)
   record.kind |> should.equal(evidence.Io)
   evidence.kind_name(record.kind) |> should.equal("io")
   record.verdict |> should.equal("approved")

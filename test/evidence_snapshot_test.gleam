@@ -70,3 +70,13 @@ pub fn evidence_gate_refuses_failed_reads_test() {
   turnstile.check(broken, [#("def", "subject", True)])
   |> should.equal(Error(["def"]))
 }
+
+pub fn evidence_snapshot_preserves_storage_failure_test() {
+  let adapter = storage.inmemory()
+  let broken =
+    storage.StorageAdapter(..adapter, list_refs: fn() {
+      Error(storage.IoError("evidence scan failed"))
+    })
+  evidence.snapshot(broken)
+  |> should.equal(Error(storage.IoError("evidence scan failed")))
+}

@@ -80,7 +80,8 @@ pub fn reopened_store_preserves_signed_evidence_test() {
   let assert Ok(Some(bytes)) = reopened.lookup(ref)
   // Content round-trips byte-identical; the record is still verifiable.
   let assert True = byte_size_positive(bytes)
-  let records = evidence.for_subject(reopened, subject_hex)
+  let assert Ok(snapshot) = evidence.snapshot(reopened)
+  let records = evidence.from_snapshot(snapshot, subject_hex)
   let assert [record] = records
   record.verdict |> should.equal("pass")
   let assert Ok(Nil) = reopened.close()

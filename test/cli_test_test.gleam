@@ -32,7 +32,8 @@ pub fn test_runs_suite_and_attaches_evidence_test() {
   let assert [#(subject_hex, payload)] = attachments
   string.contains(payload, "1 passed") |> should.be_true
   // The attestation is on the store, keyed to the subject's content hash.
-  let stored = evidence.for_subject(adapter, subject_hex)
+  let assert Ok(snapshot) = evidence.snapshot(adapter)
+  let stored = evidence.from_snapshot(snapshot, subject_hex)
   list.length(stored) |> should.equal(1)
   trust.admits(adapter, subject_hex, evidence.Test, trust.FixturesOnly)
   |> should.be_true

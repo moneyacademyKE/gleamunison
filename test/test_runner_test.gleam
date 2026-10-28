@@ -85,7 +85,8 @@ pub fn results_attach_evidence_to_subject_test() {
     test_runner.elaborated_def_for("answer", all_defs, cache)
   let subject_hex =
     hash_to_debug_string(codebase.hash_of_definition(subject_def))
-  let found = evidence.for_subject(store, subject_hex)
+  let assert Ok(snapshot) = evidence.snapshot(store)
+  let found = evidence.from_snapshot(snapshot, subject_hex)
   list.length(found) |> should.equal(1)
   let assert [ev] = found
   ev.kind |> should.equal(evidence.Test)

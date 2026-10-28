@@ -29,7 +29,8 @@ pub fn attach_then_for_subject_finds_record_test() {
       payload: "149 passed, 0 failed",
       ts: 1_760_000_000,
     )
-  let found = evidence.for_subject(adapter, subject_hex)
+  let assert Ok(snapshot) = evidence.snapshot(adapter)
+  let found = evidence.from_snapshot(snapshot, subject_hex)
   let assert [record] = found
   record.subject |> should.equal(subject_hex)
   record.kind |> should.equal(evidence.Test)
@@ -76,7 +77,8 @@ pub fn tampered_chunk_is_rejected_by_hash_check_test() {
   // Attacker rewrites the stored bytes under the same ref.
   let assert Ok(Nil) =
     adapter.insert(ref, bit_array.from_string("evidence:1:forged"))
-  evidence.for_subject(adapter, subject_hex) |> should.equal([])
+  let assert Ok(snapshot) = evidence.snapshot(adapter)
+  evidence.from_snapshot(snapshot, subject_hex) |> should.equal([])
   admits(adapter, evidence.PropertyCheck) |> should.be_false
 }
 
@@ -84,7 +86,8 @@ pub fn non_evidence_chunks_are_ignored_test() {
   let adapter = storage.inmemory()
   let junk = identity.hash_bytes(bit_array.from_string("some definition bytes"))
   let assert Ok(Nil) = adapter.insert(Ref(junk), bit_array.from_string("junk"))
-  evidence.for_subject(adapter, subject_hex) |> should.equal([])
+  let assert Ok(snapshot) = evidence.snapshot(adapter)
+  evidence.from_snapshot(snapshot, subject_hex) |> should.equal([])
 }
 
 pub fn unsigned_evidence_is_rejected_by_require_keys_policy_test() {

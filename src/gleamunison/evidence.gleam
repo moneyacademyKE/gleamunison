@@ -284,13 +284,6 @@ pub fn from_snapshot(snapshot: Snapshot, subject: String) -> List(Evidence) {
   dict.get(snapshot.records, subject) |> result.unwrap([])
 }
 
-/// Read-only compatibility shape. Admission operations reuse one snapshot.
-pub fn for_subject(adapter: StorageAdapter, subject: String) -> List(Evidence) {
-  snapshot(adapter)
-  |> result.map(fn(view) { from_snapshot(view, subject) })
-  |> result.unwrap([])
-}
-
 /// Constant-time hex comparison for signature checks outside this module.
 pub fn secure_compare_hex(a: String, b: String) -> Bool {
   crypto.secure_compare(bit_array.from_string(a), bit_array.from_string(b))
