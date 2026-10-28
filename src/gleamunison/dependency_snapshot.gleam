@@ -9,8 +9,8 @@ import gleam/set
 import gleamunison/definition_codec
 import gleamunison/definition_refs
 import gleamunison/identity.{type DefinitionRef}
+import gleamunison/name_snapshot
 import gleamunison/namespace
-import gleamunison/repl_eval
 import gleamunison/storage
 
 pub type ScanError {
@@ -35,13 +35,7 @@ pub fn read(
     namespace.load_current_or_empty(adapter, branch)
     |> result.map_error(NamespaceFailure),
   )
-  let bindings =
-    dict.from_list(
-      list.map(namespace.names(ns), fn(name) {
-        let assert Ok(content) = namespace.get(ns, name)
-        #(repl_eval.ref_for_name(name), content)
-      }),
-    )
+  let bindings = name_snapshot.from_namespace(ns)
   use refs <- result.try(adapter.list_refs() |> result.map_error(StoreFailure))
   use uses <- result.try(
     list.try_fold(refs, dict.new(), fn(acc, ref) {
