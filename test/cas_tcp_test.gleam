@@ -42,10 +42,11 @@ pub fn tcp_rejects_trailing_message_bytes_test() {
   tcp_invalid_message(1) |> should.be_true
 }
 
-pub fn legacy_raw_wrapper_does_not_admit_forged_content_test() {
+pub fn checked_raw_insert_does_not_admit_forged_content_test() {
   let cb = codebase.empty()
   let ref = Ref(hash_bytes(<<"legacy honest">>))
-  let cb = codebase.insert_raw(cb, ref, <<"legacy forged">>)
+  codebase.insert_raw_checked(cb, ref, <<"legacy forged">>)
+  |> should.be_error
   codebase.get_adapter(cb).lookup(ref) |> should.equal(Ok(None))
 }
 

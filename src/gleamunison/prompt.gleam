@@ -31,14 +31,6 @@ pub fn ref_hex(ref: DefinitionRef) -> String {
   canonical_ref_hex(ref)
 }
 
-/// Store a prompt template; returns the codebase and its content hash.
-/// Compatibility API: use put_checked when storage failures must be observed.
-pub fn put(cb: Codebase, template: String) -> #(Codebase, DefinitionRef) {
-  let ref = template_ref(template)
-  let bytes = bit_array.from_string(template)
-  #(codebase.insert_raw(cb, ref, bytes), ref)
-}
-
 /// Store a prompt without hiding a failed CAS write behind a valid-looking ref.
 pub fn put_checked(
   cb: Codebase,

@@ -345,19 +345,6 @@ pub fn insert(
   })
 }
 
-/// Compatibility wrapper: rejected content leaves the codebase unchanged.
-/// Use insert_raw_checked when admission or storage errors must be observed.
-pub fn insert_raw(
-  codebase: Codebase,
-  ref: DefinitionRef,
-  bytes: BitArray,
-) -> Codebase {
-  case insert_raw_checked(codebase, ref, bytes) {
-    Ok(updated) -> updated
-    Error(_) -> codebase
-  }
-}
-
 pub fn insert_raw_checked(
   codebase: Codebase,
   ref: DefinitionRef,
@@ -409,11 +396,4 @@ pub fn get(
 
 pub fn get_adapter(codebase: Codebase) -> StorageAdapter {
   codebase.adapter
-}
-
-pub fn list_refs(codebase: Codebase) -> List(DefinitionRef) {
-  case codebase.adapter.list_refs() {
-    Ok(refs) -> refs
-    Error(_) -> []
-  }
 }

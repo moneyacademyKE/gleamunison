@@ -4,7 +4,7 @@ import gleam/option.{Some}
 import gleam/result
 import gleam/set
 import gleam/string
-import gleamunison/codebase.{type Codebase, list_refs}
+import gleamunison/codebase.{type Codebase}
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/sync_types.{
   type PeerId, type SyncError, type SyncState, Connected, ConnectionFailed,
@@ -145,11 +145,14 @@ pub fn pull_sync(
   let PeerId(name) = peer
   case sync_connect(name) {
     Ok(_) -> {
+      use refs <- result.try(
+        codebase.get_adapter(codebase).list_refs()
+        |> result.map_error(fn(_) {
+          TransferFailed(peer, "storage lookup failed")
+        }),
+      )
       let our_refs =
-        set.to_list(set.union(
-          state.known_refs,
-          set.from_list(list_refs(codebase)),
-        ))
+        set.to_list(set.union(state.known_refs, set.from_list(refs)))
       let ref_strings =
         list.map(our_refs, fn(r) {
           let Ref(h) = r

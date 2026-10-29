@@ -10,8 +10,9 @@ import gleamunison/elab_types.{
 }
 import gleamunison/elaborate as elab
 import gleamunison/identity.{Ref, hash_bytes}
+import gleamunison/storage
 import gleamunison/sync.{new_sync_state, pull_sync}
-import gleamunison/sync_types.{PeerId}
+import gleamunison/sync_types.{PeerId, TransferFailed}
 import gleamunison/types.{empty_cache}
 import gleeunit/should
 
@@ -42,6 +43,19 @@ pub fn pull_sync_over_tcp_test() {
     Error(e) ->
       io.println("Sync error (may be expected): " <> string.inspect(e))
   }
+}
+
+pub fn pull_sync_preserves_local_list_failure_test() {
+  ffi_start_tcp_sync()
+  let port = ffi_get_tcp_port()
+  let peer = PeerId("localhost:" <> int.to_string(port))
+  let adapter = storage.inmemory()
+  let broken =
+    storage.StorageAdapter(..adapter, list_refs: fn() {
+      Error(storage.IoError("local list failed"))
+    })
+  pull_sync(new_sync_state(), peer, codebase.with_adapter(broken))
+  |> should.equal(Error(TransferFailed(peer, "storage lookup failed")))
 }
 
 pub fn shandle_unknown_ability_errors_test() {
