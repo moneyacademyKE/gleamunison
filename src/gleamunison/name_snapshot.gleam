@@ -19,17 +19,6 @@ pub fn read(
   Ok(from_namespace(ns))
 }
 
-/// Whether the branch binds this content under any name.
-///
-/// A content hash is the same on every branch — the branch selects how
-/// *dependencies* resolve, never a version of the target. So this answers a
-/// question the caller still needs answered: did `--branch` actually name this
-/// content, or only the names around it? Silence there is what let a typo'd
-/// branch look applied.
-pub fn binds_content(bindings: Bindings, ref: DefinitionRef) -> Bool {
-  dict.values(bindings) |> list.any(fn(content) { content == ref })
-}
-
 pub fn from_namespace(ns: namespace.Namespace) -> Bindings {
   dict.from_list(
     list.map(namespace.names(ns), fn(name) {

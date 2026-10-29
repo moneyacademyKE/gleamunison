@@ -21,7 +21,6 @@ import gleamunison/cli_output
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/identity.{type DefinitionRef}
-import gleamunison/name_snapshot
 import gleamunison/namespace
 import gleamunison/run_error
 import gleamunison/run_ref
@@ -144,9 +143,9 @@ pub fn branch_scope_note(
       case namespace.branch_head(adapter, name) {
         Error(reason) -> Error(#(cli_result.unresolvable, "run: " <> reason))
         Ok(_) ->
-          case name_snapshot.read(adapter, name) {
-            Ok(bindings) ->
-              case name_snapshot.binds_content(bindings, ref) {
+          case namespace.load_current_or_empty(adapter, name) {
+            Ok(ns) ->
+              case namespace.binds(ns, ref) {
                 True -> Ok(None)
                 False ->
                   Ok(Some(
