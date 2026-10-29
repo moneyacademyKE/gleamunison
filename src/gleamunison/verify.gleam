@@ -248,7 +248,7 @@ pub fn load_defs_file(
   Ok(#(cache, defs))
 }
 
-fn fold_defines(
+pub fn fold_defines(
   terms: List(SurfaceTerm),
   cache: TypeCache,
   defs: List(#(String, SurfaceDef)),

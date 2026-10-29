@@ -3,8 +3,7 @@ import gleam/io
 import gleam/list
 import gleam/result
 import gleam/string
-import gleamunison/bootstraps
-import gleamunison/elab_types.{SurfaceTermDef}
+import gleamunison/elab_types
 import gleamunison/lexer
 import gleamunison/parser
 import gleamunison/repl_eval
@@ -87,12 +86,7 @@ pub fn start_repl_loading(paths: List(String)) -> Nil {
   io.println(
     "=== Gleamunison Interactive REPL ===\nType expressions or 'exit'/'quit' to exit. Type 'help' for builtins.",
   )
-  let init_defs =
-    list.map(bootstraps.get_init_defs_data(), convert_bootstrap_def)
-  let assert Ok(compare_term) =
-    parser.parse_string("(lam a (lam b (if (eq? a b) 0 (if (lt? a b) -1 1))))")
-  let init_defs =
-    list.append(init_defs, [#("compare", SurfaceTermDef(compare_term))])
+  let init_defs = verify.get_init_defs()
   let #(cache, bootstrap_list) =
     repl_eval.bootstrap_defs(init_defs, empty_cache())
   case preload_files(paths, cache, bootstrap_list) {
@@ -146,62 +140,8 @@ fn preload_onto(
         verify.terms_from_sexprs(sexprs, [])
         |> result.map_error(fn(e) { "s-expr error: " <> e.message }),
       )
-      fold_preload(terms, cache, defs)
+      verify.fold_defines(terms, cache, defs)
     }
-  }
-}
-
-fn fold_preload(
-  terms: List(elab_types.SurfaceTerm),
-  cache: TypeCache,
-  defs: List(#(String, elab_types.SurfaceDef)),
-) -> Result(#(TypeCache, List(#(String, elab_types.SurfaceDef))), String) {
-  case terms {
-    [] -> Ok(#(cache, defs))
-    [term, ..rest] ->
-      case term {
-        elab_types.SList([elab_types.SVar("define"), elab_types.SVar(name), val]) ->
-          case repl_eval.handle_define(name, val, cache, defs) {
-            Ok(#(c2, d2)) -> fold_preload(rest, c2, d2)
-            Error(err) -> Error("define '" <> name <> "': " <> err)
-          }
-        _ -> Error("preload files must contain only definitions")
-      }
-  }
-}
-
-fn convert_bootstrap_def(
-  b: bootstraps.BootstrapDef,
-) -> #(String, elab_types.SurfaceDef) {
-  case b {
-    bootstraps.BAbility(name, ops) -> {
-      #(
-        name,
-        elab_types.SurfaceAbilityDef(
-          name,
-          list.map(ops, fn(op) {
-            elab_types.SurfaceOp(
-              op.name,
-              list.map(op.inputs, convert_bootstrap_type),
-              convert_bootstrap_type(op.output),
-            )
-          }),
-        ),
-      )
-    }
-    bootstraps.BTerm(name, ref, _) -> {
-      #(name, elab_types.SurfaceTermDef(elab_types.SRef(ref)))
-    }
-  }
-}
-
-fn convert_bootstrap_type(t: bootstraps.BootstrapType) -> elab_types.Typ {
-  case t {
-    bootstraps.BTInt -> elab_types.TBuiltin(elab_types.TInt)
-    bootstraps.BTFloat -> elab_types.TBuiltin(elab_types.TFloat)
-    bootstraps.BTText -> elab_types.TBuiltin(elab_types.TText)
-    bootstraps.BTList -> elab_types.TBuiltin(elab_types.TList)
-    bootstraps.BTVar(name) -> elab_types.TVar(name)
   }
 }
 
