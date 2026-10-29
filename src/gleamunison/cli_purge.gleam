@@ -24,7 +24,7 @@ import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/dependency_snapshot
-import gleamunison/identity.{type DefinitionRef, ref_hex}
+import gleamunison/identity.{type DefinitionRef, ref_hex, short_ref_hex}
 import gleamunison/namespace
 import gleamunison/storage
 import gleamunison/store_deps
@@ -100,7 +100,7 @@ pub fn purge(
           Error(#(
             cli_result.refused,
             "purge: "
-              <> short(ref)
+              <> short_ref_hex(ref)
               <> " is still bound on "
               <> store_deps.describe_branch_bindings(held)
               <> "\npurge: bytes are shared by every branch; retract it there first",
@@ -144,11 +144,11 @@ pub fn purge(
       Error(#(
         cli_result.refused,
         "purge: "
-          <> short(ref)
+          <> short_ref_hex(ref)
           <> " is used by "
           <> int.to_string(list.length(outside))
           <> " stored definition(s) outside the removal set: "
-          <> string.join(list.map(outside, short), ", ")
+          <> string.join(list.map(outside, short_ref_hex), ", ")
           <> "\npurge: retract or purge those first",
       ))
   }
@@ -163,7 +163,7 @@ fn exists(
     Ok(None) ->
       Error(#(
         cli_result.unresolvable,
-        "purge: not in the store: " <> short(ref),
+        "purge: not in the store: " <> short_ref_hex(ref),
       ))
     Error(error) ->
       Error(#(
@@ -182,8 +182,9 @@ fn describe_set(
   |> list.map(fn(ref) {
     let names = dependency_snapshot.names(snapshot, ref)
     case names {
-      [] -> "  " <> short(ref)
-      _ -> "  " <> short(ref) <> "  (" <> string.join(names, ", ") <> ")"
+      [] -> "  " <> short_ref_hex(ref)
+      _ ->
+        "  " <> short_ref_hex(ref) <> "  (" <> string.join(names, ", ") <> ")"
     }
   })
   |> string.join("\n")
@@ -207,7 +208,7 @@ fn remove_all(
         "purge: cannot read the index: " <> string.inspect(error),
       ))
   })
-  let hashes = list.map(removal, full_hex)
+  let hashes = list.map(removal, ref_hex)
   use _ <- result.try(unbind_all(adapter, branch, removal, snapshot))
   use _ <- result.try(drop_index_lines(manifest_path, hashes, lines))
   use _ <- result.try(
@@ -217,7 +218,7 @@ fn remove_all(
         #(
           cli_result.refused,
           "purge: cannot remove "
-            <> short(ref)
+            <> short_ref_hex(ref)
             <> ": "
             <> storage.describe_error(error),
         )
@@ -316,14 +317,6 @@ fn parse_args(
         None -> parse_args(rest, Some(value), confirmed, store_override, branch)
       }
   }
-}
-
-fn short(ref: DefinitionRef) -> String {
-  string.slice(full_hex(ref), 0, 12)
-}
-
-fn full_hex(ref: DefinitionRef) -> String {
-  ref_hex(ref)
 }
 
 fn usage() -> String {

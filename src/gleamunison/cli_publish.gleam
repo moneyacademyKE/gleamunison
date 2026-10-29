@@ -18,7 +18,9 @@ import gleamunison/cli_result
 import gleamunison/codebase
 import gleamunison/effect_evidence
 import gleamunison/elab_types.{SurfaceTermDef}
-import gleamunison/identity.{Ref, hash_to_debug_string, parse_ref_hex, ref_hex}
+import gleamunison/identity.{
+  Ref, hash_to_debug_string, parse_ref_hex, ref_hex, short_hash_hex,
+}
 import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
@@ -139,10 +141,7 @@ fn publish_with_store(
                       write_manifest(manifest_path, pairs)
                       list.each(pairs, fn(p) {
                         io.println(
-                          "published: "
-                          <> p.0
-                          <> "  #"
-                          <> string.slice(p.1, 0, 12),
+                          "published: " <> p.0 <> "  #" <> short_hash_hex(p.1),
                         )
                       })
                       io.println(

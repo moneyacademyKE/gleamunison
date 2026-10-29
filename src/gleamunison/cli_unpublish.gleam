@@ -178,7 +178,7 @@ pub fn retract(
           <> " is used by "
           <> int.to_string(list.length(dependents))
           <> " stored definition(s): "
-          <> string.join(list.map(dependents, short), ", ")
+          <> string.join(list.map(dependents, identity.short_ref_hex), ", ")
           <> "\nunpublish: retract those first, or use `purge` to remove the set",
       ))
     _, [_, ..] ->
@@ -217,14 +217,14 @@ fn drop_bytes_unless_held(
           )
         }),
       )
-      Ok("unpublished: " <> name <> " #" <> string.slice(hash, 0, 12))
+      Ok("unpublished: " <> name <> " #" <> identity.short_hash_hex(hash))
     }
     _ ->
       Ok(
         "unpublished: "
         <> name
         <> " #"
-        <> string.slice(hash, 0, 12)
+        <> identity.short_hash_hex(hash)
         <> " (bytes kept: still bound on "
         <> store_deps.describe_branch_bindings(held)
         <> ")",
@@ -328,10 +328,6 @@ fn parse_args(
         None -> parse_args(rest, Some(value), store_override, branch)
       }
   }
-}
-
-fn short(ref: identity.DefinitionRef) -> String {
-  string.slice(identity.ref_hex(ref), 0, 12)
 }
 
 fn usage() -> String {

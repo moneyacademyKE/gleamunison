@@ -13,6 +13,7 @@ import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
+import gleamunison/identity.{short_hash_hex}
 import gleamunison/store_log
 
 const default_tail = 20
@@ -59,7 +60,7 @@ fn render_content(dir: String, count: Int) -> Result(String, #(Int, String)) {
         |> list.map(fn(entry) {
           format_iso8601(entry.at)
           <> "  "
-          <> string.slice(entry.ref_hex, 0, 12)
+          <> short_hash_hex(entry.ref_hex)
           <> "  "
           <> entry.kind
         })
@@ -82,7 +83,7 @@ fn render_exec(dir: String, count: Int) -> Result(String, #(Int, String)) {
           let base =
             format_iso8601(entry.at)
             <> "  "
-            <> string.slice(entry.ref_hex, 0, 12)
+            <> short_hash_hex(entry.ref_hex)
             <> "  "
             <> entry.outcome
             <> "  "
@@ -115,7 +116,7 @@ fn render_all(dir: String, count: Int) -> Result(String, #(Int, String)) {
             <> "  "
             <> pad(entry.kind)
             <> "  "
-            <> string.slice(entry.ref_hex, 0, 12)
+            <> short_hash_hex(entry.ref_hex)
             <> "  "
             <> entry.label
           case entry.detail {

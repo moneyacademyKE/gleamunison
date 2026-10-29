@@ -81,6 +81,20 @@ pub fn runtime_module_name(ref: DefinitionRef) -> String {
 
 /// Produce a short hash prefix for display.
 pub fn hash_to_short_string(h: Hash) -> String {
-  let s = hash_to_debug_string(h)
-  string.slice(s, 0, 12)
+  short_hex(hash_to_debug_string(h))
+}
+
+/// The canonical short display of a definition reference.
+pub fn short_ref_hex(ref: DefinitionRef) -> String {
+  let Ref(hash) = ref
+  hash_to_short_string(hash)
+}
+
+/// Shorten an already-rendered hash without reparsing display data.
+pub fn short_hash_hex(hex: String) -> String {
+  short_hex(hex)
+}
+
+fn short_hex(hex: String) -> String {
+  string.slice(hex, 0, 12)
 }
