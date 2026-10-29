@@ -13,7 +13,7 @@ import gleam/result
 import gleam/string
 import gleamunison/identity.{
   type DefinitionRef, type Hash, Ref, hash_bytes, hash_to_debug_string,
-  parse_ref_hex,
+  parse_ref_hex, ref_hex,
 }
 import gleamunison/storage.{type StorageAdapter}
 
@@ -95,11 +95,6 @@ pub fn ref_of(m: Manifest) -> DefinitionRef {
 pub fn ref_from_hex(hex: String) -> Result(DefinitionRef, String) {
   parse_ref_hex(hex)
   |> result.map_error(fn(reason) { "invalid manifest reference: " <> reason })
-}
-
-/// The hex form of a ref — the shareable name of a manifest.
-pub fn ref_hex_of(ref: DefinitionRef) -> String {
-  hash_to_debug_string(ref_hash(ref))
 }
 
 /// Current canonical text. The version marker makes the format unambiguous;
@@ -280,17 +275,14 @@ pub fn fetch(
     }),
   )
   case bytes {
-    option.None ->
-      Error("manifest not found: " <> hash_to_debug_string(ref_hash(ref)))
+    option.None -> Error("manifest not found: " <> ref_hex(ref))
     option.Some(b) ->
       case bit_array.to_string(b) {
         Error(_) -> Error("manifest bytes are not utf-8")
         Ok(text) -> {
           use m <- result.try(parse(text))
           let actual = hash_of(m)
-          case
-            hash_to_debug_string(actual) == hash_to_debug_string(ref_hash(ref))
-          {
+          case hash_to_debug_string(actual) == ref_hex(ref) {
             True -> Ok(m)
             False ->
               Error(
@@ -300,9 +292,4 @@ pub fn fetch(
         }
       }
   }
-}
-
-fn ref_hash(r: DefinitionRef) -> Hash {
-  let Ref(h) = r
-  h
 }

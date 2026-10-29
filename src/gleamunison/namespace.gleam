@@ -4,8 +4,10 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes, parse_ref_hex}
-import gleamunison/namespace_codec.{ref_hex}
+import gleamunison/identity.{
+  type DefinitionRef, Ref, hash_bytes, parse_ref_hex, ref_hex,
+}
+import gleamunison/namespace_codec
 import gleamunison/storage.{type StorageAdapter}
 
 /// The name layer as data. A namespace maps names to definition refs;

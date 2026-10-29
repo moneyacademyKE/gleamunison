@@ -16,6 +16,7 @@ import gleam/option.{Some}
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import gleamunison/identity
 import gleamunison/manifest
 import gleamunison/namespace
 import gleamunison/storage.{type StorageAdapter}
@@ -303,7 +304,7 @@ fn publish_to_store_with_policy(
       manifest.add_def_with_effect(m, d.0, d.1, d.2)
     })
   case manifest.store(adapter, m) {
-    Ok(ref) -> Ok(manifest.ref_hex_of(ref))
+    Ok(ref) -> Ok(identity.ref_hex(ref))
     Error(_) -> Error(["store manifest failed"])
   }
 }

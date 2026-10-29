@@ -90,7 +90,7 @@ pub fn resolve_target(
       case namespace.load_current(adapter, branch) {
         Ok(ns) ->
           case namespace.get(ns, name) {
-            Ok(ref) -> Ok(#(store_deps.hex(ref), ref))
+            Ok(ref) -> Ok(#(identity.ref_hex(ref), ref))
             Error(_) -> Error(not_published(name))
           }
         // A branch that does not exist has no binding to retract; a
@@ -331,7 +331,7 @@ fn parse_args(
 }
 
 fn short(ref: identity.DefinitionRef) -> String {
-  string.slice(store_deps.hex(ref), 0, 12)
+  string.slice(identity.ref_hex(ref), 0, 12)
 }
 
 fn usage() -> String {

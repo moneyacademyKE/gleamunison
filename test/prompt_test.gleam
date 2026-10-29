@@ -1,6 +1,7 @@
 import gleam/list
 import gleam/string
 import gleamunison/codebase
+import gleamunison/identity.{ref_hex}
 import gleamunison/prompt
 
 pub fn put_then_get_roundtrip_test() {
@@ -29,7 +30,7 @@ pub fn hash_is_the_audit_identity_test() {
   let cb = codebase.empty()
   let assert Ok(#(_cb, ref)) = prompt.put_checked(cb, "Hello")
   // identity is the content hash itself, displayable for traces
-  let assert True = string.length(prompt.ref_hex(ref)) == 64
+  let assert True = string.length(ref_hex(ref)) == 64
 }
 
 pub fn render_by_hash_substitutes_vars_test() {

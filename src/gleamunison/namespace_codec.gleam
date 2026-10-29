@@ -8,13 +8,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleamunison/identity.{
-  type DefinitionRef, parse_ref_hex, ref_hex as canonical_ref_hex,
-}
-
-pub fn ref_hex(ref: DefinitionRef) -> String {
-  canonical_ref_hex(ref)
-}
+import gleamunison/identity.{type DefinitionRef, parse_ref_hex, ref_hex}
 
 fn hex_ref(text: String) -> Result(DefinitionRef, Nil) {
   parse_ref_hex(text) |> result.replace_error(Nil)

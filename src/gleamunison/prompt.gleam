@@ -15,20 +15,13 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/codebase.{type Codebase}
-import gleamunison/identity.{
-  type DefinitionRef, Ref, hash_bytes, ref_hex as canonical_ref_hex,
-}
+import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes}
 
 pub type PromptError {
   NotFound
   Unreadable
   MissingVar(String)
   Storage(reason: String)
-}
-
-/// Displayable hash identity for traces and pins.
-pub fn ref_hex(ref: DefinitionRef) -> String {
-  canonical_ref_hex(ref)
 }
 
 /// Store a prompt without hiding a failed CAS write behind a valid-looking ref.

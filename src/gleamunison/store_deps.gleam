@@ -29,7 +29,8 @@ pub fn describe_dependency_error(error: DependencyError) -> String {
   case error {
     StoreFailure(error) -> storage.describe_error(error)
     NamespaceFailure(reason) -> reason
-    CorruptDefinition(ref) -> "corrupt or unreadable definition " <> hex(ref)
+    CorruptDefinition(ref) ->
+      "corrupt or unreadable definition " <> canonical_ref_hex(ref)
   }
 }
 
@@ -127,8 +128,4 @@ pub fn describe_branch_bindings(held: List(#(String, String))) -> String {
   })
   |> list.map(fn(entry) { entry.0 <> " (" <> entry.1 <> ")" })
   |> string.join(", ")
-}
-
-pub fn hex(ref: DefinitionRef) -> String {
-  canonical_ref_hex(ref)
 }

@@ -14,10 +14,9 @@ import gleamunison/cli_purge
 import gleamunison/cli_result
 import gleamunison/cli_unpublish
 import gleamunison/codebase
-import gleamunison/identity.{Ref, hash_from_bytes}
+import gleamunison/identity.{Ref, hash_from_bytes, ref_hex}
 import gleamunison/namespace
 import gleamunison/storage
-import gleamunison/store_deps
 import gleeunit/should
 import simplifile
 
@@ -38,7 +37,7 @@ fn seeded() {
 
 fn index_file(name: String, ref) -> String {
   let path = "/tmp/retraction-scope-" <> int.to_string(unique_id())
-  let index = name <> " " <> store_deps.hex(ref) <> "\n"
+  let index = name <> " " <> ref_hex(ref) <> "\n"
   let assert Ok(_) = simplifile.write(index, to: path)
   path
 }
@@ -104,8 +103,8 @@ pub fn unpublish_retracts_the_name_and_keeps_shared_bytes_test() {
     namespace.commit(adapter, "dev", namespace.set(namespace.empty(), "a", ref))
   let path = index_file("a", ref)
   let assert Ok(message) =
-    cli_unpublish.retract(adapter, path, "a", store_deps.hex(ref), ref, "main", [
-      "a " <> store_deps.hex(ref) <> "\n",
+    cli_unpublish.retract(adapter, path, "a", ref_hex(ref), ref, "main", [
+      "a " <> ref_hex(ref) <> "\n",
     ])
   // The name is gone from main; dev still holds it, and the bytes survive.
   string.contains(message, "dev") |> should.be_true
@@ -153,8 +152,8 @@ pub fn unpublish_proceeds_once_no_other_branch_binds_it_test() {
   let assert Ok(_) = namespace.commit(adapter, "dev", namespace.empty())
   let path = index_file("a", ref)
   let assert Ok(message) =
-    cli_unpublish.retract(adapter, path, "a", store_deps.hex(ref), ref, "main", [
-      "a " <> store_deps.hex(ref) <> "\n",
+    cli_unpublish.retract(adapter, path, "a", ref_hex(ref), ref, "main", [
+      "a " <> ref_hex(ref) <> "\n",
     ])
   string.contains(message, "unpublished") |> should.be_true
   adapter.lookup(ref) |> should.equal(Ok(None))
@@ -179,7 +178,7 @@ pub fn a_branch_binding_survives_losing_the_index_line_test() {
   case cli_unpublish.resolve_target(adapter, [], "a", "dev") {
     Error(_) -> panic as "a bound name was reported unpublished"
     Ok(#(hash, found)) -> {
-      hash |> should.equal(store_deps.hex(ref))
+      hash |> should.equal(ref_hex(ref))
       found |> should.equal(ref)
     }
   }

@@ -6,7 +6,8 @@ import gleamunison/cli_purge
 import gleamunison/cli_unpublish
 import gleamunison/codebase
 import gleamunison/dependency_snapshot
-import gleamunison/identity.{Ref, hash_bytes}
+import gleamunison/identity.{Ref, hash_bytes, ref_hex}
+
 import gleamunison/namespace
 import gleamunison/storage
 import gleamunison/store_deps
@@ -99,7 +100,7 @@ pub fn refused_retraction_preserves_index_namespace_and_bytes_test() {
   let ns = namespace.set(namespace.empty(), "kept", ref)
   let assert Ok(_) = namespace.commit(adapter, "main", ns)
   let path = "/tmp/retraction-safety-" <> int.to_string(unique_id())
-  let index = "kept " <> store_deps.hex(ref) <> "\n"
+  let index = "kept " <> ref_hex(ref) <> "\n"
   let assert Ok(_) = simplifile.write(index, to: path)
   let assert Ok(before) = adapter.list_refs()
   let broken =
@@ -127,15 +128,9 @@ pub fn refused_retraction_preserves_index_namespace_and_bytes_test() {
   ]
   list.each(cases, fn(failed) {
     let assert Error(_) =
-      cli_unpublish.retract(
-        failed,
-        path,
-        "kept",
-        store_deps.hex(ref),
-        ref,
-        "main",
-        [index],
-      )
+      cli_unpublish.retract(failed, path, "kept", ref_hex(ref), ref, "main", [
+        index,
+      ])
     let assert Error(_) = cli_purge.purge(failed, path, ref, "main", True)
   })
   simplifile.read(path) |> should.equal(Ok(index))

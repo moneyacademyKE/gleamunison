@@ -3,6 +3,7 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/evidence
+import gleamunison/identity.{ref_hex}
 import gleamunison/manifest
 import gleamunison/namespace
 import gleamunison/pkg
@@ -21,7 +22,7 @@ fn seeded_store() -> #(storage.StorageAdapter, manifest.Manifest, String) {
     |> manifest.add_def("get-json", string.pad_end("aaa111", 64, "0"))
     |> manifest.add_def("post-json", string.pad_end("bbb222", 64, "0"))
   let assert Ok(ref) = manifest.store(adapter, m)
-  let hex = manifest.ref_hex_of(ref)
+  let hex = ref_hex(ref)
   #(adapter, m, hex)
 }
 
@@ -73,7 +74,7 @@ pub fn install_effectful_def_uses_io_evidence_test() {
     manifest.new("io-lib", "1.0.0")
     |> manifest.add_def_with_effect("write-log", content, True)
   let assert Ok(ref) = manifest.store(adapter, m)
-  let hex = manifest.ref_hex_of(ref)
+  let hex = ref_hex(ref)
   let assert Ok(_) =
     evidence.attach(adapter, content, evidence.Io, "approved", "manual", 1)
   let assert Ok(installed) = pkg.install_from_store(adapter, hex, "main")
@@ -89,7 +90,7 @@ pub fn install_pure_def_refuses_io_only_evidence_test() {
   let assert Ok(_) =
     evidence.attach(adapter, content, evidence.Io, "approved", "manual", 1)
   let assert Error(message) =
-    pkg.install_from_store(adapter, manifest.ref_hex_of(ref), "main")
+    pkg.install_from_store(adapter, ref_hex(ref), "main")
   string.contains(message, "read") |> should.be_true
 }
 
@@ -100,7 +101,7 @@ pub fn install_without_evidence_requirement_test() {
     |> manifest.add_def("helper", string.pad_end("ccc333", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(ref) = manifest.store(adapter, m)
-  let hex = manifest.ref_hex_of(ref)
+  let hex = ref_hex(ref)
   let assert Ok(installed) = pkg.install_from_store(adapter, hex, "main")
   installed |> should.equal(["helper"])
 }
@@ -186,14 +187,14 @@ pub fn install_recurses_into_deps_test() {
     |> manifest.add_def("base-helper", string.pad_end("ddd444", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(dep_ref) = manifest.store(adapter, dep)
-  let dep_hex = manifest.ref_hex_of(dep_ref)
+  let dep_hex = ref_hex(dep_ref)
   let root =
     manifest.new("app-lib", "2.0.0")
     |> manifest.add_def("app-main", string.pad_end("eee555", 64, "0"))
     |> manifest.add_dep(dep_hex)
     |> manifest.without_evidence_requirement
   let assert Ok(root_ref) = manifest.store(adapter, root)
-  let root_hex = manifest.ref_hex_of(root_ref)
+  let root_hex = ref_hex(root_ref)
 
   let assert Ok(installed) = pkg.install_from_store(adapter, root_hex, "main")
   list.contains(installed, "base-helper") |> should.be_true
@@ -215,7 +216,7 @@ pub fn install_breaks_dep_cycles_test() {
     |> manifest.add_def("loop-fn", string.pad_end("fff666", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(self_ref) = manifest.store(adapter, self_dep)
-  let self_hex = manifest.ref_hex_of(self_ref)
+  let self_hex = ref_hex(self_ref)
   let cyclic =
     manifest.new("cycle-lib", "1.0.0")
     |> manifest.add_def("cycle-fn", string.pad_end("077777", 64, "0"))
@@ -223,7 +224,7 @@ pub fn install_breaks_dep_cycles_test() {
     |> manifest.add_dep(self_hex)
     |> manifest.without_evidence_requirement
   let assert Ok(cyc_ref) = manifest.store(adapter, cyclic)
-  let cyc_hex = manifest.ref_hex_of(cyc_ref)
+  let cyc_hex = ref_hex(cyc_ref)
 
   let assert Ok(installed) = pkg.install_from_store(adapter, cyc_hex, "main")
   // self_hex appears twice in deps but installs once: loop-fn listed once.
@@ -239,14 +240,14 @@ pub fn manifest_closure_collects_transitive_refs_test() {
     |> manifest.add_def("b1", string.pad_end("d1d1d1", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(dep_ref) = manifest.store(adapter, dep)
-  let dep_hex = manifest.ref_hex_of(dep_ref)
+  let dep_hex = ref_hex(dep_ref)
   let root =
     manifest.new("top", "1.0.0")
     |> manifest.add_def("t1", string.pad_end("e2e2e2", 64, "0"))
     |> manifest.add_dep(dep_hex)
     |> manifest.without_evidence_requirement
   let assert Ok(root_ref) = manifest.store(adapter, root)
-  let root_hex = manifest.ref_hex_of(root_ref)
+  let root_hex = ref_hex(root_ref)
 
   let assert Ok(closure) = pkg.manifest_closure(adapter, root_hex)
   list.contains(closure.manifests, root_hex) |> should.be_true
@@ -270,14 +271,14 @@ pub fn pull_closure_transfers_only_the_closure_test() {
     |> manifest.add_def("dep-fn", string.pad_end("0a0a0a", 64, "0"))
     |> manifest.without_evidence_requirement
   let assert Ok(dep_ref) = manifest.store(peer, dep)
-  let dep_hex = manifest.ref_hex_of(dep_ref)
+  let dep_hex = ref_hex(dep_ref)
   let root =
     manifest.new("root-lib", "1.0.0")
     |> manifest.add_def("root-fn", string.pad_end("0b0b0b", 64, "0"))
     |> manifest.add_dep(dep_hex)
     |> manifest.without_evidence_requirement
   let assert Ok(root_ref) = manifest.store(peer, root)
-  let root_hex = manifest.ref_hex_of(root_ref)
+  let root_hex = ref_hex(root_ref)
 
   // Def chunks and an unrelated stranger chunk, peer-side only.
   let assert Ok(_) =

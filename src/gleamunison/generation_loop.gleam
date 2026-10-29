@@ -12,6 +12,7 @@ import gleamunison/agent_read_model
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/generation_candidate
+import gleamunison/identity
 import gleamunison/mcp
 import gleamunison/patch
 import gleamunison/prompt
@@ -136,7 +137,7 @@ fn prepare(
       log_directory:,
       branch:,
       max_attempts: plan.max_attempts,
-      prompt_ref: prompt.ref_hex(prompt_ref),
+      prompt_ref: identity.ref_hex(prompt_ref),
       rendered_prompt: rendered,
       signature:,
       target: plan.target,
