@@ -5,10 +5,9 @@
 //// anywhere) and whether unverified content may execute. Both are resolved
 //// through the live configuration layer and passed in as data.
 
-import gleam/list
+import filepath
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import gleam/string
 import gleamunison/config.{type Config}
 
 const default_dir = ".gleamunison"
@@ -58,10 +57,10 @@ pub fn resolve_context(
       |> result.map(store_file_path)
   }
   use store_path <- result.try(selected)
-  let root_dir = directory_of(store_path)
+  let root_dir = filepath.directory_name(store_path)
   Ok(StoreContext(
     store_path: store_path,
-    manifest_path: join(root_dir, manifest_file),
+    manifest_path: filepath.join(root_dir, manifest_file),
     root_dir: root_dir,
   ))
 }
@@ -92,7 +91,7 @@ pub fn resolve_allow_unverified() -> Result(Bool, String) {
 }
 
 fn validate_store_dir(path: String) -> Result(String, String) {
-  case string.starts_with(path, "/") {
+  case filepath.is_absolute(path) {
     True -> Ok(path)
     False ->
       Error("GLEAMUNISON_STORE_DIR must be an absolute path, got: " <> path)
@@ -100,30 +99,12 @@ fn validate_store_dir(path: String) -> Result(String, String) {
 }
 
 fn validate_store_path(path: String) -> Result(String, String) {
-  case string.starts_with(path, "/") {
+  case filepath.is_absolute(path) {
     True -> Ok(path)
     False -> Error("store path must be absolute, got: " <> path)
   }
 }
 
 fn store_file_path(dir: String) -> String {
-  join(dir, store_file)
-}
-
-fn join(dir: String, file: String) -> String {
-  case string.ends_with(dir, "/") {
-    True -> dir <> file
-    False -> dir <> "/" <> file
-  }
-}
-
-fn directory_of(path: String) -> String {
-  case string.split(path, "/") |> list.reverse {
-    [_, ..parent] ->
-      case list.reverse(parent) |> string.join("/") {
-        "" -> "/"
-        dir -> dir
-      }
-    [] -> "."
-  }
+  filepath.join(dir, store_file)
 }
