@@ -10,6 +10,7 @@ import gleam/dynamic/decode
 import gleam/int
 import gleam/result
 import gleamunison/effects.{type OpHandler}
+import gleamunison/env
 import gleamunison/json
 import gleamunison/llm
 import gleamunison/llm_middleware.{RetryPolicy}
@@ -18,9 +19,6 @@ import gleamunison/llm_types.{
   Message, OpenAI, User,
 }
 import gleamunison/llm_wire
-
-@external(erlang, "gleamunison_config", "get_env")
-fn ffi_get_env(key: String) -> Result(String, Nil)
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn cast(a: anything) -> Dynamic
@@ -33,7 +31,7 @@ pub type EnvLookup =
 
 /// CLI entry: `gleam run -- llm [openai|anthropic] <prompt>`.
 pub fn command(args: List(String)) -> String {
-  command_with_env(args, ffi_get_env)
+  command_with_env(args, env.get)
 }
 
 fn command_with_env(args: List(String), env: EnvLookup) -> String {
@@ -44,7 +42,7 @@ fn command_with_env(args: List(String), env: EnvLookup) -> String {
 
 /// The process boundary must not guess success from the rendered text.
 pub fn command_result(args: List(String)) -> Result(String, String) {
-  command_result_with_env(args, ffi_get_env)
+  command_result_with_env(args, env.get)
 }
 
 fn command_result_with_env(

@@ -10,6 +10,7 @@ import gleamunison/active_storage
 import gleamunison/agent_read_model
 import gleamunison/codebase_graph
 import gleamunison/elab_types.{type SurfaceDef}
+import gleamunison/env
 import gleamunison/lexer
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/mcp_definition
@@ -35,14 +36,8 @@ pub opaque type SessionState {
   )
 }
 
-@external(erlang, "gleamunison_config", "get_env")
-fn get_env(key: String) -> Result(String, Nil)
-
 pub fn selected_branch() -> String {
-  case get_env("GLEAMUNISON_BRANCH") {
-    Ok("") | Error(_) -> "main"
-    Ok(branch) -> branch
-  }
+  env.string_or("GLEAMUNISON_BRANCH", "main")
 }
 
 /// Server startup reads the configured branch and the node's one active store.

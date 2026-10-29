@@ -1,3 +1,4 @@
+import envoy
 import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
@@ -29,12 +30,6 @@ fn http_post(
   body: String,
 ) -> Result(#(Int, String), String)
 
-@external(erlang, "gleamunison_ffi_test", "set_env")
-fn set_env(key: String, value: String) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "unset_env")
-fn unset_env(key: String) -> Nil
-
 @external(erlang, "gleamunison_ffi_test", "without_active_storage")
 fn without_active_storage(check: fn() -> a) -> a
 
@@ -49,9 +44,9 @@ pub fn mcp_publish_then_http_app_route_executes_same_content_test() {
   let path = root <> "/store.dets"
   let _ = storage.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
-  set_env("GLEAMUNISON_STORE_DIR", root)
-  set_env("GLEAMUNISON_BRANCH", "factory")
-  set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "app-http-test-key")
+  envoy.set("GLEAMUNISON_STORE_DIR", root)
+  envoy.set("GLEAMUNISON_BRANCH", "factory")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "app-http-test-key")
 
   let #(ref, by_name, by_ref, scratch) =
     without_active_storage(fn() {
@@ -74,9 +69,9 @@ pub fn mcp_publish_then_http_app_route_executes_same_content_test() {
       #(content_ref, name_response, ref_response, scratch_response)
     })
 
-  unset_env("GLEAMUNISON_STORE_DIR")
-  unset_env("GLEAMUNISON_BRANCH")
-  unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  envoy.unset("GLEAMUNISON_BRANCH")
+  envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   let _ = storage.dets_delete_file(path)
 
   assert_route_success(by_name, ref)
@@ -86,7 +81,7 @@ pub fn mcp_publish_then_http_app_route_executes_same_content_test() {
 }
 
 pub fn untrusted_profile_refuses_app_execution_test() {
-  set_env("GLEAMUNISON_PROFILE", "untrusted-execution")
+  envoy.set("GLEAMUNISON_PROFILE", "untrusted-execution")
   let response =
     without_active_storage(fn() {
       let assert Ok(Nil) = mcp_server.start([])
@@ -96,7 +91,7 @@ pub fn untrusted_profile_refuses_app_execution_test() {
       stop_http_server()
       result
     })
-  unset_env("GLEAMUNISON_PROFILE")
+  envoy.unset("GLEAMUNISON_PROFILE")
 
   let assert Ok(#(403, body)) = response
   string.contains(body, "sandbox_refused") |> should.be_true
@@ -110,9 +105,9 @@ pub fn http_app_route_persists_db_facts_across_owner_restart_test() {
   let _ = storage.dets_delete_file(path)
   let _ = simplifile.delete(db_path)
   let assert Ok(_) = simplifile.create_directory_all(root)
-  set_env("GLEAMUNISON_STORE_DIR", root)
-  set_env("GLEAMUNISON_BRANCH", "factory")
-  set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "app-http-test-key")
+  envoy.set("GLEAMUNISON_STORE_DIR", root)
+  envoy.set("GLEAMUNISON_BRANCH", "factory")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "app-http-test-key")
 
   let #(written, read) =
     with_db_path(db_path, fn() {
@@ -156,9 +151,9 @@ pub fn http_app_route_persists_db_facts_across_owner_restart_test() {
       })
     })
 
-  unset_env("GLEAMUNISON_STORE_DIR")
-  unset_env("GLEAMUNISON_BRANCH")
-  unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  envoy.unset("GLEAMUNISON_BRANCH")
+  envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   let _ = storage.dets_delete_file(path)
   let _ = simplifile.delete(db_path)
 

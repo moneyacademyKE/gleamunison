@@ -11,11 +11,9 @@ import gleam/list
 import gleam/result
 import gleam/string
 import gleamunison/datetime
+import gleamunison/env
 import gleamunison/evidence.{type Evidence, type Signer}
 import gleamunison/storage.{type StorageAdapter}
-
-@external(erlang, "gleamunison_config", "get_env")
-fn get_env(key: String) -> Result(String, Nil)
 
 /// No expiry: an `Active` key with `until = never` is valid until revoked.
 pub const never = 9_223_372_036_854_775_807
@@ -286,7 +284,7 @@ pub fn production_policy() -> Result(TrustPolicy, String) {
 }
 
 fn env_int(key: String, fallback: Int) -> Result(Int, String) {
-  case get_env(key) {
+  case env.get(key) {
     Error(_) -> Ok(fallback)
     Ok(value) if value == "" -> Ok(fallback)
     Ok(value) ->
@@ -298,16 +296,7 @@ fn env_int(key: String, fallback: Int) -> Result(Int, String) {
 }
 
 fn env_flag(key: String) -> Bool {
-  case get_env(key) {
-    Ok(value) ->
-      case string.lowercase(value) {
-        "1" -> True
-        "true" -> True
-        "yes" -> True
-        _ -> False
-      }
-    Error(_) -> False
-  }
+  env.flag(key)
 }
 
 /// What the policy actually enforces, for a report an operator can read.

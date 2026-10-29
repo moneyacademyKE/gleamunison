@@ -19,6 +19,7 @@ import gleam/option.{type Option, None}
 import gleam/result
 import gleamunison/cancellation
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
+import gleamunison/env
 import gleamunison/http_client
 import gleamunison/identity.{type DefinitionRef, Ref}
 import gleamunison/json
@@ -30,9 +31,6 @@ import gleamunison/llm_types.{
   DecodeError, HttpError, Message, OpenAI, ProviderConfig, TransportError, User,
 }
 import gleamunison/llm_wire
-
-@external(erlang, "gleamunison_config", "get_env")
-fn get_env(key: String) -> Result(String, Nil)
 
 @external(erlang, "gleamunison_ffi", "from_dynamic")
 fn unsafe_coerce(val: Dynamic) -> a
@@ -59,11 +57,11 @@ pub fn provider_name(provider: Provider) -> String {
 /// when its key is set). Kept dependency-free so the Erlang runtime can
 /// call it directly as the ambient handler.
 pub fn complete_env(prompt: String) -> Result(String, String) {
-  let provider = case get_env("ANTHROPIC_API_KEY") {
+  let provider = case env.get("ANTHROPIC_API_KEY") {
     Ok(_) -> Anthropic
     Error(_) -> OpenAI
   }
-  case resolve_config(provider, get_env) {
+  case resolve_config(provider, env.get) {
     Error(error) -> Error(error)
     Ok(cfg) -> {
       let provider_name = provider_name(provider)
@@ -101,7 +99,7 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
       use Nil <- result.try(llm_settlement.release(provider_name))
       case completion {
         Ok(c) -> {
-          let rates = rate_config(get_env)
+          let rates = rate_config(env.get)
           let cost =
             llm_budget.cost_micro_usd(
               c.input_tokens,

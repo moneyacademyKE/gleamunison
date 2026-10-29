@@ -1,3 +1,4 @@
+import envoy
 import gleam/list
 import gleam/string
 import gleamunison/agent_publish
@@ -5,12 +6,6 @@ import gleamunison/app_route
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "set_env")
-fn set_env(key: String, value: String) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "unset_env")
-fn unset_env(key: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "without_active_storage")
 fn without_active_storage(check: fn() -> a) -> a
@@ -149,7 +144,7 @@ fn with_published_app(
   let path = root <> "/store.dets"
   let _ = storage.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
-  set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "app-route-test-key")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "app-route-test-key")
   let result =
     without_active_storage(fn() {
       let assert Ok(adapter) = storage.dets(path)
@@ -170,7 +165,7 @@ fn with_published_app(
         })
       work(adapter, greeting.content_ref, answer.content_ref)
     })
-  unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   let _ = storage.dets_delete_file(path)
   result
 }

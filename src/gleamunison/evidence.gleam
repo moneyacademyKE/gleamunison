@@ -6,13 +6,11 @@ import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/crypto
+import gleamunison/env
 import gleamunison/identity.{
   type DefinitionRef, Ref, hash_bytes, hash_equal, hash_to_debug_string,
 }
 import gleamunison/storage.{type StorageAdapter}
-
-@external(erlang, "gleamunison_config", "get_env")
-fn get_env(key: String) -> Result(String, Nil)
 
 /// What kind of evidence this is. Deploy gates ask for these by name.
 pub type Kind {
@@ -53,7 +51,7 @@ pub type AttachError {
 }
 
 pub fn production_signer() -> Result(Signer, String) {
-  case get_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY") {
+  case env.get("GLEAMUNISON_EVIDENCE_SIGNING_KEY") {
     Ok(secret) if secret != "" ->
       Ok(signer(
         "env:GLEAMUNISON_EVIDENCE_SIGNING_KEY",

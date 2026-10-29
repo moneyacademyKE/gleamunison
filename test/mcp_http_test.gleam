@@ -1,3 +1,4 @@
+import envoy
 import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
@@ -56,12 +57,6 @@ fn ffi_set_http_token(token: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "clear_http_token")
 fn ffi_clear_http_token() -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "set_env")
-fn ffi_set_env(key: String, value: String) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "unset_env")
-fn ffi_unset_env(key: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "without_active_storage")
 fn without_active_storage(check: fn() -> a) -> a
@@ -151,14 +146,14 @@ pub fn mcp_http_auth_and_limit_test() {
 
 pub fn mcp_authority_untrusted_execution_refuses_eval_test() {
   let assert Ok(Nil) = mcp_server.start([])
-  ffi_set_env("GLEAMUNISON_PROFILE", "untrusted-execution")
+  envoy.set("GLEAMUNISON_PROFILE", "untrusted-execution")
   ffi_start_http_server(18_101)
 
   let call_body =
     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"(add 20 22)\"}}}"
   let response = ffi_http_post(18_101, "/mcp", call_body)
 
-  ffi_unset_env("GLEAMUNISON_PROFILE")
+  envoy.unset("GLEAMUNISON_PROFILE")
   mcp_server.stop()
   ffi_stop_http_server()
 
@@ -172,9 +167,9 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
   let path = root <> "/store.dets"
   let _ = storage.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
-  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
-  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
-  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-publish-test-key")
+  envoy.set("GLEAMUNISON_STORE_DIR", root)
+  envoy.set("GLEAMUNISON_BRANCH", "factory")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-publish-test-key")
 
   let #(published, definition, scratch) =
     without_active_storage(fn() {
@@ -196,9 +191,9 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
       #(publish_response, definition_response, scratch_response)
     })
 
-  ffi_unset_env("GLEAMUNISON_STORE_DIR")
-  ffi_unset_env("GLEAMUNISON_BRANCH")
-  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  envoy.unset("GLEAMUNISON_BRANCH")
+  envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
 
   let assert Ok(#(200, publish_body)) = published
   let assert Ok(#(200, definition_body)) = definition
@@ -207,7 +202,7 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
   response_field(definition_body, "ref") |> should.equal(published_ref)
   string.contains(scratch_body, "7 : Int") |> should.be_true
 
-  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-publish-test-key")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-publish-test-key")
   let assert Ok(adapter) = storage.dets(path)
   let assert Ok(ref) = identity.parse_ref_hex(published_ref)
   let execution =
@@ -215,7 +210,7 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
   let assert Ok(Nil) = adapter.close()
   let cli_execution =
     cli_run.run([published_ref, "--store", path, "--branch", "factory"])
-  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   let _ = storage.dets_delete_file(path)
   execution |> should.equal(Ok("42"))
   cli_execution |> should.equal(Ok("42"))
@@ -233,16 +228,16 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
     <> "(define generated-number (+ generated-base 2))\\n"
     <> "(define test_generated-number (do Test expect (eq? generated-number 42)))', signature: 'int',}\n```"
   let assert Ok(provider_port) = start_completion_server(candidate)
-  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
-  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
-  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-generation-test-key")
-  ffi_set_env("OPENAI_API_KEY", "local-test-only")
-  ffi_set_env(
+  envoy.set("GLEAMUNISON_STORE_DIR", root)
+  envoy.set("GLEAMUNISON_BRANCH", "factory")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-generation-test-key")
+  envoy.set("OPENAI_API_KEY", "local-test-only")
+  envoy.set(
     "OPENAI_BASE_URL",
     "http://127.0.0.1:" <> int.to_string(provider_port) <> "/v1",
   )
-  ffi_set_env("OPENAI_MODEL", "local-test")
-  ffi_set_env("LLM_HTTP_TIMEOUT_MS", "5000")
+  envoy.set("OPENAI_MODEL", "local-test")
+  envoy.set("LLM_HTTP_TIMEOUT_MS", "5000")
   let result =
     without_active_storage(fn() {
       let assert Ok(Nil) = mcp_server.start([])
@@ -268,7 +263,7 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
   generated_ref |> should.not_equal(helper_ref)
   let assert Ok(#(200, app_body)) = app
   string.contains(app_body, "42") |> should.be_true
-  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-generation-test-key")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "mcp-generation-test-key")
   let assert Ok(adapter) = storage.dets(path)
   let assert Ok(ref) = identity.parse_ref_hex(generated_ref)
   let assert Ok(helper) = identity.parse_ref_hex(helper_ref)
@@ -277,7 +272,7 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
   run_ref.run_verified_on_branch(adapter, helper, "factory", [], False)
   |> should.equal(Ok("40"))
   let assert Ok(Nil) = adapter.close()
-  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   let _ = storage.dets_delete_file(path)
 }
 
@@ -285,13 +280,13 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
 fn start_completion_server(content: String) -> Result(Int, String)
 
 fn unset_generation_env() -> Nil {
-  ffi_unset_env("GLEAMUNISON_STORE_DIR")
-  ffi_unset_env("GLEAMUNISON_BRANCH")
-  ffi_unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
-  ffi_unset_env("OPENAI_API_KEY")
-  ffi_unset_env("OPENAI_BASE_URL")
-  ffi_unset_env("OPENAI_MODEL")
-  ffi_unset_env("LLM_HTTP_TIMEOUT_MS")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  envoy.unset("GLEAMUNISON_BRANCH")
+  envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+  envoy.unset("OPENAI_API_KEY")
+  envoy.unset("OPENAI_BASE_URL")
+  envoy.unset("OPENAI_MODEL")
+  envoy.unset("LLM_HTTP_TIMEOUT_MS")
 }
 
 pub fn mcp_generated_db_routes_survive_db_owner_restart_test() {
@@ -301,12 +296,12 @@ pub fn mcp_generated_db_routes_survive_db_owner_restart_test() {
   let _ = storage.dets_delete_file(path)
   let _ = simplifile.delete(db_path)
   let assert Ok(_) = simplifile.create_directory_all(root)
-  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
-  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
-  ffi_set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "generated-db-test-key")
-  ffi_set_env("OPENAI_API_KEY", "local-test-only")
-  ffi_set_env("OPENAI_MODEL", "local-test")
-  ffi_set_env("LLM_HTTP_TIMEOUT_MS", "5000")
+  envoy.set("GLEAMUNISON_STORE_DIR", root)
+  envoy.set("GLEAMUNISON_BRANCH", "factory")
+  envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "generated-db-test-key")
+  envoy.set("OPENAI_API_KEY", "local-test-only")
+  envoy.set("OPENAI_MODEL", "local-test")
+  envoy.set("LLM_HTTP_TIMEOUT_MS", "5000")
   let write =
     "(define generated-db-write (do Db transact (list (pair \"person:1\" (pair \"name\" \"Moe\"))) (list)))"
   let read = "(define generated-db-read (do Db get \"person:1\" \"name\"))"
@@ -370,7 +365,7 @@ fn generate_from_provider(id: Int, source: String, signature: String) -> Nil {
     <> signature
     <> "\"}"
   let assert Ok(provider_port) = start_completion_server(candidate)
-  ffi_set_env(
+  envoy.set(
     "OPENAI_BASE_URL",
     "http://127.0.0.1:" <> int.to_string(provider_port) <> "/v1",
   )
@@ -393,9 +388,9 @@ pub fn mcp_generation_rejects_untrusted_before_storage_test() {
   let root = "/tmp/gleamunison-mcp-untrusted-generation-test"
   let path = root <> "/store.dets"
   let _ = storage.dets_delete_file(path)
-  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
-  ffi_set_env("GLEAMUNISON_PROFILE", "untrusted-execution")
-  ffi_set_env("GLEAMUNISON_BRANCH", "factory")
+  envoy.set("GLEAMUNISON_STORE_DIR", root)
+  envoy.set("GLEAMUNISON_PROFILE", "untrusted-execution")
+  envoy.set("GLEAMUNISON_BRANCH", "factory")
   let assert Ok(decoded) =
     json.decode(bit_array.from_string(
       "{\"template\":\"generate\",\"signature\":\"int\",\"max_attempts\":1}",
@@ -403,9 +398,9 @@ pub fn mcp_generation_rejects_untrusted_before_storage_test() {
   let assert Ok(args) =
     decode.run(decoded, decode.dict(decode.string, decode.dynamic))
   let result = without_active_storage(fn() { mcp_generation.generate(args) })
-  ffi_unset_env("GLEAMUNISON_STORE_DIR")
-  ffi_unset_env("GLEAMUNISON_PROFILE")
-  ffi_unset_env("GLEAMUNISON_BRANCH")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  envoy.unset("GLEAMUNISON_PROFILE")
+  envoy.unset("GLEAMUNISON_BRANCH")
   let assert Error(message) = result
   string.contains(message, "untrusted") |> should.be_true
   simplifile.is_file(path) |> should.equal(Ok(False))
@@ -415,14 +410,14 @@ pub fn mcp_untrusted_write_is_refused_before_storage_test() {
   let root = "/tmp/gleamunison-mcp-untrusted-write-test"
   let path = root <> "/store.dets"
   let _ = storage.dets_delete_file(path)
-  ffi_set_env("GLEAMUNISON_STORE_DIR", root)
-  ffi_set_env("GLEAMUNISON_PROFILE", "untrusted-execution")
+  envoy.set("GLEAMUNISON_STORE_DIR", root)
+  envoy.set("GLEAMUNISON_PROFILE", "untrusted-execution")
   let result =
     without_active_storage(fn() {
       mcp_write.publish("(define must-not-exist 1)")
     })
-  ffi_unset_env("GLEAMUNISON_STORE_DIR")
-  ffi_unset_env("GLEAMUNISON_PROFILE")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  envoy.unset("GLEAMUNISON_PROFILE")
   let assert Error(message) = result
   string.contains(message, "untrusted") |> should.be_true
   simplifile.is_file(path) |> should.equal(Ok(False))

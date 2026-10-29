@@ -5,11 +5,9 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/result
+import gleamunison/env
 import gleamunison/mcp.{type Tool, Tool}
 import gleamunison/sandbox_policy
-
-@external(erlang, "gleamunison_config", "get_env")
-fn get_env(key: String) -> Result(String, Nil)
 
 @external(erlang, "gleamunison_web_session", "publish")
 fn owner_publish(source: String) -> Result(String, String)
@@ -23,10 +21,7 @@ pub fn tool() -> Tool {
 }
 
 pub fn check_writable() -> Result(Nil, String) {
-  let profile = case get_env("GLEAMUNISON_PROFILE") {
-    Ok("") | Error(_) -> "local"
-    Ok(value) -> value
-  }
+  let profile = env.string_or("GLEAMUNISON_PROFILE", "local")
   case sandbox_policy.denies_untrusted_execution(profile) {
     True -> Error("agent_publish_refused: untrusted profile cannot write")
     False -> Ok(Nil)

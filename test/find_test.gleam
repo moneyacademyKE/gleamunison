@@ -1,3 +1,4 @@
+import envoy
 import gleam/list
 import gleam/option.{Some}
 import gleam/string
@@ -10,12 +11,6 @@ import gleamunison/namespace
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "set_env")
-fn set_env(key: String, value: String) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "unset_env")
-fn unset_env(key: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "without_active_storage")
 fn without_active_storage(check: fn() -> a) -> a
@@ -40,8 +35,8 @@ pub fn find_boots_from_the_selected_durable_branch_test() {
       namespace.set(namespace.empty(), "published-answer", ref),
     )
   let assert Ok(_) = adapter.close()
-  set_env("GLEAMUNISON_STORE_DIR", dir)
-  set_env("GLEAMUNISON_BRANCH", "factory")
+  envoy.set("GLEAMUNISON_STORE_DIR", dir)
+  envoy.set("GLEAMUNISON_BRANCH", "factory")
   let #(state, command_result) =
     without_active_storage(fn() {
       let assert Ok(selected) = mcp_session.boot_configured()
@@ -56,8 +51,8 @@ pub fn find_boots_from_the_selected_durable_branch_test() {
   hit.branch |> should.equal(Some("factory"))
   let Ref(hash) = ref
   hit.content_ref_hex |> should.equal(Some(hash_to_debug_string(hash)))
-  unset_env("GLEAMUNISON_STORE_DIR")
-  unset_env("GLEAMUNISON_BRANCH")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  envoy.unset("GLEAMUNISON_BRANCH")
   let assert Ok(_) = storage.dets_delete_file(path)
   let assert Ok(_) = simplifile.delete(dir)
 }

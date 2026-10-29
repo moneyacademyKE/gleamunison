@@ -9,9 +9,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-
-@external(erlang, "gleamunison_config", "get_env")
-fn get_env(key: String) -> Result(String, Nil)
+import gleamunison/env
 
 const default_dir = ".gleamunison"
 
@@ -32,7 +30,7 @@ pub fn default_store_dir() -> String {
 /// against the wrong working directory looks empty, and an empty store reads
 /// as "your definition was never published".
 pub fn resolve_store_dir() -> Result(String, String) {
-  case get_env("GLEAMUNISON_STORE_DIR") {
+  case env.get("GLEAMUNISON_STORE_DIR") {
     Error(_) -> Ok(default_dir)
     Ok(dir) if dir == "" -> Ok(default_dir)
     Ok(dir) -> validate_store_dir(dir)
@@ -81,16 +79,7 @@ pub fn root_dir(context: StoreContext) -> String {
 /// The escape hatch: GLEAMUNISON_STORE_ALLOW_UNVERIFIED=1 lets a run execute
 /// content whose evidence does not verify. Absent means verify.
 pub fn resolve_allow_unverified() -> Bool {
-  case get_env("GLEAMUNISON_STORE_ALLOW_UNVERIFIED") {
-    Ok(value) ->
-      case string.lowercase(value) {
-        "1" -> True
-        "true" -> True
-        "yes" -> True
-        _ -> False
-      }
-    Error(_) -> False
-  }
+  env.flag("GLEAMUNISON_STORE_ALLOW_UNVERIFIED")
 }
 
 fn validate_store_dir(path: String) -> Result(String, String) {

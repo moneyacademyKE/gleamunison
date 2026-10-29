@@ -7,7 +7,7 @@
          clear_eval_timeout/0, otp_blake2b64/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([metrics_restart_probe/0, http_drain_probe/0, observability_probe/1,
-         metrics_name_bound_probe/0, llm_budget_snapshot_json/0, set_env/2, unset_env/1,
+         metrics_name_bound_probe/0, llm_budget_snapshot_json/0,
          without_active_storage/1]).
 -export([rescue/1]).
 
@@ -635,14 +635,6 @@ metrics_name_bound_probe() ->
 %% Budget registry snapshot as JSON, for asserting metering from Gleam.
 llm_budget_snapshot_json() ->
     iolist_to_binary(json:encode(gleamunison_llm_budget:snapshot())).
-
-set_env(Key, Value) when is_binary(Key), is_binary(Value) ->
-    true = os:putenv(binary_to_list(Key), binary_to_list(Value)),
-    nil.
-
-unset_env(Key) when is_binary(Key) ->
-    true = os:unsetenv(binary_to_list(Key)),
-    nil.
 
 without_active_storage(Fun) when is_function(Fun, 0) ->
     Old = persistent_term:get({gleamunison, active_storage}, undefined),

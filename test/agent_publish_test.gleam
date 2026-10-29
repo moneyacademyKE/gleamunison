@@ -1,3 +1,4 @@
+import envoy
 import gleam/list
 import gleam/option.{Some}
 import gleam/string
@@ -10,12 +11,6 @@ import gleamunison/run_ref
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "set_env")
-fn set_env(key: String, value: String) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "unset_env")
-fn unset_env(key: String) -> Nil
 
 @external(erlang, "gleamunison_ffi_test", "without_active_storage")
 fn without_active_storage(check: fn() -> a) -> a
@@ -41,7 +36,7 @@ pub fn untested_source_is_refused_before_publication_test() {
 
 pub fn tested_source_binds_selected_branch_and_runs_test() {
   with_store(fn(adapter, root) {
-    set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "agent-test-key")
+    envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "agent-test-key")
     let source =
       "(define agent-answer 42)\n(define test_agent-answer (do Test expect 1))\n"
     let result =
@@ -64,7 +59,7 @@ pub fn tested_source_binds_selected_branch_and_runs_test() {
     hit.origin |> should.equal("branch")
     run_ref.run_verified_on_branch(adapter, ref, "factory", [], False)
     |> should.equal(Ok("42"))
-    unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+    envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
     simplifile.is_file(root <> "/application.dets")
     |> should.equal(Ok(False))
   })
@@ -72,7 +67,7 @@ pub fn tested_source_binds_selected_branch_and_runs_test() {
 
 pub fn refresh_preserves_scratch_without_stale_stored_types_test() {
   with_store(fn(adapter, root) {
-    set_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "agent-test-key")
+    envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "agent-test-key")
     let initial =
       "(define changing 1)\n(define test_changing (do Test expect 1))\n"
     let updated =
@@ -96,7 +91,7 @@ pub fn refresh_preserves_scratch_without_stale_stored_types_test() {
         refreshed,
         "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"unrelated-scratch\"}}}",
       )
-    unset_env("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
+    envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
     let assert mcp.Respond(changing_body) = changing
     string.contains(changing_body, ": Text") |> should.be_true
     string.contains(changing_body, ": Int") |> should.be_false

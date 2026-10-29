@@ -1,3 +1,4 @@
+import envoy
 import gleam/bit_array
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
@@ -155,7 +156,7 @@ pub fn budget_middleware_admits_and_meters_within_limits_test() {
 
 pub fn budget_middleware_refuses_unpinned_model_without_calling_provider_test() {
   let assert Ok(Nil) = budget_reset()
-  set_env("GLEAMUNISON_LLM_ALLOWED_MODELS", "gpt-4o-mini")
+  envoy.set("GLEAMUNISON_LLM_ALLOWED_MODELS", "gpt-4o-mini")
   let inner = llm.mock_handler(fake_completion())
   let handler = llm_middleware.budget_handler(inner, OpenAI, "gpt-4o")
   let assert Error(reason) = call(handler)
@@ -163,12 +164,12 @@ pub fn budget_middleware_refuses_unpinned_model_without_calling_provider_test() 
   |> should_be_ok
   |> string.contains("model_not_pinned")
   |> should.be_true
-  unset_env("GLEAMUNISON_LLM_ALLOWED_MODELS")
+  envoy.unset("GLEAMUNISON_LLM_ALLOWED_MODELS")
 }
 
 pub fn budget_middleware_opens_circuit_after_threshold_failures_test() {
   let assert Ok(Nil) = budget_reset()
-  set_env("GLEAMUNISON_LLM_CIRCUIT_FAILURE_THRESHOLD", "2")
+  envoy.set("GLEAMUNISON_LLM_CIRCUIT_FAILURE_THRESHOLD", "2")
   let failing: OpHandler = fn(_args, cont) {
     cont(to_dynamic(Error(bit_array.from_string("http 500"))))
   }
@@ -181,18 +182,18 @@ pub fn budget_middleware_opens_circuit_after_threshold_failures_test() {
   |> should_be_ok
   |> string.contains("circuit_open")
   |> should.be_true
-  unset_env("GLEAMUNISON_LLM_CIRCUIT_FAILURE_THRESHOLD")
+  envoy.unset("GLEAMUNISON_LLM_CIRCUIT_FAILURE_THRESHOLD")
 }
 
 pub fn concurrency_slot_is_released_after_each_call_test() {
   let assert Ok(Nil) = budget_reset()
-  set_env("GLEAMUNISON_LLM_MAX_CONCURRENT", "1")
+  envoy.set("GLEAMUNISON_LLM_MAX_CONCURRENT", "1")
   let inner = llm.mock_handler(fake_completion())
   let handler = llm_middleware.budget_handler(inner, OpenAI, "gpt-4o-mini")
   // Two sequential calls both pass: the slot is released, not leaked.
   let assert Ok(_) = call(handler)
   let assert Ok(_) = call(handler)
-  unset_env("GLEAMUNISON_LLM_MAX_CONCURRENT")
+  envoy.unset("GLEAMUNISON_LLM_MAX_CONCURRENT")
 }
 
 // ---- redaction / retention ---------------------------------------------------
@@ -293,9 +294,3 @@ fn snapshot_text() -> String {
 
 @external(erlang, "gleamunison_ffi_test", "llm_budget_snapshot_json")
 fn snapshot_json() -> String
-
-@external(erlang, "gleamunison_ffi_test", "set_env")
-fn set_env(key: String, value: String) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "unset_env")
-fn unset_env(key: String) -> Nil
