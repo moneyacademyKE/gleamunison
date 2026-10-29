@@ -156,7 +156,7 @@ pub fn resolve_config(
   Ok(ProviderConfig(provider, url, key, model, tokens, timeout_ms, effort))
 }
 
-pub fn validate_config(cfg: ProviderConfig) -> Result(Nil, String) {
+fn validate_config(cfg: ProviderConfig) -> Result(Nil, String) {
   llm_controls.validate(
     cfg.provider == Anthropic,
     cfg.base_url,

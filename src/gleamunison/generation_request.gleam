@@ -121,7 +121,7 @@ fn optional_attempts(args: Dict(String, Dynamic)) -> Result(Int, String) {
 
 /// The deliberately small external schema vocabulary. Internal callers can
 /// still construct the full ast.Type directly; no speculative parser here.
-pub fn signature_type(text: String) -> Result(ast.Type, String) {
+fn signature_type(text: String) -> Result(ast.Type, String) {
   case string.split_once(text, " -> ") {
     Error(Nil) -> scalar(string.trim(text))
     Ok(#(parameters, result_text)) -> {

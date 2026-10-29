@@ -194,7 +194,7 @@ pub fn run_raw(
   run_raw_on_branch(adapter, ref, default_branch, args)
 }
 
-pub fn run_raw_on_branch(
+fn run_raw_on_branch(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
   branch: String,

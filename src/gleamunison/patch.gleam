@@ -93,7 +93,7 @@ pub fn apply_to_defs(
   ApplyResult(patch: p, rewritten: rewritten)
 }
 
-pub fn rewrite_definition(p: Patch, def: ast.Definition) -> ast.Definition {
+fn rewrite_definition(p: Patch, def: ast.Definition) -> ast.Definition {
   case def {
     ast.TermDef(term, typ) -> ast.TermDef(rewrite_term(p, term), typ)
     _ -> def

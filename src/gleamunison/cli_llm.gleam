@@ -36,7 +36,7 @@ pub fn command(args: List(String)) -> String {
   command_with_env(args, ffi_get_env)
 }
 
-pub fn command_with_env(args: List(String), env: EnvLookup) -> String {
+fn command_with_env(args: List(String), env: EnvLookup) -> String {
   case command_result_with_env(args, env) {
     Ok(message) | Error(message) -> message
   }

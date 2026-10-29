@@ -40,7 +40,7 @@ pub fn generate(
 
 /// Deterministic test/provider seam: the same admission and refresh path,
 /// without requiring an external provider to prove repository behavior.
-pub fn generate_with(
+fn generate_with(
   previous: SessionState,
   plan: generation_loop.Plan,
   provider: generation_loop.Provider,

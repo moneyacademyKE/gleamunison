@@ -120,7 +120,7 @@ fn initialize_result(server: Server) -> String {
   <> "}}"
 }
 
-pub fn tools_list_result(server: Server) -> String {
+fn tools_list_result(server: Server) -> String {
   let tools =
     list.map(server.tools, fn(t) {
       "{\"name\":"

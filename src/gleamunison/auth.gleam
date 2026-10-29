@@ -62,7 +62,7 @@ pub fn required_scope(path: String) -> Scope {
   }
 }
 
-pub fn scope_name(scope: Scope) -> String {
+fn scope_name(scope: Scope) -> String {
   case scope {
     Public -> "public"
     DataRead -> "data-read"
@@ -71,7 +71,7 @@ pub fn scope_name(scope: Scope) -> String {
   }
 }
 
-pub fn scope_at_least(have: Scope, need: Scope) -> Bool {
+fn scope_at_least(have: Scope, need: Scope) -> Bool {
   rank(have) >= rank(need)
 }
 
@@ -84,7 +84,7 @@ fn rank(scope: Scope) -> Int {
   }
 }
 
-pub fn identity_scopes(identity: Identity) -> List(Scope) {
+fn identity_scopes(identity: Identity) -> List(Scope) {
   case identity {
     Anonymous -> [Public]
     LocalPeer -> [Public, DataRead, DataWrite, Admin]
@@ -147,7 +147,7 @@ pub fn bind_decision(input: BindInput) -> BindDecision {
   }
 }
 
-pub fn is_loopback(address: String) -> Bool {
+fn is_loopback(address: String) -> Bool {
   address == "127.0.0.1"
   || address == "::1"
   || address == "localhost"

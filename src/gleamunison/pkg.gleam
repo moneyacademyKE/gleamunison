@@ -184,7 +184,7 @@ pub fn install_from_store_production(
   }
 }
 
-pub fn install_from_store_with_policy(
+fn install_from_store_with_policy(
   adapter: StorageAdapter,
   manifest_hex: String,
   branch: String,
@@ -290,7 +290,7 @@ pub fn publish_to_store_production(
   }
 }
 
-pub fn publish_to_store_with_policy(
+fn publish_to_store_with_policy(
   adapter: StorageAdapter,
   defs: List(#(String, String, Bool)),
   name: String,

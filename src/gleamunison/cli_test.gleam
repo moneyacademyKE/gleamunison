@@ -145,7 +145,7 @@ pub fn run_file(
   ))
 }
 
-pub fn run_file_with_signer(
+fn run_file_with_signer(
   path: String,
   adapter: StorageAdapter,
   signer: evidence.Signer,

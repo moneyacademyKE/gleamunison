@@ -97,7 +97,7 @@ pub fn generate(
 /// The tape stores the ability's module key (m_<hash-suffix>), not its
 /// surface name. Map back through the bootstrap ability table; an ability
 /// outside it is an honest error, never a guess.
-pub fn ability_name_for_key(key: String) -> Result(String, String) {
+fn ability_name_for_key(key: String) -> Result(String, String) {
   let abilities =
     list.filter_map(bootstraps.get_init_defs_data(), fn(d) {
       case d {
@@ -162,7 +162,7 @@ fn render(
 /// Erlang inspect repr → gleamunison surface literal. v1 grammar: text
 /// (`<<"hi">>` → `"hi"`), integers, and lists of the same. Anything else is
 /// an honest error, never a guess.
-pub fn repr_to_literal(repr: String) -> Result(String, String) {
+fn repr_to_literal(repr: String) -> Result(String, String) {
   let trimmed = string.trim(repr)
   case trimmed {
     "\"" <> _ ->

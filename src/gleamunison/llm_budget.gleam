@@ -64,7 +64,7 @@ pub fn effective_usage(usage: Usage, window_ms: Int, now: Int) -> Usage {
   }
 }
 
-pub fn model_allowed(budget: Budget, model: String) -> Bool {
+fn model_allowed(budget: Budget, model: String) -> Bool {
   case budget.allowed_models {
     [] -> True
     allowed -> list.contains(allowed, model)

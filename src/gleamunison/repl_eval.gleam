@@ -146,7 +146,7 @@ pub fn ref_for_name(name: String) -> DefinitionRef {
 /// module name, its type, and the advanced cache. Split from do_eval so
 /// callers can choose how to run the module: plainly (REPL), or wrapped
 /// in handler frames (replay, capabilities, transcripts).
-pub fn compile_def_module(
+fn compile_def_module(
   term: SurfaceTerm,
   name: String,
   cache: TypeCache,

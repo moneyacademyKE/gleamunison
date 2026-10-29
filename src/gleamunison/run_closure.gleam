@@ -88,7 +88,7 @@ pub fn resolve_definition(
 /// builtin; no elaborated term ever points at it. Matching only the genesis ref
 /// therefore declared every builtin missing, and `run` on a stored definition
 /// could not resolve `+`. Both shapes name the same builtin, so both count.
-pub fn is_bootstrap_ref(ref: DefinitionRef) -> Bool {
+fn is_bootstrap_ref(ref: DefinitionRef) -> Bool {
   list.any(bootstraps.get_init_defs_data(), fn(definition) {
     case definition {
       bootstraps.BAbility(name, _) -> repl_eval.ref_for_name(name) == ref
