@@ -269,24 +269,6 @@ pub fn arity_of(typ: ast.Type) -> Int {
   }
 }
 
-/// The declared arity of a stored definition, without executing it. Used by
-/// `run --json` to report a function instead of calling it.
-pub fn declared_arity(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-) -> Result(Int, RunError) {
-  let cb = codebase.with_adapter(adapter)
-  use definition <- result.try(
-    codebase.get(cb, ref)
-    |> result.map_error(fn(error) { read_error(ref, error) }),
-  )
-  case definition {
-    ast.TermDef(typ: typ, ..) -> Ok(arity_of(typ))
-    ast.TypeDef(_) -> Error(NotExecutable(ref, "a type definition"))
-    ast.AbilityDecl(_) -> Error(NotExecutable(ref, "an ability declaration"))
-  }
-}
-
 pub type FunctionInfo {
   FunctionInfo(module: String, arity: Int, exports: List(#(String, Int)))
 }

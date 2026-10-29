@@ -20,9 +20,6 @@ fn ffi_hmac(
   data: BitArray,
 ) -> Result(BitArray, String)
 
-@external(erlang, "gleamunison_crypto", "random_bytes")
-fn ffi_random_bytes(n: Int) -> BitArray
-
 @external(erlang, "gleamunison_crypto", "hash_to_hex")
 fn ffi_hash_to_hex(bytes: BitArray) -> String
 
@@ -49,10 +46,6 @@ pub fn hmac(
 ) -> Result(BitArray, CryptoError) {
   ffi_hmac(algo_to_string(algo), key, data)
   |> result.map_error(fn(e) { InvalidInput(e) })
-}
-
-pub fn random_bytes(n: Int) -> BitArray {
-  ffi_random_bytes(n)
 }
 
 pub fn hash_hex(

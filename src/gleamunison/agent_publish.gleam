@@ -39,26 +39,6 @@ pub fn publish_source(
   publish(adapter, source, branch, untrusted, log_directory, None)
 }
 
-/// A generation request names one target value shape. Check the elaborated
-/// type, not the candidate's self-description, before evidence or admission.
-pub fn publish_source_with_signature(
-  adapter: StorageAdapter,
-  source: String,
-  branch: String,
-  untrusted: Bool,
-  log_directory: String,
-  expected_signature: String,
-) -> Result(Publication, String) {
-  publish(
-    adapter,
-    source,
-    branch,
-    untrusted,
-    log_directory,
-    Some(Single(expected_signature)),
-  )
-}
-
 /// A target-selected request may admit helpers, but only the named target
 /// supplies the signature contract. All subjects use the same admission path.
 pub fn publish_target_with_signature(

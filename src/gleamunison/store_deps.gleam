@@ -82,23 +82,6 @@ pub fn other_names_checked_on_branch(
   |> result.map_error(convert)
 }
 
-pub fn stored_dependencies_checked(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-) -> Result(List(DefinitionRef), DependencyError) {
-  stored_dependencies_checked_on_branch(adapter, default_branch, ref)
-}
-
-pub fn stored_dependencies_checked_on_branch(
-  adapter: storage.StorageAdapter,
-  branch: String,
-  ref: DefinitionRef,
-) -> Result(List(DefinitionRef), DependencyError) {
-  dependency_snapshot.read(adapter, branch)
-  |> result.map(fn(snapshot) { dependency_snapshot.dependencies(snapshot, ref) })
-  |> result.map_error(convert)
-}
-
 pub fn exclusive_closure_checked(
   adapter: storage.StorageAdapter,
   root: DefinitionRef,

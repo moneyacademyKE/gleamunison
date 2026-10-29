@@ -60,17 +60,6 @@ pub fn get_init_defs_data() -> List(BootstrapDef) {
   )
 }
 
-/// Whether this ref is one of the synthetic handles the runtime uses to name a
-/// builtin's definition. Its hex is not a content hash.
-pub fn is_synthetic_ref(ref: DefinitionRef) -> Bool {
-  list.any(get_init_defs_data(), fn(definition) {
-    case definition {
-      BTerm(_, known, _) -> known == ref
-      BAbility(_, _) -> False
-    }
-  })
-}
-
 /// The name of the builtin a synthetic ref belongs to, if any.
 pub fn builtin_name_for(ref: DefinitionRef) -> Result(String, Nil) {
   case

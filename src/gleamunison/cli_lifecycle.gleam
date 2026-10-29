@@ -66,10 +66,6 @@ pub fn resolve_store_path() -> Result(String, String) {
   resolve_context(None) |> result.map(fn(context) { context.store_path })
 }
 
-pub fn resolve_manifest_path() -> Result(String, String) {
-  resolve_context(None) |> result.map(fn(context) { context.manifest_path })
-}
-
 pub fn store_path(context: StoreContext) -> String {
   context.store_path
 }

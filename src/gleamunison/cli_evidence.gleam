@@ -103,7 +103,7 @@ fn run(hash: String) -> Result(Nil, String) {
 }
 
 /// A plain-text attestation report for a subject hash. Tampered chunks are
-/// excluded upstream by for_subject (integrity re-verified on read), so
+/// excluded upstream by evidence.snapshot (integrity re-verified on read), so
 /// everything rendered here is proof, not claims.
 pub fn report(adapter: StorageAdapter, subject: String) -> String {
   report_with_policy(adapter, subject, trust.FixturesOnly)
