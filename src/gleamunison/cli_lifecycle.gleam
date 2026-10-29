@@ -2,14 +2,14 @@
 ////
 //// Two decisions belong here rather than scattered across commands: the store
 //// directory (an override for tests, CI, and running an artifact from
-//// anywhere) and whether unverified content may execute. Both are environment
-//// reads, so both are resolved in one place and passed in as data.
+//// anywhere) and whether unverified content may execute. Both are resolved
+//// through the live configuration layer and passed in as data.
 
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleamunison/env
+import gleamunison/config.{type Config}
 
 const default_dir = ".gleamunison"
 
@@ -25,29 +25,36 @@ pub fn default_store_dir() -> String {
   default_dir
 }
 
-/// The store directory: GLEAMUNISON_STORE_DIR when set, else `.gleamunison`.
+/// The store directory: `GLEAMUNISON_STORE_DIR` when set, else `.gleamunison`.
 /// A relative override is refused rather than guessed at — a store resolved
 /// against the wrong working directory looks empty, and an empty store reads
 /// as "your definition was never published".
 pub fn resolve_store_dir() -> Result(String, String) {
-  case env.get("GLEAMUNISON_STORE_DIR") {
-    Error(_) -> Ok(default_dir)
-    Ok(dir) if dir == "" -> Ok(default_dir)
-    Ok(dir) -> validate_store_dir(dir)
+  use cfg <- result.try(config.load())
+  store_dir_from(cfg)
+}
+
+fn store_dir_from(cfg: Config) -> Result(String, String) {
+  use value <- result.try(config.optional_string(cfg, "GLEAMUNISON_STORE_DIR"))
+  case value {
+    None -> Ok(default_dir)
+    Some("") -> Ok(default_dir)
+    Some(dir) -> validate_store_dir(dir)
   }
 }
 
 /// Resolve all sibling paths from one selected store file. Commands with a
 /// `--store` flag pass that path here; other commands pass `None` and use the
-/// environment/default directory. The context keeps DETS, manifests, and logs
+/// configured/default directory. The context keeps DETS, manifests, and logs
 /// on one boundary instead of letting each command choose a root independently.
 pub fn resolve_context(
   store_override: Option(String),
 ) -> Result(StoreContext, String) {
+  use cfg <- result.try(config.load())
   let selected = case store_override {
     Some(path) -> validate_store_path(path)
     None ->
-      resolve_store_dir()
+      store_dir_from(cfg)
       |> result.map(store_file_path)
   }
   use store_path <- result.try(selected)
@@ -76,10 +83,12 @@ pub fn root_dir(context: StoreContext) -> String {
   context.root_dir
 }
 
-/// The escape hatch: GLEAMUNISON_STORE_ALLOW_UNVERIFIED=1 lets a run execute
-/// content whose evidence does not verify. Absent means verify.
-pub fn resolve_allow_unverified() -> Bool {
-  env.flag("GLEAMUNISON_STORE_ALLOW_UNVERIFIED")
+/// The escape hatch: `GLEAMUNISON_STORE_ALLOW_UNVERIFIED=1` lets a run execute
+/// content whose evidence does not verify. Absent means verify; a malformed
+/// configuration is an error rather than a silent default.
+pub fn resolve_allow_unverified() -> Result(Bool, String) {
+  use cfg <- result.try(config.load())
+  config.flag(cfg, "GLEAMUNISON_STORE_ALLOW_UNVERIFIED")
 }
 
 fn validate_store_dir(path: String) -> Result(String, String) {

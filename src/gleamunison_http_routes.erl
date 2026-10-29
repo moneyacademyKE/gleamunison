@@ -72,10 +72,15 @@ handle_app_route(Socket, Target, Body) ->
     admit_execution(Socket, fun() ->
         case gleamunison@active_storage:active_or_open() of
             {ok, Adapter} ->
-                Branch = gleamunison@mcp_session:selected_branch(),
-                {response, Status, Json} =
-                    gleamunison@app_route:request(Adapter, Branch, Target, Body),
-                gleamunison_http_util:send_json(Socket, Status, Json);
+                case gleamunison@mcp_session:selected_branch() of
+                    {ok, Branch} ->
+                        {response, Status, Json} =
+                            gleamunison@app_route:request(Adapter, Branch, Target, Body),
+                        gleamunison_http_util:send_json(Socket, Status, Json);
+                    {error, Reason} ->
+                        gleamunison_http_util:send_json(Socket, 500,
+                            <<"{\"error\":\"config_invalid\",\"detail\":", (gleamunison_http_util:escape_json(Reason))/binary, "}">>)
+                end;
             {error, _Reason} ->
                 gleamunison_http_util:send_json(Socket, 503,
                     <<"{\"error\":\"storage_unavailable\"}">>)

@@ -5,7 +5,7 @@ import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/result
-import gleamunison/env
+import gleamunison/config
 import gleamunison/mcp.{type Tool, Tool}
 import gleamunison/sandbox_policy
 
@@ -21,7 +21,12 @@ pub fn tool() -> Tool {
 }
 
 pub fn check_writable() -> Result(Nil, String) {
-  let profile = env.string_or("GLEAMUNISON_PROFILE", "local")
+  use cfg <- result.try(config.load())
+  use profile <- result.try(config.string_or(
+    cfg,
+    "GLEAMUNISON_PROFILE",
+    "local",
+  ))
   case sandbox_policy.denies_untrusted_execution(profile) {
     True -> Error("agent_publish_refused: untrusted profile cannot write")
     False -> Ok(Nil)

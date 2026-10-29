@@ -569,11 +569,18 @@ When an HTTP server has N routes and an HTTP client module, integration testing 
 
 **Applied in:** Levels 1701-1707, `dogfood_v16.gleam`
 
-## PA-58. Config CLI Override Layer Is Tested Independently of TOML
+## PA-58. Config CLI Override Layer Is Tested With Live TOML
 
-The `config.load()` function initializes an empty TOML dict and reads only OS environment variables. The CLI override layer (`with_cli`) provides `StringVal`, `IntVal`, and `BoolVal` overrides that take precedence over env lookups in `get_string`/`get_int`/`get_bool`. The priority chain (cli → toml → env) is verified by: (1) load env-only config, (2) apply CLI overrides, (3) verify `get_string("KEY")` returns the CLI value even when env has a different value. The TOML layer remains dead code until a TOML parser is implemented.
+`config.load()` reads the optional TOML file selected by `GLEAMUNISON_CONFIG`
+(defaulting to `gleamunison.toml`) and falls back to the process environment.
+The CLI override layer (`with_cli`) provides `StringVal`, `IntVal`, and
+`BoolVal` overrides. The priority chain is cli → toml → env, and tests prove
+each layer directly: CLI beats both, TOML beats env, env is the fallback, and a
+malformed file or wrong value type surfaces an operator error instead of being
+ignored.
 
-**Applied in:** Levels 1720-1722, `dogfood_v16.gleam`
+**Applied in:** `src/gleamunison/config.gleam`, `test/config_test.gleam`,
+`test/cli_lifecycle_test.gleam`
 
 ## PA-59. Health Check Testing Requires Custom Checks That Guarantee Specific Outcomes
 

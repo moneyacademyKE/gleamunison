@@ -72,7 +72,10 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
     Some(value) -> value
     None -> "main"
   }
-  let allow_unverified = cli_lifecycle.resolve_allow_unverified()
+  use allow_unverified <- result.try(
+    cli_lifecycle.resolve_allow_unverified()
+    |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
+  )
   case allow_unverified {
     True ->
       io.println_error(

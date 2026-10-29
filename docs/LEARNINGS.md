@@ -392,6 +392,8 @@ The template engine's public API uses a list of key-value tuples rather than a d
 
 The `Config.toml` field is initialized to `dict.new()` in `load()` and is never populated by any code path. The 3-layer priority logic in `config.get()` (cli → toml → env) reduces to 2-layer (cli → env) in practice. The `get_string`/`get_int`/`get_bool` functions work correctly for the layers that exist, and level 1722 verifies cli precedence over env by overriding the `USER` environment variable.
 
+**Resolved (bk-5d51):** the restored `config.gleam` parses the optional TOML file with `tom`, so cli → toml → env is live and covered by `test/config_test.gleam`.
+
 ## 84. Gleam inline `case` syntax doesn't support `case r { Ok(_) -> True; Error(_) -> False }`
 
 Multi-branch case expressions inside closures or inline expressions must use multi-line block syntax. The single-line `case x { A -> B; C -> D }` form is lexed as a syntax error in Gleam. This was encountered in level 1727 when trying to write a compact `list.map(fn(r) { case r { ... } })` and required rewriting as a `list.fold` with explicit multi-line case blocks.

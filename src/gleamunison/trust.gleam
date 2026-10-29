@@ -10,8 +10,8 @@ import gleam/int
 import gleam/list
 import gleam/result
 import gleam/string
+import gleamunison/config
 import gleamunison/datetime
-import gleamunison/env
 import gleamunison/evidence.{type Evidence, type Signer}
 import gleamunison/storage.{type StorageAdapter}
 
@@ -273,30 +273,28 @@ pub fn admits(
 /// retired without touching a single evidence record.
 pub fn production_policy() -> Result(TrustPolicy, String) {
   use signer <- result.try(evidence.production_signer())
-  use since <- result.try(env_int("GLEAMUNISON_EVIDENCE_KEY_SINCE", 0))
-  use until <- result.try(env_int("GLEAMUNISON_EVIDENCE_KEY_UNTIL", never))
-  use max_age <- result.try(env_int("GLEAMUNISON_EVIDENCE_MAX_AGE_SECS", 0))
-  let state = case env_flag("GLEAMUNISON_EVIDENCE_KEY_REVOKED") {
+  use cfg <- result.try(config.load())
+  use since <- result.try(config.int_or(
+    cfg,
+    "GLEAMUNISON_EVIDENCE_KEY_SINCE",
+    0,
+  ))
+  use until <- result.try(config.int_or(
+    cfg,
+    "GLEAMUNISON_EVIDENCE_KEY_UNTIL",
+    never,
+  ))
+  use max_age <- result.try(config.int_or(
+    cfg,
+    "GLEAMUNISON_EVIDENCE_MAX_AGE_SECS",
+    0,
+  ))
+  use revoked <- result.try(config.flag(cfg, "GLEAMUNISON_EVIDENCE_KEY_REVOKED"))
+  let state = case revoked {
     True -> Revoked
     False -> Active(since, until)
   }
   Ok(RequireKeys([TrustedKey(signer, state)], max_age))
-}
-
-fn env_int(key: String, fallback: Int) -> Result(Int, String) {
-  case env.get(key) {
-    Error(_) -> Ok(fallback)
-    Ok(value) if value == "" -> Ok(fallback)
-    Ok(value) ->
-      int.parse(value)
-      |> result.replace_error(
-        key <> " must be an integer number of seconds, got: " <> value,
-      )
-  }
-}
-
-fn env_flag(key: String) -> Bool {
-  env.flag(key)
 }
 
 /// What the policy actually enforces, for a report an operator can read.

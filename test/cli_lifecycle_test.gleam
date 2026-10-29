@@ -4,8 +4,10 @@
 
 import envoy
 import gleam/option.{Some}
+import gleam/string
 import gleamunison/cli_lifecycle
 import gleeunit/should
+import simplifile
 
 fn with_store_dir(value: String, check: fn() -> a) -> a {
   envoy.set("GLEAMUNISON_STORE_DIR", value)
@@ -78,26 +80,68 @@ pub fn an_empty_override_falls_back_to_the_default_test() {
 
 pub fn verification_is_on_by_default_test() {
   envoy.unset("GLEAMUNISON_STORE_ALLOW_UNVERIFIED")
-  cli_lifecycle.resolve_allow_unverified() |> should.be_false
+  cli_lifecycle.resolve_allow_unverified() |> should.equal(Ok(False))
 }
 
 pub fn the_escape_hatch_accepts_the_usual_spellings_test() {
   with_allow_unverified("1", fn() {
-    cli_lifecycle.resolve_allow_unverified() |> should.be_true
+    cli_lifecycle.resolve_allow_unverified() |> should.equal(Ok(True))
   })
   with_allow_unverified("true", fn() {
-    cli_lifecycle.resolve_allow_unverified() |> should.be_true
+    cli_lifecycle.resolve_allow_unverified() |> should.equal(Ok(True))
   })
   with_allow_unverified("TRUE", fn() {
-    cli_lifecycle.resolve_allow_unverified() |> should.be_true
+    cli_lifecycle.resolve_allow_unverified() |> should.equal(Ok(True))
   })
 }
 
 pub fn any_other_value_leaves_verification_on_test() {
   with_allow_unverified("0", fn() {
-    cli_lifecycle.resolve_allow_unverified() |> should.be_false
+    cli_lifecycle.resolve_allow_unverified() |> should.equal(Ok(False))
   })
   with_allow_unverified("nope", fn() {
-    cli_lifecycle.resolve_allow_unverified() |> should.be_false
+    cli_lifecycle.resolve_allow_unverified() |> should.equal(Ok(False))
   })
+}
+
+pub fn a_toml_store_dir_beats_the_environment_test() {
+  let dir = "/tmp/gleamunison-config-store-test"
+  let config_path = dir <> "/gleamunison.toml"
+  let assert Ok(_) = simplifile.create_directory_all(dir)
+  let assert Ok(_) =
+    simplifile.write(
+      config_path,
+      "GLEAMUNISON_STORE_DIR = \"/tmp/toml-store\"\n",
+    )
+
+  envoy.set("GLEAMUNISON_CONFIG", config_path)
+  envoy.set("GLEAMUNISON_STORE_DIR", "/tmp/env-store")
+  let result = cli_lifecycle.resolve_store_dir()
+  envoy.unset("GLEAMUNISON_CONFIG")
+  envoy.unset("GLEAMUNISON_STORE_DIR")
+  let _ = simplifile.delete(config_path)
+  let _ = simplifile.delete(dir)
+
+  result |> should.equal(Ok("/tmp/toml-store"))
+}
+
+pub fn a_malformed_config_file_is_reported_test() {
+  let dir = "/tmp/gleamunison-config-malformed-test"
+  let config_path = dir <> "/gleamunison.toml"
+  let assert Ok(_) = simplifile.create_directory_all(dir)
+  let assert Ok(_) = simplifile.write(config_path, "GLEAMUNISON_STORE_DIR =\n")
+
+  envoy.set("GLEAMUNISON_CONFIG", config_path)
+  let result = cli_lifecycle.resolve_store_dir()
+  envoy.unset("GLEAMUNISON_CONFIG")
+  let _ = simplifile.delete(config_path)
+  let _ = simplifile.delete(dir)
+
+  case result {
+    Error(message) -> {
+      string.contains(message, config_path) |> should.be_true
+      string.contains(message, "unexpected") |> should.be_true
+    }
+    Ok(_) -> panic as "malformed configuration was silently ignored"
+  }
 }

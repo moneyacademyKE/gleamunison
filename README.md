@@ -416,6 +416,28 @@ is the explicit hatch for local work and warns on stderr.
 `GLEAMUNISON_STORE_DIR` points every command at another store directory (the
 index lives beside it), which is how a test or CI run keeps its own.
 
+## Configuration
+
+Gleam-side settings are resolved **CLI → TOML → environment**. The optional
+TOML file is `gleamunison.toml` in the working directory, or the path named by
+`GLEAMUNISON_CONFIG`. A missing file is normal; malformed TOML or a wrong value
+type fails the command rather than being silently ignored.
+
+```toml
+GLEAMUNISON_STORE_DIR = "/absolute/store"
+GLEAMUNISON_BRANCH = "factory"
+GLEAMUNISON_PROFILE = "local"
+GLEAMUNISON_STORE_ALLOW_UNVERIFIED = false
+GLEAMUNISON_EVIDENCE_KEY_SINCE = 0
+GLEAMUNISON_EVIDENCE_KEY_UNTIL = 9223372036854775807
+GLEAMUNISON_EVIDENCE_MAX_AGE_SECS = 0
+GLEAMUNISON_EVIDENCE_KEY_REVOKED = false
+```
+
+`GLEAMUNISON_EVIDENCE_SIGNING_KEY` remains environment-only because the signer
+identity recorded in evidence names that source. Erlang-owned runtime limits
+are still configured through their existing environment variables.
+
 ## HTTP API
 
 Data routes are gated by `GLEAMUNISON_HTTP_TOKEN` when set. Readiness and
