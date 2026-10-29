@@ -2,7 +2,7 @@ import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
-import gleam/option.{Some}
+import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/crypto
@@ -271,7 +271,7 @@ pub fn snapshot(
             _, _ -> Ok(records)
           }
         }
-        _ -> Ok(records)
+        None -> Error(storage.NotFound)
       }
     }),
   )

@@ -80,3 +80,20 @@ pub fn evidence_snapshot_preserves_storage_failure_test() {
   evidence.snapshot(broken)
   |> should.equal(Error(storage.IoError("evidence scan failed")))
 }
+
+pub fn evidence_snapshot_rejects_a_listed_but_missing_chunk_test() {
+  let adapter = storage.inmemory()
+  let assert Ok(#(ref, _)) =
+    evidence.attach(
+      adapter,
+      subject: "subject",
+      kind: evidence.Test,
+      verdict: "pass",
+      payload: "ok",
+      ts: 1,
+    )
+  let assert Ok(Nil) = adapter.delete(ref)
+  let missing = storage.StorageAdapter(..adapter, list_refs: fn() { Ok([ref]) })
+  evidence.snapshot(missing)
+  |> should.equal(Error(storage.NotFound))
+}
