@@ -14,7 +14,7 @@ import gleamunison/cli_purge
 import gleamunison/cli_result
 import gleamunison/cli_unpublish
 import gleamunison/codebase
-import gleamunison/identity.{Ref}
+import gleamunison/identity.{Ref, hash_from_bytes}
 import gleamunison/namespace
 import gleamunison/storage
 import gleamunison/store_deps
@@ -51,6 +51,26 @@ pub fn branches_are_discoverable_from_the_store_test() {
     namespace.commit(adapter, "dev", namespace.set(namespace.empty(), "x", ref))
   branch_scope.branches(adapter)
   |> should.equal(Ok(["dev", "main"]))
+}
+
+fn vanished_branch() {
+  let adapter = storage.inmemory()
+  let pointer = namespace.branch_pointer_ref("vanished")
+  let assert Ok(Nil) = adapter.insert(pointer, <<>>)
+  let assert Ok(refs) = adapter.list_refs()
+  let assert True = refs == [pointer]
+  let assert Ok(Nil) = adapter.delete(pointer)
+  storage.StorageAdapter(..adapter, list_refs: fn() { Ok(refs) })
+}
+
+pub fn branches_reject_a_listed_but_missing_chunk_test() {
+  branch_scope.branches(vanished_branch())
+  |> should.equal(Error("branch pointer missing"))
+}
+
+pub fn branch_bindings_reject_a_listed_but_missing_chunk_test() {
+  branch_scope.branches_binding(vanished_branch(), Ref(hash_from_bytes(<<>>)))
+  |> should.equal(Error("branch pointer missing"))
 }
 
 /// Names bound to this content, on every branch, not just the selected one.

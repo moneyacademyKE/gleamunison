@@ -34,7 +34,8 @@ pub fn branches(
         |> result.map_error(fn(_) { "store lookup failed" }),
       )
       case bytes {
-        option.None -> Ok(acc)
+        // A vanished ref cannot prove that no branch binds the content.
+        option.None -> Error("branch pointer missing")
         option.Some(b) ->
           // The pointer bytes are read, not assumed from the key: a chunk under a
           // branch-shaped key that does not carry that branch is not a branch.
