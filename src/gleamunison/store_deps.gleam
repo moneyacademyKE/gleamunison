@@ -27,17 +27,9 @@ fn convert(error: dependency_snapshot.ScanError) -> DependencyError {
 
 pub fn describe_dependency_error(error: DependencyError) -> String {
   case error {
-    StoreFailure(error) -> string_error(error)
+    StoreFailure(error) -> storage.describe_error(error)
     NamespaceFailure(reason) -> reason
     CorruptDefinition(ref) -> "corrupt or unreadable definition " <> hex(ref)
-  }
-}
-
-fn string_error(error: storage.StorageError) -> String {
-  case error {
-    storage.StorageError(message) -> message
-    storage.NotFound -> "not found"
-    storage.IoError(reason) -> "io error: " <> reason
   }
 }
 

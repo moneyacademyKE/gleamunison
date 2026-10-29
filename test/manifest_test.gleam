@@ -79,6 +79,20 @@ pub fn manifest_store_fetch_test() {
   manifest.hash_of(fetched) |> should.equal(manifest.hash_of(m))
 }
 
+pub fn manifest_store_describes_storage_failure_test() {
+  let adapter =
+    storage.StorageAdapter(
+      insert: fn(_, _) { Error(storage.IoError("disk offline")) },
+      lookup: fn(_) { Error(storage.IoError("unused")) },
+      delete: fn(_) { Error(storage.IoError("unused")) },
+      list_refs: fn() { Error(storage.IoError("unused")) },
+      close: fn() { Ok(Nil) },
+    )
+
+  manifest.store(adapter, sample())
+  |> should.equal(Error("store manifest: io error: disk offline"))
+}
+
 /// Parse rejects garbage.
 pub fn manifest_parse_rejects_garbage_test() {
   manifest.parse("not a manifest") |> should.be_error

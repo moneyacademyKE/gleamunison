@@ -364,14 +364,6 @@ pub type ReadError {
   DecodeFailed(ref: DefinitionRef, reason: String)
 }
 
-fn describe_storage_error(error: storage.StorageError) -> String {
-  case error {
-    storage.StorageError(message) -> message
-    storage.NotFound -> "not found"
-    storage.IoError(reason) -> "io error: " <> reason
-  }
-}
-
 /// The read half of the store. Identity is the ref, so a stored payload is
 /// re-verified before it is decoded: a store that disagrees with its own keys
 /// must not be able to hand a different definition to the loader.
@@ -383,7 +375,7 @@ pub fn get(
     Ok(option.None) -> Error(NotFound(ref))
     Ok(option.Some(bytes)) ->
       case storage.verify_content(ref, bytes) {
-        Error(error) -> Error(Corrupt(ref, describe_storage_error(error)))
+        Error(error) -> Error(Corrupt(ref, storage.describe_error(error)))
         Ok(Nil) ->
           case definition_codec.decode(bytes) {
             Ok(definition) -> Ok(definition)

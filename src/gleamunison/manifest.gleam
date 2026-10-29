@@ -263,7 +263,7 @@ pub fn store(
 ) -> Result(DefinitionRef, String) {
   let ref = ref_of(m)
   adapter.insert(ref, bit_array.from_string(serialize(m)))
-  |> result.map_error(fn(e) { "store manifest: " <> storage_error(e) })
+  |> result.map_error(fn(e) { "store manifest: " <> storage.describe_error(e) })
   |> result.map(fn(_) { ref })
 }
 
@@ -275,7 +275,9 @@ pub fn fetch(
 ) -> Result(Manifest, String) {
   use bytes <- result.try(
     adapter.lookup(ref)
-    |> result.map_error(fn(e) { "fetch manifest: " <> storage_error(e) }),
+    |> result.map_error(fn(e) {
+      "fetch manifest: " <> storage.describe_error(e)
+    }),
   )
   case bytes {
     option.None ->
@@ -303,12 +305,4 @@ pub fn fetch(
 fn ref_hash(r: DefinitionRef) -> Hash {
   let Ref(h) = r
   h
-}
-
-fn storage_error(e: storage.StorageError) -> String {
-  case e {
-    storage.StorageError(msg) -> msg
-    storage.NotFound -> "not found"
-    storage.IoError(reason) -> "io: " <> reason
-  }
 }

@@ -166,7 +166,10 @@ fn exists(
         "purge: not in the store: " <> short(ref),
       ))
     Error(error) ->
-      Error(#(cli_result.unresolvable, "purge: " <> describe(error)))
+      Error(#(
+        cli_result.unresolvable,
+        "purge: " <> storage.describe_error(error),
+      ))
   }
 }
 
@@ -213,7 +216,10 @@ fn remove_all(
       |> result.map_error(fn(error) {
         #(
           cli_result.refused,
-          "purge: cannot remove " <> short(ref) <> ": " <> describe(error),
+          "purge: cannot remove "
+            <> short(ref)
+            <> ": "
+            <> storage.describe_error(error),
         )
       })
     }),
@@ -318,14 +324,6 @@ fn short(ref: DefinitionRef) -> String {
 
 fn full_hex(ref: DefinitionRef) -> String {
   ref_hex(ref)
-}
-
-fn describe(error: storage.StorageError) -> String {
-  case error {
-    storage.StorageError(message) -> message
-    storage.NotFound -> "not found"
-    storage.IoError(reason) -> reason
-  }
 }
 
 fn usage() -> String {

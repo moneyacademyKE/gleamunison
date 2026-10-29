@@ -2,7 +2,9 @@ import gleam/io
 import gleam/option.{None, Some}
 import gleamunison/codebase
 import gleamunison/identity.{Ref, hash_bytes}
-import gleamunison/storage.{inmemory}
+import gleamunison/storage.{
+  IoError, NotFound, StorageError, describe_error, inmemory,
+}
 import gleamunison/sync.{new_sync_state, pull_sync}
 import gleamunison/sync_types.{PeerId}
 
@@ -15,6 +17,12 @@ pub fn storage_roundtrip_test() {
   let assert Ok(Nil) = adapter.insert(ref, data)
   let assert Ok(Some(retrieved)) = adapter.lookup(ref)
   let assert True = retrieved == data
+}
+
+pub fn describe_storage_errors_test() {
+  let assert "read denied" = describe_error(StorageError("read denied"))
+  let assert "not found" = describe_error(NotFound)
+  let assert "io error: disk offline" = describe_error(IoError("disk offline"))
 }
 
 pub fn pull_empty_diff_test() {

@@ -11,6 +11,14 @@ pub type StorageError {
   IoError(reason: String)
 }
 
+pub fn describe_error(error: StorageError) -> String {
+  case error {
+    StorageError(message) -> message
+    NotFound -> "not found"
+    IoError(reason) -> "io error: " <> reason
+  }
+}
+
 /// Trusted key/value primitives, including mutable branch pointers.
 /// Untrusted immutable content must use insert_content, not insert directly.
 pub type StorageAdapter {

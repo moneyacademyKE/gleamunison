@@ -210,7 +210,10 @@ fn drop_bytes_unless_held(
         |> result.map_error(fn(error) {
           #(
             cli_result.refused,
-            "unpublish: cannot remove " <> hash <> ": " <> describe(error),
+            "unpublish: cannot remove "
+              <> hash
+              <> ": "
+              <> storage.describe_error(error),
           )
         }),
       )
@@ -324,14 +327,6 @@ fn parse_args(
           ))
         None -> parse_args(rest, Some(value), store_override, branch)
       }
-  }
-}
-
-fn describe(error: storage.StorageError) -> String {
-  case error {
-    storage.StorageError(message) -> message
-    storage.NotFound -> "not found"
-    storage.IoError(reason) -> reason
   }
 }
 
