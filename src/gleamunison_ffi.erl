@@ -5,7 +5,6 @@
     hex_to_bytes/1,
     unload_binary/1, soft_purge_binary/1,
     binary_to_erl_literal/1,
-    get_plain_args/0,
     halt_failure/0, halt_failure_code/1,
     application_version/0,
     to_dynamic/1,
@@ -364,9 +363,6 @@ parse_term_arg(Arg) when is_binary(Arg) ->
 binary_to_erl_literal(Bin) when is_binary(Bin) ->
     Segments = [integer_to_list(X) || <<X>> <= Bin],
     erlang:iolist_to_binary(["<<", string:join(Segments, ", "), ">>"]).
-
-get_plain_args() ->
-    [argv_to_binary(A) || A <- init:get_plain_arguments()].
 
 %% Erlang hands plain arguments over as latin-1 codepoints: the UTF-8 bytes
 %% 195,169 (é) arrive as the single codepoint 233, and `list_to_binary/1` then

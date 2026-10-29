@@ -1,3 +1,4 @@
+import argv
 import dogfood
 import dogfood_meta as meta
 import gleam/dict
@@ -29,11 +30,8 @@ import gleamunison/verify
 import gleamunison/version
 
 pub fn main() -> Nil {
-  run(get_plain_args())
+  run(argv.load().arguments)
 }
-
-@external(erlang, "gleamunison_ffi", "get_plain_args")
-fn get_plain_args() -> List(String)
 
 @external(erlang, "gleamunison_ffi", "halt_failure")
 fn halt_failure() -> Nil

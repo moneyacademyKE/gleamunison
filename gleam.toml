@@ -13,6 +13,7 @@ glam = ">= 2.0.0 and < 3.0.0"
 envoy = ">= 1.2.0 and < 2.0.0"
 tom = ">= 2.1.0 and < 3.0.0"
 birl = ">= 2.0.0 and < 3.0.0"
+argv = ">= 1.1.0 and < 2.0.0"
 
 [dev_dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
