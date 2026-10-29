@@ -93,23 +93,6 @@ pub fn exclusive_closure_checked_on_branch(
   |> result.map_error(convert)
 }
 
-pub fn names_for_checked(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-) -> Result(List(String), DependencyError) {
-  names_for_checked_on_branch(adapter, default_branch, ref)
-}
-
-pub fn names_for_checked_on_branch(
-  adapter: storage.StorageAdapter,
-  branch: String,
-  ref: DefinitionRef,
-) -> Result(List(String), DependencyError) {
-  dependency_snapshot.read(adapter, branch)
-  |> result.map(fn(snapshot) { dependency_snapshot.names(snapshot, ref) })
-  |> result.map_error(convert)
-}
-
 /// Content is shared by every branch, so a retraction decision needs to know
 /// whether a branch other than the selected one still binds the ref: deleting
 /// bytes another branch resolves to leaves a binding nobody can load.

@@ -85,18 +85,6 @@ pub fn refusal_name(refusal: TrustRefusal) -> String {
   }
 }
 
-/// Pure key-state decision: does this signer id admit a record at `ts`?
-pub fn key_admits(
-  policy: TrustPolicy,
-  signer_id: String,
-  ts: Int,
-) -> Result(TrustedKey, TrustRefusal) {
-  case policy {
-    FixturesOnly -> Error(UnknownSigner(signer_id))
-    RequireKeys(keys, _max_age) -> keys_admit(keys, signer_id, ts)
-  }
-}
-
 fn keys_admit(
   keys: List(TrustedKey),
   signer_id: String,
