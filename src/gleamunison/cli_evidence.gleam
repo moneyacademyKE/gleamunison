@@ -62,7 +62,7 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
             kind: evidence.Io,
             verdict: "approved",
             payload: note,
-            ts: datetime.to_unix(datetime.now()),
+            ts: datetime.now_unix(),
           )
           |> result.map(fn(pair) {
             "attested io on " <> hash <> " (evidence " <> pair.1 <> ")"

@@ -224,7 +224,7 @@ fn attach_results_with_signer(
                       kind: evidence.Test,
                       verdict: verdict_of(r),
                       payload:,
-                      ts: datetime.to_unix(datetime.now()),
+                      ts: datetime.now_unix(),
                     )
                   Some(s) ->
                     evidence.attach_signed(
@@ -234,7 +234,7 @@ fn attach_results_with_signer(
                       kind: evidence.Test,
                       verdict: verdict_of(r),
                       payload:,
-                      ts: datetime.to_unix(datetime.now()),
+                      ts: datetime.now_unix(),
                     )
                 }
                 case signed {

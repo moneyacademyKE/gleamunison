@@ -10,6 +10,7 @@
 //// writes to them, so the record does not depend on which CLI path ran.
 
 import gleam/list
+import gleamunison/datetime
 
 pub type ContentEntry {
   ContentEntry(ref_hex: String, kind: String, at: Int)
@@ -72,9 +73,6 @@ fn tail_exec_ffi(
   n: Int,
 ) -> Result(List(#(String, String, String, String, Int)), String)
 
-@external(erlang, "gleamunison_datetime", "now")
-fn now() -> Int
-
 /// Record that a definition entered the store. Failure is returned, never
 /// swallowed: a store that cannot say what it holds is a store you cannot
 /// audit.
@@ -83,7 +81,7 @@ pub fn record_content(
   ref_hex: String,
   kind: String,
 ) -> Result(Nil, String) {
-  append_content_ffi(dir, ref_hex, kind, now())
+  append_content_ffi(dir, ref_hex, kind, datetime.now_unix())
   |> result_map_nil
 }
 
@@ -96,7 +94,7 @@ pub fn record_exec(
   reason: String,
   caller: String,
 ) -> Result(Nil, String) {
-  append_exec_ffi(dir, ref_hex, outcome, reason, caller, now())
+  append_exec_ffi(dir, ref_hex, outcome, reason, caller, datetime.now_unix())
   |> result_map_nil
 }
 

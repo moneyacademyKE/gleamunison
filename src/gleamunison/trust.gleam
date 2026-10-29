@@ -111,7 +111,7 @@ pub fn admit(
   policy: TrustPolicy,
   record: Evidence,
 ) -> Result(Evidence, TrustRefusal) {
-  admit_at(policy, record, datetime.to_unix(datetime.now()))
+  admit_at(policy, record, datetime.now_unix())
 }
 
 /// Full admission at an explicit time: the signature must match a key whose
@@ -187,7 +187,7 @@ pub fn verified(
   kind: evidence.Kind,
   policy: TrustPolicy,
 ) -> Result(Nil, TrustRefusal) {
-  verified_at(adapter, subject, kind, policy, datetime.to_unix(datetime.now()))
+  verified_at(adapter, subject, kind, policy, datetime.now_unix())
 }
 
 pub fn verified_at(
@@ -209,13 +209,7 @@ pub fn verified_in(
   kind: evidence.Kind,
   policy: TrustPolicy,
 ) -> Result(Nil, TrustRefusal) {
-  verified_in_at(
-    snapshot,
-    subject,
-    kind,
-    policy,
-    datetime.to_unix(datetime.now()),
-  )
+  verified_in_at(snapshot, subject, kind, policy, datetime.now_unix())
 }
 
 pub fn verified_in_at(

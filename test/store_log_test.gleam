@@ -2,12 +2,10 @@
 //// across restarts (dets beside the store file), and readable in insertion
 //// order. The tail is the last N, oldest first.
 
+import gleamunison/datetime
 import gleamunison/store_log
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_datetime", "now")
-fn now() -> Int
 
 fn temp_dir(name: String) -> String {
   let dir = "/tmp/gleamunison-store-log-test-" <> name
@@ -83,9 +81,9 @@ pub fn the_two_logs_are_separate_test() {
 
 pub fn entries_are_time_ordered_and_timestamped_test() {
   let dir = temp_dir("timestamps")
-  let before = now()
+  let before = datetime.now_unix()
   store_log.record_content(dir, "stamped", "term") |> should.equal(Ok(Nil))
-  let after = now()
+  let after = datetime.now_unix()
   let assert Ok(entries) = store_log.content_tail(dir, 5)
   case entries {
     [entry] -> {

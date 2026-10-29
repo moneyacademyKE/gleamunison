@@ -13,13 +13,11 @@ import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
+import gleamunison/datetime
 import gleamunison/identity.{short_hash_hex}
 import gleamunison/store_log
 
 const default_tail = 20
-
-@external(erlang, "gleamunison_datetime", "format_iso8601")
-fn format_iso8601(seconds: Int) -> String
 
 pub fn command(args: List(String)) -> Nil {
   case run(args) {
@@ -58,7 +56,7 @@ fn render_content(dir: String, count: Int) -> Result(String, #(Int, String)) {
       Ok(
         entries
         |> list.map(fn(entry) {
-          format_iso8601(entry.at)
+          datetime.format_unix(entry.at)
           <> "  "
           <> short_hash_hex(entry.ref_hex)
           <> "  "
@@ -81,7 +79,7 @@ fn render_exec(dir: String, count: Int) -> Result(String, #(Int, String)) {
         entries
         |> list.map(fn(entry) {
           let base =
-            format_iso8601(entry.at)
+            datetime.format_unix(entry.at)
             <> "  "
             <> short_hash_hex(entry.ref_hex)
             <> "  "
@@ -112,7 +110,7 @@ fn render_all(dir: String, count: Int) -> Result(String, #(Int, String)) {
         entries
         |> list.map(fn(entry) {
           let base =
-            format_iso8601(entry.at)
+            datetime.format_unix(entry.at)
             <> "  "
             <> pad(entry.kind)
             <> "  "
