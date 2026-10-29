@@ -8,7 +8,7 @@
 import gleam/int
 import gleam/string
 import gleamunison/codebase
-import gleamunison/identity.{type DefinitionRef, ref_hex as canonical_ref_hex}
+import gleamunison/identity.{type DefinitionRef}
 import gleamunison/loader
 
 pub type RunError {
@@ -22,8 +22,8 @@ pub type RunError {
   EvaluationFailed(ref: DefinitionRef, reason: String)
 }
 
-pub fn hex(ref: DefinitionRef) -> String {
-  canonical_ref_hex(ref)
+fn hex(ref: DefinitionRef) -> String {
+  identity.ref_hex(ref)
 }
 
 pub fn read_error(ref: DefinitionRef, error: codebase.ReadError) -> RunError {

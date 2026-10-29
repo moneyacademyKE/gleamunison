@@ -173,7 +173,7 @@ fn execute(
   case run_ref.run_verified_raw_on_branch(adapter, ref, branch, args, False) {
     Error(error) -> execution_failure(error)
     Ok(term) -> {
-      let hex = run_error.hex(ref)
+      let hex = identity.ref_hex(ref)
       case app_response.success(hex, branch, term) {
         Ok(body) -> Response(200, body)
         Error(code) ->

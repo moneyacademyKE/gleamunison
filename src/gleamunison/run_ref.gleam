@@ -13,14 +13,14 @@ import gleamunison/codebase
 import gleamunison/compile
 import gleamunison/effect_evidence
 import gleamunison/evidence
-import gleamunison/identity.{type DefinitionRef}
+import gleamunison/identity.{type DefinitionRef, ref_hex as hex}
 import gleamunison/loader
 import gleamunison/name_snapshot
 import gleamunison/repl_eval
 import gleamunison/run_closure
 import gleamunison/run_error.{
   type RunError, ArityUnavailable, EvaluationFailed, LoadFailed, NoEvidence,
-  NotExecutable, Unreadable, hex, read_error,
+  NotExecutable, Unreadable, read_error,
 }
 import gleamunison/storage
 import gleamunison/trust

@@ -184,7 +184,7 @@ fn render_output(
       run_ref.inspect_function_on_branch(adapter, ref, branch)
       |> result.map(fn(info) {
         cli_output.function_json(
-          run_error.hex(ref),
+          identity.ref_hex(ref),
           info.module,
           info.arity,
           info.exports,
@@ -217,7 +217,7 @@ fn render_output(
           record(dir, ref, outcome)
           outcome
           |> result.map(fn(term) {
-            cli_output.value_json(run_error.hex(ref), term)
+            cli_output.value_json(identity.ref_hex(ref), term)
           })
           |> result.map_error(classify)
         }
@@ -237,7 +237,7 @@ fn record(
     Ok(_) -> #("ok", "")
     Error(error) -> #("refused", run_error.describe(error))
   }
-  case store_log.record_exec(dir, run_error.hex(ref), kind, reason, "cli") {
+  case store_log.record_exec(dir, identity.ref_hex(ref), kind, reason, "cli") {
     Ok(_) -> Nil
     Error(problem) ->
       io.println_error("run: cannot write the exec log: " <> problem)
