@@ -18,10 +18,7 @@ pub fn level70() -> Nil {
       io.println("All certification levels passed!")
       io.println("Level 70: OK")
     }
-    Error(e) -> {
-      io.println("Failed to load levels: " <> e)
-      cli_result.halt_failure()
-    }
+    Error(e) -> cli_result.fail("Failed to load levels: " <> e)
   }
 }
 

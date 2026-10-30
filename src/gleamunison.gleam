@@ -51,10 +51,7 @@ pub fn run(args: List(String)) -> Nil {
     ["datalog", path] ->
       case cli_datalog.run(path) {
         Ok(out) -> io.println(out)
-        Error(err) -> {
-          io.println("ERROR: " <> err)
-          cli_result.halt_failure()
-        }
+        Error(err) -> cli_result.fail("ERROR: " <> err)
       }
     ["datalog"] -> cli_result.fail("usage: gleam run -- datalog <file.lisp>")
     ["mcp", ..rest] -> cli_result.finish(cli_mcp.command(rest))
@@ -103,10 +100,7 @@ fn dispatch(cmd: String, param: String) -> Nil {
     "verify" -> {
       case verify.verify_file(param) {
         Ok(msg) -> io.println("OK: " <> msg)
-        Error(err) -> {
-          io.println("ERROR: " <> err)
-          cli_result.halt_failure()
-        }
+        Error(err) -> cli_result.fail("ERROR: " <> err)
       }
     }
     _ -> dispatch_level(cmd)
@@ -155,8 +149,12 @@ fn run_all_levels() -> Nil {
 }
 
 fn level_data_error(message: String) -> Nil {
-  io.println("ERROR: " <> message)
-  io.println("This build cannot run levels: the level data file is missing.")
+  // Both lines are the diagnostic, so both go to stderr: stdout carries only
+  // a result, which is cli_result's contract for every command.
+  io.println_error("ERROR: " <> message)
+  io.println_error(
+    "This build cannot run levels: the level data file is missing.",
+  )
   cli_result.halt_failure()
 }
 
