@@ -23,9 +23,9 @@ import gleamunison/cli_store
 import gleamunison/dependency_snapshot
 import gleamunison/identity
 import gleamunison/namespace
+import gleamunison/publication_index
 import gleamunison/storage
 import gleamunison/store_deps
-import simplifile
 
 const default_branch = "main"
 
@@ -77,7 +77,7 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
 /// is the authority for its own bindings.
 pub fn resolve_target(
   adapter: storage.StorageAdapter,
-  lines: List(String),
+  lines: List(publication_index.Line),
   name: String,
   branch: String,
 ) -> Result(#(String, identity.DefinitionRef), #(Int, String)) {
@@ -123,7 +123,7 @@ pub fn retract(
   hash: String,
   ref: identity.DefinitionRef,
   branch: String,
-  lines: List(String),
+  lines: List(publication_index.Line),
 ) -> Result(String, #(Int, String)) {
   use snapshot <- result.try(
     dependency_snapshot.read(adapter, branch)
@@ -232,25 +232,20 @@ fn drop_bytes_unless_held(
   }
 }
 
-fn read_manifest(path: String) -> Result(List(String), #(Int, String)) {
-  case simplifile.read(path) {
-    Ok(content) -> Ok(string.split(content, "\n"))
-    Error(simplifile.Enoent) -> Ok([])
-    Error(error) ->
-      Error(#(
-        cli_result.refused,
-        "unpublish: cannot read the index: " <> string.inspect(error),
-      ))
-  }
+fn read_manifest(
+  path: String,
+) -> Result(List(publication_index.Line), #(Int, String)) {
+  publication_index.read(path)
+  |> result.map_error(publication_index.describe("unpublish", _))
 }
 
 fn find_name(
-  lines: List(String),
+  lines: List(publication_index.Line),
   name: String,
 ) -> Result(String, #(Int, String)) {
-  case list.find_map(lines, fn(line) { hash_of_line(line, name) }) {
-    Ok(hash) -> Ok(hash)
-    Error(_) ->
+  case publication_index.hash_of(lines, name) {
+    Some(hash) -> Ok(hash)
+    None ->
       Error(#(
         cli_result.refused,
         "unpublish: " <> name <> " is not published (nothing to retract)",
@@ -258,45 +253,16 @@ fn find_name(
   }
 }
 
-fn hash_of_line(line: String, name: String) -> Result(String, Nil) {
-  case string.split_once(line, " ") {
-    Ok(#(found, hash)) if found == name -> Ok(hash)
-    _ -> Error(Nil)
-  }
-}
-
-/// Whole-file rewrite, then an atomic replace: a crash mid-write leaves the old
-/// index intact rather than a half-written one.
+/// Retraction drops the one name's line and keeps everything else. The atomic
+/// replace belongs to publication_index, so a crash mid-write still leaves the
+/// old index intact rather than a half-written one.
 fn rewrite_manifest(
   path: String,
   name: String,
-  lines: List(String),
+  lines: List(publication_index.Line),
 ) -> Result(Nil, #(Int, String)) {
-  let kept =
-    list.filter(lines, fn(line) {
-      case string.split_once(line, " ") {
-        Ok(#(found, _)) -> found != name
-        Error(_) -> line != ""
-      }
-    })
-  let content = string.join(kept, "\n") <> "\n"
-  let temp = path <> ".tmp"
-  use _ <- result.try(
-    simplifile.write(temp, content)
-    |> result.map_error(fn(error) {
-      #(
-        cli_result.refused,
-        "unpublish: cannot write the index: " <> string.inspect(error),
-      )
-    }),
-  )
-  simplifile.rename(temp, path)
-  |> result.map_error(fn(error) {
-    #(
-      cli_result.refused,
-      "unpublish: cannot replace the index: " <> string.inspect(error),
-    )
-  })
+  publication_index.rewrite(path, lines, fn(found, _) { found != name })
+  |> result.map_error(publication_index.describe("unpublish", _))
 }
 
 fn parse_args(

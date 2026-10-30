@@ -10,12 +10,14 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option.{None}
+import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/identity.{short_hash_hex}
 import gleamunison/publication
+import gleamunison/publication_index
 import gleamunison/storage
 import gleamunison/verify
 import simplifile
@@ -136,26 +138,31 @@ fn refusal_message(path: String, missing: List(publication.Subject)) -> String {
   <> " `gleam run -- evidence attest <hash> io <note>`"
 }
 
+/// Record the admitted subjects in the store-local index. A read failure is a
+/// refusal, not an empty index: treating it as empty made a permission failure
+/// look like a first publish and rewrote the file with only these subjects,
+/// dropping every name the command could not read. The write goes through
+/// publication_index's temp-and-rename, so a crash mid-publish leaves the
+/// previous index intact instead of half-written.
+///
+/// Every stage reports through the one phrase the CLI truth contract asserts
+/// (scripts/test_cli_truth.clj): reading the index is part of writing it, and
+/// the inspected filesystem error carries the actual cause.
 fn write_manifest(path: String, selected: List(publication.Subject)) -> Nil {
-  let existing = case simplifile.read(path) {
-    Ok(content) -> string.split(content, "\n")
-    Error(_) -> []
-  }
-  let names = list.map(selected, fn(subject) { subject.name })
-  let kept =
-    list.filter(existing, fn(line) {
-      case string.split_once(line, " ") {
-        Ok(#(name, _)) -> !list.contains(names, name)
-        Error(_) -> line != ""
-      }
-    })
-  let new_lines =
-    list.map(selected, fn(subject) {
-      subject.name <> " " <> subject.content_ref
-    })
-  let content = string.join(list.append(kept, new_lines), "\n") <> "\n"
-  case simplifile.write(path, content) {
+  case update_index(path, selected) {
     Ok(_) -> Nil
-    Error(e) -> fail("publish: cannot write manifest: " <> string.inspect(e))
+    Error(failure) -> fail("publish: cannot write manifest: " <> failure.detail)
   }
+}
+
+fn update_index(
+  path: String,
+  selected: List(publication.Subject),
+) -> Result(Nil, publication_index.Failure) {
+  use existing <- result.try(publication_index.read(path))
+  let entries =
+    list.map(selected, fn(subject) {
+      publication_index.Entry(name: subject.name, hash: subject.content_ref)
+    })
+  publication_index.upsert(path, existing, entries)
 }

@@ -16,6 +16,7 @@ import gleamunison/cli_unpublish
 import gleamunison/codebase
 import gleamunison/identity.{Ref, hash_from_bytes, ref_hex}
 import gleamunison/namespace
+import gleamunison/publication_index
 import gleamunison/storage
 import gleeunit/should
 import simplifile
@@ -33,10 +34,19 @@ fn seeded() {
   #(adapter, ref)
 }
 
+fn index_text(name: String, ref) -> String {
+  name <> " " <> ref_hex(ref) <> "\n"
+}
+
+/// The lines the CLI would have read from `index_file`'s bytes, parsed by the
+/// same owner the command uses — so this test cannot drift from the format.
+fn index_lines(name: String, ref) -> List(publication_index.Line) {
+  publication_index.parse(index_text(name, ref))
+}
+
 fn index_file(name: String, ref) -> String {
   let path = "/tmp/retraction-scope-" <> int.to_string(unique_integer())
-  let index = name <> " " <> ref_hex(ref) <> "\n"
-  let assert Ok(_) = simplifile.write(index, to: path)
+  let assert Ok(_) = simplifile.write(index_text(name, ref), to: path)
   path
 }
 
@@ -100,10 +110,9 @@ pub fn unpublish_retracts_the_name_and_keeps_shared_bytes_test() {
   let assert Ok(_) =
     namespace.commit(adapter, "dev", namespace.set(namespace.empty(), "a", ref))
   let path = index_file("a", ref)
+  let lines = index_lines("a", ref)
   let assert Ok(message) =
-    cli_unpublish.retract(adapter, path, "a", ref_hex(ref), ref, "main", [
-      "a " <> ref_hex(ref) <> "\n",
-    ])
+    cli_unpublish.retract(adapter, path, "a", ref_hex(ref), ref, "main", lines)
   // The name is gone from main; dev still holds it, and the bytes survive.
   string.contains(message, "dev") |> should.be_true
   namespace.load_current(adapter, "main")
@@ -149,10 +158,9 @@ pub fn unpublish_proceeds_once_no_other_branch_binds_it_test() {
     )
   let assert Ok(_) = namespace.commit(adapter, "dev", namespace.empty())
   let path = index_file("a", ref)
+  let lines = index_lines("a", ref)
   let assert Ok(message) =
-    cli_unpublish.retract(adapter, path, "a", ref_hex(ref), ref, "main", [
-      "a " <> ref_hex(ref) <> "\n",
-    ])
+    cli_unpublish.retract(adapter, path, "a", ref_hex(ref), ref, "main", lines)
   string.contains(message, "unpublished") |> should.be_true
   adapter.lookup(ref) |> should.equal(Ok(None))
   let assert Ok(_) = simplifile.delete(path)

@@ -26,9 +26,9 @@ import gleamunison/cli_store
 import gleamunison/dependency_snapshot
 import gleamunison/identity.{type DefinitionRef, ref_hex, short_ref_hex}
 import gleamunison/namespace
+import gleamunison/publication_index
 import gleamunison/storage
 import gleamunison/store_deps
-import simplifile
 
 const default_branch = "main"
 
@@ -199,15 +199,10 @@ fn remove_all(
 ) -> Result(Nil, #(Int, String)) {
   // All reads precede mutation. Missing index is valid for hash-only stores;
   // an unreadable index is not an empty one.
-  use lines <- result.try(case simplifile.read(manifest_path) {
-    Ok(content) -> Ok(string.split(content, "\n"))
-    Error(simplifile.Enoent) -> Ok([])
-    Error(error) ->
-      Error(#(
-        cli_result.refused,
-        "purge: cannot read the index: " <> string.inspect(error),
-      ))
-  })
+  use lines <- result.try(
+    publication_index.read(manifest_path)
+    |> result.map_error(publication_index.describe("purge", _)),
+  )
   let hashes = list.map(removal, ref_hex)
   use _ <- result.try(unbind_all(adapter, branch, removal, snapshot))
   use _ <- result.try(drop_index_lines(manifest_path, hashes, lines))
@@ -252,37 +247,17 @@ fn unbind_all(
   }
 }
 
-/// Remove index lines whose hash is in the removed set, atomically.
+/// Remove index lines whose hash is in the removed set — the names that pointed
+/// at bytes purge is about to delete. The atomic replace is publication_index's.
 fn drop_index_lines(
   path: String,
   hashes: List(String),
-  lines: List(String),
+  lines: List(publication_index.Line),
 ) -> Result(Nil, #(Int, String)) {
-  let kept =
-    list.filter(lines, fn(line) {
-      case string.split_once(line, " ") {
-        Ok(#(_, hash)) -> !list.contains(hashes, hash)
-        Error(_) -> line != ""
-      }
-    })
-  let content = string.join(kept, "\n") <> "\n"
-  let temp = path <> ".tmp"
-  use _ <- result.try(
-    simplifile.write(temp, content)
-    |> result.map_error(fn(error) {
-      #(
-        cli_result.refused,
-        "purge: cannot write the index: " <> string.inspect(error),
-      )
-    }),
-  )
-  simplifile.rename(temp, path)
-  |> result.map_error(fn(error) {
-    #(
-      cli_result.refused,
-      "purge: cannot replace the index: " <> string.inspect(error),
-    )
+  publication_index.rewrite(path, lines, fn(_, hash) {
+    !list.contains(hashes, hash)
   })
+  |> result.map_error(publication_index.describe("purge", _))
 }
 
 fn parse_args(
