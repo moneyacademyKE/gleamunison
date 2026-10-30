@@ -110,16 +110,20 @@ pub fn load(
   adapter: StorageAdapter,
   branch: String,
 ) -> Result(#(List(Entry), Selection), String) {
-  use names <- result.try(name_snapshot.read(adapter, branch))
+  // One immutable view per load: the bindings and the entries must come from
+  // the same namespace. Reading twice doubled the branch I/O on the hot path
+  // (mcp_session, generation_loop), and a write landing between the two reads
+  // was the only way a bound name could fail to resolve below — a failure no
+  // single consistent load can produce, so it is asserted, not mapped.
   use ns <- result.try(namespace.load_current_or_empty(adapter, branch))
+  let names = name_snapshot.from_namespace(ns)
   let selection = Selection(adapter, branch, names)
   let cb = codebase.with_adapter(adapter)
   use entries <- result.try(
     list.try_map(namespace.names(ns), fn(name) {
-      use ref <- result.try(
-        namespace.get(ns, name)
-        |> result.map_error(fn(_) { "missing branch binding: " <> name }),
-      )
+      // `name` comes from this same ns, so the binding cannot miss: the
+      // invariant name_snapshot.from_namespace already asserts.
+      let assert Ok(ref) = namespace.get(ns, name)
       use definition <- result.try(
         codebase.get(cb, ref)
         |> result.map_error(fn(error) {

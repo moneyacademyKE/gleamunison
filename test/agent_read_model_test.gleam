@@ -1,6 +1,8 @@
+import gleam/bit_array
 import gleam/list
 import gleam/option
 import gleam/string
+import gleamunison/agent_read_model
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/identity.{Local, Ref, hash_to_debug_string}
@@ -10,6 +12,45 @@ import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleeunit/should
+
+@external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
+fn pd_counter_inc(key: BitArray) -> Int
+
+@external(erlang, "gleamunison_ffi_test", "pd_counter_get")
+fn pd_counter_get(key: BitArray) -> Int
+
+/// One read model, one immutable view: the branch pointer is read once per
+/// load. A second read doubles namespace I/O on the hot path (mcp_session,
+/// generation_loop) and can diverge from the first under a concurrent write.
+pub fn load_reads_branch_namespace_once_test() {
+  let #(adapter, _, _, _) = seeded_branches()
+  let pointer = namespace.branch_pointer_ref("main")
+  let key = bit_array.from_string("read-model-head-lookups")
+  let counting =
+    storage.StorageAdapter(..adapter, lookup: fn(ref) {
+      case ref == pointer {
+        True -> {
+          let _ = pd_counter_inc(key)
+          adapter.lookup(ref)
+        }
+        False -> adapter.lookup(ref)
+      }
+    })
+  let before = pd_counter_get(key)
+  let assert Ok(_) = agent_read_model.load(counting, "main")
+  pd_counter_get(key) - before |> should.equal(1)
+}
+
+/// A store that cannot answer is still an error, not an empty namespace: one
+/// load failing must surface exactly as it did when there were two.
+pub fn load_surfaces_a_broken_branch_pointer_test() {
+  let #(adapter, _, _, _) = seeded_branches()
+  let broken =
+    storage.StorageAdapter(..adapter, lookup: fn(_) {
+      Error(storage.IoError("store unavailable"))
+    })
+  agent_read_model.load(broken, "main") |> should.be_error
+}
 
 pub fn selected_branch_controls_stored_dependencies_test() {
   let #(adapter, caller_ref, base_main, base_other) = seeded_branches()
