@@ -62,7 +62,7 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
       let provider_name = provider_name(provider)
       // Budget/circuit gate: admission, concurrency slot, and metering are
       // owned by gleamunison_llm_budget; refusal names are typed policy.
-      use Nil <- result.try(budget_admit(provider_name, cfg.model))
+      use Nil <- result.try(llm_budget.admit_call(provider_name, cfg.model))
       let body = llm_wire.messages_json([Message(User, prompt)])
       let result: Result(BitArray, BitArray) =
         from_dynamic(
@@ -117,9 +117,6 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
     }
   }
 }
-
-@external(erlang, "gleamunison_llm_budget", "admit")
-fn budget_admit(provider: String, model: String) -> Result(Nil, String)
 
 /// Rates are data, not policy: micro-USD per 1M tokens from the environment,
 /// defaulting to zero (metering on, cost accounting estimate-only).

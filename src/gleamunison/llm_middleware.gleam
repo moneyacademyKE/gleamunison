@@ -22,9 +22,6 @@ import gleamunison/llm_wire
 @external(erlang, "timer", "sleep")
 fn sleep(ms: Int) -> Nil
 
-@external(erlang, "gleamunison_llm_budget", "admit")
-fn budget_admit(provider: String, model: String) -> Result(Nil, String)
-
 /// Budget/circuit gate as handler composition. Admit before the call,
 /// release the concurrency slot exactly once, then meter actuals and
 /// report the outcome. Refusals return the typed refusal name as the
@@ -40,7 +37,7 @@ pub fn budget_handler(
 ) -> OpHandler {
   let name = llm.provider_name(provider)
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-    case budget_admit(name, model) {
+    case llm_budget.admit_call(name, model) {
       Error(refusal) -> cont(to_dynamic(Error(bit_array.from_string(refusal))))
       Ok(Nil) -> {
         let result = inner(args, fn(d) { d })

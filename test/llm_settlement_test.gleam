@@ -6,21 +6,19 @@
 //// takes down a call whose completion already succeeded.
 
 import gleam/string
+import gleamunison/llm_budget
 import gleamunison/llm_settlement
 import gleeunit/should
 
 @external(erlang, "gleamunison_llm_budget", "reset")
 fn budget_reset() -> Result(Nil, Nil)
 
-@external(erlang, "gleamunison_llm_budget", "admit")
-fn budget_admit(provider: String, model: String) -> Result(Nil, String)
-
 @external(erlang, "gleamunison_ffi_test", "llm_budget_snapshot_json")
 fn snapshot_json() -> String
 
 pub fn settlement_meters_one_admitted_call_test() {
   let assert Ok(Nil) = budget_reset()
-  let assert Ok(Nil) = budget_admit("settle-provider", "m")
+  let assert Ok(Nil) = llm_budget.admit_call("settle-provider", "m")
   let assert Ok(Nil) = llm_settlement.release("settle-provider")
   let assert Ok(Nil) = llm_settlement.success("settle-provider", 12, 34)
   let snap = snapshot_json()
@@ -30,7 +28,7 @@ pub fn settlement_meters_one_admitted_call_test() {
 
 pub fn settlement_records_failure_after_release_test() {
   let assert Ok(Nil) = budget_reset()
-  let assert Ok(Nil) = budget_admit("settle-fail", "m")
+  let assert Ok(Nil) = llm_budget.admit_call("settle-fail", "m")
   let assert Ok(Nil) = llm_settlement.release("settle-fail")
   let assert Ok(Nil) = llm_settlement.failure("settle-fail")
   snapshot_json() |> string.contains("settle-fail") |> should.be_true

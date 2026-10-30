@@ -109,6 +109,12 @@ pub fn admit(
   }
 }
 
+/// Ask the stateful holder to admit a call: it applies `admit/5` above to its
+/// own window, circuit and concurrency state, and the refusal arrives already
+/// named, so a caller prints it as-is.
+@external(erlang, "gleamunison_llm_budget", "admit")
+pub fn admit_call(provider: String, model: String) -> Result(Nil, String)
+
 pub fn begin(usage: Usage) -> Usage {
   Usage(..usage, in_flight: usage.in_flight + 1)
 }
