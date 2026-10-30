@@ -69,8 +69,14 @@ start_real_services() ->
 
 http_fixture(Mode, Path) ->
     with_mode(Mode, fun() ->
-        Port = 18103,
-        {ServerPid, ServerMonitor} = start_http_server(Port),
+        %% A kernel-assigned free port, so this fixture cannot collide with
+        %% another test's server. It used to hardcode the very port that
+        %% mcp_http_test also binds inside the same node: whichever came second
+        %% either failed to bind or, worse, quietly talked to the other test's
+        %% listener and passed for the wrong reason. Port 0 is not an option
+        %% here — gleamunison_http_sup:init/1 reads Port =< 0 as "run no
+        %% listener at all".
+        {ServerPid, ServerMonitor, Port} = start_http_server(free_port()),
         try
             {ok, _} = application:ensure_all_started(inets),
             Url = "http://127.0.0.1:" ++ integer_to_list(Port) ++ binary_to_list(Path),
@@ -90,8 +96,8 @@ start_http_server(Port) ->
         ok = gleamunison_http:start_server(Port)
     end),
     try
-        ok = wait_for_port(Port, 20),
-        {Pid, Monitor}
+        ok = wait_for_listening(Port, 200),
+        {Pid, Monitor, Port}
     catch
         error:Reason ->
             exit(Pid, kill),
@@ -106,9 +112,41 @@ wait_for_server_exit(Pid, Monitor) ->
         error(http_stop_timeout)
     end.
 
-wait_for_port(_Port, 0) -> error(listener_start_timeout);
-wait_for_port(Port, Attempts) ->
-    case gen_tcp:connect({127, 0, 0, 1}, Port, [binary, {active, false}], 50) of
-        {ok, Socket} -> gen_tcp:close(Socket), ok;
-        {error, _} -> timer:sleep(20), wait_for_port(Port, Attempts - 1)
+%% A kernel-assigned free port, bound on the same loopback address the server
+%% uses by default. The probe socket is closed before the server starts, so
+%% there is a small window in which another process could take the port; that
+%% window now fails loudly below, where the old hardcoded port could instead
+%% succeed against somebody else's listener.
+free_port() ->
+    {ok, Socket} = gen_tcp:listen(0, [binary, {active, false}, {reuseaddr, true},
+                                      {ip, {127, 0, 0, 1}}]),
+    {ok, Port} = inet:port(Socket),
+    ok = gen_tcp:close(Socket),
+    Port.
+
+%% gleamunison_http:listen/2 registers {Owner, ListenSocket} in a
+%% persistent_term only after gen_tcp:listen succeeded, so that registration is
+%% the readiness signal. The old code connected to a hardcoded port in a loop
+%% instead (20 attempts, ~1.4s), which raced the listener and could not tell
+%% our server from another test's. Matching the port we asked for means a
+%% leftover listener can no longer masquerade as ours.
+wait_for_listening(Port, Attempts) ->
+    case registered_port() of
+        {ok, Port} -> ok;
+        _ when Attempts =< 0 -> error(listener_start_timeout);
+        _ ->
+            timer:sleep(10),
+            wait_for_listening(Port, Attempts - 1)
+    end.
+
+%% The registered listener's port, or undefined when nothing is registered yet
+%% or the registration is stale because its socket is already closed.
+registered_port() ->
+    case persistent_term:get({gleamunison_http, listener}, undefined) of
+        {_Owner, Socket} ->
+            case inet:port(Socket) of
+                {ok, Port} -> {ok, Port};
+                {error, _} -> undefined
+            end;
+        undefined -> undefined
     end.
