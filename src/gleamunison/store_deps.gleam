@@ -1,28 +1,21 @@
-//// Read-only compatibility queries plus checked retraction decisions.
-//// Mutation callers build one verified snapshot and reuse it for all checks.
+//// Checked retraction decisions: the dependency error vocabulary and the
+//// branch-binding queries the retraction commands share. Mutation callers
+//// build ONE verified snapshot (dependency_snapshot.read) and reuse it for
+//// all checks — the one-shot `*_checked` wrappers that used to live here
+//// re-read the whole store per question, existed only for tests, and are
+//// deleted (bk-f7ea); tests now use the production shape directly.
 
 import gleam/list
 import gleam/result
 import gleam/string
 import gleamunison/branch_scope
-import gleamunison/dependency_snapshot
 import gleamunison/identity.{type DefinitionRef, ref_hex as canonical_ref_hex}
 import gleamunison/storage
-
-const default_branch = "main"
 
 pub type DependencyError {
   StoreFailure(storage.StorageError)
   NamespaceFailure(String)
   CorruptDefinition(DefinitionRef)
-}
-
-fn convert(error: dependency_snapshot.ScanError) -> DependencyError {
-  case error {
-    dependency_snapshot.StoreFailure(error) -> StoreFailure(error)
-    dependency_snapshot.NamespaceFailure(reason) -> NamespaceFailure(reason)
-    dependency_snapshot.CorruptDefinition(ref) -> CorruptDefinition(ref)
-  }
 }
 
 pub fn describe_dependency_error(error: DependencyError) -> String {
@@ -32,66 +25,6 @@ pub fn describe_dependency_error(error: DependencyError) -> String {
     CorruptDefinition(ref) ->
       "corrupt or unreadable definition " <> canonical_ref_hex(ref)
   }
-}
-
-pub fn dependents_checked(
-  adapter: storage.StorageAdapter,
-  target: DefinitionRef,
-) -> Result(List(DefinitionRef), DependencyError) {
-  dependents_checked_on_branch(adapter, default_branch, target)
-}
-
-pub fn dependents_checked_on_branch(
-  adapter: storage.StorageAdapter,
-  branch: String,
-  target: DefinitionRef,
-) -> Result(List(DefinitionRef), DependencyError) {
-  dependency_snapshot.read(adapter, branch)
-  |> result.map(fn(snapshot) {
-    dependency_snapshot.dependents(snapshot, target)
-  })
-  |> result.map_error(convert)
-}
-
-pub fn other_names_checked(
-  adapter: storage.StorageAdapter,
-  target: DefinitionRef,
-  retracting: String,
-) -> Result(List(String), DependencyError) {
-  other_names_checked_on_branch(adapter, default_branch, target, retracting)
-}
-
-pub fn other_names_checked_on_branch(
-  adapter: storage.StorageAdapter,
-  branch: String,
-  target: DefinitionRef,
-  retracting: String,
-) -> Result(List(String), DependencyError) {
-  dependency_snapshot.read(adapter, branch)
-  |> result.map(fn(snapshot) {
-    dependency_snapshot.names(snapshot, target)
-    |> list.filter(fn(name) { name != retracting })
-  })
-  |> result.map_error(convert)
-}
-
-pub fn exclusive_closure_checked(
-  adapter: storage.StorageAdapter,
-  root: DefinitionRef,
-) -> Result(List(DefinitionRef), DependencyError) {
-  exclusive_closure_checked_on_branch(adapter, default_branch, root)
-}
-
-fn exclusive_closure_checked_on_branch(
-  adapter: storage.StorageAdapter,
-  branch: String,
-  root: DefinitionRef,
-) -> Result(List(DefinitionRef), DependencyError) {
-  dependency_snapshot.read(adapter, branch)
-  |> result.map(fn(snapshot) {
-    dependency_snapshot.exclusive_closure(snapshot, root)
-  })
-  |> result.map_error(convert)
 }
 
 /// Content is shared by every branch, so a retraction decision needs to know

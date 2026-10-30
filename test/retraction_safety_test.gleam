@@ -11,7 +11,6 @@ import gleamunison/identity.{Ref, hash_bytes, ref_hex}
 import gleamunison/namespace
 import gleamunison/publication_index
 import gleamunison/storage
-import gleamunison/store_deps
 import gleeunit/should
 import simplifile
 import test_ffi.{pd_counter_get, pd_counter_inc, unique_integer}
@@ -29,7 +28,8 @@ pub fn absent_branch_does_not_hide_content_dependents_test() {
       codebase.with_adapter(adapter),
       ast.Unit(ref, [#(ref, definition)]),
     )
-  store_deps.dependents_checked(adapter, target()) |> should.equal(Ok([ref]))
+  let assert Ok(snapshot) = dependency_snapshot.read(adapter, "main")
+  dependency_snapshot.dependents(snapshot, target()) |> should.equal([ref])
 }
 
 pub fn failed_listing_is_not_an_empty_dependency_set_test() {
@@ -39,9 +39,10 @@ pub fn failed_listing_is_not_an_empty_dependency_set_test() {
     storage.StorageAdapter(..adapter, list_refs: fn() {
       Error(storage.IoError("list failed"))
     })
-  store_deps.dependents_checked(broken, target())
+  // A failed listing must surface as an Error, never an empty dependent set.
+  dependency_snapshot.read(broken, "main")
   |> should.equal(
-    Error(store_deps.StoreFailure(storage.IoError("list failed"))),
+    Error(dependency_snapshot.StoreFailure(storage.IoError("list failed"))),
   )
 }
 
@@ -52,9 +53,12 @@ pub fn failed_listing_is_not_an_empty_exclusive_closure_test() {
     storage.StorageAdapter(..adapter, list_refs: fn() {
       Error(storage.IoError("closure scan failed"))
     })
-  store_deps.exclusive_closure_checked(broken, target())
+  // Same failure, closure question: an Error, never an empty closure.
+  dependency_snapshot.read(broken, "main")
   |> should.equal(
-    Error(store_deps.StoreFailure(storage.IoError("closure scan failed"))),
+    Error(
+      dependency_snapshot.StoreFailure(storage.IoError("closure scan failed")),
+    ),
   )
 }
 
@@ -64,8 +68,8 @@ pub fn failed_branch_lookup_is_not_no_aliases_test() {
     storage.StorageAdapter(..adapter, lookup: fn(_) {
       Error(storage.IoError("read failed"))
     })
-  let assert Error(_) =
-    store_deps.other_names_checked_on_branch(broken, "main", target(), "name")
+  // The alias question never reaches an empty list: the read itself fails.
+  let assert Error(_) = dependency_snapshot.read(broken, "main")
 }
 
 pub fn corrupt_candidate_does_not_disappear_from_safety_scan_test() {
@@ -73,8 +77,8 @@ pub fn corrupt_candidate_does_not_disappear_from_safety_scan_test() {
   let assert Ok(_) = namespace.commit(adapter, "main", namespace.empty())
   let corrupt = Ref(hash_bytes(<<"different bytes">>))
   let assert Ok(_) = adapter.insert(corrupt, <<"corrupt">>)
-  store_deps.dependents_checked(adapter, target())
-  |> should.equal(Error(store_deps.CorruptDefinition(corrupt)))
+  dependency_snapshot.read(adapter, "main")
+  |> should.equal(Error(dependency_snapshot.CorruptDefinition(corrupt)))
 }
 
 pub fn corrupt_branch_commit_must_refuse_before_any_write_test() {
