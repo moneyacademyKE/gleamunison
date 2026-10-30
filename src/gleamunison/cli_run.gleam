@@ -20,6 +20,7 @@ import gleamunison/cli_lifecycle
 import gleamunison/cli_output
 import gleamunison/cli_result
 import gleamunison/cli_store
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/identity.{type DefinitionRef}
 import gleamunison/namespace
 import gleamunison/run_error
@@ -29,9 +30,6 @@ import gleamunison/store_log
 
 @external(erlang, "gleamunison_ffi", "parse_term_arg")
 fn parse_term_arg(arg: String) -> Result(Dynamic, Nil)
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn text_arg(arg: String) -> Dynamic
 
 pub fn command(args: List(String)) -> Nil {
   case run(args) {
@@ -269,7 +267,7 @@ fn to_call_args(args: List(String)) -> List(Dynamic) {
   list.map(args, fn(arg) {
     case parse_term_arg(arg) {
       Ok(term) -> term
-      Error(_) -> text_arg(arg)
+      Error(_) -> to_dynamic(arg)
     }
   })
 }

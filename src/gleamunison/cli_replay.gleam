@@ -4,12 +4,12 @@
 //// tape) fails loudly. Verification, not vibes: a clean replay proves the
 //// run the tape records is the run the code performs.
 
-import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/result
 import gleam/string
 import gleamunison/cli_result
 import gleamunison/compile
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, RuntimeConfig}
 
 import gleamunison/repl_eval
@@ -19,12 +19,6 @@ import simplifile
 
 @external(erlang, "gleamunison_ffi", "rescue")
 fn ffi_rescue(f: fn() -> a) -> Result(a, String)
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn from_dynamic(val: Dynamic) -> a
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
 
 /// Bare module evaluation: no default ability handlers, so caller-installed
 /// frames (recording wraps, playback, capability gates) are the whole stack.

@@ -18,6 +18,7 @@ import gleam/int
 import gleam/option.{type Option, None}
 import gleam/result
 import gleamunison/cancellation
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/env
 import gleamunison/http_client
@@ -31,12 +32,6 @@ import gleamunison/llm_types.{
   DecodeError, HttpError, Message, OpenAI, ProviderConfig, TransportError, User,
 }
 import gleamunison/llm_wire
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn unsafe_coerce(val: Dynamic) -> a
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
 
 pub fn ability_ref() -> DefinitionRef {
   // Abilities resolve by name hash (same rule as elaborate.ref_for_name):
@@ -70,7 +65,7 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
       use Nil <- result.try(budget_admit(provider_name, cfg.model))
       let body = llm_wire.messages_json([Message(User, prompt)])
       let result: Result(BitArray, BitArray) =
-        unsafe_coerce(
+        from_dynamic(
           provider_handler(cfg)(
             [to_dynamic(bit_array.from_string(body))],
             fn(d) { d },

@@ -1,6 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/list
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/identity.{type DefinitionRef, runtime_module_name}
 
 pub type HandlerFrame {
@@ -16,9 +17,6 @@ pub type RuntimeConfig {
 
 @external(erlang, "gleamunison_effets", "handle_comp")
 fn ffi_handle_comp(handler: Dynamic, thunk: fn() -> Dynamic) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: any) -> Dynamic
 
 /// The handler-stack key for an ability: "m_" + last 8 of its hash.
 /// Public so tooling (transcripts, capability gates) keys frames the same

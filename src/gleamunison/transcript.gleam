@@ -5,6 +5,7 @@ import gleam/list
 import gleam/option.{type Option}
 import gleam/result
 import gleam/string
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/llm
 
@@ -54,12 +55,6 @@ pub opaque type Recorder {
 pub opaque type Playback {
   Playback(token: Dynamic)
 }
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn from_dynamic(val: Dynamic) -> a
 
 @external(erlang, "gleamunison_transcript", "new_token")
 fn new_token() -> Dynamic

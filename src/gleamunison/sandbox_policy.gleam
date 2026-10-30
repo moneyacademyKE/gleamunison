@@ -3,6 +3,7 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 import gleamunison/capability
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 
 @external(erlang, "gleamunison_eval_scope", "run_bounded")
 fn ffi_run_bounded(
@@ -136,12 +137,6 @@ pub fn execute(policy: SandboxPolicy, input: String) -> Result(String, String) {
       }
   }
 }
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(value: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn from_dynamic(value: Dynamic) -> a
 
 pub fn refusal_name(refusal: BoundaryRefusal) -> String {
   case refusal {

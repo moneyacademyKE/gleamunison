@@ -9,6 +9,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/result
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type OpHandler}
 import gleamunison/env
 import gleamunison/json
@@ -19,12 +20,6 @@ import gleamunison/llm_types.{
   Message, OpenAI, User,
 }
 import gleamunison/llm_wire
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn cast(a: anything) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn uncast(a: Dynamic) -> anything
 
 pub type EnvLookup =
   fn(String) -> Result(String, Nil)
@@ -130,8 +125,9 @@ pub fn complete_with(
   prompt: String,
 ) -> Result(Completion, String) {
   let body = llm_wire.messages_json([Message(User, prompt)])
-  let arg = cast(bit_array.from_string(body))
-  let result: Result(BitArray, BitArray) = uncast(handler([arg], identity))
+  let arg = to_dynamic(bit_array.from_string(body))
+  let result: Result(BitArray, BitArray) =
+    from_dynamic(handler([arg], identity))
   case result {
     Error(e) -> Error("llm: " <> unwrap_bit(e))
     Ok(bin) ->

@@ -9,6 +9,7 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/result
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type OpHandler}
 import gleamunison/json
 import gleamunison/llm
@@ -17,15 +18,6 @@ import gleamunison/llm_controls
 import gleamunison/llm_settlement
 import gleamunison/llm_types.{type Completion}
 import gleamunison/llm_wire
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn as_result(d: Dynamic) -> Result(BitArray, BitArray)
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn as_bit_array(d: Dynamic) -> BitArray
 
 @external(erlang, "timer", "sleep")
 fn sleep(ms: Int) -> Nil
@@ -53,7 +45,7 @@ pub fn budget_handler(
       Ok(Nil) -> {
         let result = inner(args, fn(d) { d })
         llm_settlement.report(llm_settlement.release(name))
-        case as_result(result) {
+        case from_dynamic(result) {
           Ok(json_bin) ->
             case meter_completion(provider, json_bin) {
               Ok(#(tokens, cost)) ->
@@ -122,7 +114,7 @@ fn attempt(
   n: Int,
 ) -> Dynamic {
   let result = inner(args, fn(d) { d })
-  case as_result(result) {
+  case from_dynamic(result) {
     Ok(_) -> result
     Error(reason) ->
       case
@@ -151,7 +143,7 @@ fn chain(handlers: List(OpHandler), args: List(Dynamic)) -> Dynamic {
     [] -> to_dynamic(Error(bit_array.from_string("fallback: no providers")))
     [handler, ..rest] -> {
       let result = handler(args, fn(d) { d })
-      case as_result(result) {
+      case from_dynamic(result) {
         Ok(_) -> result
         Error(_) ->
           case rest {
@@ -171,7 +163,7 @@ pub fn recording_mock(
 ) -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
     case args {
-      [messages_dyn, ..] -> record(as_bit_array(messages_dyn))
+      [messages_dyn, ..] -> record(from_dynamic(messages_dyn))
       [] -> Nil
     }
     cont(to_dynamic(Ok(llm_wire.completion_json(response))))

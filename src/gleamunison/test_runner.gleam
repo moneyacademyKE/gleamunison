@@ -7,6 +7,7 @@ import gleam/string
 import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/datetime
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{
   type HandlerFrame, type OpHandler, HandlerFrame, RuntimeConfig,
 }
@@ -18,12 +19,6 @@ import gleamunison/repl_eval
 import gleamunison/storage.{type StorageAdapter}
 import gleamunison/transcript
 import gleamunison/types.{type TypeCache}
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn unsafe_coerce(val: Dynamic) -> a
 
 /// One test definition's outcome: assertion tallies from the Test tape.
 pub type TestResult {
@@ -111,7 +106,7 @@ pub fn run_suite(
             ))
           })
         let eval_result: Result(#(String, ast.Type, TypeCache), String) =
-          unsafe_coerce(outcome)
+          from_dynamic(outcome)
         let entries = transcript.entries(rec)
         transcript.stop(rec)
         let failed = list.count(entries, fn(e) { e.result_repr == "0" })

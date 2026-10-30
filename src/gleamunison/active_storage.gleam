@@ -5,6 +5,7 @@ import gleam/list
 import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
+import gleamunison/dynamic_ffi.{from_dynamic}
 import gleamunison/identity.{
   type DefinitionRef, Ref, hash_from_bytes, hash_to_bytes,
 }
@@ -12,9 +13,6 @@ import gleamunison/storage.{type StorageAdapter}
 
 @external(erlang, "gleamunison_storage", "active")
 fn active_ffi() -> Result(Dynamic, String)
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn coerce(value: Dynamic) -> a
 
 pub type StorageBackend {
   Ets(BitArray)
@@ -36,7 +34,7 @@ fn refs(values: List(BitArray)) -> List(DefinitionRef) {
 /// default exactly as the HTTP server does. Shared backends are not closed here.
 pub fn active_or_open() -> Result(StorageAdapter, String) {
   case active_ffi() {
-    Ok(backend) -> Ok(adapter(coerce(backend)))
+    Ok(backend) -> Ok(adapter(from_dynamic(backend)))
     Error(_) -> {
       use path <- result.try(cli_lifecycle.resolve_store_path())
       storage.dets(path) |> result.map_error(string.inspect)
