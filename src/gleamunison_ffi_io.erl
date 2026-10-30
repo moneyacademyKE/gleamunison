@@ -361,9 +361,9 @@ is_content_row(Type, Tab, Ref) ->
     end.
 
 ref_to_hex({ref, {hash, Bytes}}) ->
-    iolist_to_binary(gleamunison_ffi:hash_to_hex(Bytes));
+    gleamunison_crypto:hash_to_hex(Bytes);
 ref_to_hex(Bytes) when is_binary(Bytes) ->
-    iolist_to_binary(gleamunison_ffi:hash_to_hex(Bytes)).
+    gleamunison_crypto:hash_to_hex(Bytes).
 
 hex_to_ref(Hex) ->
     gleamunison@identity:parse_ref_hex(Hex).

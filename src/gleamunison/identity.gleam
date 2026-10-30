@@ -39,8 +39,8 @@ pub fn parse_ref_hex(hex: String) -> Result(DefinitionRef, String) {
 @external(erlang, "gleamunison_ffi", "hash_equal")
 fn ffi_hash_equal(_a: BitArray, _b: BitArray) -> Bool
 
-@external(erlang, "gleamunison_ffi", "hash_to_hex")
-fn ffi_hash_to_hex(_bytes: BitArray) -> List(String)
+@external(erlang, "gleamunison_crypto", "hash_to_hex")
+fn ffi_hash_to_hex(_bytes: BitArray) -> String
 
 // --- Construction (module-private) ---
 
@@ -77,8 +77,7 @@ pub fn name_ref(name: String) -> DefinitionRef {
 
 /// Produce a hex string for display/debugging.
 pub fn hash_to_debug_string(h: Hash) -> String {
-  let parts = ffi_hash_to_hex(hash_to_bytes(h))
-  string.join(parts, "")
+  ffi_hash_to_hex(hash_to_bytes(h))
 }
 
 /// The canonical external representation of a definition reference.

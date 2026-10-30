@@ -1,6 +1,6 @@
 -module(gleamunison_ffi).
 -export([
-    hash_bytes/1, hash_equal/2, hash_to_hex/1,
+    hash_bytes/1, hash_equal/2,
     compile_source/1, load_binary/2, module_available/1, module_exports/1, string_to_binary/1,
     hex_to_bytes/1,
     unload_binary/1, soft_purge_binary/1,
@@ -24,12 +24,6 @@ hash_bytes(Bytes) when is_binary(Bytes) ->
     crypto:hash(sha256, Bytes).
 
 hash_equal(A, B) when is_binary(A), is_binary(B) -> A =:= B.
-
-hash_to_hex(Bytes) when is_binary(Bytes) ->
-    [<<(hex(N bsr 4)), (hex(N band 15))>> || <<N:8>> <= Bytes].
-
-hex(N) when N < 10 -> $0 + N;
-hex(N) -> $a + N - 10.
 
 string_to_binary(S) when is_binary(S) -> S;
 string_to_binary(S) when is_list(S) -> list_to_binary(S).

@@ -5,8 +5,8 @@
 %% the DETS and Mnesia sites (bk-0249). The hash-encode-truncate-atom dance
 %% was previously triplicated across gleamunison_app_db, gleamunison_store_log
 %% and gleamunison_storage, with two divergent hex encoders (uppercase
-%% binary:encode_hex vs lowercase gleamunison_ffi:hash_to_hex) and divergent
-%% input handling.
+%% binary:encode_hex vs the lowercase ffi encoder, since folded into
+%% gleamunison_crypto:hash_to_hex — bk-bd8f) and divergent input handling.
 %%
 %% The atom names are load-bearing on disk: Mnesia persists table names in
 %% its schema and DETS/Mnesia files were opened under these names, so each
@@ -25,4 +25,4 @@ stable(Prefix, Material, HexChars, Case)
     binary_to_atom(<<Prefix/binary, (binary:part(Hex, 0, HexChars))/binary>>, utf8).
 
 hex(Digest, uppercase) -> binary:encode_hex(Digest);
-hex(Digest, lowercase) -> iolist_to_binary(gleamunison_ffi:hash_to_hex(Digest)).
+hex(Digest, lowercase) -> gleamunison_crypto:hash_to_hex(Digest).
