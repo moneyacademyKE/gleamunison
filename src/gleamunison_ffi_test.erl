@@ -4,7 +4,9 @@
 -export([start_http_server/1, stop_http_server/0, http_get/2, http_post/3, http_post_auth/4,
          http_post_auth_length/5, set_http_token/1,
          clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
-         clear_eval_timeout/0, otp_blake2b64/1, constant_time_equal_probe/2]).
+         clear_eval_timeout/0, otp_blake2b64/1, constant_time_equal_probe/2,
+         app_db_table_name_probe/1, store_log_table_name_probe/1,
+         storage_table_name_probe/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([metrics_restart_probe/0, http_drain_probe/0, observability_probe/1,
          metrics_name_bound_probe/0, llm_budget_snapshot_json/0,
@@ -535,6 +537,21 @@ otp_blake2b64(Data) ->
 %% token lengths never short-circuit.
 constant_time_equal_probe(A, B) ->
     gleamunison_crypto:constant_time_equal(A, B).
+
+%% Golden probes for the unified table naming (bk-0249): the pinned parameter
+%% choices of each of the three sites, exactly as passed in their own modules.
+%% test/table_name_test.gleam asserts the exact atoms the pre-unification code
+%% produced, so any byte drift in table naming — which would orphan on-disk
+%% DETS/Mnesia tables — fails the suite. Atoms are returned as binaries.
+app_db_table_name_probe(Path) when is_binary(Path) ->
+    atom_to_binary(gleamunison_table_name:stable(<<"gleamunison_app_db_">>, Path, 16, uppercase), utf8).
+
+store_log_table_name_probe(Path) when is_binary(Path) ->
+    atom_to_binary(gleamunison_table_name:stable(<<"gleamunison_store_log_">>,
+                                                 unicode:characters_to_binary(Path), 16, uppercase), utf8).
+
+storage_table_name_probe(Bin) when is_binary(Bin) ->
+    atom_to_binary(gleamunison_table_name:stable(<<"gleamunison_">>, Bin, 64, lowercase), utf8).
 
 parse_http_response(Bin) ->
     case binary:split(Bin, <<"\r\n">>) of

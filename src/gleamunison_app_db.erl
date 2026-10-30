@@ -92,9 +92,10 @@ configured_path() ->
             end
     end.
 
+%% Table naming is owned by gleamunison_table_name (bk-0249); this site has
+%% always produced gleamunison_app_db_<16 uppercase hex chars>.
 table_name(Path) ->
-    Hex = binary:encode_hex(crypto:hash(sha256, Path)),
-    binary_to_atom(<<"gleamunison_app_db_", (binary:part(Hex, 0, 16))/binary>>, utf8).
+    gleamunison_table_name:stable(<<"gleamunison_app_db_">>, Path, 16, uppercase).
 
 handle_call({transact, Assertions, Retractions}, _From, State) ->
     case gleamunison_app_db_facts:validate_changes(Assertions, Retractions) of

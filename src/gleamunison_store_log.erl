@@ -129,10 +129,13 @@ open(Path) ->
     end.
 
 %% dets table names must be atoms; the file path is not, so hash it to a stable
-%% small atom rather than leaking one atom per path.
+%% small atom rather than leaking one atom per path. Naming is owned by
+%% gleamunison_table_name (bk-0249); this site has always produced
+%% gleamunison_store_log_<16 uppercase hex chars> over the unicode-converted
+%% path, so the conversion stays here, at the site that always did it.
 stable_name(Path) ->
-    Hex = binary:encode_hex(crypto:hash(sha256, unicode:characters_to_binary(Path))),
-    binary_to_atom(<<"gleamunison_store_log_", (binary:part(Hex, 0, 16))/binary>>, utf8).
+    gleamunison_table_name:stable(<<"gleamunison_store_log_">>,
+                                  unicode:characters_to_binary(Path), 16, uppercase).
 
 format_error(Class, Reason) ->
     iolist_to_binary(io_lib:format("~p:~p", [Class, Reason])).

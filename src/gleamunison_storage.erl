@@ -255,6 +255,8 @@ mnesia_delete(Tab, Ref) ->
 
 mnesia_close(_Tab) -> {ok, nil}.
 
+%% Naming is owned by gleamunison_table_name (bk-0249); this site has always
+%% produced gleamunison_<full 64 lowercase hex chars> over prefix-embedded
+%% material, and Mnesia persists these names in its schema — bytes frozen.
 stable_name(Bin) when is_binary(Bin) ->
-    Hex = iolist_to_binary(gleamunison_ffi:hash_to_hex(crypto:hash(sha256, Bin))),
-    erlang:binary_to_atom(<<"gleamunison_", Hex/binary>>, utf8).
+    gleamunison_table_name:stable(<<"gleamunison_">>, Bin, 64, lowercase).
