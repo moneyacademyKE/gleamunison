@@ -20,11 +20,6 @@ pub fn now_unix() -> Int {
   birl.to_unix(birl.utc_now())
 }
 
-pub fn to_unix(dt: DateTime) -> Int {
-  let DateTime(timestamp) = dt
-  timestamp
-}
-
 /// Render whole Unix seconds exactly as the store log has always done:
 /// `YYYY-MM-DDTHH:MM:SSZ`, with no fractional-second noise.
 pub fn format_unix(seconds: Int) -> String {

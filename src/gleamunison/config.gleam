@@ -104,10 +104,7 @@ pub fn resolve_profile() -> Result(String, String) {
   string_or(cfg, profile_key, "local")
 }
 
-pub fn optional_int(
-  config: Config,
-  key: String,
-) -> Result(Option(Int), String) {
+fn optional_int(config: Config, key: String) -> Result(Option(Int), String) {
   case dict.get(config.cli, key) {
     Ok(IntVal(value)) -> Ok(Some(value))
     Ok(other) -> Error(wrong_type(key, "int", classify_cli(other)))
@@ -141,10 +138,7 @@ pub fn int_or(
   }
 }
 
-pub fn optional_bool(
-  config: Config,
-  key: String,
-) -> Result(Option(Bool), String) {
+fn optional_bool(config: Config, key: String) -> Result(Option(Bool), String) {
   case dict.get(config.cli, key) {
     Ok(BoolVal(value)) -> Ok(Some(value))
     Ok(other) -> Error(wrong_type(key, "bool", classify_cli(other)))

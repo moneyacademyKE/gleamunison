@@ -16,7 +16,7 @@ import gleamunison/elab_types.{
   SMatch, SRef, SText, SUse, SVar, SurfaceAbilityDef, SurfacePubTypeAlias,
   SurfaceTermDef, SurfaceTypeAlias, SurfaceTypeDef,
 }
-import gleamunison/identity.{type DefinitionRef, ref_hex as canonical_ref_hex}
+import gleamunison/identity.{ref_hex as canonical_ref_hex}
 import gleamunison/lisp_literal
 
 /// A datalog datom for the codebase index: entity is a stable per-def int,
@@ -47,10 +47,10 @@ pub fn ref_hex(name: String, def: SurfaceDef) -> String {
     // elaborator emits and what a caller can actually reference.
     SurfaceTermDef(SRef(r)) ->
       case bootstraps.builtin_name_for(r) {
-        Ok(builtin) -> ref_to_hex(identity.name_ref(builtin))
-        Error(_) -> ref_to_hex(r)
+        Ok(builtin) -> canonical_ref_hex(identity.name_ref(builtin))
+        Error(_) -> canonical_ref_hex(r)
       }
-    _ -> ref_to_hex(identity.name_ref(name))
+    _ -> canonical_ref_hex(identity.name_ref(name))
   }
 }
 
@@ -69,12 +69,9 @@ pub fn kind_of_entry(entry: agent_read_model.Entry) -> String {
 pub fn ref_hex_entry(entry: agent_read_model.Entry) -> String {
   case entry {
     agent_read_model.Source(name:, definition:, ..) -> ref_hex(name, definition)
-    agent_read_model.Stored(name:, ..) -> ref_to_hex(identity.name_ref(name))
+    agent_read_model.Stored(name:, ..) ->
+      canonical_ref_hex(identity.name_ref(name))
   }
-}
-
-fn ref_to_hex(r: DefinitionRef) -> String {
-  canonical_ref_hex(r)
 }
 
 /// The index schema: one entity per definition, carrying name/hash/kind,

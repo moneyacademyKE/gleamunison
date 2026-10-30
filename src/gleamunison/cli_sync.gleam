@@ -42,7 +42,7 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
         let _ =
           store_log.record_content(
             cli_lifecycle.root_dir(context),
-            ref_hex(ref),
+            identity.ref_hex(ref),
             "sync",
           )
         Nil
@@ -65,10 +65,6 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
     }),
   )
   cli_result.success(output)
-}
-
-fn ref_hex(ref: identity.DefinitionRef) -> String {
-  identity.ref_hex(ref)
 }
 
 fn parse_args(

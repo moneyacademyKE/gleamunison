@@ -22,7 +22,7 @@ pub fn definition_is_effectful(definition: ast.Definition) -> Bool {
   }
 }
 
-pub fn term_is_effectful(term: ast.Term) -> Bool {
+fn term_is_effectful(term: ast.Term) -> Bool {
   case term {
     ast.Do(..) -> True
     ast.RefTo(ref) -> bootstrap_terms.is_host_ref(ref)
