@@ -42,7 +42,7 @@ pub fn post_without_headers_keeps_octet_stream_default_test() {
   let assert Ok(port) = start_echo_server()
   let url = "http://127.0.0.1:" <> int.to_string(port) <> "/legacy"
   let assert Ok(resp) =
-    http_client.post(url, bit_array.from_string("raw-bytes"))
+    http_client.request("POST", url, [], bit_array.from_string("raw-bytes"))
   let assert True = http_client.status(resp) == 200
   let seen = string.lowercase(body_to_string(resp))
   // Regression guard: the pre-change default must be preserved.

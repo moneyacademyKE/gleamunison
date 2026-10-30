@@ -1,8 +1,5 @@
 -module(gleamunison_http_client).
--export([request/4, request_with_options/6, get/1, post/2, put/2, delete/1]).
-
-request(Method, Url, Headers, Body) ->
-    request_with_options(Method, Url, Headers, Body, 180000, none).
+-export([request_with_options/6]).
 
 request_with_options(Method, Url, Headers, Body, TimeoutMs, Cancellation)
     when is_binary(Method), is_binary(Url), is_integer(TimeoutMs),
@@ -86,15 +83,3 @@ take_content_type(Headers) ->
         {[{_, V} | _], Rest} -> {V, Rest};
         {[], _} -> {"application/octet-stream", Headers}
     end.
-
-get(Url) when is_binary(Url) ->
-    request(<<"GET">>, Url, [], <<>>).
-
-post(Url, Body) when is_binary(Url), is_binary(Body) ->
-    request(<<"POST">>, Url, [], Body).
-
-put(Url, Body) when is_binary(Url), is_binary(Body) ->
-    request(<<"PUT">>, Url, [], Body).
-
-delete(Url) when is_binary(Url) ->
-    request(<<"DELETE">>, Url, [], <<>>).

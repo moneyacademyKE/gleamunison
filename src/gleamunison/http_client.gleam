@@ -24,28 +24,6 @@ pub type HttpError {
   HttpError(reason: String)
 }
 
-@external(erlang, "gleamunison_http_client", "get")
-fn ffi_get(
-  url: BitArray,
-) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
-
-@external(erlang, "gleamunison_http_client", "post")
-fn ffi_post(
-  url: BitArray,
-  body: BitArray,
-) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
-
-@external(erlang, "gleamunison_http_client", "put")
-fn ffi_put(
-  url: BitArray,
-  body: BitArray,
-) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
-
-@external(erlang, "gleamunison_http_client", "delete")
-fn ffi_delete(
-  url: BitArray,
-) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
-
 fn pack(s: String) -> BitArray {
   bit_array.from_string(s)
 }
@@ -78,8 +56,8 @@ fn ffi_request_with_options(
   cancellation: Option(cancellation.Token),
 ) -> Result(#(Int, List(#(BitArray, BitArray)), BitArray), BitArray)
 
-/// Header-aware request — the general form; get/post/put/delete are the
-/// no-header conveniences preserved for existing callers.
+/// Header-aware request — the general form, and the single convenience
+/// wrapper over request_with_options (default timeout, no cancellation).
 pub fn request(
   method: String,
   url: String,
@@ -129,36 +107,4 @@ pub fn post_with_headers(
   body: BitArray,
 ) -> Result(HttpResponse, HttpError) {
   request("POST", url, headers, body)
-}
-
-pub fn get(url: String) -> Result(HttpResponse, HttpError) {
-  case ffi_get(pack(url)) {
-    Ok(#(status, headers, body)) ->
-      Ok(HttpResponse(status, map_headers(headers), body))
-    Error(e) -> Error(HttpError(unpack(e)))
-  }
-}
-
-pub fn post(url: String, body: BitArray) -> Result(HttpResponse, HttpError) {
-  case ffi_post(pack(url), body) {
-    Ok(#(status, headers, body)) ->
-      Ok(HttpResponse(status, map_headers(headers), body))
-    Error(e) -> Error(HttpError(unpack(e)))
-  }
-}
-
-pub fn put(url: String, body: BitArray) -> Result(HttpResponse, HttpError) {
-  case ffi_put(pack(url), body) {
-    Ok(#(status, headers, body)) ->
-      Ok(HttpResponse(status, map_headers(headers), body))
-    Error(e) -> Error(HttpError(unpack(e)))
-  }
-}
-
-pub fn delete(url: String) -> Result(HttpResponse, HttpError) {
-  case ffi_delete(pack(url)) {
-    Ok(#(status, headers, body)) ->
-      Ok(HttpResponse(status, map_headers(headers), body))
-    Error(e) -> Error(HttpError(unpack(e)))
-  }
 }
