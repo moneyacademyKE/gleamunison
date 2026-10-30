@@ -33,9 +33,6 @@ pub fn main() -> Nil {
   run(argv.load().arguments)
 }
 
-@external(erlang, "gleamunison_ffi", "halt_failure")
-fn halt_failure() -> Nil
-
 @external(erlang, "gleamunison_render", "setup_stdio")
 fn setup_stdio() -> Nil
 
@@ -56,7 +53,7 @@ pub fn run(args: List(String)) -> Nil {
         Ok(out) -> io.println(out)
         Error(err) -> {
           io.println("ERROR: " <> err)
-          halt_failure()
+          cli_result.halt_failure()
         }
       }
     ["datalog"] -> cli_result.fail("usage: gleam run -- datalog <file.lisp>")
@@ -108,7 +105,7 @@ fn dispatch(cmd: String, param: String) -> Nil {
         Ok(msg) -> io.println("OK: " <> msg)
         Error(err) -> {
           io.println("ERROR: " <> err)
-          halt_failure()
+          cli_result.halt_failure()
         }
       }
     }
@@ -132,7 +129,7 @@ fn dispatch_level(cmd: String) -> Nil {
           io.println(
             "Unknown command: '" <> cmd <> "'. Run --help for the list.",
           )
-          halt_failure()
+          cli_result.halt_failure()
         }
       }
     Error(e) -> level_data_error(e)
@@ -160,7 +157,7 @@ fn run_all_levels() -> Nil {
 fn level_data_error(message: String) -> Nil {
   io.println("ERROR: " <> message)
   io.println("This build cannot run levels: the level data file is missing.")
-  halt_failure()
+  cli_result.halt_failure()
 }
 
 fn print_help() -> Nil {

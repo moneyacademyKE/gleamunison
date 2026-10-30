@@ -6,12 +6,9 @@
 //// so the decision is unit-testable with real files.
 
 import gleam/io
+import gleamunison/time_ffi.{sleep}
 import gleamunison/verify
 import simplifile
-
-// Erlang returns the atom `ok`; the value is discarded.
-@external(erlang, "timer", "sleep")
-fn sleep(ms: Int) -> Nil
 
 pub type Poll {
   Changed(mtime: Int)

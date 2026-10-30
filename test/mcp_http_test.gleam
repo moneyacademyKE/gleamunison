@@ -360,7 +360,7 @@ fn attest_io(
 fn generate_from_provider(id: Int, source: String, signature: String) -> Nil {
   let candidate =
     "{\"source\":"
-    <> json_string(source)
+    <> json.json_quote(source)
     <> ",\"signature\":\""
     <> signature
     <> "\"}"
@@ -380,9 +380,6 @@ fn generate_from_provider(id: Int, source: String, signature: String) -> Nil {
   let assert True = string.contains(response, "\\\"admitted\\\":1")
   Nil
 }
-
-@external(erlang, "gleamunison_ffi", "json_quote")
-fn json_string(value: String) -> String
 
 pub fn mcp_generation_rejects_untrusted_before_storage_test() {
   let root = "/tmp/gleamunison-mcp-untrusted-generation-test"

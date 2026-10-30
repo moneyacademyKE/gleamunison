@@ -8,6 +8,7 @@ import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/generation_loop
 import gleamunison/identity
+import gleamunison/json
 import gleamunison/namespace
 import gleamunison/prompt
 import gleamunison/run_ref
@@ -97,7 +98,9 @@ pub fn retry_receives_feedback_and_exhaustion_preserves_branch_test() {
                 "previous candidate was rejected: generation candidate contains no JSON",
               )
               |> should.be_true
-              "{\"source\":" <> quoted(source) <> ",\"signature\":\"int\"}"
+              "{\"source\":"
+              <> json.json_quote(source)
+              <> ",\"signature\":\"int\"}"
             }
           }
         },
@@ -154,7 +157,9 @@ pub fn signature_mismatch_is_refused_before_publication_test() {
         "factory",
         False,
         plan,
-        fn(_) { "{\"source\":" <> quoted(source) <> ",\"signature\":\"int\"}" },
+        fn(_) {
+          "{\"source\":" <> json.json_quote(source) <> ",\"signature\":\"int\"}"
+        },
       )
     string.contains(message, "signature") |> should.be_true
     let assert Ok(ns) = namespace.load_current_or_empty(adapter, "factory")
@@ -209,7 +214,9 @@ pub fn explicit_target_admits_helpers_and_runs_test() {
         "factory",
         False,
         plan,
-        fn(_) { "{\"source\":" <> quoted(source) <> ",\"signature\":\"int\"}" },
+        fn(_) {
+          "{\"source\":" <> json.json_quote(source) <> ",\"signature\":\"int\"}"
+        },
       )
     outcome.publication.admitted |> should.equal(2)
     let assert Ok(helper) = published(outcome.publication, "generated-base")
@@ -257,7 +264,9 @@ pub fn invalid_explicit_target_preserves_existing_branch_test() {
         False,
         plan,
         fn(_) {
-          "{\"source\":" <> quoted(missing_source) <> ",\"signature\":\"int\"}"
+          "{\"source\":"
+          <> json.json_quote(missing_source)
+          <> ",\"signature\":\"int\"}"
         },
       )
     string.contains(missing, "target") |> should.be_true
@@ -277,7 +286,9 @@ pub fn invalid_explicit_target_preserves_existing_branch_test() {
         False,
         plan,
         fn(_) {
-          "{\"source\":" <> quoted(wrong_source) <> ",\"signature\":\"int\"}"
+          "{\"source\":"
+          <> json.json_quote(wrong_source)
+          <> ",\"signature\":\"int\"}"
         },
       )
     string.contains(wrong_type, "signature mismatch") |> should.be_true
@@ -314,7 +325,9 @@ pub fn patch_reports_dependents_without_rewriting_stored_code_test() {
           target: None,
         ),
         fn(_) {
-          "{\"source\":" <> quoted(updated_source) <> ",\"signature\":\"int\"}"
+          "{\"source\":"
+          <> json.json_quote(updated_source)
+          <> ",\"signature\":\"int\"}"
         },
       )
     outcome.dependents |> should.equal(["derived-value"])
@@ -354,9 +367,6 @@ fn ref(hex: String) -> identity.DefinitionRef {
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn dynamic(value: String) -> b
-
-@external(erlang, "gleamunison_ffi", "json_quote")
-fn quoted(value: String) -> String
 
 fn with_store(work: fn(storage.StorageAdapter, String) -> a) -> a {
   let root = "/tmp/gleamunison-generation-loop-test"

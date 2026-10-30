@@ -6,19 +6,14 @@
 import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/cli_output
+import gleamunison/json
 import gleeunit/should
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
 fn to_dynamic(value: a) -> Dynamic
 
-@external(erlang, "gleamunison_ffi", "term_to_json")
-fn term_to_json(term: Dynamic, depth: Int) -> String
-
-@external(erlang, "gleamunison_ffi", "json_quote")
-fn json_quote(text: String) -> String
-
 fn json(value: a) -> String {
-  term_to_json(to_dynamic(value), 0)
+  json.term_to_json(to_dynamic(value), 0)
 }
 
 pub fn an_integer_is_native_test() {
@@ -63,12 +58,12 @@ pub fn a_function_is_opaque_rather_than_invented_test() {
 pub fn the_depth_cap_truncates_test() {
   // Depth 17 is past the cap of 16: the encoder names the depth rather than
   // recursing, which is what stops a self-referential term.
-  term_to_json(to_dynamic(1), 17)
+  json.term_to_json(to_dynamic(1), 17)
   |> should.equal("{\"truncated\":17}")
 }
 
 pub fn the_depth_cap_does_not_fire_early_test() {
-  term_to_json(to_dynamic(1), 16) |> should.equal("1")
+  json.term_to_json(to_dynamic(1), 16) |> should.equal("1")
 }
 
 pub fn the_envelope_carries_the_ref_and_the_value_test() {
@@ -85,5 +80,5 @@ pub fn the_function_envelope_names_the_entry_point_test() {
 }
 
 pub fn quote_escapes_for_the_envelope_test() {
-  json_quote("a\"b") |> should.equal("\"a\\\"b\"")
+  json.json_quote("a\"b") |> should.equal("\"a\\\"b\"")
 }

@@ -14,9 +14,6 @@ import gleamunison/test_runner.{type TestResult}
 import gleamunison/verify
 import simplifile
 
-@external(erlang, "gleamunison_ffi", "halt_failure")
-fn halt_failure() -> Nil
-
 /// Attachments produced by a run: subject hash + human payload, in order.
 pub type Attachments =
   List(#(String, String))
@@ -101,7 +98,7 @@ fn report(results: List(TestResult), attachments: Attachments) -> Nil {
     [] -> fail("test: no test_ definitions found")
     _ ->
       case has_failures(results) {
-        True -> halt_failure()
+        True -> cli_result.halt_failure()
         False -> Nil
       }
   }

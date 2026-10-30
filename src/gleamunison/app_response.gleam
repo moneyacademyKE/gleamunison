@@ -3,14 +3,9 @@
 
 import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
+import gleamunison/json
 
 const max_response_bytes = 1_048_576
-
-@external(erlang, "gleamunison_ffi", "term_to_json")
-fn term_to_json(term: Dynamic, depth: Int) -> String
-
-@external(erlang, "gleamunison_ffi", "json_quote")
-fn quoted(text: String) -> String
 
 pub fn success(
   ref: String,
@@ -19,11 +14,11 @@ pub fn success(
 ) -> Result(String, String) {
   let body =
     "{\"ref\":"
-    <> quoted(ref)
+    <> json.json_quote(ref)
     <> ",\"branch\":"
-    <> quoted(branch)
+    <> json.json_quote(branch)
     <> ",\"value\":"
-    <> term_to_json(term, 0)
+    <> json.term_to_json(term, 0)
     <> "}"
   case bit_array.byte_size(bit_array.from_string(body)) <= max_response_bytes {
     True -> Ok(body)
@@ -32,5 +27,9 @@ pub fn success(
 }
 
 pub fn failure(code: String, detail: String) -> String {
-  "{\"error\":" <> quoted(code) <> ",\"detail\":" <> quoted(detail) <> "}"
+  "{\"error\":"
+  <> json.json_quote(code)
+  <> ",\"detail\":"
+  <> json.json_quote(detail)
+  <> "}"
 }

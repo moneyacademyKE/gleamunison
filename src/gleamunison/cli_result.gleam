@@ -8,8 +8,11 @@
 
 import gleam/io
 
+/// Exit the process with the failure code and no message of its own: the caller
+/// has already said why. This is the raw form of `fail` below, for the commands
+/// that print their own diagnostic first.
 @external(erlang, "gleamunison_ffi", "halt_failure")
-fn halt_failure() -> Nil
+pub fn halt_failure() -> Nil
 
 @external(erlang, "gleamunison_ffi", "halt_failure_code")
 fn halt_failure_code(code: Int) -> Nil

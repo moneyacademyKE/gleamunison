@@ -10,21 +10,14 @@
 import gleam/dynamic.{type Dynamic}
 import gleam/int
 import gleam/list
-
-@external(erlang, "gleamunison_ffi", "term_to_json")
-fn term_to_json(term: Dynamic, depth: Int) -> String
-
-/// JSON-escape a string. The FFI owns escaping (control characters, UTF-8), so
-/// the envelope and the values it wraps agree on one encoder.
-@external(erlang, "gleamunison_ffi", "json_quote")
-fn quoted(text: String) -> String
+import gleamunison/json
 
 /// A value definition's result.
 pub fn value_json(ref_hex: String, term: Dynamic) -> String {
   "{\"ref\":"
-  <> quoted(ref_hex)
+  <> json.json_quote(ref_hex)
   <> ",\"value\":"
-  <> term_to_json(term, 0)
+  <> json.term_to_json(term, 0)
   <> "}"
 }
 
@@ -38,11 +31,11 @@ pub fn function_json(
 ) -> String {
   let #(name, export_arity) = primary_export(exports)
   "{\"ref\":"
-  <> quoted(ref_hex)
+  <> json.json_quote(ref_hex)
   <> ",\"module\":"
-  <> quoted(module)
+  <> json.json_quote(module)
   <> ",\"function\":{\"name\":"
-  <> quoted(name)
+  <> json.json_quote(name)
   <> ",\"export_arity\":"
   <> int.to_string(export_arity)
   <> ",\"arity\":"

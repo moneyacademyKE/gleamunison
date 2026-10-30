@@ -18,9 +18,7 @@ import gleamunison/llm_controls
 import gleamunison/llm_settlement
 import gleamunison/llm_types.{type Completion}
 import gleamunison/llm_wire
-
-@external(erlang, "timer", "sleep")
-fn sleep(ms: Int) -> Nil
+import gleamunison/time_ffi.{sleep}
 
 /// Budget/circuit gate as handler composition. Admit before the call,
 /// release the concurrency slot exactly once, then meter actuals and

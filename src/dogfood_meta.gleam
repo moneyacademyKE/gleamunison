@@ -3,9 +3,7 @@ import dogfood_runner
 import gleam/int
 import gleam/io
 import gleam/list
-
-@external(erlang, "gleamunison_ffi", "halt_failure")
-fn halt_failure() -> Nil
+import gleamunison/cli_result
 
 /// Level 70 runs every certification level (n % 50 == 0). A missing data
 /// file is a failure, not an empty run: this used to print
@@ -22,7 +20,7 @@ pub fn level70() -> Nil {
     }
     Error(e) -> {
       io.println("Failed to load levels: " <> e)
-      halt_failure()
+      cli_result.halt_failure()
     }
   }
 }
