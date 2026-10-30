@@ -17,7 +17,6 @@ import gleamunison/definition_refs
 import gleamunison/identity.{type DefinitionRef}
 import gleamunison/loader
 import gleamunison/name_snapshot
-import gleamunison/repl_eval
 import gleamunison/run_error.{
   type RunError, Cycle, LoadFailed, Missing, describe_load, read_error,
 }
@@ -91,9 +90,9 @@ pub fn resolve_definition(
 fn is_bootstrap_ref(ref: DefinitionRef) -> Bool {
   list.any(bootstraps.get_init_defs_data(), fn(definition) {
     case definition {
-      bootstraps.BAbility(name, _) -> repl_eval.ref_for_name(name) == ref
+      bootstraps.BAbility(name, _) -> identity.name_ref(name) == ref
       bootstraps.BTerm(name, known_ref, _) ->
-        known_ref == ref || repl_eval.ref_for_name(name) == ref
+        known_ref == ref || identity.name_ref(name) == ref
     }
   })
 }

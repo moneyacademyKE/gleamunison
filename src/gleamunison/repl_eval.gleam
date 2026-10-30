@@ -12,10 +12,8 @@ import gleamunison/elab_types.{
   type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
 }
 import gleamunison/elaborate as elab
-import gleamunison/identity.{type DefinitionRef, Ref}
-import gleamunison/loader_ffi.{
-  eval_module, load_binary, string_to_binary, unload_binary,
-}
+import gleamunison/identity.{type DefinitionRef}
+import gleamunison/loader_ffi.{eval_module, load_binary, unload_binary}
 import gleamunison/types.{type TypeCache, CTTerm, TypeCache}
 
 @external(erlang, "gleamunison_ffi_io", "serialize_term")
@@ -129,8 +127,11 @@ pub fn format_elab_error(
   }
 }
 
+/// The name-to-ref derivation belongs to identity; this is the public
+/// contract its callers have always used, kept as a delegate rather than
+/// left as a second authority for the bytes.
 pub fn ref_for_name(name: String) -> DefinitionRef {
-  Ref(identity.hash_bytes(string_to_binary(name)))
+  identity.name_ref(name)
 }
 
 /// Elaborate + compile + load a term definition, returning the loaded

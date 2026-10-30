@@ -8,10 +8,9 @@ import gleamunison/effects.{
   type HandlerFrame, type OpHandler, HandlerFrame, ability_key,
 }
 import gleamunison/identity.{type DefinitionRef}
-import gleamunison/repl_eval
 
 pub fn ability_ref() -> DefinitionRef {
-  repl_eval.ref_for_name("Db")
+  identity.name_ref("Db")
 }
 
 pub fn key() -> String {

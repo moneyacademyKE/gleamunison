@@ -11,6 +11,7 @@ import gleamunison/agent_read_model
 import gleamunison/codebase_graph
 import gleamunison/config
 import gleamunison/elab_types.{type SurfaceDef}
+import gleamunison/identity
 import gleamunison/lexer
 import gleamunison/mcp.{type Response, type Tool, Server, Tool}
 import gleamunison/mcp_definition
@@ -103,7 +104,7 @@ pub fn overlay_scratch(
       scratch,
       TypeCache(dict.merge(previous.cache.entries, fresh.cache.entries)),
       fn(cache, entry) {
-        let name_ref = repl_eval.ref_for_name(agent_read_model.name(entry))
+        let name_ref = identity.name_ref(agent_read_model.name(entry))
         case dict.get(previous.cache.entries, name_ref) {
           Ok(computed) ->
             TypeCache(dict.insert(cache.entries, name_ref, computed))

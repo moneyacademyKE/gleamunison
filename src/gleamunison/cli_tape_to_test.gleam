@@ -17,7 +17,7 @@ import gleam/string
 import gleamunison/bootstraps
 import gleamunison/cli_result
 import gleamunison/compile
-import gleamunison/repl_eval
+import gleamunison/identity
 import gleamunison/transcript
 import simplifile
 
@@ -107,7 +107,7 @@ fn ability_name_for_key(key: String) -> Result(String, String) {
     })
   case
     list.find(abilities, fn(name) {
-      compile.module_name_for(repl_eval.ref_for_name(name)) == key
+      compile.module_name_for(identity.name_ref(name)) == key
     })
   {
     Ok(name) -> Ok(name)

@@ -13,6 +13,7 @@ import gleam/result
 import gleam/string
 import gleamunison/elab_types
 import gleamunison/elaborate as elab
+import gleamunison/identity
 import gleamunison/json
 import gleamunison/lexer
 import gleamunison/lsp_features
@@ -235,7 +236,7 @@ fn elaborate_diagnostics(
       }
     })
   let defs = list.append(file_defs, init_defs)
-  let root = repl_eval.ref_for_name("lsp_diagnose")
+  let root = identity.name_ref("lsp_diagnose")
   case
     elab.elaborate_unit(elab_types.SurfaceUnit(root:, defs:), empty_cache())
   {

@@ -14,7 +14,6 @@ import gleam/option
 import gleamunison/ast
 import gleamunison/bootstrap_terms
 import gleamunison/identity.{ref_hex}
-import gleamunison/repl_eval
 
 pub fn definition_is_effectful(definition: ast.Definition) -> Bool {
   case definition {
@@ -109,7 +108,7 @@ fn name_of_content_ref(
 ) -> Result(String, Nil) {
   case
     list.find(entries, fn(entry) {
-      ref_hex(repl_eval.ref_for_name(entry.name)) == hash
+      ref_hex(identity.name_ref(entry.name)) == hash
     })
   {
     Ok(entry) -> Ok(entry.name)

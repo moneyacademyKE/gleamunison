@@ -11,8 +11,7 @@ import gleamunison/cli_result
 import gleamunison/compile
 import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, RuntimeConfig}
-
-import gleamunison/repl_eval
+import gleamunison/identity
 import gleamunison/transcript
 import gleamunison/verify
 import simplifile
@@ -92,6 +91,6 @@ fn load_and_compile(path: String, name: String) -> Result(String, String) {
   use #(_cache, defs) <- result.try(verify.load_defs_file(path))
   case list.any(defs, fn(pair) { pair.0 == name }) {
     False -> Error("replay: no definition named " <> name <> " in " <> path)
-    True -> Ok(compile.module_name_for(repl_eval.ref_for_name(name)))
+    True -> Ok(compile.module_name_for(identity.name_ref(name)))
   }
 }

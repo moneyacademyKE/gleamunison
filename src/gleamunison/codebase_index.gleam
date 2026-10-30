@@ -18,7 +18,6 @@ import gleamunison/elab_types.{
 }
 import gleamunison/identity.{type DefinitionRef, ref_hex as canonical_ref_hex}
 import gleamunison/lisp_literal
-import gleamunison/repl_eval
 
 /// A datalog datom for the codebase index: entity is a stable per-def int,
 /// value is always a string (hashes, names, kinds) so q-val joins work.
@@ -48,10 +47,10 @@ pub fn ref_hex(name: String, def: SurfaceDef) -> String {
     // elaborator emits and what a caller can actually reference.
     SurfaceTermDef(SRef(r)) ->
       case bootstraps.builtin_name_for(r) {
-        Ok(builtin) -> ref_to_hex(repl_eval.ref_for_name(builtin))
+        Ok(builtin) -> ref_to_hex(identity.name_ref(builtin))
         Error(_) -> ref_to_hex(r)
       }
-    _ -> ref_to_hex(repl_eval.ref_for_name(name))
+    _ -> ref_to_hex(identity.name_ref(name))
   }
 }
 
@@ -70,8 +69,7 @@ pub fn kind_of_entry(entry: agent_read_model.Entry) -> String {
 pub fn ref_hex_entry(entry: agent_read_model.Entry) -> String {
   case entry {
     agent_read_model.Source(name:, definition:, ..) -> ref_hex(name, definition)
-    agent_read_model.Stored(name:, ..) ->
-      ref_to_hex(repl_eval.ref_for_name(name))
+    agent_read_model.Stored(name:, ..) -> ref_to_hex(identity.name_ref(name))
   }
 }
 
@@ -96,7 +94,7 @@ pub fn datoms_of_entries(entries: List(agent_read_model.Entry)) -> List(Datom) {
       let with_name =
         dict.insert(
           acc,
-          repl_eval.ref_for_name(agent_read_model.name(entry)),
+          identity.name_ref(agent_read_model.name(entry)),
           agent_read_model.name(entry),
         )
       case entry {

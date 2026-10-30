@@ -8,16 +8,16 @@ import gleamunison/elab_types.{
   type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
 }
 import gleamunison/elaborate as elab
-import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes}
+import gleamunison/identity.{type DefinitionRef}
 import gleamunison/lexer.{type ParseError}
-import gleamunison/loader_ffi.{
-  eval_module, load_binary, string_to_binary, unload_binary,
-}
+import gleamunison/loader_ffi.{eval_module, load_binary, unload_binary}
 import gleamunison/parser
 import gleamunison/types.{type TypeCache}
 
+/// identity owns the name-to-ref bytes; still public because callers have
+/// been able to reach the derivation through the pipeline.
 pub fn ref_for_name(name: String) -> DefinitionRef {
-  Ref(hash_bytes(string_to_binary(name)))
+  identity.name_ref(name)
 }
 
 pub fn parse_only(source: String) -> Result(SurfaceTerm, ParseError) {

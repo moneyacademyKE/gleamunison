@@ -16,7 +16,6 @@ import gleamunison/identity
 import gleamunison/mcp
 import gleamunison/patch
 import gleamunison/prompt
-import gleamunison/repl_eval
 import gleamunison/schema_printer
 import gleamunison/storage.{type StorageAdapter}
 
@@ -304,7 +303,7 @@ fn direct_dependents(
   let definitions = list.map(stored, fn(item) { #(item.1, item.2) })
   publication.definitions
   |> list.flat_map(fn(published) {
-    patch.dependents(definitions, repl_eval.ref_for_name(published.name))
+    patch.dependents(definitions, identity.name_ref(published.name))
   })
   |> list.unique
   |> list.filter_map(fn(ref) {

@@ -14,7 +14,6 @@ import gleamunison/loader
 import gleamunison/lower.{type_ref_to_type}
 import gleamunison/name_snapshot
 import gleamunison/namespace
-import gleamunison/repl_eval
 import gleamunison/run_closure
 import gleamunison/run_error
 import gleamunison/storage.{type StorageAdapter}
@@ -99,7 +98,7 @@ pub fn cache(entries: List(Entry), baseline: TypeCache) -> TypeCache {
         TypeCache(
           acc.entries
           |> dict.insert(ref, computed)
-          |> dict.insert(repl_eval.ref_for_name(name), computed),
+          |> dict.insert(identity.name_ref(name), computed),
         )
       }
     }
@@ -139,7 +138,7 @@ pub fn load(
       run_closure.resolve_definition(
         ld,
         cb,
-        repl_eval.ref_for_name(name),
+        identity.name_ref(name),
         definition,
         [],
         names,

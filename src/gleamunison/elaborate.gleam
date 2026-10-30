@@ -8,13 +8,15 @@ import gleamunison/elab_types.{
   SurfaceAbilityDef, SurfacePubTypeAlias, SurfaceTermDef, SurfaceTypeAlias,
   SurfaceTypeDef, SurfaceUnit,
 }
-import gleamunison/identity.{type DefinitionRef, Local, Ref}
-import gleamunison/loader_ffi.{string_to_binary}
+import gleamunison/identity.{type DefinitionRef, Local}
 import gleamunison/typecheck
 import gleamunison/types.{type TypeCache, CTType, TypeCache}
 
+/// identity owns the name-to-ref bytes; elaborate only needs the value.
+/// This was a private copy of the derivation, forced by repl_eval importing
+/// elaborate, so the copy could not call the original.
 fn ref_for_name(name: String) -> DefinitionRef {
-  Ref(identity.hash_bytes(string_to_binary(name)))
+  identity.name_ref(name)
 }
 
 fn register_ability_ops(

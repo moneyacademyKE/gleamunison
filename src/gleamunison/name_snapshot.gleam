@@ -5,7 +5,6 @@ import gleam/list
 import gleam/result
 import gleamunison/identity.{type DefinitionRef}
 import gleamunison/namespace
-import gleamunison/repl_eval
 import gleamunison/storage
 
 pub type Bindings =
@@ -23,7 +22,7 @@ pub fn from_namespace(ns: namespace.Namespace) -> Bindings {
   dict.from_list(
     list.map(namespace.names(ns), fn(name) {
       let assert Ok(content) = namespace.get(ns, name)
-      #(repl_eval.ref_for_name(name), content)
+      #(identity.name_ref(name), content)
     }),
   )
 }

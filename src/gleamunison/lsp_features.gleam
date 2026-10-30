@@ -13,6 +13,7 @@ import gleam/string
 import gleamunison/ast
 import gleamunison/elab_types
 import gleamunison/elaborate as elab
+import gleamunison/identity
 import gleamunison/lexer
 import gleamunison/lsp_types
 import gleamunison/repl_eval
@@ -253,7 +254,7 @@ fn hover_type(text: String, name: String) -> option.Option(String) {
           // Bootstrap first: file defs reference builtin names, so their
           // types must be in the cache before the file elaborates.
           let defs = list.append(verify.get_init_defs(), file_defs)
-          let root = repl_eval.ref_for_name("lsp_hover")
+          let root = identity.name_ref("lsp_hover")
           case
             elab.elaborate_unit(
               elab_types.SurfaceUnit(root:, defs:),
@@ -262,7 +263,7 @@ fn hover_type(text: String, name: String) -> option.Option(String) {
           {
             Error(_) -> option.None
             Ok(#(unit, _, _)) ->
-              case list.key_find(unit.defs, repl_eval.ref_for_name(name)) {
+              case list.key_find(unit.defs, identity.name_ref(name)) {
                 Ok(ast.TermDef(_, typ)) ->
                   option.Some(type_pretty.pretty_print(typ))
                 _ -> option.None

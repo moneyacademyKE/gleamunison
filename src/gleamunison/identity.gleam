@@ -1,5 +1,6 @@
 import gleam/result
 import gleam/string
+import gleamunison/loader_ffi
 
 /// Opaque hash type. No access to the inner bytes outside this module.
 pub opaque type Hash {
@@ -60,6 +61,18 @@ pub fn hash_equal(a: Hash, b: Hash) -> Bool {
 /// Compute a SHA-256 hash from arbitrary bytes.
 pub fn hash_bytes(contents: BitArray) -> Hash {
   Hash(ffi_hash_bytes(contents))
+}
+
+/// The ref a *name* derives to: the SHA-256 of its UTF-8 bytes. Elaboration
+/// wires intra-batch references this way, so every layer that resolves a name
+/// to a ref must agree on these bytes - changing the derivation orphans every
+/// definition already stored under the old one.
+///
+/// This lives with the other hash authorities rather than in the REPL
+/// evaluator, where it grew first and which the read model, the index and the
+/// db layer were importing purely to hash a name.
+pub fn name_ref(name: String) -> DefinitionRef {
+  Ref(hash_bytes(loader_ffi.string_to_binary(name)))
 }
 
 /// Produce a hex string for display/debugging.

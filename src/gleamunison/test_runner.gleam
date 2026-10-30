@@ -27,7 +27,7 @@ pub type TestResult {
 
 /// The Test ability's ref: surface-declared abilities are keyed by name hash.
 pub fn ability_ref() -> DefinitionRef {
-  repl_eval.ref_for_name("Test")
+  identity.name_ref("Test")
 }
 
 /// The expect handler: passes the assertion value through unchanged; the
@@ -144,7 +144,7 @@ pub fn elaborated_def_for(
   defs: List(#(String, SurfaceDef)),
   cache: TypeCache,
 ) -> Result(ast.Definition, String) {
-  let root = repl_eval.ref_for_name(name)
+  let root = identity.name_ref(name)
   case elab.elaborate_unit(SurfaceUnit(root: root, defs:), cache) {
     Error(err) -> Error(string.inspect(err))
     Ok(#(unit, _, _)) ->
