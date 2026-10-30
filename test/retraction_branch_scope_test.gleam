@@ -19,9 +19,7 @@ import gleamunison/namespace
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "erlang", "unique_integer")
-fn unique_id() -> Int
+import test_ffi.{unique_integer}
 
 fn seeded() {
   let adapter = storage.inmemory()
@@ -36,7 +34,7 @@ fn seeded() {
 }
 
 fn index_file(name: String, ref) -> String {
-  let path = "/tmp/retraction-scope-" <> int.to_string(unique_id())
+  let path = "/tmp/retraction-scope-" <> int.to_string(unique_integer())
   let index = name <> " " <> ref_hex(ref) <> "\n"
   let assert Ok(_) = simplifile.write(index, to: path)
   path

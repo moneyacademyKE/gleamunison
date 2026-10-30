@@ -1,6 +1,5 @@
 import envoy
 import gleam/bit_array
-import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/list
 import gleam/string
@@ -13,31 +12,10 @@ import gleamunison/source_loader
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "start_http_server")
-fn start_http_server(port: Int) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "stop_http_server")
-fn stop_http_server() -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "http_get")
-fn http_get(port: Int, path: String) -> Result(#(Int, String), String)
-
-@external(erlang, "gleamunison_ffi_test", "http_post")
-fn http_post(
-  port: Int,
-  path: String,
-  body: String,
-) -> Result(#(Int, String), String)
-
-@external(erlang, "gleamunison_ffi_test", "without_active_storage")
-fn without_active_storage(check: fn() -> a) -> a
-
-@external(erlang, "gleamunison_app_db", "with_path")
-fn with_db_path(path: String, work: fn() -> a) -> a
-
-@external(erlang, "gleamunison_runtime_sup", "stop_db")
-fn stop_db() -> Dynamic
+import test_ffi.{
+  http_get, http_post, start_http_server, stop_db, stop_http_server,
+  with_db_path, without_active_storage,
+}
 
 pub fn mcp_publish_then_http_app_route_executes_same_content_test() {
   let root = "/tmp/gleamunison-app-http-test"

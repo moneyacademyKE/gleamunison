@@ -1,5 +1,8 @@
 import gleam/string
 import gleeunit/should
+import test_ffi.{
+  capture_request, clear_logs, clear_traces, log_count, log_entry, trace_count,
+}
 
 @external(erlang, "gleamunison_observability", "export_json")
 fn export_json() -> String
@@ -15,33 +18,6 @@ fn http_drain_probe() -> Bool
 
 @external(erlang, "gleamunison_readiness", "http_response")
 fn readiness_http_response() -> #(Int, String)
-
-@external(erlang, "gleamunison_trace", "capture_request")
-fn capture_request(
-  method: String,
-  path: String,
-  headers: List(#(String, String)),
-) -> Result(String, String)
-
-@external(erlang, "gleamunison_trace", "trace_count")
-fn trace_count() -> Int
-
-@external(erlang, "gleamunison_trace", "clear_traces")
-fn clear_traces() -> Nil
-
-@external(erlang, "gleamunison_log", "log_entry")
-fn log_entry(
-  level: String,
-  message: String,
-  keys: List(String),
-  vals: List(String),
-) -> Nil
-
-@external(erlang, "gleamunison_log", "log_count")
-fn log_count() -> Int
-
-@external(erlang, "gleamunison_log", "clear_logs")
-fn clear_logs() -> Nil
 
 pub fn export_is_machine_readable_with_all_sections_test() {
   let json = export_json()

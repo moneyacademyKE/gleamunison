@@ -9,12 +9,7 @@ import gleamunison/llm_middleware
 import gleamunison/llm_types
 import gleamunison/llm_wire
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
-fn increment(key: BitArray) -> Int
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_get")
-fn count(key: BitArray) -> Int
+import test_ffi.{pd_counter_get, pd_counter_inc}
 
 fn env_with(settings: List(#(String, String))) -> cli_llm.EnvLookup {
   let values =
@@ -112,7 +107,7 @@ pub fn unsupported_anthropic_effort_is_not_silently_ignored_test() {
 pub fn retry_attempts_have_a_hard_cap_test() {
   let key = <<"retry-hard-cap">>
   let inner = fn(_, cont) {
-    let _ = increment(key)
+    let _ = pd_counter_inc(key)
     cont(to_dynamic(Error(<<"transient failure">>)))
   }
   let handler =
@@ -120,7 +115,7 @@ pub fn retry_attempts_have_a_hard_cap_test() {
   let response: Result(BitArray, BitArray) =
     from_dynamic(handler([], fn(value) { value }))
   response |> should.be_error
-  count(key) |> should.equal(3)
+  pd_counter_get(key) |> should.equal(3)
 }
 
 pub fn terminal_errors_are_not_retried_test() {
@@ -129,7 +124,7 @@ pub fn terminal_errors_are_not_retried_test() {
     fn(message) {
       let key = bit_array.from_string("terminal:" <> message)
       let inner = fn(_, cont) {
-        let _ = increment(key)
+        let _ = pd_counter_inc(key)
         cont(to_dynamic(Error(bit_array.from_string(message))))
       }
       let handler =
@@ -137,7 +132,7 @@ pub fn terminal_errors_are_not_retried_test() {
       let response: Result(BitArray, BitArray) =
         from_dynamic(handler([], fn(value) { value }))
       response |> should.be_error
-      count(key) |> should.equal(1)
+      pd_counter_get(key) |> should.equal(1)
     },
   )
 }

@@ -1,5 +1,4 @@
 import gleam/dict
-import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/string
 import gleamunison/ast
@@ -17,15 +16,7 @@ import gleamunison/verify
 import gleeunit/should
 import run_support
 import simplifile
-
-@external(erlang, "gleamunison_app_db", "with_path")
-fn with_db_path(path: String, work: fn() -> a) -> a
-
-@external(erlang, "gleamunison_runtime_sup", "stop_db")
-fn stop_db() -> Dynamic
-
-@external(erlang, "gleamunison_ffi_test", "rescue")
-fn rescue(work: fn() -> Dynamic) -> Result(Dynamic, String)
+import test_ffi.{rescue, stop_db, with_db_path}
 
 pub fn db_operations_have_concrete_signatures_test() {
   let #(cache, _) =

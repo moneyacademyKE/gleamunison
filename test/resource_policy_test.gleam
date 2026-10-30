@@ -3,6 +3,10 @@ import gleam/int
 import gleam/list
 import gleamunison/identity.{hash_bytes, hash_to_bytes}
 import gleeunit/should
+import test_ffi.{
+  capture_request, clear_logs, clear_traces, log_count, log_entry, trace_count,
+  unique_integer,
+}
 
 // list.range is gone from modern stdlib; a tiny recursive loop does the job.
 fn each_n(n: Int, fun: fn(Int) -> Nil) -> Nil {
@@ -23,37 +27,10 @@ fn ref_bytes(name: String) -> BitArray {
   hash_to_bytes(hash_bytes(bit_array.from_string(name)))
 }
 
-@external(erlang, "gleamunison_trace", "capture_request")
-fn capture_request(
-  method: String,
-  path: String,
-  headers: List(#(String, String)),
-) -> Result(String, String)
-
 @external(erlang, "gleamunison_trace", "get_trace")
 fn get_trace(
   id: String,
 ) -> Result(#(String, String, String, String, List(#(String, String))), String)
-
-@external(erlang, "gleamunison_trace", "trace_count")
-fn trace_count() -> Int
-
-@external(erlang, "gleamunison_trace", "clear_traces")
-fn clear_traces() -> Nil
-
-@external(erlang, "gleamunison_log", "log_entry")
-fn log_entry(
-  level: String,
-  message: String,
-  keys: List(String),
-  vals: List(String),
-) -> Nil
-
-@external(erlang, "gleamunison_log", "log_count")
-fn log_count() -> Int
-
-@external(erlang, "gleamunison_log", "clear_logs")
-fn clear_logs() -> Nil
 
 @external(erlang, "gleamunison_storage", "new")
 fn ets_new() -> BitArray
@@ -88,9 +65,6 @@ fn dets_close(tab: BitArray) -> Result(Nil, Nil)
 
 @external(erlang, "gleamunison_storage", "dets_delete_file")
 fn dets_delete_file(path: String) -> Result(Nil, Nil)
-
-@external(erlang, "erlang", "unique_integer")
-fn unique_integer() -> Int
 
 pub fn trace_table_is_bounded_and_evicts_oldest_test() {
   clear_traces()

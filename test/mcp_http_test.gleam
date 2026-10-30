@@ -1,6 +1,5 @@
 import envoy
 import gleam/bit_array
-import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/list
@@ -18,22 +17,10 @@ import gleamunison/source_loader
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "start_http_server")
-fn ffi_start_http_server(port: Int) -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "stop_http_server")
-fn ffi_stop_http_server() -> Nil
-
-@external(erlang, "gleamunison_ffi_test", "http_get")
-fn ffi_http_get(port: Int, path: String) -> Result(#(Int, String), String)
-
-@external(erlang, "gleamunison_ffi_test", "http_post")
-fn ffi_http_post(
-  port: Int,
-  path: String,
-  body: String,
-) -> Result(#(Int, String), String)
+import test_ffi.{
+  http_get, http_post, start_http_server, stop_db, stop_http_server,
+  with_db_path, without_active_storage,
+}
 
 @external(erlang, "gleamunison_ffi_test", "http_post_auth")
 fn ffi_http_post_auth(
@@ -58,30 +45,21 @@ fn ffi_set_http_token(token: String) -> Nil
 @external(erlang, "gleamunison_ffi_test", "clear_http_token")
 fn ffi_clear_http_token() -> Nil
 
-@external(erlang, "gleamunison_ffi_test", "without_active_storage")
-fn without_active_storage(check: fn() -> a) -> a
-
-@external(erlang, "gleamunison_app_db", "with_path")
-fn with_db_path(path: String, work: fn() -> a) -> a
-
-@external(erlang, "gleamunison_runtime_sup", "stop_db")
-fn stop_db() -> Dynamic
-
 pub fn http_scratch_is_visible_to_mcp_and_browse_test() {
   let assert Ok(Nil) = mcp_server.start([])
-  ffi_start_http_server(18_102)
+  start_http_server(18_102)
   let assert Ok(#(200, _)) =
-    ffi_http_get(18_102, "/define?name=factory_shared&expr=42")
+    http_get(18_102, "/define?name=factory_shared&expr=42")
   let call_body =
     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"get_definition\",\"arguments\":{\"name\":\"factory_shared\"}}}"
-  let mcp_response = ffi_http_post(18_102, "/mcp", call_body)
+  let mcp_response = http_post(18_102, "/mcp", call_body)
   let eval_body =
     "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"factory_shared\"}}}"
-  let eval_response = ffi_http_post(18_102, "/mcp", eval_body)
-  let browse_response = ffi_http_get(18_102, "/browse")
+  let eval_response = http_post(18_102, "/mcp", eval_body)
+  let browse_response = http_get(18_102, "/browse")
 
   mcp_server.stop()
-  ffi_stop_http_server()
+  stop_http_server()
 
   let assert Ok(#(200, definition)) = mcp_response
   string.contains(definition, "factory_shared") |> should.be_true
@@ -98,38 +76,38 @@ pub fn http_scratch_is_visible_to_mcp_and_browse_test() {
 
 pub fn mcp_http_end_to_end_test() {
   let assert Ok(Nil) = mcp_server.start([])
-  ffi_start_http_server(18_099)
+  start_http_server(18_099)
 
   let init_body =
     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
-  let assert Ok(#(200, resp)) = ffi_http_post(18_099, "/mcp", init_body)
+  let assert Ok(#(200, resp)) = http_post(18_099, "/mcp", init_body)
   let assert True = string.contains(resp, "protocolVersion")
   let assert True = string.contains(resp, "gleamunison")
 
   let call_body =
     "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"(add 20 22)\"}}}"
-  let assert Ok(#(200, resp2)) = ffi_http_post(18_099, "/mcp", call_body)
+  let assert Ok(#(200, resp2)) = http_post(18_099, "/mcp", call_body)
   let assert True = string.contains(resp2, "42")
   let assert True = string.contains(resp2, "\"isError\":false")
 
   let notif_body =
     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}"
-  let assert Ok(#(202, _)) = ffi_http_post(18_099, "/mcp", notif_body)
+  let assert Ok(#(202, _)) = http_post(18_099, "/mcp", notif_body)
 
-  let assert Ok(#(404, _)) = ffi_http_post(18_099, "/nope", "{}")
+  let assert Ok(#(404, _)) = http_post(18_099, "/nope", "{}")
 
   mcp_server.stop()
-  ffi_stop_http_server()
+  stop_http_server()
 }
 
 pub fn mcp_http_auth_and_limit_test() {
   let assert Ok(Nil) = mcp_server.start([])
   ffi_set_http_token("test-token")
-  ffi_start_http_server(18_100)
+  start_http_server(18_100)
 
   let init_body =
     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
-  let assert Ok(#(401, _)) = ffi_http_post(18_100, "/mcp", init_body)
+  let assert Ok(#(401, _)) = http_post(18_100, "/mcp", init_body)
   let assert Ok(#(401, _)) =
     ffi_http_post_auth(18_100, "/mcp", init_body, "wrong-token")
   let assert Ok(#(200, resp)) =
@@ -141,21 +119,21 @@ pub fn mcp_http_auth_and_limit_test() {
 
   ffi_clear_http_token()
   mcp_server.stop()
-  ffi_stop_http_server()
+  stop_http_server()
 }
 
 pub fn mcp_authority_untrusted_execution_refuses_eval_test() {
   let assert Ok(Nil) = mcp_server.start([])
   envoy.set("GLEAMUNISON_PROFILE", "untrusted-execution")
-  ffi_start_http_server(18_101)
+  start_http_server(18_101)
 
   let call_body =
     "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"(add 20 22)\"}}}"
-  let response = ffi_http_post(18_101, "/mcp", call_body)
+  let response = http_post(18_101, "/mcp", call_body)
 
   envoy.unset("GLEAMUNISON_PROFILE")
   mcp_server.stop()
-  ffi_stop_http_server()
+  stop_http_server()
 
   let assert Ok(#(403, body)) = response
   let assert True = string.contains(body, "sandbox_refused")
@@ -174,20 +152,20 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
   let #(published, definition, scratch) =
     without_active_storage(fn() {
       let assert Ok(Nil) = mcp_server.start([])
-      ffi_start_http_server(18_103)
+      start_http_server(18_103)
       let assert Ok(#(200, _)) =
-        ffi_http_get(18_103, "/define?name=mcp-scratch&expr=7")
+        http_get(18_103, "/define?name=mcp-scratch&expr=7")
       let publish_body =
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"agent_publish\",\"arguments\":{\"source\":\"(define mcp-published 42)\\n(define test_mcp-published (do Test expect 1))\\n\"}}}"
-      let publish_response = ffi_http_post(18_103, "/mcp", publish_body)
+      let publish_response = http_post(18_103, "/mcp", publish_body)
       let definition_body =
         "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"get_definition\",\"arguments\":{\"name\":\"mcp-published\"}}}"
-      let definition_response = ffi_http_post(18_103, "/mcp", definition_body)
+      let definition_response = http_post(18_103, "/mcp", definition_body)
       let scratch_body =
         "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"eval\",\"arguments\":{\"expr\":\"mcp-scratch\"}}}"
-      let scratch_response = ffi_http_post(18_103, "/mcp", scratch_body)
+      let scratch_response = http_post(18_103, "/mcp", scratch_body)
       mcp_server.stop()
-      ffi_stop_http_server()
+      stop_http_server()
       #(publish_response, definition_response, scratch_response)
     })
 
@@ -241,13 +219,13 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
   let result =
     without_active_storage(fn() {
       let assert Ok(Nil) = mcp_server.start([])
-      ffi_start_http_server(18_104)
+      start_http_server(18_104)
       let body =
         "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"agent_generate\",\"arguments\":{\"template\":\"Create a numeric answer with schema {{signature}}\",\"signature\":\"int\",\"target\":\"generated-number\",\"max_attempts\":1}}}"
-      let generated = ffi_http_post(18_104, "/mcp", body)
-      let app = ffi_http_post(18_104, "/app/generated-number", "{\"args\":[]}")
+      let generated = http_post(18_104, "/mcp", body)
+      let app = http_post(18_104, "/app/generated-number", "{\"args\":[]}")
       mcp_server.stop()
-      ffi_stop_http_server()
+      stop_http_server()
       #(generated, app)
     })
   unset_generation_env()
@@ -312,16 +290,16 @@ pub fn mcp_generated_db_routes_survive_db_owner_restart_test() {
         attest_io(adapter, "generated-db-write", write)
         attest_io(adapter, "generated-db-read", read)
         let assert Ok(Nil) = mcp_server.start([])
-        ffi_start_http_server(18_106)
+        start_http_server(18_106)
         generate_from_provider(1, write, "int")
         generate_from_provider(2, read, "list")
         let write_response =
-          ffi_http_post(18_106, "/app/generated-db-write", "{\"args\":[]}")
+          http_post(18_106, "/app/generated-db-write", "{\"args\":[]}")
         let _ = stop_db()
         let read_response =
-          ffi_http_post(18_106, "/app/generated-db-read", "{\"args\":[]}")
+          http_post(18_106, "/app/generated-db-read", "{\"args\":[]}")
         mcp_server.stop()
-        ffi_stop_http_server()
+        stop_http_server()
         #(write_response, read_response)
       })
     })
@@ -375,7 +353,7 @@ fn generate_from_provider(id: Int, source: String, signature: String) -> Nil {
     <> ",\"method\":\"tools/call\",\"params\":{\"name\":\"agent_generate\",\"arguments\":{\"template\":\"Generate the durable application route with {{signature}}\",\"signature\":\""
     <> signature
     <> "\",\"max_attempts\":1}}}"
-  let result = ffi_http_post(18_106, "/mcp", body)
+  let result = http_post(18_106, "/mcp", body)
   let assert Ok(#(200, response)) = result
   let assert True = string.contains(response, "\\\"admitted\\\":1")
   Nil

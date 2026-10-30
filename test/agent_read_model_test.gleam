@@ -12,12 +12,7 @@ import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
-fn pd_counter_inc(key: BitArray) -> Int
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_get")
-fn pd_counter_get(key: BitArray) -> Int
+import test_ffi.{pd_counter_get, pd_counter_inc}
 
 /// One read model, one immutable view: the branch pointer is read once per
 /// load. A second read doubles namespace I/O on the hot path (mcp_session,

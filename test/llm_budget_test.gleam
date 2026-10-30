@@ -17,9 +17,7 @@ import gleamunison/llm_types.{type Completion, Completion, OpenAI}
 import gleamunison/llm_wire
 import gleamunison/transcript
 import gleeunit/should
-
-@external(erlang, "gleamunison_llm_budget", "reset")
-fn budget_reset() -> Result(Nil, Nil)
+import test_ffi.{budget_reset, snapshot_json}
 
 /// The handler's reply, read back as the typed result the
 /// middleware contract promises.
@@ -292,6 +290,3 @@ fn snapshot_text() -> String {
   // The snapshot is an Erlang map; render via the budget JSON probe.
   snapshot_json()
 }
-
-@external(erlang, "gleamunison_ffi_test", "llm_budget_snapshot_json")
-fn snapshot_json() -> String

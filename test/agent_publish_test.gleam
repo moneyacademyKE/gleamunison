@@ -11,9 +11,7 @@ import gleamunison/run_ref
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "without_active_storage")
-fn without_active_storage(check: fn() -> a) -> a
+import test_ffi.{without_active_storage}
 
 pub fn untested_source_is_refused_before_publication_test() {
   with_store(fn(adapter, _) {

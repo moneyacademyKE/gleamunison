@@ -16,9 +16,7 @@ import gleamunison/run_ref
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "without_active_storage")
-fn without_active_storage(check: fn() -> a) -> a
+import test_ffi.{without_active_storage}
 
 pub fn near_miss_generation_is_admitted_and_runnable_test() {
   with_store(fn(adapter, root) {

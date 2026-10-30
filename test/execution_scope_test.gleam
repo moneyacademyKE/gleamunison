@@ -8,9 +8,7 @@ import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleamunison/sandbox_policy
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi_test", "rescue")
-fn ffi_rescue(f: fn() -> Dynamic) -> Result(Dynamic, String)
+import test_ffi.{rescue}
 
 fn ok_handler() -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
@@ -68,7 +66,7 @@ pub fn untrusted_policy_denies_llm_capability_test() {
   capability.check(policy.abilities, frames) |> should.be_error
   let assert [guarded] = frames
   let assert Ok(handler) = dict.get(guarded.ops, 0)
-  let result = ffi_rescue(fn() { handler([to_dynamic("no")], fn(d) { d }) })
+  let result = rescue(fn() { handler([to_dynamic("no")], fn(d) { d }) })
   let assert Error(reason) = result
   string.contains(reason, "capability_denied") |> should.be_true
 }

@@ -13,6 +13,7 @@ import gleamunison/storage
 import gleamunison/store_deps
 import gleeunit/should
 import simplifile
+import test_ffi.{pd_counter_get, pd_counter_inc, unique_integer}
 
 fn target() {
   Ref(hash_bytes(<<"retraction-target">>))
@@ -85,9 +86,6 @@ pub fn corrupt_branch_commit_must_refuse_before_any_write_test() {
   adapter.list_refs() |> should.equal(Ok(before))
 }
 
-@external(erlang, "erlang", "unique_integer")
-fn unique_id() -> Int
-
 pub fn refused_retraction_preserves_index_namespace_and_bytes_test() {
   let adapter = storage.inmemory()
   let definition = ast.TermDef(ast.Int(99), ast.Builtin(ast.IntType))
@@ -99,7 +97,7 @@ pub fn refused_retraction_preserves_index_namespace_and_bytes_test() {
     )
   let ns = namespace.set(namespace.empty(), "kept", ref)
   let assert Ok(_) = namespace.commit(adapter, "main", ns)
-  let path = "/tmp/retraction-safety-" <> int.to_string(unique_id())
+  let path = "/tmp/retraction-safety-" <> int.to_string(unique_integer())
   let index = "kept " <> ref_hex(ref) <> "\n"
   let assert Ok(_) = simplifile.write(index, to: path)
   let assert Ok(before) = adapter.list_refs()
@@ -140,12 +138,6 @@ pub fn refused_retraction_preserves_index_namespace_and_bytes_test() {
   let assert Ok(_) = simplifile.delete(path)
 }
 
-@external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
-fn increment(key: BitArray) -> Int
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_get")
-fn count(key: BitArray) -> Int
-
 pub fn snapshot_reads_store_once_for_all_closure_decisions_test() {
   let adapter = storage.inmemory()
   let leaf = ast.TermDef(ast.Int(100), ast.Builtin(ast.IntType))
@@ -159,7 +151,7 @@ pub fn snapshot_reads_store_once_for_all_closure_decisions_test() {
     )
   let observed =
     storage.StorageAdapter(..adapter, list_refs: fn() {
-      let _ = increment(<<"snapshot-list-once">>)
+      let _ = pd_counter_inc(<<"snapshot-list-once">>)
       adapter.list_refs()
     })
   let assert Ok(snapshot) = dependency_snapshot.read(observed, "main")
@@ -167,5 +159,5 @@ pub fn snapshot_reads_store_once_for_all_closure_decisions_test() {
   list.length(removal) |> should.equal(2)
   list.contains(removal, leaf_ref) |> should.equal(True)
   dependency_snapshot.dependents(snapshot, leaf_ref) |> should.equal([root_ref])
-  count(<<"snapshot-list-once">>) |> should.equal(1)
+  pd_counter_get(<<"snapshot-list-once">>) |> should.equal(1)
 }

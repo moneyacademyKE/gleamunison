@@ -6,16 +6,11 @@ import gleamunison/storage
 import gleamunison/trust
 import gleamunison/turnstile
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
-fn increment(key: BitArray) -> Int
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_get")
-fn count(key: BitArray) -> Int
+import test_ffi.{pd_counter_get, pd_counter_inc}
 
 fn observed(adapter: storage.StorageAdapter, key: BitArray) {
   storage.StorageAdapter(..adapter, list_refs: fn() {
-    let _ = increment(key)
+    let _ = pd_counter_inc(key)
     adapter.list_refs()
   })
 }
@@ -38,7 +33,7 @@ pub fn many_definition_gate_reads_one_evidence_snapshot_test() {
     })
   turnstile.check(observed(adapter, <<"gate-scan-once">>), defs)
   |> should.equal(Ok(list.map(defs, fn(d) { d.0 })))
-  count(<<"gate-scan-once">>) |> should.equal(1)
+  pd_counter_get(<<"gate-scan-once">>) |> should.equal(1)
 }
 
 pub fn report_reads_one_snapshot_for_records_test_and_io_test() {
@@ -58,7 +53,7 @@ pub fn report_reads_one_snapshot_for_records_test_and_io_test() {
       "subject",
       trust.FixturesOnly,
     )
-  count(<<"report-scan-once">>) |> should.equal(1)
+  pd_counter_get(<<"report-scan-once">>) |> should.equal(1)
 }
 
 pub fn evidence_gate_refuses_failed_reads_test() {

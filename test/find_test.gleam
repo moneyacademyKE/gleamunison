@@ -11,9 +11,7 @@ import gleamunison/namespace
 import gleamunison/storage
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi_test", "without_active_storage")
-fn without_active_storage(check: fn() -> a) -> a
+import test_ffi.{without_active_storage}
 
 pub fn find_boots_from_the_selected_durable_branch_test() {
   let dir = "/tmp/gleamunison-find-cli-test"

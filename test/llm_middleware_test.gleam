@@ -6,12 +6,7 @@ import gleamunison/effects.{type OpHandler}
 import gleamunison/llm
 import gleamunison/llm_middleware.{RetryPolicy}
 import gleamunison/llm_types.{Completion}
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
-fn pd_counter_inc(key: BitArray) -> Int
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_get")
-fn pd_counter_get(key: BitArray) -> Int
+import test_ffi.{pd_counter_get, pd_counter_inc}
 
 @external(erlang, "gleamunison_ffi_test", "pd_record")
 fn pd_record(key: BitArray, value: BitArray) -> Nil

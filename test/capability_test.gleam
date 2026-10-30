@@ -6,9 +6,7 @@ import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi_test", "rescue")
-fn ffi_rescue(f: fn() -> Dynamic) -> Result(Dynamic, String)
+import test_ffi.{rescue}
 
 fn ok_handler() -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
@@ -45,7 +43,7 @@ pub fn denied_ability_raises_capability_denied_test() {
   capability.check(policy, frames) |> should.be_error
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)
-  let result = ffi_rescue(fn() { handler([to_dynamic("no")], fn(d) { d }) })
+  let result = rescue(fn() { handler([to_dynamic("no")], fn(d) { d }) })
   let assert Error(reason) = result
   string.contains(reason, "capability_denied") |> should.be_true
 }
@@ -59,7 +57,7 @@ pub fn preflight_lists_denied_abilities_test() {
 
 pub fn catch_all_denies_uninstalled_ability_test() {
   let handler = capability.catch_all()
-  let result = ffi_rescue(fn() { handler(0, [to_dynamic("x")], fn(d) { d }) })
+  let result = rescue(fn() { handler(0, [to_dynamic("x")], fn(d) { d }) })
   let assert Error(reason) = result
   string.contains(reason, "capability_denied") |> should.be_true
 }

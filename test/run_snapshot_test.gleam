@@ -7,12 +7,7 @@ import gleamunison/repl_eval
 import gleamunison/storage
 import gleeunit/should
 import run_support
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
-fn increment(key: BitArray) -> Int
-
-@external(erlang, "gleamunison_ffi_test", "pd_counter_get")
-fn count(key: BitArray) -> Int
+import test_ffi.{pd_counter_get, pd_counter_inc}
 
 pub fn two_named_dependencies_read_the_selected_namespace_once_test() {
   let cb = codebase.empty()
@@ -44,7 +39,7 @@ pub fn two_named_dependencies_read_the_selected_namespace_once_test() {
     storage.StorageAdapter(..adapter, lookup: fn(ref) {
       case ref == namespace.branch_pointer_ref("selected") {
         True -> {
-          let _ = increment(<<"namespace-per-run">>)
+          let _ = pd_counter_inc(<<"namespace-per-run">>)
           Nil
         }
         False -> Nil
@@ -53,5 +48,5 @@ pub fn two_named_dependencies_read_the_selected_namespace_once_test() {
     })
   run_support.run_on_branch(observed, ref, "selected", [])
   |> should.equal(Ok("440"))
-  count(<<"namespace-per-run">>) |> should.equal(1)
+  pd_counter_get(<<"namespace-per-run">>) |> should.equal(1)
 }

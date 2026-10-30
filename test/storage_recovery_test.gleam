@@ -8,16 +8,14 @@ import gleamunison/manifest
 import gleamunison/storage
 import gleeunit/should
 import simplifile
+import test_ffi.{unique_integer}
 
 fn temp_path(name: String) -> String {
   "/tmp/gleamunison-storage-recovery-"
   <> name
   <> "-"
-  <> int.to_string(erlang_unique_integer())
+  <> int.to_string(unique_integer())
 }
-
-@external(erlang, "erlang", "unique_integer")
-fn erlang_unique_integer() -> Int
 
 pub fn dets_store_survives_close_and_reopen_test() {
   let path = temp_path("reopen")

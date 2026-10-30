@@ -9,12 +9,7 @@ import gleam/string
 import gleamunison/llm_budget
 import gleamunison/llm_settlement
 import gleeunit/should
-
-@external(erlang, "gleamunison_llm_budget", "reset")
-fn budget_reset() -> Result(Nil, Nil)
-
-@external(erlang, "gleamunison_ffi_test", "llm_budget_snapshot_json")
-fn snapshot_json() -> String
+import test_ffi.{budget_reset, snapshot_json}
 
 pub fn settlement_meters_one_admitted_call_test() {
   let assert Ok(Nil) = budget_reset()
