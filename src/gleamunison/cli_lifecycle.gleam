@@ -8,6 +8,7 @@
 import filepath
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleamunison/cli_result
 import gleamunison/config.{type Config}
 
 const default_dir = ".gleamunison"
@@ -15,6 +16,17 @@ const default_dir = ".gleamunison"
 const store_file = "store.dets"
 
 const manifest_file = "published"
+
+/// The branch a store-scoped command runs against when `--branch` is absent.
+/// The commands that peel `--store`/`--branch` take their default from here
+/// instead of declaring their own "main", so the default cannot drift between
+/// them.
+///
+/// Two look-alikes deliberately stay where they are: `cli_publish.publish_branch`
+/// is where publish records its entries — a decision of its own that happens to
+/// share the name — and `run_ref.default_branch` is public surface the
+/// branch-scope tests read.
+pub const default_branch = "main"
 
 pub type StoreContext {
   StoreContext(store_path: String, manifest_path: String, root_dir: String)
@@ -88,6 +100,25 @@ pub fn root_dir(context: StoreContext) -> String {
 pub fn resolve_allow_unverified() -> Result(Bool, String) {
   use cfg <- result.try(config.load())
   config.flag(cfg, "GLEAMUNISON_STORE_ALLOW_UNVERIFIED")
+}
+
+/// `--store` given with no path after it. purge and unpublish refuse with
+/// exactly these bytes and this exit code, so the wording lives here rather
+/// than in two files that could drift apart.
+///
+/// The other three store-scoped commands keep their own: run prefixes "run: "
+/// and reports a bare String, sync omits the usage block, and pkg has no
+/// missing-value arm at all — its `--branch` must follow the manifest hash, so
+/// it refuses with "--branch needs the manifest hash first". Folding those in
+/// would mean parameterising the message, the error type and the precedence:
+/// more machinery than the four lines it would save.
+pub fn missing_store_value(usage: String) -> #(Int, String) {
+  #(cli_result.refused, "--store needs a path\n" <> usage)
+}
+
+/// `--branch` given with no name after it. Same two commands, same exceptions.
+pub fn missing_branch_value(usage: String) -> #(Int, String) {
+  #(cli_result.refused, "--branch needs a name\n" <> usage)
 }
 
 fn validate_store_dir(path: String) -> Result(String, String) {

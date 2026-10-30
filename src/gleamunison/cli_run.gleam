@@ -68,7 +68,7 @@ fn execute(args: List(String)) -> Result(String, #(Int, String)) {
   let store_path = cli_lifecycle.store_path(context)
   let branch = case branch_override {
     Some(value) -> value
-    None -> "main"
+    None -> cli_lifecycle.default_branch
   }
   use allow_unverified <- result.try(
     cli_lifecycle.resolve_allow_unverified()

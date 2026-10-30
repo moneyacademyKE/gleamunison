@@ -27,8 +27,6 @@ import gleamunison/publication_index
 import gleamunison/storage
 import gleamunison/store_deps
 
-const default_branch = "main"
-
 pub fn command(args: List(String)) -> Nil {
   case run(args) {
     Ok(message) -> io.println(message)
@@ -41,7 +39,7 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
     args,
     None,
     None,
-    default_branch,
+    cli_lifecycle.default_branch,
   ))
   use context <- result.try(
     cli_lifecycle.resolve_context(store_override)
@@ -278,12 +276,10 @@ fn parse_args(
         None -> Error(#(cli_result.refused, usage()))
       }
     ["--store", path, ..rest] -> parse_args(rest, name, Some(path), branch)
-    ["--store"] ->
-      Error(#(cli_result.refused, "--store needs a path\n" <> usage()))
+    ["--store"] -> Error(cli_lifecycle.missing_store_value(usage()))
     ["--branch", selected, ..rest] ->
       parse_args(rest, name, store_override, selected)
-    ["--branch"] ->
-      Error(#(cli_result.refused, "--branch needs a name\n" <> usage()))
+    ["--branch"] -> Error(cli_lifecycle.missing_branch_value(usage()))
     [value, ..rest] ->
       case name {
         Some(_) ->

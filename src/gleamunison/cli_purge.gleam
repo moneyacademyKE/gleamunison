@@ -30,8 +30,6 @@ import gleamunison/publication_index
 import gleamunison/storage
 import gleamunison/store_deps
 
-const default_branch = "main"
-
 pub fn command(args: List(String)) -> Nil {
   case run(args) {
     Ok(message) -> io.println(message)
@@ -45,7 +43,7 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
     None,
     False,
     None,
-    default_branch,
+    cli_lifecycle.default_branch,
   ))
   use ref <- result.try(
     identity.parse_ref_hex(hash)
@@ -276,12 +274,10 @@ fn parse_args(
     ["--yes"] -> parse_args([], hash, True, store_override, branch)
     ["--store", path, ..rest] ->
       parse_args(rest, hash, confirmed, Some(path), branch)
-    ["--store"] ->
-      Error(#(cli_result.refused, "--store needs a path\n" <> usage()))
+    ["--store"] -> Error(cli_lifecycle.missing_store_value(usage()))
     ["--branch", name, ..rest] ->
       parse_args(rest, hash, confirmed, store_override, name)
-    ["--branch"] ->
-      Error(#(cli_result.refused, "--branch needs a name\n" <> usage()))
+    ["--branch"] -> Error(cli_lifecycle.missing_branch_value(usage()))
     [value, ..rest] ->
       case hash {
         Some(_) ->

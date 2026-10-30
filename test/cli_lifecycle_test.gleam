@@ -6,6 +6,7 @@ import envoy
 import gleam/option.{Some}
 import gleam/string
 import gleamunison/cli_lifecycle
+import gleamunison/cli_result
 import gleeunit/should
 import simplifile
 
@@ -144,4 +145,23 @@ pub fn a_malformed_config_file_is_reported_test() {
     }
     Ok(_) -> panic as "malformed configuration was silently ignored"
   }
+}
+
+/// The branch default is one decision with one owner: purge, unpublish, pkg and
+/// run take it from here instead of each declaring its own "main".
+pub fn the_default_branch_is_main_test() {
+  cli_lifecycle.default_branch |> should.equal("main")
+}
+
+/// purge and unpublish refuse a valueless --store with exactly these bytes and
+/// this exit code. The wording used to be written out in both files, where the
+/// two could drift apart without either command noticing.
+pub fn a_valueless_store_flag_refuses_with_the_usage_test() {
+  cli_lifecycle.missing_store_value("USAGE")
+  |> should.equal(#(cli_result.refused, "--store needs a path\nUSAGE"))
+}
+
+pub fn a_valueless_branch_flag_refuses_with_the_usage_test() {
+  cli_lifecycle.missing_branch_value("USAGE")
+  |> should.equal(#(cli_result.refused, "--branch needs a name\nUSAGE"))
 }

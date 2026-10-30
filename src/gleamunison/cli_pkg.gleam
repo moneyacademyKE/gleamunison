@@ -23,8 +23,6 @@ import gleamunison/sync
 import gleamunison/sync_types.{PeerId}
 import gleamunison/verify
 
-const default_branch = "main"
-
 pub fn command(args: List(String)) -> Result(Nil, #(Int, String)) {
   case args {
     ["install", ..rest] -> install(rest)
@@ -171,7 +169,7 @@ fn parse_args(
           Error(
             "usage: gleam run -- pkg install <manifest-hash> [--peer host:port] [--branch name]",
           )
-        Some(h) -> Ok(#(h, peer, default_branch, store))
+        Some(h) -> Ok(#(h, peer, cli_lifecycle.default_branch, store))
       }
     ["--peer", p, ..rest] -> parse_args(rest, hash, Some(p), store)
     ["--peer"] -> Error("--peer needs host:port")
