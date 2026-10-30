@@ -10,7 +10,7 @@ import gleamunison/codebase
 import gleamunison/compile
 import gleamunison/elab_types
 import gleamunison/elaborate
-import gleamunison/identity.{Local, Ref, hash_bytes}
+import gleamunison/identity.{type DefinitionRef, Local, Ref, hash_bytes}
 import gleamunison/loader
 import gleamunison/pipeline
 import gleamunison/repl
@@ -26,22 +26,16 @@ pub fn run_level(lvl: LevelData) -> Nil {
     dogfood_data.CompileInt(n, val) -> {
       io.println("--- compile+load int ---")
       let def = ast.TermDef(ast.Int(val), ast.Builtin(ast.IntType))
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let #(_, r) = compile_load_eval(def)
       io.println("Int: " <> r <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.CompileFloat(n, val) -> {
       io.println("--- compile+load float ---")
       let def = ast.TermDef(ast.Float(val), ast.Builtin(ast.FloatType))
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let #(_, r) = compile_load_eval(def)
       io.println("Float: " <> r <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.CompileText(n, val) -> {
       io.println("--- compile+load text ---")
@@ -50,24 +44,18 @@ pub fn run_level(lvl: LevelData) -> Nil {
           ast.Text(bit_array.from_string(val)),
           ast.Builtin(ast.TextType),
         )
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let #(_, r) = compile_load_eval(def)
       io.println("Text: " <> string.slice(r, 0, 10) <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.LambdaApply(n, val) -> {
       io.println("--- compile+load lambda apply ---")
       let id = ast.Lambda(Local(0), ast.LocalVarRef(Local(0)))
       let def =
         ast.TermDef(ast.Apply(id, ast.Int(val)), ast.Builtin(ast.IntType))
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let #(_, r) = compile_load_eval(def)
       io.println("Apply: " <> r <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.CompileLet(n, val) -> {
       io.println("--- compile Let ---")
@@ -76,12 +64,9 @@ pub fn run_level(lvl: LevelData) -> Nil {
           ast.Let(Local(0), ast.Int(val), ast.LocalVarRef(Local(0))),
           ast.Builtin(ast.IntType),
         )
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let #(_, r) = compile_load_eval(def)
       io.println("Let: " <> r <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.CompileList(n, elements) -> {
       io.println("--- compile List ---")
@@ -90,12 +75,9 @@ pub fn run_level(lvl: LevelData) -> Nil {
           ast.List(list.map(elements, ast.Int)),
           ast.Builtin(ast.ListType),
         )
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let #(_, r) = compile_load_eval(def)
       io.println("List: " <> string.slice(r, 0, 15) <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.Elaborate(n, lit) -> {
       io.println("--- elaborate_only ---")
@@ -108,7 +90,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
           [],
         )
       io.println("Elab: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.LoaderLimit(n, limit, count) -> {
       io.println("--- loader limit ---")
@@ -127,7 +109,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
           }
         })
       io.println("limit: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.CodebaseInsert(n, count, mult) -> {
       io.println("--- codebase insert ---")
@@ -146,7 +128,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let a = codebase.get_adapter(cb)
       let assert Ok(rs) = a.list_refs()
       io.println("insert: OK " <> int.to_string(list.length(rs)))
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.StorageStress(n, count) -> {
       io.println("--- storage stress ---")
@@ -157,22 +139,16 @@ pub fn run_level(lvl: LevelData) -> Nil {
       })
       let assert Ok(rs) = a.list_refs()
       io.println("refs: " <> int.to_string(list.length(rs)))
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.CrossRef(n, val) -> {
       io.println("--- cross-module RefTo ---")
       let db = ast.TermDef(ast.Int(val), ast.Builtin(ast.IntType))
-      let hb = codebase.hash_of_definition(db)
-      let assert Ok(bb) = pipeline.compile_only(db, Ref(hb))
-      let assert Ok(_) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(hb)), bb)
-      let da = ast.TermDef(ast.RefTo(Ref(hb)), ast.Builtin(ast.IntType))
-      let ha = codebase.hash_of_definition(da)
-      let assert Ok(ba) = pipeline.compile_only(da, Ref(ha))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(ha)), ba)
+      let #(db_ref, _) = compile_load_eval(db)
+      let da = ast.TermDef(ast.RefTo(db_ref), ast.Builtin(ast.IntType))
+      let #(_, r) = compile_load_eval(da)
       io.println("Cross: " <> r <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.EffectsHandle(n, val) -> {
       io.println("--- effects Handle ---")
@@ -188,10 +164,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
             ),
           ]),
         )
-      let ah = codebase.hash_of_definition(ab)
-      let assert Ok(bb) = pipeline.compile_only(ab, Ref(ah))
-      let assert Ok(_) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(ah)), bb)
+      let _ = compile_load_eval(ab)
       let h =
         ast.Handle(
           ast.Int(val),
@@ -199,12 +172,9 @@ pub fn run_level(lvl: LevelData) -> Nil {
           ab_r,
         )
       let d = ast.TermDef(h, ast.Builtin(ast.IntType))
-      let dh = codebase.hash_of_definition(d)
-      let assert Ok(b) = pipeline.compile_only(d, Ref(dh))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(dh)), b)
+      let #(_, r) = compile_load_eval(d)
       io.println("Handle: " <> r <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.ElabUnitAbilities(n, count) -> {
       io.println("--- elab abilities ---")
@@ -228,7 +198,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let assert Ok(#(_, _, _)) =
         elaborate.elaborate_unit(su, types.empty_cache())
       io.println("Elab: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.Typecheck(n, v1, v2) -> {
       io.println("--- typecheck ---")
@@ -240,7 +210,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let assert Ok(#(_, _)) =
         typecheck.typecheck_unit(unit, types.empty_cache())
       io.println("TC: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.LoaderLoaded(n, val) -> {
       io.println("--- loader is_loaded ---")
@@ -250,7 +220,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let assert Ok(l) = loader.ensure_loaded(ldr, h, d)
       let assert True = loader.is_loaded(l, h)
       io.println("Loaded: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.HashDistinct(n, v1, v2) -> {
       io.println("--- hash distinct ---")
@@ -262,7 +232,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
           codebase.hash_of_definition(d2),
         )
       io.println("Diff: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.InsertRaw(n) -> {
       io.println("--- insert_raw ---")
@@ -273,13 +243,13 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let a = codebase.get_adapter(cb2)
       let assert Ok(Some(v)) = a.lookup(r)
       io.println("Found: " <> string.inspect(v))
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.ReplEval(n, lit) -> {
       io.println("--- REPL eval ---")
       let assert Ok(_) = repl.eval_string(lit)
       io.println("REPL: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.Serialize(n, val) -> {
       io.println("--- serialize/deserialize ---")
@@ -287,23 +257,20 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let deser: Int = repl_eval.deserialize_term(ser)
       let assert True = val == deser
       io.println("Ser: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.EmptyList(n) -> {
       io.println("--- compile empty list ---")
       let def = ast.TermDef(ast.List([]), ast.Builtin(ast.ListType))
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(r) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let #(_, r) = compile_load_eval(def)
       io.println("Empty: " <> r <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.ElabError(n, lit) -> {
       io.println("--- elab error check ---")
       let assert Error(_) = pipeline.parse_only(lit)
       io.println("Err: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.CompileConstruct(n) -> {
       io.println("--- compile Construct ---")
@@ -313,12 +280,9 @@ pub fn run_level(lvl: LevelData) -> Nil {
           ast.Construct(ctor_ref, [ast.Int(42)]),
           ast.Builtin(ast.IntType),
         )
-      let h = codebase.hash_of_definition(def)
-      let assert Ok(beam) = pipeline.compile_only(def, Ref(h))
-      let assert Ok(_) =
-        pipeline.load_and_eval(compile.module_name_for(Ref(h)), beam)
+      let _ = compile_load_eval(def)
       io.println("Construct: OK")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.TypePretty(n, lit, expected) -> {
       io.println("--- type pretty-print ---")
@@ -334,7 +298,7 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let pretty = type_pretty.pretty_print(ty)
       let assert True = string.contains(pretty, expected)
       io.println("Pretty: " <> pretty <> " [OK]")
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
     dogfood_data.InferTerm(n, lit, expected) -> {
       io.println("--- infer_term ---")
@@ -350,7 +314,28 @@ pub fn run_level(lvl: LevelData) -> Nil {
       let pretty = type_pretty.pretty_print(ty)
       let assert True = string.contains(pretty, expected)
       io.println("Infer: " <> pretty)
-      io.println("Level " <> int.to_string(n) <> ": OK")
+      level_ok(n)
     }
   }
+}
+
+/// The harness sequence: hash the definition, compile it, load the beam and
+/// evaluate it. Every step asserts, because a level that cannot compile or
+/// load is exactly what this runner exists to catch - an error swallowed here
+/// would certify a broken pipeline.
+///
+/// The ref comes back with the result: CrossRef points a RefTo at the
+/// dependency it just loaded, so it needs the ref the sequence chose.
+fn compile_load_eval(def: ast.Definition) -> #(DefinitionRef, String) {
+  let ref = Ref(codebase.hash_of_definition(def))
+  let assert Ok(beam) = pipeline.compile_only(def, ref)
+  let assert Ok(result) =
+    pipeline.load_and_eval(compile.module_name_for(ref), beam)
+  #(ref, result)
+}
+
+/// The certification line every level ends with. One authority, so the bytes
+/// the playbook runner reads cannot drift between levels.
+fn level_ok(n: Int) -> Nil {
+  io.println("Level " <> int.to_string(n) <> ": OK")
 }
