@@ -24,7 +24,7 @@ pub fn refs_of_definition(definition: ast.Definition) -> List(DefinitionRef) {
   list.unique(refs)
 }
 
-pub fn refs_of_term(term: ast.Term) -> List(DefinitionRef) {
+fn refs_of_term(term: ast.Term) -> List(DefinitionRef) {
   case term {
     ast.Located(inner:, ..) -> refs_of_term(inner)
     ast.Int(_) | ast.Float(_) | ast.Text(_) | ast.Hole | ast.LocalVarRef(_) -> []
@@ -66,7 +66,7 @@ fn refs_of_case(case_: ast.Case) -> List(DefinitionRef) {
   ])
 }
 
-pub fn refs_of_pattern(pattern: ast.Pattern) -> List(DefinitionRef) {
+fn refs_of_pattern(pattern: ast.Pattern) -> List(DefinitionRef) {
   case pattern {
     ast.PatVar(_)
     | ast.PatInt(_)
@@ -81,7 +81,7 @@ pub fn refs_of_pattern(pattern: ast.Pattern) -> List(DefinitionRef) {
   }
 }
 
-pub fn refs_of_type(typ: ast.Type) -> List(DefinitionRef) {
+fn refs_of_type(typ: ast.Type) -> List(DefinitionRef) {
   case typ {
     ast.Builtin(_) | ast.TypeVar(_) | ast.AbilityVar(_) -> []
     ast.Fn(params:, result:, requires:) ->
@@ -104,7 +104,7 @@ fn refs_of_requirement(requirement: ast.Requirement) -> List(DefinitionRef) {
   })
 }
 
-pub fn refs_of_type_ref(type_ref: ast.TypeRef) -> List(DefinitionRef) {
+fn refs_of_type_ref(type_ref: ast.TypeRef) -> List(DefinitionRef) {
   case type_ref {
     ast.TypeRefVar(_) | ast.TypeRefBuiltin(_) -> []
     ast.TypeCon(ref) -> [ref]

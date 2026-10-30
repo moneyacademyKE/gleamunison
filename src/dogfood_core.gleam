@@ -92,7 +92,7 @@ pub fn level24() -> Nil {
 }
 
 @external(erlang, "gleamunison_ffi_io", "eval_expression")
-pub fn server_eval(expr: String) -> String
+fn server_eval(expr: String) -> String
 
 pub fn level25() -> Nil {
   io.println("--- Level 25: /eval endpoint ---")

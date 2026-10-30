@@ -116,7 +116,7 @@ pub fn admit(
 
 /// Full admission at an explicit time: the signature must match a key whose
 /// state admits the record's timestamp, and the record must be young enough.
-pub fn admit_at(
+fn admit_at(
   policy: TrustPolicy,
   record: Evidence,
   now: Int,
@@ -212,7 +212,7 @@ pub fn verified_in(
   verified_in_at(snapshot, subject, kind, policy, datetime.now_unix())
 }
 
-pub fn verified_in_at(
+fn verified_in_at(
   snapshot: evidence.Snapshot,
   subject: String,
   kind: evidence.Kind,

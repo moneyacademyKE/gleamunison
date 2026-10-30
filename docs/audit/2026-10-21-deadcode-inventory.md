@@ -176,3 +176,28 @@ reference, the reference stays inside the module, and the client calls the token
 
 Section F (101 over-exports) was not part of the six steps and is untouched: `pub` → `fn` tightening
 touches 101 call sites' worth of surface area and deserves its own pass with its own proof.
+
+---
+
+## Resolution — section F residue, bead `bk-33f9` (2026-10-30 EAT)
+
+The later over-export waves left ten functions. Each was re-verified against the full `src`, `test`,
+and `scripts` tree before changing visibility. Nine are internal delegates or recursive walkers and
+were demoted to private; one Gleam declaration was dead and deleted. The Erlang
+`gleamunison_ffi:load_dogfood_levels/1` export stays because `load_dogfood_levels_resolved/0` uses it.
+
+| Function | Verified callers | Outcome |
+|---|---|---|
+| `trust.admit_at` | `trust.gleam:114,238,244` only | private |
+| `trust.verified_in_at` | `trust.gleam:203,212` only | private |
+| `type_pretty.type_to_doc` | `type_pretty.gleam:70,93,94,131` only | private |
+| `definition_refs.refs_of_term` | `definition_refs.gleam:16,29,31,32,34,36,39,42,46,50,53,59,65` only | private |
+| `definition_refs.refs_of_pattern` | `definition_refs.gleam:63,76,79` only | private |
+| `definition_refs.refs_of_type` | `definition_refs.gleam:16,89,90` only | private |
+| `definition_refs.refs_of_type_ref` | `definition_refs.gleam:119,125` only | private |
+| `store_deps.exclusive_closure_checked_on_branch` | `store_deps.gleam:82` only | private |
+| `dogfood_core.server_eval` | `dogfood_core.gleam:99` only | private |
+| `dogfood_data.load_levels` | no Gleam or script caller; only historical docs | declaration deleted |
+
+Gates: `gleam format --check src test`, `gleam check --target erlang` with zero warnings, and
+`gleam test` with 779 passing, no failures.

@@ -82,7 +82,7 @@ pub fn exclusive_closure_checked(
   exclusive_closure_checked_on_branch(adapter, default_branch, root)
 }
 
-pub fn exclusive_closure_checked_on_branch(
+fn exclusive_closure_checked_on_branch(
   adapter: storage.StorageAdapter,
   branch: String,
   root: DefinitionRef,

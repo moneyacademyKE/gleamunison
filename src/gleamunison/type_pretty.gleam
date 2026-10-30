@@ -51,7 +51,7 @@ fn var_name(index: Int) -> String {
   }
 }
 
-pub fn type_to_doc(t: Type) -> Document {
+fn type_to_doc(t: Type) -> Document {
   case t {
     ast.TypeVar(idx) -> doc.from_string(var_name(idx))
     ast.AbilityVar(idx) -> doc.from_string("e" <> int.to_string(idx))
