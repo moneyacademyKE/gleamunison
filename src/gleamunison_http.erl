@@ -400,19 +400,12 @@ token_scopes(Headers) ->
         [] -> none_configured;
         _ ->
             Matches = [S || {Expected, S} <- Configured,
-                            constant_time_equal(Expected, Provided)],
+                            gleamunison_crypto:constant_time_equal(Expected, Provided)],
             case Matches of
                 [] -> error;
                 [Scopes | _] -> {ok, Scopes}
             end
     end.
-
-constant_time_equal(Expected, Provided) when is_binary(Expected), is_binary(Provided) ->
-    constant_time_hash_compare(crypto:hash(sha256, Expected), crypto:hash(sha256, Provided), 0).
-
-constant_time_hash_compare(<<A, RestA/binary>>, <<B, RestB/binary>>, Acc) ->
-    constant_time_hash_compare(RestA, RestB, Acc bor (A bxor B));
-constant_time_hash_compare(<<>>, <<>>, Acc) -> Acc =:= 0.
 
 send_unauthorized(Socket) ->
     gleamunison_http_util:send_json(Socket, 401, <<"{\"error\":\"unauthorized\"}">>).

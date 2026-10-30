@@ -1,6 +1,6 @@
 -module(gleamunison_crypto).
 -export([hash/2, hmac/3, random_bytes/1, hash_to_hex/1]).
--export([blake2b/2, argon2id/8, argon2_h0/8, secure_compare/2]).
+-export([blake2b/2, argon2id/8, argon2_h0/8, secure_compare/2, constant_time_equal/2]).
 
 hash(Algo, Data) when is_binary(Data) ->
     try
@@ -55,3 +55,13 @@ secure_compare(A, B) when is_binary(A), is_binary(B),
     crypto:hash_equals(A, B);
 secure_compare(_, _) ->
     false.
+
+%% Constant-time equality for secrets of arbitrary, possibly UNEQUAL length:
+%% both sides are sha256-hashed first, so the comparison always runs over
+%% fixed 32-byte digests — no length oracle, and secure_compare/2's
+%% equal-size guard can never short-circuit. Never pass raw secrets to
+%% secure_compare/2 directly: unequal lengths return false without ever
+%% entering the constant-time path. The HTTP bearer gate and the TCP sync
+%% handshake hand-rolled this compare twice (bk-49ec); this is the one owner.
+constant_time_equal(A, B) when is_binary(A), is_binary(B) ->
+    secure_compare(crypto:hash(sha256, A), crypto:hash(sha256, B)).

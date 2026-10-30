@@ -4,7 +4,7 @@
 -export([start_http_server/1, stop_http_server/0, http_get/2, http_post/3, http_post_auth/4,
          http_post_auth_length/5, set_http_token/1,
          clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
-         clear_eval_timeout/0, otp_blake2b64/1]).
+         clear_eval_timeout/0, otp_blake2b64/1, constant_time_equal_probe/2]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
 -export([metrics_restart_probe/0, http_drain_probe/0, observability_probe/1,
          metrics_name_bound_probe/0, llm_budget_snapshot_json/0,
@@ -535,6 +535,12 @@ recv_all(Socket, Acc) ->
 %% Native OTP BLAKE2b-64 for cross-checking our pure implementation.
 otp_blake2b64(Data) ->
     crypto:hash(blake2b, Data).
+
+%% Test probe exposing the one-owner constant-time secret compare (bk-49ec):
+%% gleamunison_crypto:constant_time_equal/2, sha256-then-compare so unequal
+%% token lengths never short-circuit.
+constant_time_equal_probe(A, B) ->
+    gleamunison_crypto:constant_time_equal(A, B).
 
 parse_http_response(Bin) ->
     case binary:split(Bin, <<"\r\n">>) of

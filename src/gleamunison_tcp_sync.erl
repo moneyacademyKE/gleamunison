@@ -140,7 +140,7 @@ handle_handshake(Sock, Token) ->
                     Digest = crypto:hash(sha256, term_to_binary(Message)),
                     Expected = crypto:mac(hmac, sha256, Token,
                                           <<ClientNonce/binary, ServerNonce/binary, Digest/binary>>),
-                    case constant_time_equal(Expected, Proof) of
+                    case gleamunison_crypto:constant_time_equal(Expected, Proof) of
                         false -> send_reply(Sock, {error, auth_failed});
                         true ->
                             case claim_session(ClientNonce, ServerNonce) of
@@ -193,13 +193,6 @@ configured_token() ->
         "" -> none;
         Token -> {ok, list_to_binary(Token)}
     end.
-
-constant_time_equal(Expected, Provided) when is_binary(Expected), is_binary(Provided) ->
-    constant_time_hash_compare(crypto:hash(sha256, Expected), crypto:hash(sha256, Provided), 0).
-
-constant_time_hash_compare(<<A, RestA/binary>>, <<B, RestB/binary>>, Acc) ->
-    constant_time_hash_compare(RestA, RestB, Acc bor (A bxor B));
-constant_time_hash_compare(<<>>, <<>>, Acc) -> Acc =:= 0.
 
 dispatch({SelfName, {connect, _Name}}) when is_binary(SelfName) ->
     gleamunison_ffi_io:register_peer_refs(SelfName, []),

@@ -109,3 +109,29 @@ pub fn argon2id_h0_intermediate_test() {
     hex
     == "2889de487eb42ae500c0007ed9252f1069eadec40d5765b485de6dc2437a67b8546a2f0acc1a0882db8fcf74714b472e94df421a5da1112ffa11434370a1e997"
 }
+
+// The one-owner constant-time secret compare (bk-49ec), used by the HTTP
+// bearer gate and the TCP sync handshake: sha256-then-compare means tokens
+// of UNEQUAL length take the same fixed-digest path instead of a
+// short-circuiting size check.
+@external(erlang, "gleamunison_ffi_test", "constant_time_equal_probe")
+fn constant_time_equal_probe(a: BitArray, b: BitArray) -> Bool
+
+pub fn constant_time_equal_unequal_length_tokens_test() {
+  // unequal length, unequal content
+  let assert False =
+    constant_time_equal_probe(<<"a-longer-secret-token":utf8>>, <<"short":utf8>>)
+  // unequal length, one side empty (the missing-Authorization-header path)
+  let assert False = constant_time_equal_probe(<<"secret":utf8>>, <<"":utf8>>)
+  let assert True = constant_time_equal_probe(<<"":utf8>>, <<"":utf8>>)
+  // equal length, equal content
+  let assert True =
+    constant_time_equal_probe(<<"same-token":utf8>>, <<"same-token":utf8>>)
+  // equal length, different content
+  let assert False =
+    constant_time_equal_probe(<<"token-a":utf8>>, <<"token-b":utf8>>)
+  // unequal length where the longer token starts with the shorter one —
+  // a prefix must never pass
+  let assert False =
+    constant_time_equal_probe(<<"token":utf8>>, <<"token-extended":utf8>>)
+}
