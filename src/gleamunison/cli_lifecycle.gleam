@@ -1,9 +1,10 @@
-//// Where a store lives, and whether a run trusts it.
+//// Where a store lives, whether a run trusts it, and which branch it reads.
 ////
-//// Two decisions belong here rather than scattered across commands: the store
-//// directory (an override for tests, CI, and running an artifact from
-//// anywhere) and whether unverified content may execute. Both are resolved
-//// through the live configuration layer and passed in as data.
+//// Three decisions belong here rather than scattered across commands: the
+//// store directory (an override for tests, CI, and running an artifact from
+//// anywhere), whether unverified content may execute, and which branch a
+//// session or command is bound to. All three are resolved through the live
+//// configuration layer and passed in as data.
 
 import filepath
 import gleam/option.{type Option, None, Some}
@@ -100,6 +101,19 @@ pub fn root_dir(context: StoreContext) -> String {
 pub fn resolve_allow_unverified() -> Result(Bool, String) {
   use cfg <- result.try(config.load())
   config.flag(cfg, "GLEAMUNISON_STORE_ALLOW_UNVERIFIED")
+}
+
+/// The branch a session or command is bound to: `GLEAMUNISON_BRANCH` through
+/// the CLI > TOML > env precedence, else `default_branch`. This lived in
+/// mcp_session, which made the refresh path and the hand-written HTTP routes
+/// depend on a 443-line session module for a pure configuration decision.
+pub fn resolve_branch() -> Result(String, String) {
+  use cfg <- result.try(config.load())
+  branch_from(cfg)
+}
+
+fn branch_from(cfg: Config) -> Result(String, String) {
+  config.string_or(cfg, "GLEAMUNISON_BRANCH", default_branch)
 }
 
 /// `--store` given with no path after it. purge and unpublish refuse with

@@ -72,7 +72,7 @@ handle_app_route(Socket, Target, Body) ->
     admit_execution(Socket, fun() ->
         case gleamunison@active_storage:active_or_open() of
             {ok, Adapter} ->
-                case gleamunison@mcp_session:selected_branch() of
+                case gleamunison@cli_lifecycle:resolve_branch() of
                     {ok, Branch} ->
                         {response, Status, Json} =
                             gleamunison@app_route:request(Adapter, Branch, Target, Body),

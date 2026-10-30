@@ -8,8 +8,8 @@ import gleam/result
 import gleam/string
 import gleamunison/active_storage
 import gleamunison/agent_read_model
+import gleamunison/cli_lifecycle
 import gleamunison/codebase_graph
-import gleamunison/config
 import gleamunison/elab_types.{type SurfaceDef}
 import gleamunison/identity
 import gleamunison/lexer
@@ -37,15 +37,10 @@ pub opaque type SessionState {
   )
 }
 
-pub fn selected_branch() -> Result(String, String) {
-  use cfg <- result.try(config.load())
-  config.string_or(cfg, "GLEAMUNISON_BRANCH", "main")
-}
-
 /// Server startup reads the configured branch and the node's one active store.
 pub fn boot_configured() -> Result(SessionState, String) {
   use adapter <- result.try(active_storage.active_or_open())
-  use branch <- result.try(selected_branch())
+  use branch <- result.try(cli_lifecycle.resolve_branch())
   from_store(adapter, branch)
 }
 

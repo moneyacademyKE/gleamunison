@@ -17,7 +17,7 @@ pub fn publish(
   use _ <- result.try(mcp_write.check_writable())
   use context <- result.try(cli_lifecycle.resolve_context(None))
   use adapter <- result.try(active_storage.active_or_open())
-  use branch <- result.try(mcp_session.selected_branch())
+  use branch <- result.try(cli_lifecycle.resolve_branch())
   use publication <- result.try(agent_publish.publish_source(
     adapter,
     source,
@@ -49,7 +49,7 @@ fn generate_with(
   use _ <- result.try(mcp_write.check_writable())
   use context <- result.try(cli_lifecycle.resolve_context(None))
   use adapter <- result.try(active_storage.active_or_open())
-  use branch <- result.try(mcp_session.selected_branch())
+  use branch <- result.try(cli_lifecycle.resolve_branch())
   use outcome <- result.try(generation_loop.generate_with_provider(
     adapter,
     cli_lifecycle.root_dir(context),

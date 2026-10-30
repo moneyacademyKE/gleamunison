@@ -24,6 +24,23 @@ fn with_allow_unverified(value: String, check: fn() -> a) -> a {
   result
 }
 
+fn with_branch(value: String, check: fn() -> a) -> a {
+  envoy.set("GLEAMUNISON_BRANCH", value)
+  let result = check()
+  envoy.unset("GLEAMUNISON_BRANCH")
+  result
+}
+
+/// Branch resolution reads the live configuration file, so the default is
+/// asserted against a path that does not exist: otherwise a gleamunison.toml
+/// sitting in the working directory could supply the answer under test.
+fn with_absent_config(check: fn() -> a) -> a {
+  envoy.set("GLEAMUNISON_CONFIG", "/tmp/gleamunison-branch-absent.toml")
+  let result = check()
+  envoy.unset("GLEAMUNISON_CONFIG")
+  result
+}
+
 pub fn the_default_store_dir_is_dot_gleamunison_test() {
   envoy.unset("GLEAMUNISON_STORE_DIR")
   cli_lifecycle.resolve_store_dir() |> should.equal(Ok(".gleamunison"))
@@ -151,6 +168,54 @@ pub fn a_malformed_config_file_is_reported_test() {
 /// run take it from here instead of each declaring its own "main".
 pub fn the_default_branch_is_main_test() {
   cli_lifecycle.default_branch |> should.equal("main")
+}
+
+/// resolve_branch walks the same CLI > TOML > env chain the store dir does, so
+/// the branch a session binds to is configuration rather than a decision made
+/// inside the session module that used to hold it.
+pub fn the_selected_branch_defaults_to_the_branch_default_test() {
+  envoy.unset("GLEAMUNISON_BRANCH")
+  with_absent_config(fn() {
+    cli_lifecycle.resolve_branch()
+    |> should.equal(Ok(cli_lifecycle.default_branch))
+  })
+}
+
+pub fn an_environment_branch_override_wins_test() {
+  with_absent_config(fn() {
+    with_branch("dev", fn() {
+      cli_lifecycle.resolve_branch() |> should.equal(Ok("dev"))
+    })
+  })
+}
+
+/// An empty override is treated as absent by config.string_or, which matters
+/// here more than elsewhere: an empty branch name would silently bind a
+/// session to nothing rather than falling back.
+pub fn an_empty_branch_override_falls_back_to_the_default_test() {
+  with_absent_config(fn() {
+    with_branch("", fn() {
+      cli_lifecycle.resolve_branch() |> should.equal(Ok("main"))
+    })
+  })
+}
+
+pub fn a_toml_branch_beats_the_environment_test() {
+  let dir = "/tmp/gleamunison-config-branch-test"
+  let config_path = dir <> "/gleamunison.toml"
+  let assert Ok(_) = simplifile.create_directory_all(dir)
+  let assert Ok(_) =
+    simplifile.write(config_path, "GLEAMUNISON_BRANCH = \"release\"\n")
+
+  envoy.set("GLEAMUNISON_CONFIG", config_path)
+  envoy.set("GLEAMUNISON_BRANCH", "dev")
+  let result = cli_lifecycle.resolve_branch()
+  envoy.unset("GLEAMUNISON_CONFIG")
+  envoy.unset("GLEAMUNISON_BRANCH")
+  let _ = simplifile.delete(config_path)
+  let _ = simplifile.delete(dir)
+
+  result |> should.equal(Ok("release"))
 }
 
 /// purge and unpublish refuse a valueless --store with exactly these bytes and
