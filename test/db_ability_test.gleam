@@ -11,11 +11,11 @@ import gleamunison/identity.{Ref}
 import gleamunison/parser
 import gleamunison/publication
 import gleamunison/repl_eval
-import gleamunison/run_ref
 import gleamunison/test_runner
 import gleamunison/types.{CTAbility}
 import gleamunison/verify
 import gleeunit/should
+import run_support
 import simplifile
 
 @external(erlang, "gleamunison_app_db", "with_path")
@@ -63,21 +63,21 @@ pub fn db_call_is_effectful_for_publication_test() {
 pub fn db_transactions_survive_owner_restart_test() {
   with_temp_db(fn(_) {
     let #(cb, write, retract, read, find, status) = definitions()
-    let assert Ok("1") = run_ref.run(codebase.get_adapter(cb), write, [])
+    let assert Ok("1") = run_support.run(codebase.get_adapter(cb), write, [])
     stop_db()
-    let assert Ok(reading) = run_ref.run(codebase.get_adapter(cb), read, [])
+    let assert Ok(reading) = run_support.run(codebase.get_adapter(cb), read, [])
     string.contains(reading, "Moe") |> should.be_true
-    let assert Ok(found) = run_ref.run(codebase.get_adapter(cb), find, [])
+    let assert Ok(found) = run_support.run(codebase.get_adapter(cb), find, [])
     string.contains(found, "person:1") |> should.be_true
     let assert Ok(before_retract) =
-      run_ref.run(codebase.get_adapter(cb), status, [])
+      run_support.run(codebase.get_adapter(cb), status, [])
     string.contains(before_retract, "new") |> should.be_true
-    let assert Ok("2") = run_ref.run(codebase.get_adapter(cb), retract, [])
+    let assert Ok("2") = run_support.run(codebase.get_adapter(cb), retract, [])
     stop_db()
     let assert Ok(after_retract) =
-      run_ref.run(codebase.get_adapter(cb), status, [])
+      run_support.run(codebase.get_adapter(cb), status, [])
     string.contains(after_retract, "new") |> should.be_false
-    let assert Ok("3") = run_ref.run(codebase.get_adapter(cb), write, [])
+    let assert Ok("3") = run_support.run(codebase.get_adapter(cb), write, [])
   })
 }
 

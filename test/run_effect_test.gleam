@@ -12,8 +12,8 @@ import gleamunison/ast
 import gleamunison/codebase
 import gleamunison/identity.{type DefinitionRef, Local, Ref}
 import gleamunison/repl_eval
-import gleamunison/run_ref
 import gleeunit/should
+import run_support
 
 fn insert(
   cb: codebase.Codebase,
@@ -39,14 +39,16 @@ fn printing(text: BitArray) -> ast.Definition {
 pub fn an_effectful_definition_runs_with_the_console_handler_test() {
   let #(cb, main_ref) =
     insert(codebase.empty(), printing(<<"héllo from the store">>))
-  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("0"))
+  run_support.run(codebase.get_adapter(cb), main_ref, [])
+  |> should.equal(Ok("0"))
 }
 
 /// The Console operation returns the unit value (0), so an effectful def is
 /// still an ordinary value: the handler runs for its effect, not its result.
 pub fn console_print_yields_unit_test() {
   let #(cb, main_ref) = insert(codebase.empty(), printing(<<"🦀 crabs">>))
-  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("0"))
+  run_support.run(codebase.get_adapter(cb), main_ref, [])
+  |> should.equal(Ok("0"))
 }
 
 /// A print must not take the evaluation down with it. Text is a BitArray, so a
@@ -54,5 +56,6 @@ pub fn console_print_yields_unit_test() {
 /// would raise inside the frame, and the fix is to fall back to the term form.
 pub fn console_print_survives_a_non_utf8_payload_test() {
   let #(cb, main_ref) = insert(codebase.empty(), printing(<<255, 254>>))
-  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("0"))
+  run_support.run(codebase.get_adapter(cb), main_ref, [])
+  |> should.equal(Ok("0"))
 }

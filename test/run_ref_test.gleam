@@ -11,8 +11,8 @@ import gleamunison/identity.{type DefinitionRef, Local, Ref, hash_bytes}
 import gleamunison/namespace
 import gleamunison/repl_eval
 import gleamunison/run_error
-import gleamunison/run_ref
 import gleeunit/should
+import run_support
 
 fn insert(
   cb: codebase.Codebase,
@@ -43,7 +43,8 @@ pub fn a_stored_dependency_resolves_and_executes_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, main_ref) = insert(cb, main)
-  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("7"))
+  run_support.run(codebase.get_adapter(cb), main_ref, [])
+  |> should.equal(Ok("7"))
 }
 
 pub fn a_genesis_builtin_needs_no_store_entry_test() {
@@ -59,7 +60,8 @@ pub fn a_genesis_builtin_needs_no_store_entry_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
-  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("3"))
+  run_support.run(codebase.get_adapter(cb), main_ref, [])
+  |> should.equal(Ok("3"))
 }
 
 /// The shape production actually emits. `a_genesis_builtin_needs_no_store_entry_test`
@@ -79,7 +81,8 @@ pub fn a_builtin_reached_by_name_ref_needs_no_store_entry_test() {
       typ: ast.Builtin(ast.IntType),
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
-  run_ref.run(codebase.get_adapter(cb), main_ref, []) |> should.equal(Ok("3"))
+  run_support.run(codebase.get_adapter(cb), main_ref, [])
+  |> should.equal(Ok("3"))
 }
 
 pub fn a_stored_process_round_trip_uses_genesis_builtins_test() {
@@ -102,7 +105,7 @@ pub fn a_stored_process_round_trip_uses_genesis_builtins_test() {
       typ: bootstrap_types.host_value(),
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
-  run_ref.run(codebase.get_adapter(cb), main_ref, [])
+  run_support.run(codebase.get_adapter(cb), main_ref, [])
   |> should.equal(Ok("<<\"jet-removal:stored-round-trip\">>"))
 }
 
@@ -115,7 +118,7 @@ pub fn a_missing_dependency_names_the_ref_test() {
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
   let assert Error(run_error.Missing(got)) =
-    run_ref.run(codebase.get_adapter(cb), main_ref, [])
+    run_support.run(codebase.get_adapter(cb), main_ref, [])
   got |> should.equal(absent)
 }
 
@@ -138,7 +141,7 @@ pub fn a_name_reference_resolves_through_the_namespace_test() {
       "main",
       namespace.set(namespace.empty(), "dep", dep_ref),
     )
-  run_ref.run(adapter, main_ref, []) |> should.equal(Ok("9"))
+  run_support.run(adapter, main_ref, []) |> should.equal(Ok("9"))
 }
 
 pub fn a_name_reference_uses_the_selected_branch_without_fallback_test() {
@@ -158,7 +161,7 @@ pub fn a_name_reference_uses_the_selected_branch_without_fallback_test() {
       "release",
       namespace.set(namespace.empty(), "release-dep", release_dep_ref),
     )
-  run_ref.run_on_branch(adapter, main_ref, "release", [])
+  run_support.run_on_branch(adapter, main_ref, "release", [])
   |> should.equal(Ok("12"))
   let assert Ok(_) =
     namespace.commit(
@@ -166,9 +169,9 @@ pub fn a_name_reference_uses_the_selected_branch_without_fallback_test() {
       "main",
       namespace.set(namespace.empty(), "release-dep", main_dep_ref),
     )
-  run_ref.run_on_branch(adapter, main_ref, "release", [])
+  run_support.run_on_branch(adapter, main_ref, "release", [])
   |> should.equal(Ok("12"))
-  run_ref.run_on_branch(adapter, main_ref, "main", [])
+  run_support.run_on_branch(adapter, main_ref, "main", [])
   |> should.equal(Ok("13"))
 }
 
@@ -181,14 +184,14 @@ pub fn a_name_reference_without_a_binding_is_missing_test() {
     )
   let #(cb, main_ref) = insert(codebase.empty(), main)
   let assert Error(run_error.Missing(got)) =
-    run_ref.run(codebase.get_adapter(cb), main_ref, [])
+    run_support.run(codebase.get_adapter(cb), main_ref, [])
   got |> should.equal(name_ref)
 }
 
 pub fn an_absent_root_ref_is_missing_test() {
   let absent = Ref(hash_bytes(<<"absent-root">>))
   let assert Error(run_error.Missing(got)) =
-    run_ref.run(codebase.get_adapter(codebase.empty()), absent, [])
+    run_support.run(codebase.get_adapter(codebase.empty()), absent, [])
   got |> should.equal(absent)
 }
 
@@ -196,7 +199,7 @@ pub fn a_type_definition_refuses_to_execute_test() {
   let definition = ast.TypeDef(ast.Structural(Local(0), [], []))
   let #(cb, ref) = insert(codebase.empty(), definition)
   let assert Error(run_error.NotExecutable(got, _)) =
-    run_ref.run(codebase.get_adapter(cb), ref, [])
+    run_support.run(codebase.get_adapter(cb), ref, [])
   got |> should.equal(ref)
 }
 
@@ -206,7 +209,7 @@ pub fn absence_is_reported_before_evidence_test() {
   // failure, which it would if evidence were checked first.
   let absent = Ref(hash_bytes(<<"absent-before-evidence">>))
   let assert Error(run_error.Missing(got)) =
-    run_ref.run_verified(
+    run_support.run_verified(
       codebase.get_adapter(codebase.empty()),
       absent,
       [],
@@ -218,7 +221,7 @@ pub fn absence_is_reported_before_evidence_test() {
 pub fn raw_absence_is_reported_before_evidence_test() {
   let absent = Ref(hash_bytes(<<"absent-before-evidence-raw">>))
   let assert Error(run_error.Missing(got)) =
-    run_ref.run_verified_raw(
+    run_support.run_verified_raw(
       codebase.get_adapter(codebase.empty()),
       absent,
       [],
@@ -230,7 +233,7 @@ pub fn raw_absence_is_reported_before_evidence_test() {
 pub fn the_escape_hatch_runs_stored_content_test() {
   let definition = ast.TermDef(term: ast.Int(11), typ: ast.Builtin(ast.IntType))
   let #(cb, ref) = insert(codebase.empty(), definition)
-  run_ref.run_verified(codebase.get_adapter(cb), ref, [], True)
+  run_support.run_verified(codebase.get_adapter(cb), ref, [], True)
   |> should.equal(Ok("11"))
 }
 
@@ -246,7 +249,7 @@ fn int_value(n: Int) -> ast.Definition {
 pub fn run_gate_refuses_and_names_the_reason_test() {
   let #(cb, ref) = insert(codebase.empty(), int_value(7))
   let assert Error(error) =
-    run_ref.run_verified(codebase.get_adapter(cb), ref, [], False)
+    run_support.run_verified(codebase.get_adapter(cb), ref, [], False)
   run_error.describe(error)
   |> string.contains("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
   |> should.be_true
@@ -255,7 +258,7 @@ pub fn run_gate_refuses_and_names_the_reason_test() {
 /// The escape hatch is explicit, and only then does unevidenced content run.
 pub fn run_gate_is_skipped_only_when_explicitly_allowed_test() {
   let #(cb, ref) = insert(codebase.empty(), int_value(7))
-  run_ref.run_verified(codebase.get_adapter(cb), ref, [], True)
+  run_support.run_verified(codebase.get_adapter(cb), ref, [], True)
   |> should.equal(Ok("7"))
 }
 
@@ -282,7 +285,7 @@ pub fn an_effectful_function_runs_with_its_argument_test() {
       ),
     )
   let #(cb, ref) = insert(codebase.empty(), def)
-  run_ref.run(codebase.get_adapter(cb), ref, [text_arg(<<"probe">>)])
+  run_support.run(codebase.get_adapter(cb), ref, [text_arg(<<"probe">>)])
   |> should.equal(Ok("0"))
 }
 

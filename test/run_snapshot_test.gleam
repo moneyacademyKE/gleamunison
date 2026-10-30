@@ -4,9 +4,9 @@ import gleamunison/genesis
 import gleamunison/identity.{Ref}
 import gleamunison/namespace
 import gleamunison/repl_eval
-import gleamunison/run_ref
 import gleamunison/storage
 import gleeunit/should
+import run_support
 
 @external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
 fn increment(key: BitArray) -> Int
@@ -51,7 +51,7 @@ pub fn two_named_dependencies_read_the_selected_namespace_once_test() {
       }
       adapter.lookup(ref)
     })
-  run_ref.run_on_branch(observed, ref, "selected", [])
+  run_support.run_on_branch(observed, ref, "selected", [])
   |> should.equal(Ok("440"))
   count(<<"namespace-per-run">>) |> should.equal(1)
 }

@@ -11,11 +11,11 @@ import gleamunison/mcp
 import gleamunison/mcp_session
 import gleamunison/parser
 import gleamunison/repl_eval
-import gleamunison/run_ref
 import gleamunison/test_runner
 import gleamunison/types.{empty_cache}
 import gleamunison/verify
 import gleeunit/should
+import run_support
 import simplifile
 
 pub fn mcp_content_ref_is_distinct_from_name_ref_and_runs_test() {
@@ -54,7 +54,7 @@ pub fn mcp_content_ref_is_distinct_from_name_ref_and_runs_test() {
   let assert Ok(ref) = parse_ref_hex(content_hex)
   let assert Ok(cb) =
     codebase.insert(codebase.empty(), ast.Unit(ref, [#(ref, definition)]))
-  run_ref.run_raw(codebase.get_adapter(cb), ref, [])
+  run_support.run_raw(codebase.get_adapter(cb), ref, [])
   |> should.be_ok
   simplifile.delete(path)
 }

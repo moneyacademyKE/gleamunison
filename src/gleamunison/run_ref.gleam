@@ -37,53 +37,19 @@ fn call_eval_ffi(
 @external(erlang, "gleamunison_ffi", "render_term")
 fn render_term_ffi(term: Dynamic) -> String
 
-const default_branch = "main"
+/// The branch selected when a caller has no explicit release branch.
+pub const default_branch = "main"
 
-/// Execute with the evidence gate on. A definition runs only when a verified
-/// Test record covers its content hash — the same turnstile `publish` passes,
-/// checked again at the moment of execution because a store can be filled by
-/// `sync` or `pkg install` long after admission. `allow_unverified` is the
-/// explicit escape hatch for local stores; the caller warns on stderr.
+/// The execution authority: settle existence, check evidence, then execute.
+///
+/// A definition runs only when a verified Test record covers its content hash —
+/// the same turnstile `publish` passes, checked again at the moment of execution
+/// because a store can be filled by `sync` or `pkg install` long after admission.
+/// `allow_unverified` is the explicit escape hatch for local stores; the caller
+/// warns on stderr.
 ///
 /// Existence is settled first: an absent definition is absent, not unverified,
 /// and a caller reading exit codes must be able to tell the two apart.
-pub fn run_verified(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-  args: List(Dynamic),
-  allow_unverified: Bool,
-) -> Result(String, RunError) {
-  run_verified_on_branch(adapter, ref, default_branch, args, allow_unverified)
-}
-
-pub fn run_verified_on_branch(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-  branch: String,
-  args: List(Dynamic),
-  allow_unverified: Bool,
-) -> Result(String, RunError) {
-  use _ <- result.try(preflight(adapter, ref))
-  use _ <- result.try(evidence_gate(adapter, ref, allow_unverified))
-  run_on_branch(adapter, ref, branch, args)
-}
-
-/// The same gate, returning the raw term for a caller that renders it itself.
-pub fn run_verified_raw(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-  args: List(Dynamic),
-  allow_unverified: Bool,
-) -> Result(Dynamic, RunError) {
-  run_verified_raw_on_branch(
-    adapter,
-    ref,
-    default_branch,
-    args,
-    allow_unverified,
-  )
-}
-
 pub fn run_verified_raw_on_branch(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
@@ -94,6 +60,25 @@ pub fn run_verified_raw_on_branch(
   use _ <- result.try(preflight(adapter, ref))
   use _ <- result.try(evidence_gate(adapter, ref, allow_unverified))
   execute(adapter, ref, branch, args)
+}
+
+/// The CLI-facing text form: run through the same authority, then render the
+/// resulting term the way the REPL does.
+pub fn run_verified_on_branch(
+  adapter: storage.StorageAdapter,
+  ref: DefinitionRef,
+  branch: String,
+  args: List(Dynamic),
+  allow_unverified: Bool,
+) -> Result(String, RunError) {
+  use term <- result.try(run_verified_raw_on_branch(
+    adapter,
+    ref,
+    branch,
+    args,
+    allow_unverified,
+  ))
+  Ok(render_term_ffi(term))
 }
 
 fn preflight(
@@ -165,42 +150,6 @@ fn definition_is_effectful(
     // conservative answer is "pure", which demands test evidence.
     Error(_) -> False
   }
-}
-
-/// The CLI-facing text form: execute, then render the way the REPL does.
-pub fn run(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-  args: List(Dynamic),
-) -> Result(String, RunError) {
-  run_on_branch(adapter, ref, default_branch, args)
-}
-
-pub fn run_on_branch(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-  branch: String,
-  args: List(Dynamic),
-) -> Result(String, RunError) {
-  use term <- result.try(execute(adapter, ref, branch, args))
-  Ok(render_term_ffi(term))
-}
-
-pub fn run_raw(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-  args: List(Dynamic),
-) -> Result(Dynamic, RunError) {
-  run_raw_on_branch(adapter, ref, default_branch, args)
-}
-
-fn run_raw_on_branch(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-  branch: String,
-  args: List(Dynamic),
-) -> Result(Dynamic, RunError) {
-  execute(adapter, ref, branch, args)
 }
 
 fn execute(
@@ -278,13 +227,6 @@ pub type FunctionInfo {
 /// is loaded (dependencies first) because the export table only exists once
 /// the module is in the runtime — but `'$eval'` is never applied, so this is
 /// inspection, not execution.
-pub fn inspect_function(
-  adapter: storage.StorageAdapter,
-  ref: DefinitionRef,
-) -> Result(FunctionInfo, RunError) {
-  inspect_function_on_branch(adapter, ref, default_branch)
-}
-
 pub fn inspect_function_on_branch(
   adapter: storage.StorageAdapter,
   ref: DefinitionRef,
