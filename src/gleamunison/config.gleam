@@ -29,6 +29,8 @@ const default_path = "gleamunison.toml"
 
 const path_key = "GLEAMUNISON_CONFIG"
 
+const profile_key = "GLEAMUNISON_PROFILE"
+
 pub fn empty() -> Config {
   Config(dict.new(), dict.new())
 }
@@ -89,6 +91,17 @@ pub fn string_or(
     Some(text) if text != "" -> Ok(text)
     _ -> Ok(default)
   }
+}
+
+/// The one profile resolver for every admission gate: CLI overrides, then
+/// TOML, then the environment, then "local". An empty string anywhere means
+/// unset. The Erlang bind and sandbox gates call this compiled function
+/// instead of reading the environment themselves, so a TOML-set profile is
+/// visible at admission time. Resolved per call — never cached at boot — and
+/// a malformed config file surfaces as an error the gate must refuse on.
+pub fn resolve_profile() -> Result(String, String) {
+  use cfg <- result.try(load())
+  string_or(cfg, profile_key, "local")
 }
 
 pub fn optional_int(

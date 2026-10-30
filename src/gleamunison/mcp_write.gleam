@@ -21,12 +21,7 @@ pub fn tool() -> Tool {
 }
 
 pub fn check_writable() -> Result(Nil, String) {
-  use cfg <- result.try(config.load())
-  use profile <- result.try(config.string_or(
-    cfg,
-    "GLEAMUNISON_PROFILE",
-    "local",
-  ))
+  use profile <- result.try(config.resolve_profile())
   case sandbox_policy.denies_untrusted_execution(profile) {
     True -> Error("agent_publish_refused: untrusted profile cannot write")
     False -> Ok(Nil)

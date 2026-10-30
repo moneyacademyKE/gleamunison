@@ -133,3 +133,45 @@ pub fn a_wrong_cli_type_is_reported_test() {
     Ok(_) -> panic as "an int override was accepted as a string"
   }
 }
+
+// resolve_profile is the one profile resolver the Erlang bind and sandbox
+// gates call (bk-b299): default, env override, TOML precedence, and
+// empty-string-as-unset must all hold or admission drifts between gates.
+
+pub fn resolve_profile_defaults_to_local_test() {
+  envoy.unset("GLEAMUNISON_PROFILE")
+  envoy.set("GLEAMUNISON_CONFIG", absent_path)
+  config.resolve_profile() |> should.equal(Ok("local"))
+  envoy.unset("GLEAMUNISON_CONFIG")
+}
+
+pub fn resolve_profile_env_override_test() {
+  envoy.set("GLEAMUNISON_PROFILE", "authenticated-remote")
+  envoy.set("GLEAMUNISON_CONFIG", absent_path)
+  config.resolve_profile() |> should.equal(Ok("authenticated-remote"))
+  envoy.unset("GLEAMUNISON_PROFILE")
+  envoy.unset("GLEAMUNISON_CONFIG")
+}
+
+pub fn resolve_profile_toml_beats_env_test() {
+  envoy.set("GLEAMUNISON_PROFILE", "authenticated-remote")
+  with_file("GLEAMUNISON_PROFILE = \"untrusted-execution\"\n", fn() {
+    envoy.set("GLEAMUNISON_CONFIG", file_path)
+    config.resolve_profile() |> should.equal(Ok("untrusted-execution"))
+    envoy.unset("GLEAMUNISON_CONFIG")
+  })
+  envoy.unset("GLEAMUNISON_PROFILE")
+}
+
+pub fn resolve_profile_empty_string_means_unset_test() {
+  envoy.set("GLEAMUNISON_PROFILE", "")
+  envoy.set("GLEAMUNISON_CONFIG", absent_path)
+  config.resolve_profile() |> should.equal(Ok("local"))
+  with_file("GLEAMUNISON_PROFILE = \"\"\n", fn() {
+    envoy.set("GLEAMUNISON_CONFIG", file_path)
+    config.resolve_profile() |> should.equal(Ok("local"))
+    envoy.unset("GLEAMUNISON_CONFIG")
+  })
+  envoy.unset("GLEAMUNISON_PROFILE")
+  envoy.unset("GLEAMUNISON_CONFIG")
+}

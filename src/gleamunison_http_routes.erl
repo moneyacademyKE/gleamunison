@@ -23,20 +23,22 @@ handle_eval_route(Socket, _) ->
     gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing expr parameter\"}">>).
 
 %% One admission gate for every route that evaluates caller-supplied code.
-%% The policy lives in gleamunison/sandbox_policy.gleam: this module only
-%% reads the profile name and reports the refusal.
+%% The policy lives in gleamunison/sandbox_policy.gleam and the profile name
+%% comes from gleamunison@config:resolve_profile/0 — the one resolver owning
+%% CLI -> TOML -> env -> "local" precedence (empty string means unset), read
+%% per request, never cached at boot. This module only reports the refusal;
+%% a malformed config file fails closed.
 sandbox_admits() ->
-    Profile = case os:getenv("GLEAMUNISON_PROFILE") of
-        false -> <<"local">>;
-        "" -> <<"local">>;
-        Value -> list_to_binary(Value)
-    end,
-    try gleamunison@sandbox_policy:admit_profile(Profile) of
-        {ok, _} -> ok;
-        {error, Refusal} when is_binary(Refusal) -> {error, Refusal};
-        _ -> {error, <<"sandbox_admission_failed">>}
-    catch
-        _:_ -> {error, <<"sandbox_admission_failed">>}
+    case gleamunison@config:resolve_profile() of
+        {ok, Profile} ->
+            try gleamunison@sandbox_policy:admit_profile(Profile) of
+                {ok, _} -> ok;
+                {error, Refusal} when is_binary(Refusal) -> {error, Refusal};
+                _ -> {error, <<"sandbox_admission_failed">>}
+            catch
+                _:_ -> {error, <<"sandbox_admission_failed">>}
+            end;
+        {error, Reason} -> {error, <<"profile_config_error: ", Reason/binary>>}
     end.
 
 handle_eval_admitted(Socket, Expr) ->

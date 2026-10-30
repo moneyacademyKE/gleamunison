@@ -123,14 +123,18 @@ bind_gate() ->
         "" -> <<"127.0.0.1">>;
         Value -> list_to_binary(Value)
     end,
-    Profile = case os:getenv("GLEAMUNISON_PROFILE") of
-        false -> <<"local">>;
-        P -> list_to_binary(P)
-    end,
-    Input = {bind_input, Address, Profile, http_token_present(), sync_token_present()},
-    case gleamunison@auth:bind_decision(Input) of
-        allow -> parse_bind_ip(Address);
-        {refuse, Reason} -> {error, Reason}
+    %% One profile resolver: gleamunison@config:resolve_profile/0 owns the
+    %% CLI -> TOML -> env -> "local" precedence (empty string means unset).
+    %% A malformed config file fails the gate closed instead of silently
+    %% falling back to the environment.
+    case gleamunison@config:resolve_profile() of
+        {ok, Profile} ->
+            Input = {bind_input, Address, Profile, http_token_present(), sync_token_present()},
+            case gleamunison@auth:bind_decision(Input) of
+                allow -> parse_bind_ip(Address);
+                {refuse, Reason} -> {error, Reason}
+            end;
+        {error, Reason} -> {error, <<"profile_config_error: ", Reason/binary>>}
     end.
 
 http_token_present() ->
