@@ -46,7 +46,9 @@ wait_for_response(RequestId, Deadline, Cancellation) ->
                 false ->
                     receive
                         {http, {RequestId, {{_Ver, Status, _Reason}, RespHeaders, RespBody}}} ->
-                            BinHeaders = [{list_to_binary(K), list_to_binary(V)} || {K, V} <- RespHeaders],
+                            %% HTTP headers are historically Latin-1; re-encode so only
+                            %% valid UTF-8 ever crosses the FFI into Gleam.
+                            BinHeaders = [{latin1_to_utf8(K), latin1_to_utf8(V)} || {K, V} <- RespHeaders],
                             {ok, {Status, BinHeaders, RespBody}};
                         {http, {RequestId, {error, Reason}}} ->
                             {error, error_binary(Reason)}
@@ -66,7 +68,13 @@ cancelled({some, Token}) -> 'gleamunison@cancellation':is_cancelled(Token).
 
 error_binary(timeout) -> <<"request_timeout">>;
 error_binary({failed_connect, _}) -> <<"connect_failed">>;
-error_binary(Reason) -> list_to_binary(io_lib:format("~p", [Reason])).
+error_binary(Reason) -> latin1_to_utf8(io_lib:format("~p", [Reason])).
+
+%% Latin-1 chars/bytes (0..255) re-encoded as UTF-8 so every binary crossing
+%% the FFI decodes cleanly in Gleam. Total for header strings and ~p output;
+%% codepoints above 255 never occur there (io_lib:format renders them as
+%% integer lists).
+latin1_to_utf8(X) -> unicode:characters_to_binary(X, latin1, utf8).
 
 method_atom(<<"GET">>) -> get;
 method_atom(<<"POST">>) -> post;
