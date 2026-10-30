@@ -193,12 +193,12 @@ fn publish(uri: String, diagnostics: List(Diagnostic)) -> String {
       <> ",\"character\":"
       <> int.to_string(d.col + 1)
       <> "}},\"severity\":1,\"message\":"
-      <> lsp_types.jstr(d.message)
+      <> json.json_quote(d.message)
       <> "}"
     })
   "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\","
   <> "\"params\":{\"uri\":"
-  <> lsp_types.jstr(uri)
+  <> json.json_quote(uri)
   <> ",\"diagnostics\":["
   <> string.join(diags, ",")
   <> "]}}"

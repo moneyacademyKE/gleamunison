@@ -112,11 +112,11 @@ fn dispatch(server: Server, req: Request) -> Response {
 
 fn initialize_result(server: Server) -> String {
   "{\"protocolVersion\":"
-  <> jstr(protocol_version)
+  <> json_string(protocol_version)
   <> ",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":"
-  <> jstr(server.name)
+  <> json_string(server.name)
   <> ",\"version\":"
-  <> jstr(server.version)
+  <> json_string(server.version)
   <> "}}"
 }
 
@@ -124,9 +124,9 @@ fn tools_list_result(server: Server) -> String {
   let tools =
     list.map(server.tools, fn(t) {
       "{\"name\":"
-      <> jstr(t.name)
+      <> json_string(t.name)
       <> ",\"description\":"
-      <> jstr(t.description)
+      <> json_string(t.description)
       <> ",\"inputSchema\":"
       <> tool_schema(t.name)
       <> "}"
@@ -193,7 +193,7 @@ fn tool_result(text: String, is_error: Bool) -> String {
     False -> "false"
   }
   "{\"content\":[{\"type\":\"text\",\"text\":"
-  <> jstr(text)
+  <> json_string(text)
   <> "}],\"isError\":"
   <> err
   <> "}"
@@ -213,29 +213,22 @@ fn error_body(id: JsonId, code: Int, message: String) -> String {
   <> ",\"error\":{\"code\":"
   <> int.to_string(code)
   <> ",\"message\":"
-  <> jstr(message)
+  <> json_string(message)
   <> "}}"
 }
 
 fn id_json(id: JsonId) -> String {
   case id {
     IntId(n) -> int.to_string(n)
-    StrId(s) -> jstr(s)
+    StrId(s) -> json_string(s)
     NoId -> "null"
   }
 }
 
+/// Thin delegate to the JSON boundary's single escaper (json.json_quote).
+/// The former encode-based body degraded to "\"\"" on encode failure;
+/// json_quote is total, so there is no failure left to degrade — an
+/// invalid JSON string can no longer be built here at all.
 pub fn json_string(s: String) -> String {
-  case json.encode(s) {
-    Ok(encoded) ->
-      case bit_array.to_string(encoded) {
-        Ok(value) -> value
-        Error(_) -> "\"\""
-      }
-    Error(_) -> "\"\""
-  }
-}
-
-fn jstr(s: String) -> String {
-  json_string(s)
+  json.json_quote(s)
 }

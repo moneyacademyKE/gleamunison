@@ -1,7 +1,8 @@
 //// Provider wire codec for the LLM ability (pure data <-> JSON).
 ////
 //// One owner for the provider wire format: request building, response
-//// parsing, JSON string escaping, and the house completion shape. Split
+//// parsing, and the house completion shape. String escaping is the JSON
+//// boundary's job (json.json_quote), not a per-module helper. Split
 //// from llm.gleam so each module keeps exactly one concern — llm.gleam
 //// owns the ability host surface (handlers, budget gate, config), this
 //// module owns the wire.
@@ -27,7 +28,7 @@ pub fn build_request(
 ) -> #(String, List(#(String, String)), String) {
   let effort_field = case cfg.reasoning_effort {
     "" -> ""
-    e -> ",\"reasoning_effort\":" <> jstr(e)
+    e -> ",\"reasoning_effort\":" <> json.json_quote(e)
   }
   case cfg.provider {
     OpenAI -> #(
@@ -37,7 +38,7 @@ pub fn build_request(
         #("content-type", "application/json"),
       ],
       "{\"model\":"
-        <> jstr(cfg.model)
+        <> json.json_quote(cfg.model)
         <> ",\"max_tokens\":"
         <> int.to_string(cfg.max_tokens)
         <> effort_field
@@ -49,7 +50,7 @@ pub fn build_request(
       let #(system, rest) = list.partition(messages, fn(m) { m.role == System })
       let system_field = case system {
         [] -> ""
-        sys -> "\"system\":" <> jstr(join_contents(sys)) <> ","
+        sys -> "\"system\":" <> json.json_quote(join_contents(sys)) <> ","
       }
       #(
         cfg.base_url <> "/v1/messages",
@@ -59,7 +60,7 @@ pub fn build_request(
           #("content-type", "application/json"),
         ],
         "{\"model\":"
-          <> jstr(cfg.model)
+          <> json.json_quote(cfg.model)
           <> ",\"max_tokens\":"
           <> int.to_string(cfg.max_tokens)
           <> ","
@@ -82,9 +83,9 @@ pub fn messages_json(msgs: List(Message)) -> String {
   let parts =
     list.map(msgs, fn(m) {
       "{\"role\":"
-      <> jstr(role_name(m.role))
+      <> json.json_quote(role_name(m.role))
       <> ",\"content\":"
-      <> jstr(m.content)
+      <> json.json_quote(m.content)
       <> "}"
     })
   "[" <> string.join(parts, ",") <> "]"
@@ -96,18 +97,6 @@ fn role_name(r: Role) -> String {
     User -> "user"
     Assistant -> "assistant"
   }
-}
-
-fn jstr(s: String) -> String {
-  "\"" <> escape(s) <> "\""
-}
-
-fn escape(s: String) -> String {
-  s
-  |> string.replace("\\", "\\\\")
-  |> string.replace("\"", "\\\"")
-  |> string.replace("\n", "\\n")
-  |> string.replace("\t", "\\t")
 }
 
 // ---------------------------------------------------------------------------
@@ -186,9 +175,9 @@ fn anthropic_decoder() -> decode.Decoder(Completion) {
 pub fn completion_json(c: Completion) -> BitArray {
   bit_array.from_string(
     "{\"content\":"
-    <> jstr(c.content)
+    <> json.json_quote(c.content)
     <> ",\"model\":"
-    <> jstr(c.model)
+    <> json.json_quote(c.model)
     <> ",\"input_tokens\":"
     <> int.to_string(c.input_tokens)
     <> ",\"output_tokens\":"

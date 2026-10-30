@@ -40,8 +40,10 @@ is_proplist(_) -> false.
 build_json(Value) when is_integer(Value) -> integer_to_binary(Value);
 build_json(Value) when is_float(Value) -> float_to_binary(Value);
 build_json(Value) when is_binary(Value) ->
-    Encoded = escape_json_string(Value),
-    <<$", Encoded/binary, $">>;
+    %% The FFI escaper is the single owner (quotes included): it escapes
+    %% \r and every C0 control as \uXXXX, which the local escaper this
+    %% replaced passed through raw, producing invalid JSON (bk-5f59).
+    gleamunison_ffi:json_quote(Value);
 build_json(true) -> <<"true">>;
 build_json(false) -> <<"false">>;
 build_json(null) -> <<"null">>;
@@ -50,18 +52,8 @@ build_json(Value) when is_list(Value) ->
     <<$[, (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, $]>>;
 build_json(Value) when is_map(Value) ->
     Parts = [begin
-        KJson = <<$", (escape_json_string(K))/binary, $">>,
+        KJson = gleamunison_ffi:json_quote(K),
         VJson = build_json(V),
         <<KJson/binary, $:, VJson/binary>>
     end || {K, V} <- maps:to_list(Value)],
     <<${, (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, $}>>.
-
-escape_json_string(Bin) when is_binary(Bin) ->
-    escape_json_char(Bin, <<>>).
-
-escape_json_char(<<>>, Acc) -> Acc;
-escape_json_char(<<$", Rest/binary>>, Acc) -> escape_json_char(Rest, <<Acc/binary, "\\\"">>);
-escape_json_char(<<$\\, Rest/binary>>, Acc) -> escape_json_char(Rest, <<Acc/binary, "\\\\">>);
-escape_json_char(<<$\n, Rest/binary>>, Acc) -> escape_json_char(Rest, <<Acc/binary, "\\n">>);
-escape_json_char(<<$\t, Rest/binary>>, Acc) -> escape_json_char(Rest, <<Acc/binary, "\\t">>);
-escape_json_char(<<C, Rest/binary>>, Acc) -> escape_json_char(Rest, <<Acc/binary, C>>).

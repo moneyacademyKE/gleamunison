@@ -1,11 +1,15 @@
+import gleam/bit_array
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/list
 import gleam/string
 import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
+import gleamunison/json
 import gleamunison/llm
 import gleamunison/transcript.{OpRecord}
+import gleamunison/transcript_json
 import gleeunit/should
 
 fn echo_handler() -> OpHandler {
@@ -76,7 +80,7 @@ pub fn json_roundtrip_preserves_entries_test() {
   transcript.stop(rec)
 
   let json = transcript.to_json(t)
-  let assert Ok(t2) = transcript.from_json(json)
+  let assert Ok(t2) = transcript_json.from_json(json)
   transcript.to_json(t2) |> should.equal(json)
   let assert [entry] = transcript.tape_entries(t2)
   entry.op |> should.equal(0)
@@ -108,7 +112,7 @@ pub fn json_round_trip_preserves_replay_test() {
   let _ = handler([to_dynamic("hello")], fn(d) { d })
   let tape = transcript.capture(rec)
   let json = transcript.to_json(tape)
-  let assert Ok(loaded) = transcript.from_json(json)
+  let assert Ok(loaded) = transcript_json.from_json(json)
   transcript.is_replayable(loaded) |> should.be_true
   let pb = transcript.playback(loaded)
   let replayed = transcript.replay_frames(pb, [llm_frame(boom_handler())])
@@ -124,7 +128,7 @@ pub fn json_round_trip_preserves_replay_test() {
 pub fn v1_tape_loads_audit_only_test() {
   let v1 =
     "[{\"ability\":\"m_abcd1234\",\"op\":0,\"args\":\"x\",\"result\":\"y\",\"seq\":0}]"
-  let assert Ok(tape) = transcript.from_json(v1)
+  let assert Ok(tape) = transcript_json.from_json(v1)
   transcript.is_replayable(tape) |> should.be_false
 }
 
@@ -191,4 +195,46 @@ fn record_one_tape(tag: String) -> transcript.Tape {
   let tape = transcript.capture(rec)
   transcript.stop(rec)
   tape
+}
+
+pub fn to_json_escapes_control_characters_test() {
+  // Term reprs routinely contain tabs; audit JSONL must stay valid JSON —
+  // and round-trip through both the standard codec and the module's own
+  // reader, which learned \r, \t and \uXXXX when the writer was fixed.
+  let nasty = "cr\r tab\t nul\u{0} us\u{1f} quote\" back\\"
+  let tape =
+    transcript.from_entries([
+      OpRecord(
+        ability: "m_deadbeef",
+        op: 0,
+        args_repr: nasty,
+        result_repr: nasty,
+        seq: 0,
+      ),
+    ])
+  let encoded = transcript.to_json(tape)
+  let assert Ok(dyn) = json.decode(bit_array.from_string(encoded))
+  let decoder =
+    decode.list({
+      use args <- decode.field("args", decode.string)
+      use res <- decode.field("result", decode.string)
+      decode.success(#(args, res))
+    })
+  let assert Ok([#(args, res)]) = decode.run(dyn, decoder)
+  args |> should.equal(nasty)
+  res |> should.equal(nasty)
+  let assert Ok(loaded) = transcript_json.from_json(encoded)
+  let assert [entry] = transcript.tape_entries(loaded)
+  entry.args_repr |> should.equal(nasty)
+  entry.result_repr |> should.equal(nasty)
+}
+
+pub fn from_json_still_reads_legacy_raw_control_characters_test() {
+  // Pre-fix tapes carry raw tabs (the old escaper missed them); the reader
+  // stays lenient so old audit files still load and replay.
+  let legacy =
+    "[{\"ability\":\"m_abcd1234\",\"op\":0,\"args\":\"a\tb\",\"result\":\"y\",\"seq\":0}]"
+  let assert Ok(tape) = transcript_json.from_json(legacy)
+  let assert [entry] = transcript.tape_entries(tape)
+  entry.args_repr |> should.equal("a\tb")
 }

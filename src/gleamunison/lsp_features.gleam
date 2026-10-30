@@ -14,6 +14,7 @@ import gleamunison/ast
 import gleamunison/elab_types
 import gleamunison/elaborate as elab
 import gleamunison/identity
+import gleamunison/json
 import gleamunison/lexer
 import gleamunison/lsp_types
 import gleamunison/repl_eval
@@ -43,7 +44,7 @@ pub fn hover_reply(
               lsp_types.respond(
                 id,
                 "{\"contents\":{\"kind\":\"markdown\",\"value\":"
-                  <> lsp_types.jstr(
+                  <> json.json_quote(
                   "```gleamunison\n" <> name <> " : " <> typ <> "\n```",
                 )
                   <> "}}",
@@ -53,7 +54,7 @@ pub fn hover_reply(
               lsp_types.respond(
                 id,
                 "{\"contents\":{\"kind\":\"markdown\",\"value\":"
-                  <> lsp_types.jstr(name)
+                  <> json.json_quote(name)
                   <> "}}",
               ),
             ]
@@ -78,7 +79,7 @@ pub fn definition_reply(
               lsp_types.respond(
                 id,
                 "{\"uri\":"
-                  <> lsp_types.jstr(uri)
+                  <> json.json_quote(uri)
                   <> ",\"range\":{\"start\":{\"line\":"
                   <> int.to_string(line0)
                   <> ",\"character\":"
@@ -113,7 +114,7 @@ pub fn completion_reply(
             |> list.filter(fn(n) { string.starts_with(n, prefix) })
             |> list.unique
             |> list.map(fn(n) {
-              "{\"label\":" <> lsp_types.jstr(n) <> ",\"kind\":3}"
+              "{\"label\":" <> json.json_quote(n) <> ",\"kind\":3}"
             })
           [
             lsp_types.respond(

@@ -7,7 +7,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/option.{type Option}
-import gleam/string
+import gleamunison/json
 
 /// Server state: the open documents. Stateless services can't answer
 /// "what is THIS symbol in THIS file" — hover/definition/completion read
@@ -46,7 +46,7 @@ pub fn error_response(id: Dynamic, code: Int, message: String) -> String {
   <> ",\"error\":{\"code\":"
   <> int.to_string(code)
   <> ",\"message\":"
-  <> jstr(message)
+  <> json.json_quote(message)
   <> "}}"
 }
 
@@ -55,19 +55,8 @@ pub fn id_json(id: Dynamic) -> String {
     Ok(n) -> int.to_string(n)
     Error(_) ->
       case decode.run(id, decode.string) {
-        Ok(s) -> jstr(s)
+        Ok(s) -> json.json_quote(s)
         Error(_) -> "null"
       }
   }
-}
-
-pub fn jstr(s: String) -> String {
-  let escaped =
-    s
-    |> string.replace("\\", "\\\\")
-    |> string.replace("\"", "\\\"")
-    |> string.replace("\n", "\\n")
-    |> string.replace("\r", "\\r")
-    |> string.replace("\t", "\\t")
-  "\"" <> escaped <> "\""
 }

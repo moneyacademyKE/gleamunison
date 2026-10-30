@@ -13,6 +13,7 @@ import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, RuntimeConfig}
 import gleamunison/identity
 import gleamunison/transcript
+import gleamunison/transcript_json
 import gleamunison/verify
 import simplifile
 
@@ -64,7 +65,7 @@ pub fn replay_from_file(
     Ok(t) -> Ok(t)
     Error(e) -> Error("replay: cannot read tape: " <> string.inspect(e))
   })
-  use tape <- result.try(transcript.from_json(tape_text))
+  use tape <- result.try(transcript_json.from_json(tape_text))
   case transcript.is_replayable(tape) {
     False -> Error("replay: tape is audit-only (no raw values recorded)")
     True -> {

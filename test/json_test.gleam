@@ -40,3 +40,21 @@ pub fn encode_escapes_quotes_test() {
   let assert Ok(text) = bit_array.to_string(bin)
   let assert True = string.contains(text, "\\\"hi\\\"")
 }
+
+pub fn json_quote_roundtrips_control_characters_test() {
+  // The single owner's contract: quote, backslash, CR, TAB, NUL and US —
+  // everything a raw JSON string cannot carry — must survive the round trip.
+  let nasty = "cr\r tab\t nul\u{0} us\u{1f} quote\" back\\"
+  let quoted = json.json_quote(nasty)
+  let assert Ok(dyn) = json.decode(bit_array.from_string(quoted))
+  let assert Ok(back) = decode.run(dyn, decode.string)
+  let assert True = back == nasty
+}
+
+pub fn encode_roundtrips_control_characters_test() {
+  let nasty = "cr\r tab\t nul\u{0} us\u{1f} quote\" back\\"
+  let assert Ok(bin) = json.encode(nasty)
+  let assert Ok(dyn) = json.decode(bin)
+  let assert Ok(back) = decode.run(dyn, decode.string)
+  let assert True = back == nasty
+}

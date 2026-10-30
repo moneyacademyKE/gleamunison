@@ -1,4 +1,7 @@
+import gleam/bit_array
+import gleam/dynamic/decode
 import gleam/string
+import gleamunison/json
 import gleamunison/mcp
 import gleeunit/should
 
@@ -26,4 +29,14 @@ pub fn json_string_escapes_control_characters_test() {
   string.contains(escaped, "\\\"") |> should.be_true
   string.contains(escaped, "\\\\") |> should.be_true
   string.contains(escaped, "\\n") |> should.be_true
+}
+
+pub fn json_string_roundtrips_control_characters_test() {
+  // json_string is now a thin delegate to the JSON boundary's single
+  // escaper: CR, TAB, NUL and US must decode-accept and round-trip.
+  let nasty = "cr\r tab\t nul\u{0} us\u{1f} quote\" back\\"
+  let encoded = mcp.json_string(nasty)
+  let assert Ok(dyn) = json.decode(bit_array.from_string(encoded))
+  let assert Ok(back) = decode.run(dyn, decode.string)
+  back |> should.equal(nasty)
 }

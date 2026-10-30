@@ -1,5 +1,9 @@
+import gleam/bit_array
+import gleam/dynamic/decode
 import gleam/int
 import gleam/string
+import gleamunison/dynamic_ffi.{to_dynamic}
+import gleamunison/json
 import gleamunison/lsp
 import gleamunison/lsp_types
 import gleamunison/version
@@ -163,4 +167,40 @@ pub fn hover_on_unknown_position_returns_null_test() {
   let assert [resp] = open_then(source, req)
   string.contains(resp, "\"id\":10") |> should.be_true
   string.contains(resp, "\"result\":null") |> should.be_true
+}
+
+pub fn diagnostics_render_escapes_control_characters_test() {
+  // A didOpen uri flows through publish into a Content-Length framed
+  // notification: one raw CR desyncs the editor's frame stream. The
+  // rendered body must be valid JSON that round-trips the uri.
+  let nasty = "file:///cr\r tab\t nul\u{0} us\u{1f} quote\" back\\.lisp"
+  let open =
+    "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":"
+    <> json.json_quote(nasty)
+    <> ",\"text\":\"(define main 1)\"}}}"
+  let #(replies, _) = lsp.handle_message(open, lsp_types.new_state())
+  let assert [body] = replies
+  let assert Ok(dyn) = json.decode(bit_array.from_string(body))
+  let decoder =
+    decode.field(
+      "params",
+      decode.field("uri", decode.string, decode.success),
+      decode.success,
+    )
+  let assert Ok(uri) = decode.run(dyn, decoder)
+  uri |> should.equal(nasty)
+}
+
+pub fn error_response_escapes_control_characters_test() {
+  let nasty = "cr\r tab\t nul\u{0} us\u{1f} quote\" back\\"
+  let body = lsp_types.error_response(to_dynamic(1), -32_603, nasty)
+  let assert Ok(dyn) = json.decode(bit_array.from_string(body))
+  let decoder =
+    decode.field(
+      "error",
+      decode.field("message", decode.string, decode.success),
+      decode.success,
+    )
+  let assert Ok(message) = decode.run(dyn, decoder)
+  message |> should.equal(nasty)
 }

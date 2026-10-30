@@ -1,7 +1,9 @@
 import gleam/bit_array
+import gleam/dynamic/decode
 import gleam/list
 import gleam/string
 import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
+import gleamunison/json
 import gleamunison/llm
 import gleamunison/llm_types.{
   type ProviderConfig, Anthropic, Completion, Message, OpenAI, ProviderConfig,
@@ -120,4 +122,20 @@ pub fn ability_frame_targets_genesis_hash_test() {
   let handler = llm.mock_handler(Completion("x", "m", 0, 0))
   let frame = llm.frame(handler)
   let assert True = frame.ability == llm.ability_ref()
+}
+
+pub fn messages_json_escapes_control_characters_test() {
+  // This body goes over the wire to the provider: one raw CR or NUL makes
+  // the whole request invalid JSON. It must decode-accept and round-trip.
+  let nasty = "cr\r tab\t nul\u{0} us\u{1f} quote\" back\\"
+  let encoded = llm_wire.messages_json([Message(User, nasty)])
+  let assert Ok(dyn) = json.decode(bit_array.from_string(encoded))
+  let decoder =
+    decode.list({
+      use role <- decode.field("role", decode.string)
+      use content <- decode.field("content", decode.string)
+      decode.success(#(role, content))
+    })
+  let assert Ok([#("user", content)]) = decode.run(dyn, decoder)
+  let assert True = content == nasty
 }

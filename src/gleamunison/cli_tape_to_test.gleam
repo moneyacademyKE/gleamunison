@@ -19,6 +19,7 @@ import gleamunison/cli_result
 import gleamunison/compile
 import gleamunison/identity
 import gleamunison/transcript
+import gleamunison/transcript_json
 import simplifile
 
 pub fn command(args: List(String)) -> Nil {
@@ -65,7 +66,7 @@ pub fn generate(
   def_name: String,
   tape_json: String,
 ) -> Result(String, String) {
-  use tape <- result_try(transcript.from_json(tape_json))
+  use tape <- result_try(transcript_json.from_json(tape_json))
   let entries = transcript.tape_entries(tape)
   use entry <- result_try(case entries {
     [] -> Error("tape has no recorded ops")
