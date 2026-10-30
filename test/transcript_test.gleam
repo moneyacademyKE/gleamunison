@@ -132,3 +132,68 @@ pub fn v1_tape_loads_audit_only_test() {
   let assert Ok(tape) = transcript.from_json(v1)
   transcript.is_replayable(tape) |> should.be_false
 }
+
+pub fn interleaved_recorders_keep_separate_tapes_test() {
+  let first = transcript.start_with(transcript.CaptureAll)
+  let second = transcript.start_with(transcript.CaptureAll)
+
+  let assert [first_frame] =
+    transcript.wrap_frames(first, [llm_frame(echo_handler())])
+  let assert [second_frame] =
+    transcript.wrap_frames(second, [llm_frame(echo_handler())])
+  let assert Ok(first_handler) = dict.get(first_frame.ops, 0)
+  let assert Ok(second_handler) = dict.get(second_frame.ops, 0)
+
+  let _ = first_handler([to_dynamic("first-a")], fn(d) { d })
+  let _ = second_handler([to_dynamic("second-a")], fn(d) { d })
+  let _ = first_handler([to_dynamic("first-b")], fn(d) { d })
+
+  let assert [f1, f2] = transcript.entries(first)
+  let assert [s1] = transcript.entries(second)
+  f1.seq |> should.equal(0)
+  f2.seq |> should.equal(1)
+  s1.seq |> should.equal(0)
+  string.contains(f1.args_repr, "first-a") |> should.be_true
+  string.contains(f2.args_repr, "first-b") |> should.be_true
+  string.contains(s1.args_repr, "second-a") |> should.be_true
+
+  transcript.stop(first)
+  transcript.stop(second)
+}
+
+pub fn interleaved_playbacks_keep_separate_cursors_test() {
+  let recorded = record_one_tape("cursor-a")
+  let other = record_one_tape("cursor-b")
+
+  let first = transcript.playback(recorded)
+  let second = transcript.playback(other)
+  let assert [first_frame] =
+    transcript.replay_frames(first, [llm_frame(boom_handler())])
+  let assert [second_frame] =
+    transcript.replay_frames(second, [llm_frame(boom_handler())])
+  let assert Ok(first_handler) = dict.get(first_frame.ops, 0)
+  let assert Ok(second_handler) = dict.get(second_frame.ops, 0)
+
+  let first_result: String =
+    unsafe_coerce(first_handler([to_dynamic("ignored")], fn(d) { d }))
+  let second_result: String =
+    unsafe_coerce(second_handler([to_dynamic("ignored")], fn(d) { d }))
+
+  first_result |> should.equal("handled:cursor-a")
+  second_result |> should.equal("handled:cursor-b")
+  transcript.playback_remaining(first) |> should.equal(0)
+  transcript.playback_remaining(second) |> should.equal(0)
+
+  transcript.stop_playback(first)
+  transcript.stop_playback(second)
+}
+
+fn record_one_tape(tag: String) -> transcript.Tape {
+  let rec = transcript.start_with(transcript.CaptureAll)
+  let assert [frame] = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
+  let assert Ok(handler) = dict.get(frame.ops, 0)
+  let _ = handler([to_dynamic(tag)], fn(d) { d })
+  let tape = transcript.capture(rec)
+  transcript.stop(rec)
+  tape
+}

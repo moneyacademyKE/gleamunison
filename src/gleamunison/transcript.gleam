@@ -39,14 +39,20 @@ pub type CapturePolicy {
   CaptureAll
 }
 
-/// Opaque handle to the process-local recording log.
+/// Opaque handle to one process-local recording log.
+///
+/// The token is the actual process-dictionary key, so two recorders in the
+/// same process own separate tapes.
 pub opaque type Recorder {
-  Recorder(policy: CapturePolicy)
+  Recorder(policy: CapturePolicy, token: Dynamic)
 }
 
-/// Opaque handle to a playback cursor over raw captured values.
+/// Opaque handle to one playback cursor over raw captured values.
+///
+/// The token is the actual process-dictionary cursor key, so two playbacks
+/// in the same process cannot consume each other's entries.
 pub opaque type Playback {
-  Playback
+  Playback(token: Dynamic)
 }
 
 @external(erlang, "gleamunison_ffi", "to_dynamic")
@@ -55,45 +61,54 @@ fn to_dynamic(val: a) -> Dynamic
 @external(erlang, "gleamunison_ffi", "from_dynamic")
 fn from_dynamic(val: Dynamic) -> a
 
+@external(erlang, "gleamunison_transcript", "new_token")
+fn new_token() -> Dynamic
+
 @external(erlang, "gleamunison_transcript", "log_start")
-fn log_start() -> Nil
+fn log_start(token: Dynamic) -> Nil
 
 @external(erlang, "gleamunison_transcript", "log_append")
-fn log_append(ability: String, op: Int, args: Dynamic, result: Dynamic) -> Nil
+fn log_append(
+  token: Dynamic,
+  ability: String,
+  op: Int,
+  args: Dynamic,
+  result: Dynamic,
+) -> Nil
 
 @external(erlang, "gleamunison_transcript", "log_entries")
-fn log_entries() -> Dynamic
+fn log_entries(token: Dynamic) -> Dynamic
 
 @external(erlang, "gleamunison_transcript", "log_stop")
-fn log_stop() -> Nil
+fn log_stop(token: Dynamic) -> Nil
 
 @external(erlang, "gleamunison_transcript", "pb_start")
-fn pb_start(entries: Dynamic) -> Nil
+fn pb_start(token: Dynamic, entries: Dynamic) -> Nil
 
 @external(erlang, "gleamunison_transcript", "pb_next")
-fn pb_next(ability: String, op: Int) -> Result(Dynamic, Dynamic)
+fn pb_next(token: Dynamic, ability: String, op: Int) -> Result(Dynamic, Dynamic)
 
 @external(erlang, "gleamunison_transcript", "pb_remaining")
-fn pb_remaining() -> Int
+fn pb_remaining(token: Dynamic) -> Int
 
 @external(erlang, "gleamunison_transcript", "pb_stop")
-fn pb_stop() -> Nil
+fn pb_stop(token: Dynamic) -> Nil
 
 pub fn start() -> Recorder {
-  log_start()
-  Recorder(RedactPrivate)
+  start_with(RedactPrivate)
 }
 
 /// Deliberate full capture: fixture recording (tape-to-test) and replay
 /// auditing. Artifacts contain whatever the recorded code sent — never run
 /// this against prompts or sources you would not commit.
 pub fn start_with(policy: CapturePolicy) -> Recorder {
-  log_start()
-  Recorder(policy)
+  let token = new_token()
+  log_start(token)
+  Recorder(policy:, token:)
 }
 
-pub fn stop(_rec: Recorder) -> Nil {
-  log_stop()
+pub fn stop(rec: Recorder) -> Nil {
+  log_stop(rec.token)
 }
 
 /// Wrap every op handler in every frame: each call is appended to the log
@@ -128,8 +143,14 @@ fn wrap_op(
       // never reach a durable artifact.
       case rec.policy, is_private_ability(key) {
         RedactPrivate, True ->
-          log_append(key, op_idx, redacted_marker(), redacted_marker())
-        _, _ -> log_append(key, op_idx, to_dynamic(args), result)
+          log_append(
+            rec.token,
+            key,
+            op_idx,
+            redacted_marker(),
+            redacted_marker(),
+          )
+        _, _ -> log_append(rec.token, key, op_idx, to_dynamic(args), result)
       }
       cont(result)
     })
@@ -153,8 +174,8 @@ pub fn entries(rec: Recorder) -> List(OpRecord) {
 
 /// Capture the log as a Tape: serializable entries plus the raw values
 /// needed for in-process replay.
-pub fn capture(_rec: Recorder) -> Tape {
-  let raw = log_entries()
+pub fn capture(rec: Recorder) -> Tape {
+  let raw = log_entries(rec.token)
   Tape(entries: decode_entries(raw), raw: raw)
 }
 
@@ -187,23 +208,24 @@ fn decode_entries(raw: Dynamic) -> List(OpRecord) {
 /// a tape built from JSON or from_entries has no raw values and replays
 /// as exhausted.
 pub fn playback(tape: Tape) -> Playback {
-  pb_start(tape.raw)
-  Playback
+  let token = new_token()
+  pb_start(token, tape.raw)
+  Playback(token:)
 }
 
-pub fn stop_playback(_pb: Playback) -> Nil {
-  pb_stop()
+pub fn stop_playback(pb: Playback) -> Nil {
+  pb_stop(pb.token)
 }
 
-pub fn playback_remaining(_pb: Playback) -> Int {
-  pb_remaining()
+pub fn playback_remaining(pb: Playback) -> Int {
+  pb_remaining(pb.token)
 }
 
 /// Frames whose handlers serve recorded results in order, never calling
 /// the inner handler. A mismatch or exhausted tape raises: replay is for
 /// verification, and silent drift must be loud.
 pub fn replay_frames(
-  _pb: Playback,
+  pb: Playback,
   frames: List(HandlerFrame),
 ) -> List(HandlerFrame) {
   list.map(frames, fn(frame) {
@@ -212,7 +234,7 @@ pub fn replay_frames(
       ability: frame.ability,
       ops: dict.map_values(frame.ops, fn(op_idx, _inner) {
         fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-          case pb_next(key, op_idx) {
+          case pb_next(pb.token, key, op_idx) {
             Ok(recorded) -> cont(recorded)
             Error(_) -> panic as "transcript replay: no recorded op"
           }
@@ -256,7 +278,7 @@ fn term_to_b64(term: Dynamic) -> String
 fn b64_to_term(b64: String) -> Dynamic
 
 @external(erlang, "gleamunison_transcript", "run_replay")
-fn run_replay_ffi(entries: Dynamic, thunk: fn() -> a) -> a
+fn run_replay_ffi(token: Dynamic, entries: Dynamic, thunk: fn() -> a) -> a
 
 /// Serialize a tape for audit AND replay: alongside the human-readable
 /// reprs, each entry carries base64 term_to_binary blobs of the raw args
@@ -314,9 +336,10 @@ pub fn is_replayable(tape: Tape) -> Bool {
 /// Run a thunk under playback of the tape. Divergence from the recorded
 /// call sequence raises; the tape must be replayable (is_replayable).
 pub fn run_with_playback(tape: Tape, thunk: fn() -> a) -> a {
-  pb_start(tape.raw)
-  let result = run_replay_ffi(tape.raw, thunk)
-  pb_stop()
+  let token = new_token()
+  pb_start(token, tape.raw)
+  let result = run_replay_ffi(token, tape.raw, thunk)
+  pb_stop(token)
   result
 }
 

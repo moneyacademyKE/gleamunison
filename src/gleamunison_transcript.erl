@@ -1,55 +1,61 @@
-%% Effect transcript recorder: process-dictionary log.
+%% Effect transcript recorder: token-keyed process-dictionary tapes.
 %%
 %% do_op runs handlers in the evaluating process, so a process-dict log
 %% captures every op in call order without a server process or ETS table.
-%% The same machinery holds a playback cursor for replay.
+%% Each recorder/playback handle owns a unique token, so two tapes in the
+%% same process cannot silently clobber one another.
 %%
 %% Entries are {AbilityKey, OpIdx, ArgsDynamic, ResultDynamic, Seq} tuples:
 %% original values are preserved for in-process replay; serialization to
 %% inspect-strings happens on the Gleam side for audit/DAG storage.
 -module(gleamunison_transcript).
--export([log_start/0, log_append/4, log_entries/0, log_stop/0]).
--export([pb_start/1, pb_next/2, pb_remaining/0, pb_stop/0]).
--export([term_to_b64/1, b64_to_term/1, run_replay/2]).
+-export([new_token/0]).
+-export([log_start/1, log_append/5, log_entries/1, log_stop/1]).
+-export([pb_start/2, pb_next/3, pb_remaining/1, pb_stop/1]).
+-export([term_to_b64/1, b64_to_term/1, run_replay/3]).
 
 -define(LOG_KEY, gleamunison_transcript_log).
 -define(PB_KEY, gleamunison_transcript_playback).
 
-log_start() ->
-    put(?LOG_KEY, []),
+new_token() ->
+    make_ref().
+
+log_start(Token) ->
+    put({?LOG_KEY, Token}, []),
     nil.
 
-log_append(AbilityKey, OpIdx, Args, Result) ->
-    Log = case get(?LOG_KEY) of
-        undefined -> [];
-        L when is_list(L) -> L
-    end,
-    Seq = length(Log),
-    put(?LOG_KEY, [{AbilityKey, OpIdx, Args, Result, Seq} | Log]),
-    nil.
-
-%% Entries in call order (oldest first).
-log_entries() ->
-    case get(?LOG_KEY) of
-        undefined -> [];
-        L when is_list(L) -> lists:reverse(L)
+log_append(Token, AbilityKey, OpIdx, Args, Result) ->
+    case get({?LOG_KEY, Token}) of
+        Log when is_list(Log) ->
+            Seq = length(Log),
+            put({?LOG_KEY, Token}, [{AbilityKey, OpIdx, Args, Result, Seq} | Log]),
+            nil;
+        _ ->
+            nil
     end.
 
-log_stop() ->
-    erase(?LOG_KEY),
+%% Entries in call order (oldest first).
+log_entries(Token) ->
+    case get({?LOG_KEY, Token}) of
+        Log when is_list(Log) -> lists:reverse(Log);
+        _ -> []
+    end.
+
+log_stop(Token) ->
+    erase({?LOG_KEY, Token}),
     nil.
 
 %% Playback: a FIFO of recorded entries consumed in order. pb_next checks
 %% the head against the requested ability+op and returns the recorded
 %% result (original value) so replay never touches the real handler.
-pb_start(Entries) when is_list(Entries) ->
-    put(?PB_KEY, Entries),
+pb_start(Token, Entries) when is_list(Entries) ->
+    put({?PB_KEY, Token}, Entries),
     nil.
 
-pb_next(AbilityKey, OpIdx) ->
-    case get(?PB_KEY) of
+pb_next(Token, AbilityKey, OpIdx) ->
+    case get({?PB_KEY, Token}) of
         [{AbilityKey, OpIdx, _Args, Result, _Seq} | Rest] ->
-            put(?PB_KEY, Rest),
+            put({?PB_KEY, Token}, Rest),
             {ok, Result};
         [Other | _] ->
             {error, {playback_mismatch, Other}};
@@ -57,14 +63,14 @@ pb_next(AbilityKey, OpIdx) ->
             {error, playback_exhausted}
     end.
 
-pb_remaining() ->
-    case get(?PB_KEY) of
-        undefined -> 0;
-        L when is_list(L) -> length(L)
+pb_remaining(Token) ->
+    case get({?PB_KEY, Token}) of
+        Entries when is_list(Entries) -> length(Entries);
+        _ -> 0
     end.
 
-pb_stop() ->
-    erase(?PB_KEY),
+pb_stop(Token) ->
+    erase({?PB_KEY, Token}),
     nil.
 
 %% Faithful serialization of raw captured values: term_to_binary under
@@ -82,11 +88,11 @@ b64_to_term(B64) ->
 %% Playback handlers serve recorded results in order via pb_next; any
 %% divergence (wrong ability, wrong op, exhausted tape) raises — replay
 %% is verification, and silent drift must be loud.
-run_replay(Entries, Thunk) when is_list(Entries), is_function(Thunk, 0) ->
+run_replay(Token, Entries, Thunk) when is_list(Entries), is_function(Thunk, 0) ->
     Keys = unique_keys(Entries, []),
     Stacked = lists:foldl(
         fun(Key, Fun) ->
-            fun() -> gleamunison_effets:handle_comp(playback_frame(Key, Entries), Fun) end
+            fun() -> gleamunison_effets:handle_comp(playback_frame(Token, Key, Entries), Fun) end
         end,
         Thunk,
         Keys
@@ -100,10 +106,10 @@ unique_keys([{Key, _, _, _, _} | Rest], Acc) ->
         false -> unique_keys(Rest, [Key | Acc])
     end.
 
-playback_frame(Key, Entries) ->
+playback_frame(Token, Key, Entries) ->
     Ops = maps:from_list([
         {OpIdx, fun(_Args, Cont) ->
-            case pb_next(Key, OpIdx) of
+            case pb_next(Token, Key, OpIdx) of
                 {ok, Recorded} -> Cont(Recorded);
                 {error, Reason} -> error({transcript_replay, Reason})
             end

@@ -233,8 +233,8 @@ copyable_process_dictionary() ->
     [Entry || Entry = {Key, _Value} <- erlang:get(), copyable_key(Key)].
 
 copyable_key({gleamunison_handlers}) -> true;
-copyable_key(gleamunison_transcript_log) -> true;
-copyable_key(gleamunison_transcript_playback) -> true;
+copyable_key({gleamunison_transcript_log, _Token}) -> true;
+copyable_key({gleamunison_transcript_playback, _Token}) -> true;
 copyable_key({state_val, _Key}) -> true;
 copyable_key({pd_counter, _Key}) -> true;
 copyable_key({pd_records, _Key}) -> true;
