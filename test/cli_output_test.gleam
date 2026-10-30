@@ -3,14 +3,11 @@
 //// honest representation. The depth cap is the only thing standing between a
 //// self-referential term and a hung CLI.
 
-import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/cli_output
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/json
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(value: a) -> Dynamic
 
 fn json(value: a) -> String {
   json.term_to_json(to_dynamic(value), 0)

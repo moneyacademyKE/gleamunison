@@ -1,16 +1,11 @@
 import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/string
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type OpHandler}
 import gleamunison/llm
 import gleamunison/llm_middleware.{RetryPolicy}
 import gleamunison/llm_types.{Completion}
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn cast(a: anything) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn uncast(a: Dynamic) -> anything
 
 @external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
 fn pd_counter_inc(key: BitArray) -> Int
@@ -34,8 +29,8 @@ fn scripted_fail_then_ok(key: String, fail_times: Int) -> OpHandler {
   fn(_args, cont) {
     let n = pd_counter_inc(bit_array.from_string(key))
     case n <= fail_times {
-      True -> cont(cast(Error(bit_array.from_string("boom"))))
-      False -> cont(cast(Ok(bit_array.from_string("ok-payload"))))
+      True -> cont(to_dynamic(Error(bit_array.from_string("boom"))))
+      False -> cont(to_dynamic(Ok(bit_array.from_string("ok-payload"))))
     }
   }
 }
@@ -43,7 +38,7 @@ fn scripted_fail_then_ok(key: String, fail_times: Int) -> OpHandler {
 fn always_fail(key: String) -> OpHandler {
   fn(_args, cont) {
     let _ = pd_counter_inc(bit_array.from_string(key))
-    cont(cast(Error(bit_array.from_string("always fails"))))
+    cont(to_dynamic(Error(bit_array.from_string("always fails"))))
   }
 }
 
@@ -56,7 +51,7 @@ pub fn retry_succeeds_after_transient_failures_test() {
       RetryPolicy(max_attempts: 3, base_delay_ms: 0),
     )
   let result = handler(no_args, identity_cont)
-  let assert Ok(payload) = uncast(result)
+  let assert Ok(payload) = from_dynamic(result)
   let assert True = payload == bit_array.from_string("ok-payload")
   let assert True = pd_counter_get(bit_array.from_string(key)) == 3
 }
@@ -70,7 +65,7 @@ pub fn retry_exhausts_and_returns_last_error_test() {
       RetryPolicy(max_attempts: 2, base_delay_ms: 0),
     )
   let result = handler(no_args, identity_cont)
-  let assert Error(reason) = uncast(result)
+  let assert Error(reason) = from_dynamic(result)
   let assert True = reason == bit_array.from_string("always fails")
   let assert True = pd_counter_get(bit_array.from_string(key)) == 2
 }
@@ -81,7 +76,7 @@ pub fn fallback_first_success_wins_test() {
   let bad = always_fail(fail_key)
   let handler = llm_middleware.fallback_handler([good, bad])
   let result = handler(no_args, identity_cont)
-  let assert Ok(json_bin) = uncast(result)
+  let assert Ok(json_bin) = from_dynamic(result)
   let assert Ok(text) = bit_array.to_string(json_bin)
   let assert True = string.contains(text, "\"content\":\"primary\"")
   // second provider never touched
@@ -95,7 +90,7 @@ pub fn fallback_skips_failures_in_order_test() {
   let handler =
     llm_middleware.fallback_handler([always_fail(k1), always_fail(k2), good])
   let result = handler(no_args, identity_cont)
-  let assert Ok(json_bin) = uncast(result)
+  let assert Ok(json_bin) = from_dynamic(result)
   let assert Ok(text) = bit_array.to_string(json_bin)
   let assert True = string.contains(text, "\"content\":\"tertiary\"")
   let assert True = pd_counter_get(bit_array.from_string(k1)) == 1
@@ -107,7 +102,7 @@ pub fn fallback_all_fail_returns_last_error_test() {
   let handler =
     llm_middleware.fallback_handler([always_fail(k), always_fail(k)])
   let result = handler(no_args, identity_cont)
-  let assert Error(reason) = uncast(result)
+  let assert Error(reason) = from_dynamic(result)
   let assert True = reason == bit_array.from_string("always fails")
 }
 
@@ -120,8 +115,8 @@ pub fn recording_mock_captures_args_test() {
     llm_middleware.recording_mock(Completion("canned", "m", 1, 1), recorder)
   let messages =
     bit_array.from_string("[{\"role\":\"user\",\"content\":\"hi\"}]")
-  let result = handler([cast(messages)], identity_cont)
-  let assert Ok(_) = uncast(result)
+  let result = handler([to_dynamic(messages)], identity_cont)
+  let assert Ok(_) = from_dynamic(result)
   let assert [recorded] = pd_records(bit_array.from_string(key))
   let assert True = recorded == messages
 }

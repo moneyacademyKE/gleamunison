@@ -3,23 +3,18 @@ import gleam/dynamic.{type Dynamic}
 import gleam/option.{Some}
 import gleam/string
 import gleamunison/capability
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleamunison/sandbox_policy
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn unsafe_coerce(val: Dynamic) -> a
 
 @external(erlang, "gleamunison_ffi_test", "rescue")
 fn ffi_rescue(f: fn() -> Dynamic) -> Result(Dynamic, String)
 
 fn ok_handler() -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-    let args: List(String) = unsafe_coerce(to_dynamic(args))
+    let args: List(String) = from_dynamic(to_dynamic(args))
     let head = case args {
       [x, ..] -> x
       _ -> ""
@@ -61,7 +56,7 @@ pub fn scope_policy_preserves_deny_by_default_test() {
   capability.check(policy.abilities, frames) |> should.be_ok
   let assert [guarded] = frames
   let assert Ok(handler) = dict.get(guarded.ops, 0)
-  unsafe_coerce(handler([to_dynamic("run")], fn(d) { d }))
+  from_dynamic(handler([to_dynamic("run")], fn(d) { d }))
   |> should.equal("allowed:run")
   key |> string.length |> should.equal(10)
 }

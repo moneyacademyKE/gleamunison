@@ -1,20 +1,14 @@
 import gleam/bit_array
 import gleam/dict
-import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/string
 import gleamunison/cli_llm
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/llm
 import gleamunison/llm_middleware
 import gleamunison/llm_types
 import gleamunison/llm_wire
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn cast(value: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn uncast(value: Dynamic) -> a
 
 @external(erlang, "gleamunison_ffi_test", "pd_counter_inc")
 fn increment(key: BitArray) -> Int
@@ -119,12 +113,12 @@ pub fn retry_attempts_have_a_hard_cap_test() {
   let key = <<"retry-hard-cap">>
   let inner = fn(_, cont) {
     let _ = increment(key)
-    cont(cast(Error(<<"transient failure">>)))
+    cont(to_dynamic(Error(<<"transient failure">>)))
   }
   let handler =
     llm_middleware.retry_handler(inner, llm_middleware.RetryPolicy(50, 0))
   let response: Result(BitArray, BitArray) =
-    uncast(handler([], fn(value) { value }))
+    from_dynamic(handler([], fn(value) { value }))
   response |> should.be_error
   count(key) |> should.equal(3)
 }
@@ -136,12 +130,12 @@ pub fn terminal_errors_are_not_retried_test() {
       let key = bit_array.from_string("terminal:" <> message)
       let inner = fn(_, cont) {
         let _ = increment(key)
-        cont(cast(Error(bit_array.from_string(message))))
+        cont(to_dynamic(Error(bit_array.from_string(message))))
       }
       let handler =
         llm_middleware.retry_handler(inner, llm_middleware.RetryPolicy(3, 0))
       let response: Result(BitArray, BitArray) =
-        uncast(handler([], fn(value) { value }))
+        from_dynamic(handler([], fn(value) { value }))
       response |> should.be_error
       count(key) |> should.equal(1)
     },

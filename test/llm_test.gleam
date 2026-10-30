@@ -1,19 +1,13 @@
 import gleam/bit_array
-import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/string
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/llm
 import gleamunison/llm_types.{
   type ProviderConfig, Anthropic, Completion, Message, OpenAI, ProviderConfig,
   System, User,
 }
 import gleamunison/llm_wire
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn cast(a: anything) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn uncast(a: Dynamic) -> anything
 
 fn openai_cfg() -> ProviderConfig {
   ProviderConfig(
@@ -112,11 +106,11 @@ pub fn mock_handler_returns_fixed_completion_test() {
   let expected = Completion("canned", "mock-model", 1, 1)
   let handler = llm.mock_handler(expected)
   let args = [
-    cast(bit_array.from_string("[]")),
-    cast(bit_array.from_string("{}")),
+    to_dynamic(bit_array.from_string("[]")),
+    to_dynamic(bit_array.from_string("{}")),
   ]
   let result = handler(args, fn(d) { d })
-  let assert Ok(json_bin) = uncast(result)
+  let assert Ok(json_bin) = from_dynamic(result)
   let assert Ok(text) = bit_array.to_string(json_bin)
   let assert True = string.contains(text, "\"content\":\"canned\"")
   let assert True = string.contains(text, "\"model\":\"mock-model\"")

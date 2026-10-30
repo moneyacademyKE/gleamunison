@@ -2,6 +2,7 @@ import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/cli_llm
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/llm
 import gleamunison/llm_types.{Anthropic, Completion, OpenAI}
 
@@ -97,9 +98,6 @@ pub fn command_usage_on_empty_args_test() {
   let assert True = string.contains(out, "usage")
 }
 
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn cast_any(a: anything) -> Dynamic
-
 fn cast_error(msg: String) -> Dynamic {
-  cast_any(Error(bit_array.from_string(msg)))
+  to_dynamic(Error(bit_array.from_string(msg)))
 }

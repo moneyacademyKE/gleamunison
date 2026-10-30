@@ -2,20 +2,15 @@ import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/string
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleamunison/transcript.{OpRecord}
 import gleeunit/should
 
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn unsafe_coerce(val: Dynamic) -> a
-
 fn echo_handler() -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-    let arg0: List(String) = unsafe_coerce(to_dynamic(args))
+    let arg0: List(String) = from_dynamic(to_dynamic(args))
     let head = case arg0 {
       [x, ..] -> x
       _ -> "no-args"
@@ -120,7 +115,7 @@ pub fn json_round_trip_preserves_replay_test() {
   let assert [rframe] = replayed
   let assert Ok(rhandler) = dict.get(rframe.ops, 0)
   let result = rhandler([to_dynamic("hello")], fn(d) { d })
-  let decoded: String = unsafe_coerce(result)
+  let decoded: String = from_dynamic(result)
   decoded |> should.equal("handled:hello")
   transcript.stop_playback(pb)
   transcript.stop(rec)
@@ -175,9 +170,9 @@ pub fn interleaved_playbacks_keep_separate_cursors_test() {
   let assert Ok(second_handler) = dict.get(second_frame.ops, 0)
 
   let first_result: String =
-    unsafe_coerce(first_handler([to_dynamic("ignored")], fn(d) { d }))
+    from_dynamic(first_handler([to_dynamic("ignored")], fn(d) { d }))
   let second_result: String =
-    unsafe_coerce(second_handler([to_dynamic("ignored")], fn(d) { d }))
+    from_dynamic(second_handler([to_dynamic("ignored")], fn(d) { d }))
 
   first_result |> should.equal("handled:cursor-a")
   second_result |> should.equal("handled:cursor-b")

@@ -3,19 +3,16 @@
 //// argument at a time. The declared function type is the arity contract: a
 //// call with the wrong count is refused before any dependency work.
 
-import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleamunison/ast
 import gleamunison/codebase
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Local, Ref}
 import gleamunison/run_error
 import gleamunison/run_ref
 import gleeunit/should
 import run_support
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn arg(value: Int) -> Dynamic
 
 fn insert(
   cb: codebase.Codebase,
@@ -53,7 +50,7 @@ pub fn a_one_argument_function_runs_with_an_argument_test() {
       ),
     )
   let #(cb, ref) = insert(codebase.empty(), int_fn(1, body))
-  run_support.run(codebase.get_adapter(cb), ref, [arg(21)])
+  run_support.run(codebase.get_adapter(cb), ref, [to_dynamic(21)])
   |> should.equal(Ok("42"))
 }
 
@@ -74,7 +71,7 @@ pub fn a_two_argument_function_runs_with_two_arguments_test() {
       ),
     )
   let #(cb, ref) = insert(codebase.empty(), int_fn(2, body))
-  run_support.run(codebase.get_adapter(cb), ref, [arg(2), arg(3)])
+  run_support.run(codebase.get_adapter(cb), ref, [to_dynamic(2), to_dynamic(3)])
   |> should.equal(Ok("5"))
 }
 
@@ -82,7 +79,7 @@ pub fn passing_an_argument_to_a_value_is_refused_test() {
   let definition = ast.TermDef(term: ast.Int(42), typ: ast.Builtin(ast.IntType))
   let #(cb, ref) = insert(codebase.empty(), definition)
   let assert Error(run_error.ArityUnavailable(got, expected, supplied)) =
-    run_support.run(codebase.get_adapter(cb), ref, [arg(1)])
+    run_support.run(codebase.get_adapter(cb), ref, [to_dynamic(1)])
   got |> should.equal(ref)
   expected |> should.equal(0)
   supplied |> should.equal(1)
@@ -95,7 +92,7 @@ pub fn too_few_arguments_is_refused_test() {
       int_fn(2, ast.Lambda(binder: Local(0), body: ast.Int(0))),
     )
   let assert Error(run_error.ArityUnavailable(_, expected, supplied)) =
-    run_support.run(codebase.get_adapter(cb), ref, [arg(1)])
+    run_support.run(codebase.get_adapter(cb), ref, [to_dynamic(1)])
   expected |> should.equal(2)
   supplied |> should.equal(1)
 }
@@ -151,7 +148,7 @@ pub fn a_curried_two_parameter_definition_runs_test() {
       ),
     )
   let #(cb, ref) = insert(codebase.empty(), definition)
-  run_support.run(codebase.get_adapter(cb), ref, [arg(40), arg(2)])
+  run_support.run(codebase.get_adapter(cb), ref, [to_dynamic(40), to_dynamic(2)])
   |> should.equal(Ok("42"))
 }
 
@@ -175,5 +172,6 @@ pub fn inspect_loads_without_executing_test() {
   info.exports |> should.equal([#("$eval", 0)])
   // Calling the same definition does fail, which is what makes the above
   // proof rather than a no-op.
-  run_support.run(codebase.get_adapter(cb), ref, [arg(1)]) |> should.be_error
+  run_support.run(codebase.get_adapter(cb), ref, [to_dynamic(1)])
+  |> should.be_error
 }

@@ -2,22 +2,17 @@ import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/capability
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleeunit/should
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn unsafe_coerce(val: Dynamic) -> a
 
 @external(erlang, "gleamunison_ffi_test", "rescue")
 fn ffi_rescue(f: fn() -> Dynamic) -> Result(Dynamic, String)
 
 fn ok_handler() -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-    let arg0: List(String) = unsafe_coerce(to_dynamic(args))
+    let arg0: List(String) = from_dynamic(to_dynamic(args))
     let head = case arg0 {
       [x, ..] -> x
       _ -> ""
@@ -41,7 +36,7 @@ pub fn allowed_ability_executes_under_policy_test() {
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)
   let result = handler([to_dynamic("yes")], fn(d) { d })
-  unsafe_coerce(result) |> should.equal("ran:yes")
+  from_dynamic(result) |> should.equal("ran:yes")
 }
 
 pub fn denied_ability_raises_capability_denied_test() {

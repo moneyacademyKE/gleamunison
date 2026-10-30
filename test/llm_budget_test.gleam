@@ -5,6 +5,7 @@ import gleam/dynamic.{type Dynamic}
 import gleam/option
 import gleam/string
 import gleamunison/cancellation
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleamunison/llm_budget.{
@@ -20,11 +21,11 @@ import gleeunit/should
 @external(erlang, "gleamunison_llm_budget", "reset")
 fn budget_reset() -> Result(Nil, Nil)
 
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn as_result(d: Dynamic) -> Result(BitArray, BitArray)
+/// The handler's reply, read back as the typed result the
+/// middleware contract promises.
+fn as_result(d: Dynamic) -> Result(BitArray, BitArray) {
+  from_dynamic(d)
+}
 
 fn test_budget() -> Budget {
   Budget(

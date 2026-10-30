@@ -5,6 +5,7 @@ import gleam/string
 import gleamunison/cli_replay
 import gleamunison/cli_tape_to_test
 import gleamunison/cli_test
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/repl_eval
 import gleamunison/storage
@@ -12,9 +13,6 @@ import gleamunison/test_runner
 import gleamunison/transcript
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
 
 fn mock_console() -> OpHandler {
   fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {

@@ -2,14 +2,12 @@ import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/cli_replay
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/repl_eval
 import gleamunison/transcript
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
 
 fn console_frame() -> HandlerFrame {
   HandlerFrame(

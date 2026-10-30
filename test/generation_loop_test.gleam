@@ -6,6 +6,7 @@ import gleamunison/agent_publish
 import gleamunison/app_route
 import gleamunison/ast
 import gleamunison/codebase
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/generation_loop
 import gleamunison/identity
 import gleamunison/json
@@ -54,7 +55,7 @@ pub fn near_miss_generation_is_admitted_and_runnable_test() {
       adapter,
       ref(published.content_ref),
       "factory",
-      [dynamic("Moe")],
+      [to_dynamic("Moe")],
       False,
     )
     |> should.equal(Ok("<<\"MOE\">>"))
@@ -364,9 +365,6 @@ fn ref(hex: String) -> identity.DefinitionRef {
   let assert Ok(value) = identity.parse_ref_hex(hex)
   value
 }
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn dynamic(value: String) -> b
 
 fn with_store(work: fn(storage.StorageAdapter, String) -> a) -> a {
   let root = "/tmp/gleamunison-generation-loop-test"

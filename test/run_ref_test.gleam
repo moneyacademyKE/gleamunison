@@ -1,11 +1,11 @@
 //// Run by hash: resolve the closure, load it, execute it. These tests use an
 //// in-memory store, which is the same adapter contract dets satisfies.
 
-import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/ast
 import gleamunison/bootstrap_types
 import gleamunison/codebase
+import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/genesis
 import gleamunison/identity.{type DefinitionRef, Local, Ref, hash_bytes}
 import gleamunison/namespace
@@ -285,9 +285,6 @@ pub fn an_effectful_function_runs_with_its_argument_test() {
       ),
     )
   let #(cb, ref) = insert(codebase.empty(), def)
-  run_support.run(codebase.get_adapter(cb), ref, [text_arg(<<"probe">>)])
+  run_support.run(codebase.get_adapter(cb), ref, [to_dynamic(<<"probe">>)])
   |> should.equal(Ok("0"))
 }
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn text_arg(value: BitArray) -> Dynamic

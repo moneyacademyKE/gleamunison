@@ -5,14 +5,12 @@
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleamunison/cli_replay
+import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleamunison/repl_eval
 import gleeunit/should
 import simplifile
-
-@external(erlang, "gleamunison_ffi", "to_dynamic")
-fn to_dynamic(val: a) -> Dynamic
 
 /// The ability ref surface code resolves must be the name hash — the same
 /// key handler frames are installed under.
@@ -27,16 +25,13 @@ fn mock_llm() -> OpHandler {
   fn(args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
     case args {
       [prompt, ..] -> {
-        let p: String = unsafe_coerce(prompt)
+        let p: String = from_dynamic(prompt)
         cont(to_dynamic("mocked:" <> p))
       }
       [] -> cont(to_dynamic("mocked:"))
     }
   }
 }
-
-@external(erlang, "gleamunison_ffi", "from_dynamic")
-fn unsafe_coerce(val: Dynamic) -> a
 
 fn llm_frame() -> HandlerFrame {
   HandlerFrame(
