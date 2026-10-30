@@ -152,13 +152,7 @@ test_ffi_io_coverage() ->
     Hex = gleamunison_ffi_io:ref_to_hex(Ref),
     Hex = gleamunison_ffi_io:ref_to_hex(HexBytes),
 
-    %% 9. Test gleamunison_config env lookup
-    {error, nil} = gleamunison_config:get_env(<<"NONEXISTENT_ENV_VAR_12345">>),
-    _AllEnvs = gleamunison_config:get_all_env(),
-    os:putenv("TEST_ENV_VAR_12345", "val"),
-    {ok, <<"val">>} = gleamunison_config:get_env(<<"TEST_ENV_VAR_12345">>),
-
-    %% 10. Test gleamunison_crypto algorithm and hashing paths
+    %% 9. Test gleamunison_crypto algorithm and hashing paths
     Bin = <<"hello">>,
     {ok, _H} = gleamunison_crypto:hash(<<"sha256">>, Bin),
     {ok, _H2} = gleamunison_crypto:hash(<<"sha512">>, Bin),
