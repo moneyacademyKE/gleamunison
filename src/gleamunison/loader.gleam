@@ -6,10 +6,8 @@ import gleamunison/compile.{
   type Compiler, compile_definition, module_name_for, new as new_compiler,
 }
 import gleamunison/identity.{type DefinitionRef}
+import gleamunison/loader_ffi.{load_binary}
 import gleamy/bimap
-
-@external(erlang, "gleamunison_ffi", "load_binary")
-fn load_binary(mod_name: String, beam: BitArray) -> Result(Nil, String)
 
 @external(erlang, "gleamunison_ffi", "module_available")
 fn module_available_ffi(mod_name: String) -> Bool

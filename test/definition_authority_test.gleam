@@ -1,7 +1,7 @@
 import gleamunison/ast.{Apply, Int, Lambda, RefTo, TermDef}
 import gleamunison/compile
 import gleamunison/identity.{Local, Ref, hash_bytes, hash_from_bytes}
-import gleamunison/repl_eval
+import gleamunison/loader_ffi
 import gleeunit/should
 
 pub fn stored_definition_wins_over_legacy_jet_hash_test() {
@@ -24,8 +24,8 @@ pub fn stored_definition_wins_over_legacy_jet_hash_test() {
 
   let assert Ok(stored_beam) =
     compile.compile_definition(compiler, stored_def, stored_ref)
-  let _ = repl_eval.unload_binary(stored_mod)
-  let assert Ok(Nil) = repl_eval.load_binary(stored_mod, stored_beam)
+  let _ = loader_ffi.unload_binary(stored_mod)
+  let assert Ok(Nil) = loader_ffi.load_binary(stored_mod, stored_beam)
 
   let caller_ref = Ref(hash_bytes(<<"caller_of_stored_definition">>))
   let caller_mod = compile.module_name_for(caller_ref)
@@ -33,11 +33,11 @@ pub fn stored_definition_wins_over_legacy_jet_hash_test() {
   let caller_def = TermDef(term: caller_term, typ: ast.Builtin(ast.IntType))
   let assert Ok(caller_beam) =
     compile.compile_definition(compiler, caller_def, caller_ref)
-  let _ = repl_eval.unload_binary(caller_mod)
-  let assert Ok(Nil) = repl_eval.load_binary(caller_mod, caller_beam)
+  let _ = loader_ffi.unload_binary(caller_mod)
+  let assert Ok(Nil) = loader_ffi.load_binary(caller_mod, caller_beam)
 
-  let result = repl_eval.eval_module(caller_mod)
-  let _ = repl_eval.unload_binary(stored_mod)
-  let _ = repl_eval.unload_binary(caller_mod)
+  let result = loader_ffi.eval_module(caller_mod)
+  let _ = loader_ffi.unload_binary(stored_mod)
+  let _ = loader_ffi.unload_binary(caller_mod)
   result |> should.equal(Ok("42"))
 }

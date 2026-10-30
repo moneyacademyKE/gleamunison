@@ -10,9 +10,7 @@ import gleamunison/lexer.{
   type ParseError, type Token, type TokenInfo, FloatVal, IntVal, LParen,
   ParseError, Quote, RParen, Symbol,
 }
-
-@external(erlang, "gleamunison_ffi", "string_to_binary")
-fn string_to_binary(s: String) -> BitArray
+import gleamunison/loader_ffi.{string_to_binary}
 
 pub type SExpr {
   SAtom(Token, line: Int, col: Int)

@@ -6,7 +6,7 @@ import gleamunison/compile.{module_name_for}
 import gleamunison/genesis.{builtin_int_add, builtin_io_read_line}
 import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal}
 import gleamunison/inference.{infer_term}
-import gleamunison/repl_eval
+import gleamunison/loader_ffi
 import gleamunison/types.{empty_cache}
 import gleeunit
 
@@ -82,9 +82,9 @@ pub fn compiler_output_correctness_test() {
   let ref = Ref(hash_bytes(<<"identity">>))
   let assert Ok(beam) = compile.compile_definition(compiler, def, ref)
   let mod_name = module_name_for(ref)
-  let _ = repl_eval.unload_binary(mod_name)
-  let assert Ok(Nil) = repl_eval.load_binary(mod_name, beam)
-  let assert Ok(val) = repl_eval.eval_module(mod_name)
-  let _ = repl_eval.unload_binary(mod_name)
+  let _ = loader_ffi.unload_binary(mod_name)
+  let assert Ok(Nil) = loader_ffi.load_binary(mod_name, beam)
+  let assert Ok(val) = loader_ffi.eval_module(mod_name)
+  let _ = loader_ffi.unload_binary(mod_name)
   let assert True = val != ""
 }

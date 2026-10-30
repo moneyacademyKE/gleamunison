@@ -10,20 +10,11 @@ import gleamunison/elab_types.{
 import gleamunison/elaborate as elab
 import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes}
 import gleamunison/lexer.{type ParseError}
+import gleamunison/loader_ffi.{
+  eval_module, load_binary, string_to_binary, unload_binary,
+}
 import gleamunison/parser
 import gleamunison/types.{type TypeCache}
-
-@external(erlang, "gleamunison_ffi", "string_to_binary")
-fn string_to_binary(s: String) -> BitArray
-
-@external(erlang, "gleamunison_ffi", "load_binary")
-fn load_binary(mod_name: String, beam: BitArray) -> Result(Nil, String)
-
-@external(erlang, "gleamunison_ffi", "unload_binary")
-fn unload_binary(mod_name: String) -> Result(Nil, String)
-
-@external(erlang, "gleamunison_repl_ffi", "eval_module")
-fn eval_module(mod_name: String) -> Result(String, String)
 
 pub fn ref_for_name(name: String) -> DefinitionRef {
   Ref(hash_bytes(string_to_binary(name)))

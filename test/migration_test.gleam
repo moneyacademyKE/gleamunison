@@ -1,7 +1,7 @@
 import gleamunison/ast
 import gleamunison/compile
 import gleamunison/identity.{Ref, hash_bytes}
-import gleamunison/repl_eval
+import gleamunison/loader_ffi
 
 pub fn live_process_migration_test() {
   let compiler = compile.new()
@@ -16,26 +16,26 @@ pub fn live_process_migration_test() {
   let assert Ok(beam) = compile.compile_definition(compiler, def, ref)
 
   // 2. Load it
-  let _ = repl_eval.unload_binary(mod_name)
-  let assert Ok(Nil) = repl_eval.load_binary(mod_name, beam)
+  let _ = loader_ffi.unload_binary(mod_name)
+  let assert Ok(Nil) = loader_ffi.load_binary(mod_name, beam)
 
   // 3. Create a closure that evaluates to calling the module
   // In Erlang FFI, we can just call it via '$eval'
-  let assert Ok(res_str) = repl_eval.eval_module(mod_name)
+  let assert Ok(res_str) = loader_ffi.eval_module(mod_name)
   let assert "42" = res_str
 
   // 4. Unload the module (simulating remote node not having the code yet)
-  let assert Ok(Nil) = repl_eval.unload_binary(mod_name)
+  let assert Ok(Nil) = loader_ffi.unload_binary(mod_name)
 
   // 5. Verify it fails now (module is unloaded)
-  let assert Error(_) = repl_eval.eval_module(mod_name)
+  let assert Error(_) = loader_ffi.eval_module(mod_name)
 
   // 6. Reload the module (simulating pull sync code shipping)
-  let assert Ok(Nil) = repl_eval.load_binary(mod_name, beam)
+  let assert Ok(Nil) = loader_ffi.load_binary(mod_name, beam)
 
   // 7. Verify execution succeeds again
-  let assert Ok("42") = repl_eval.eval_module(mod_name)
+  let assert Ok("42") = loader_ffi.eval_module(mod_name)
 
   // Clean up
-  let _ = repl_eval.unload_binary(mod_name)
+  let _ = loader_ffi.unload_binary(mod_name)
 }

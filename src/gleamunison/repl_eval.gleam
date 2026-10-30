@@ -13,19 +13,10 @@ import gleamunison/elab_types.{
 }
 import gleamunison/elaborate as elab
 import gleamunison/identity.{type DefinitionRef, Ref}
+import gleamunison/loader_ffi.{
+  eval_module, load_binary, string_to_binary, unload_binary,
+}
 import gleamunison/types.{type TypeCache, CTTerm, TypeCache}
-
-@external(erlang, "gleamunison_ffi", "string_to_binary")
-pub fn string_to_binary(s: String) -> BitArray
-
-@external(erlang, "gleamunison_ffi", "load_binary")
-pub fn load_binary(mod_name: String, beam: BitArray) -> Result(Nil, String)
-
-@external(erlang, "gleamunison_ffi", "unload_binary")
-pub fn unload_binary(mod_name: String) -> Result(Nil, String)
-
-@external(erlang, "gleamunison_repl_ffi", "eval_module")
-pub fn eval_module(mod_name: String) -> Result(String, String)
 
 @external(erlang, "gleamunison_ffi_io", "serialize_term")
 pub fn serialize_term(term: a) -> BitArray

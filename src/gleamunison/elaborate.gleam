@@ -9,11 +9,9 @@ import gleamunison/elab_types.{
   SurfaceTypeDef, SurfaceUnit,
 }
 import gleamunison/identity.{type DefinitionRef, Local, Ref}
+import gleamunison/loader_ffi.{string_to_binary}
 import gleamunison/typecheck
 import gleamunison/types.{type TypeCache, CTType, TypeCache}
-
-@external(erlang, "gleamunison_ffi", "string_to_binary")
-fn string_to_binary(_s: String) -> BitArray
 
 fn ref_for_name(name: String) -> DefinitionRef {
   Ref(identity.hash_bytes(string_to_binary(name)))
