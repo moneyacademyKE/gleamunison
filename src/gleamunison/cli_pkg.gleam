@@ -11,13 +11,13 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import gleamunison/cli_lifecycle
-import gleamunison/cli_publish
 import gleamunison/cli_result
 import gleamunison/cli_store
 import gleamunison/codebase
 import gleamunison/elab_types
 import gleamunison/manifest
 import gleamunison/pkg
+import gleamunison/publication
 import gleamunison/storage
 import gleamunison/sync
 import gleamunison/sync_types.{PeerId}
@@ -65,9 +65,7 @@ fn publish_outcome(args: List(String)) -> Result(Nil, String) {
             _ -> Error(Nil)
           }
         })
-      use pairs <- result.try(
-        cli_publish.hash_defs(term_names, defs, cache, []),
-      )
+      use pairs <- result.try(publication.hash_defs(term_names, defs, cache))
       pkg.publish_to_store_production(adapter, pairs, name, version)
       |> result.map(fn(hex) {
         "pkg: published " <> name <> " " <> version <> " as\n" <> hex

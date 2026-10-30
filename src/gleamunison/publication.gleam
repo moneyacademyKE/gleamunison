@@ -16,53 +16,161 @@ import gleamunison/trust
 import gleamunison/turnstile
 import gleamunison/types.{type TypeCache}
 
+/// A named, content-addressed definition selected for publication.
 pub type Subject {
   Subject(name: String, content_ref: String, definition: ast.Definition)
 }
 
+/// Why publication was refused.
+///
+/// `MissingEvidence` carries the refused subjects so a caller can render the
+/// evidence turnstile's guidance; `Failed` carries an already-rendered reason
+/// for policy, storage, or namespace failures.
+pub type AdmitError {
+  MissingEvidence(subjects: List(Subject))
+  Failed(reason: String)
+}
+
+type Entry {
+  Entry(
+    name: String,
+    content_ref: String,
+    definition: ast.Definition,
+    term: ast.Term,
+  )
+}
+
+/// Render an admission refusal as the canonical CLI guidance.
+pub fn describe_error(error: AdmitError) -> String {
+  case error {
+    MissingEvidence(missing) ->
+      "publish: REFUSED — no evidence for: "
+      <> string.join(list.map(missing, fn(s) { s.name }), ", ")
+      <> "; run tests or attest the named content hashes"
+    Failed(reason) -> reason
+  }
+}
+
+/// Elaborate selected definitions exactly once, keeping the term needed for
+/// transitive effect classification alongside the stored definition.
+fn elaborate(
+  names: List(String),
+  definitions: List(#(String, elab_types.SurfaceDef)),
+  cache: TypeCache,
+) -> Result(List(Entry), String) {
+  list.try_map(names, fn(name) {
+    case test_runner.elaborated_def_for(name, definitions, cache) {
+      Error(reason) -> Error("cannot elaborate " <> name <> ": " <> reason)
+      Ok(definition) ->
+        case definition {
+          ast.TermDef(term, _) -> {
+            let Ref(hash) = Ref(codebase.hash_of_definition(definition))
+            Ok(Entry(name, hash_to_debug_string(hash), definition, term))
+          }
+          _ -> Error(name <> " is not a term definition")
+        }
+    }
+  })
+}
+
+/// Elaborate definitions into publishable subjects.
 pub fn subjects(
   names: List(String),
   definitions: List(#(String, elab_types.SurfaceDef)),
   cache: TypeCache,
 ) -> Result(List(Subject), String) {
-  list.try_map(names, fn(name) {
-    case test_runner.elaborated_def_for(name, definitions, cache) {
-      Error(reason) -> Error("cannot elaborate " <> name <> ": " <> reason)
-      Ok(definition) -> {
-        let Ref(hash) = Ref(codebase.hash_of_definition(definition))
-        Ok(Subject(name, hash_to_debug_string(hash), definition))
-      }
-    }
-  })
+  use entries <- result.try(elaborate(names, definitions, cache))
+  Ok(
+    list.map(entries, fn(entry) {
+      Subject(entry.name, entry.content_ref, entry.definition)
+    }),
+  )
 }
 
+/// Elaborate definitions into evidence triples: name, content ref, effectful.
+///
+/// Effectfulness is computed across the whole batch, so a pure caller of an
+/// effectful batch member still requires evidence.
+pub fn hash_defs(
+  names: List(String),
+  definitions: List(#(String, elab_types.SurfaceDef)),
+  cache: TypeCache,
+) -> Result(List(#(String, String, Bool)), String) {
+  use entries <- result.try(elaborate(names, definitions, cache))
+  let effectful = effect_evidence.batch_effectful(batch_entries(entries))
+  Ok(
+    list.map(entries, fn(entry) {
+      #(entry.name, entry.content_ref, list.contains(effectful, entry.name))
+    }),
+  )
+}
+
+/// Admit selected subjects through the evidence turnstile, store their content,
+/// and bind their names on the target branch.
 pub fn admit(
   adapter: StorageAdapter,
   directory: String,
   branch: String,
   selected: List(Subject),
-) -> Result(Nil, String) {
+) -> Result(Nil, AdmitError) {
+  let effectful =
+    effect_evidence.batch_effectful(
+      list.filter_map(selected, fn(subject) {
+        case subject.definition {
+          ast.TermDef(term, _) ->
+            Ok(effect_evidence.BatchEntry(
+              subject.name,
+              subject.content_ref,
+              term,
+            ))
+          _ -> Error(Nil)
+        }
+      }),
+    )
   let pairs =
     list.map(selected, fn(subject) {
       #(
         subject.name,
         subject.content_ref,
-        effect_evidence.definition_is_effectful(subject.definition),
+        list.contains(effectful, subject.name),
       )
     })
-  use policy <- result.try(trust.production_policy())
+
+  use policy <- result.try(
+    trust.production_policy()
+    |> result.map_error(fn(reason) { Failed(reason) }),
+  )
+
   case turnstile.check_with_policy(adapter, pairs, policy) {
     Error(missing) ->
-      Error(
-        "publish: REFUSED — no evidence for: "
-        <> string.join(missing, ", ")
-        <> "; run tests or attest the named content hashes",
-      )
+      Error(MissingEvidence(missing_subjects(missing, selected)))
     Ok(_) -> {
-      use _ <- result.try(store_definitions(adapter, directory, selected))
+      use _ <- result.try(
+        store_definitions(adapter, directory, selected)
+        |> result.map_error(Failed),
+      )
       bind_names(adapter, branch, selected)
+      |> result.map_error(Failed)
     }
   }
+}
+
+fn batch_entries(entries: List(Entry)) -> List(effect_evidence.BatchEntry) {
+  list.map(entries, fn(entry) {
+    effect_evidence.BatchEntry(entry.name, entry.content_ref, entry.term)
+  })
+}
+
+fn missing_subjects(
+  missing: List(String),
+  selected: List(Subject),
+) -> List(Subject) {
+  list.filter_map(missing, fn(name) {
+    case list.find(selected, fn(subject) { subject.name == name }) {
+      Ok(subject) -> Ok(subject)
+      Error(_) -> Error(Nil)
+    }
+  })
 }
 
 fn store_definitions(
@@ -118,6 +226,7 @@ fn bind_names(
   |> result.map(fn(_) { Nil })
 }
 
+/// Keep only names that bind surface term definitions.
 pub fn term_names(
   names: List(String),
   definitions: List(#(String, elab_types.SurfaceDef)),

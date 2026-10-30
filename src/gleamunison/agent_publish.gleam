@@ -82,12 +82,10 @@ fn publish(
           ))
           use _ <- result.try(check_signature(subjects, expected_signature))
           use _ <- result.try(test_and_attest(adapter, loaded))
-          use _ <- result.try(publication.admit(
-            adapter,
-            log_directory,
-            branch,
-            subjects,
-          ))
+          use _ <- result.try(
+            publication.admit(adapter, log_directory, branch, subjects)
+            |> result.map_error(publication.describe_error),
+          )
           Ok(Publication(
             branch:,
             definitions: list.map(subjects, fn(subject) {

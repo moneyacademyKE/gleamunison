@@ -4,12 +4,12 @@ import gleam/list
 import gleam/string
 import gleamunison/ast
 import gleamunison/capability
-import gleamunison/cli_publish
 import gleamunison/codebase
 import gleamunison/effects.{HandlerFrame}
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/identity.{Ref}
 import gleamunison/parser
+import gleamunison/publication
 import gleamunison/repl_eval
 import gleamunison/run_ref
 import gleamunison/test_runner
@@ -56,7 +56,7 @@ pub fn db_call_is_effectful_for_publication_test() {
   let assert Ok(term) = parser.parse_string("(do Db get \"person:1\" \"name\")")
   let user_defs = [#("db-read", SurfaceTermDef(term)), ..defs]
   let assert Ok([#(_, _, effectful)]) =
-    cli_publish.hash_defs(["db-read"], user_defs, cache, [])
+    publication.hash_defs(["db-read"], user_defs, cache)
   effectful |> should.be_true
 }
 

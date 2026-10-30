@@ -13,6 +13,8 @@ import gleam/list
 import gleam/option
 import gleamunison/ast
 import gleamunison/bootstrap_terms
+import gleamunison/identity.{ref_hex}
+import gleamunison/repl_eval
 
 pub fn definition_is_effectful(definition: ast.Definition) -> Bool {
   case definition {
@@ -48,4 +50,102 @@ fn case_is_effectful(c: ast.Case) -> Bool {
     option.None -> False
   }
   guard_has || term_is_effectful(c.body)
+}
+
+/// One elaborated definition in a publication batch.
+pub type BatchEntry {
+  BatchEntry(name: String, content_ref: String, term: ast.Term)
+}
+
+/// Names in the batch that must carry effect evidence.
+///
+/// A definition is effectful when its own term performs an ability op, or when
+/// it transitively references another batch definition that does. This is
+/// conservative: a `Do` sitting under a `Handle` still counts, matching the
+/// original single-definition check extended across the batch graph.
+pub fn batch_effectful(entries: List(BatchEntry)) -> List(String) {
+  let initial =
+    list.filter_map(entries, fn(entry) {
+      case term_is_effectful(entry.term) {
+        True -> Ok(entry.name)
+        False -> Error(Nil)
+      }
+    })
+  expand_batch(entries, initial)
+}
+
+fn expand_batch(
+  entries: List(BatchEntry),
+  known: List(String),
+) -> List(String) {
+  let newly =
+    list.filter_map(entries, fn(entry) {
+      case list.contains(known, entry.name) {
+        True -> Error(Nil)
+        False -> {
+          let dep_names =
+            list.filter_map(term_deps(entry.term), fn(hash) {
+              name_of_content_ref(entries, hash)
+            })
+          case list.any(dep_names, fn(name) { list.contains(known, name) }) {
+            True -> Ok(entry.name)
+            False -> Error(Nil)
+          }
+        }
+      }
+    })
+  case newly {
+    [] -> known
+    _ -> expand_batch(entries, list.append(known, newly))
+  }
+}
+
+/// Elaboration wires intra-batch references by *name* (`ref_for_name` = hash
+/// of the name), while evidence identity is the *content* hash. A term's dep
+/// refs are therefore keyed on name hashes; resolve them back to batch names.
+fn name_of_content_ref(
+  entries: List(BatchEntry),
+  hash: String,
+) -> Result(String, Nil) {
+  case
+    list.find(entries, fn(entry) {
+      ref_hex(repl_eval.ref_for_name(entry.name)) == hash
+    })
+  {
+    Ok(entry) -> Ok(entry.name)
+    Error(_) -> Error(Nil)
+  }
+}
+
+fn term_deps(t: ast.Term) -> List(String) {
+  do_term_deps(t, [])
+}
+
+fn do_term_deps(t: ast.Term, acc: List(String)) -> List(String) {
+  case t {
+    ast.RefTo(ref) -> [ref_hex(ref), ..acc]
+    ast.LocalVarRef(_) | ast.Int(_) | ast.Float(_) | ast.Text(_) | ast.Hole ->
+      acc
+    ast.List(items) -> list.fold(items, acc, fn(a, x) { do_term_deps(x, a) })
+    ast.Apply(f, a) -> do_term_deps(a, do_term_deps(f, acc))
+    ast.Lambda(_, body) -> do_term_deps(body, acc)
+    ast.Let(_, value, body) -> do_term_deps(body, do_term_deps(value, acc))
+    ast.Match(scrutinee, cases) -> {
+      let acc2 = do_term_deps(scrutinee, acc)
+      list.fold(cases, acc2, fn(a, c) {
+        let a2 = case c.guard {
+          option.Some(ast.GuardTerm(gt)) -> do_term_deps(gt, a)
+          option.None -> a
+        }
+        do_term_deps(c.body, a2)
+      })
+    }
+    ast.Do(_, _, args) -> list.fold(args, acc, fn(a, x) { do_term_deps(x, a) })
+    ast.Handle(comp, handler, _) ->
+      do_term_deps(handler, do_term_deps(comp, acc))
+    ast.Construct(_, args) ->
+      list.fold(args, acc, fn(a, x) { do_term_deps(x, a) })
+    ast.Use(_, call, body) -> do_term_deps(body, do_term_deps(call, acc))
+    ast.Located(inner, _) -> do_term_deps(inner, acc)
+  }
 }

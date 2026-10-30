@@ -1,5 +1,5 @@
-import gleamunison/cli_publish
 import gleamunison/elab_types.{SApply, SDo, SLambda, SText, SVar, SurfaceTermDef}
+import gleamunison/publication
 import gleamunison/repl_eval
 import gleamunison/types.{empty_cache}
 import gleamunison/verify
@@ -16,7 +16,7 @@ pub fn hash_defs_flags_console_def_effectful_test() {
     #("main", SurfaceTermDef(SDo("Console", "print", [SText(<<"hi">>)]))),
   ]
   let all_defs = list_append(defs, user)
-  let assert Ok(triples) = cli_publish.hash_defs(["main"], all_defs, cache, [])
+  let assert Ok(triples) = publication.hash_defs(["main"], all_defs, cache)
   let assert [#("main", _, effectful)] = triples
   case effectful {
     True -> Nil
@@ -26,7 +26,7 @@ pub fn hash_defs_flags_console_def_effectful_test() {
 
 pub fn hash_defs_marks_pure_defs_clean_test() {
   let #(cache, defs) = boot()
-  let assert Ok(triples) = cli_publish.hash_defs(["add"], defs, cache, [])
+  let assert Ok(triples) = publication.hash_defs(["add"], defs, cache)
   let assert [#("add", _, effectful)] = triples
   case effectful {
     False -> Nil
@@ -50,7 +50,7 @@ pub fn hash_defs_flags_transitive_effectful_test() {
   ]
   let all_defs = list_append(defs, user)
   let assert Ok(triples) =
-    cli_publish.hash_defs(["greet", "main"], all_defs, cache, [])
+    publication.hash_defs(["greet", "main"], all_defs, cache)
   let assert [#("greet", _, True), #("main", _, True)] = triples
   Nil
 }

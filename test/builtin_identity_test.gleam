@@ -1,12 +1,12 @@
 import gleam/dict
 import gleam/list
 import gleamunison/bootstraps
-import gleamunison/cli_publish
 import gleamunison/codebase
 import gleamunison/definition_codec as codec
 import gleamunison/elab_types.{SurfaceTermDef}
 import gleamunison/identity.{Ref}
 import gleamunison/parser
+import gleamunison/publication
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleamunison/test_runner
@@ -47,14 +47,14 @@ pub fn builtin_identity_json_roundtrips_cas_test() {
 pub fn builtin_identity_file_read_requires_io_evidence_test() {
   let #(defs, cache, _) = definition("reader", "(lam p (file-read p))")
   let assert Ok([#("reader", _, effectful)]) =
-    cli_publish.hash_defs(["reader"], defs, cache, [])
+    publication.hash_defs(["reader"], defs, cache)
   effectful |> should.be_true
 }
 
 pub fn builtin_identity_http_get_requires_io_evidence_test() {
   let #(defs, cache, _) = definition("fetcher", "(lam url (http-get url))")
   let assert Ok([#("fetcher", _, effectful)]) =
-    cli_publish.hash_defs(["fetcher"], defs, cache, [])
+    publication.hash_defs(["fetcher"], defs, cache)
   effectful |> should.be_true
 }
 
