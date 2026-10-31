@@ -2,7 +2,33 @@
 
 ---
 
-## Unreleased
+## What's New in v3.25.0 (2026-11-01)
+
+The content-addressed lifecycle release: definitions run by their content hash, names bind and retract per branch, and the CLI, HTTP and MCP surfaces speak one JSON dialect — with a 205-commit audit behind it that retired every duplicated authority the codebase had accumulated.
+
+### Definitions run by content hash
+
+- `run <content-hash>` resolves a stored definition's closure and executes it: name references resolve through the branch namespace, builtin dependencies by name ref, and the call works at any arity.
+- Publishing stores the definition bytes and binds names on admission; `unpublish` retracts a name's index line, binding and bytes; `purge` removes a definition and the dependencies only it kept alive.
+- `GLEAMUNISON_STORE_DIR` locates the store; content and execution logs are append-only, with a merged chronological view of both.
+- `--json` emits one parseable line per event; `--inspect` reports without executing. The run gate separates refused (exit 1) from unresolvable (exit 2), the value goes to stdout only, and identity, capability and freshness proofs back admission.
+
+### The application surface serves the store
+
+- HTTP app routes serve admitted definitions, with one live session shared by `/eval` and `/define`.
+- MCP admits agent writes through a single publication tool; the bounded generation loop is closed, with target-selected helper generation and fixed graph queries answered straight from the datoms.
+- Application facts persist through one db ability, and the durable application loop is proven by test.
+- A verification gate that executes what it verifies, and an operator-settable trust policy owning the admission decision.
+
+### Configuration and environment
+
+- TOML is live: CLI → TOML → env, resolved through `tom`, with `GLEAMUNISON_PROFILE` resolved in one place — visible to the Erlang admission gates, empty string meaning unset.
+- Environment access is centralised through `envoy`; timestamps render through `birl`.
+
+### One owner per decision
+
+- Six JSON string escapers became one `json_quote` (the previously "correct" one passed `\r` and C0 raw — invalid JSON); two Erlang hex encoders folded into `gleamunison_crypto` with byte-identity proven before the swap; name-to-ref derivation moved to `identity`, branch resolution to `cli_lifecycle`, the profile resolver to `config`.
+- Path→atom table naming, the publication index format and the dogfood runner's compile-load-eval each have one owner. The suite grew from 736 to 822 tests with zero warnings, and the gate batteries CI never ran — lsp-stdio, cli-truth, upgrade-rollback — are now in the matrix.
 
 ### Three answers that were not the question asked
 

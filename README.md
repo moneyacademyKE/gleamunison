@@ -8,8 +8,8 @@ type, compiled on demand to BEAM bytecode, and loaded into a running VM by
 hash. Not a filename, not a module path, not a package — the hash *is* the
 identity.
 
-- **Version:** 3.24.0
-- **Verified local suite:** 736 tests, no failures ([factory acceptance](docs/verification/factory-readiness-2026-10-26.md))
+- **Version:** 3.25.0
+- **Verified local suite:** 822 tests, no failures ([factory acceptance](docs/verification/factory-readiness-2026-10-26.md))
 - **CI:** Erlang/OTP 27, 28, 29 × Ubuntu, macOS — matrix configured; local receipts are not a substitute for every hosted leg
 - **Classification:** `authenticated-single-node-service`
   ([production witness](docs/verification/production-boundaries-2026-10-26.md))
@@ -184,10 +184,11 @@ them at the infrastructure layer.
 
 ## Project state
 
-At v3.24.0, the local factory acceptance proof covers generation, signed
-admission, durable Db recovery, and `/app` execution. Its 736-test result and
-full battery are recorded in the
-[factory readiness witness](docs/verification/factory-readiness-2026-10-26.md).
+At v3.25.0, the local factory acceptance proof covers generation, signed
+admission, durable Db recovery, and `/app` execution. The full battery is
+recorded in the
+[factory readiness witness](docs/verification/factory-readiness-2026-10-26.md);
+the suite has since grown to 822 tests, no failures.
 The hosted CI matrix remains a separate check, not a local claim.
 
 | Subsystem | Current contract |
