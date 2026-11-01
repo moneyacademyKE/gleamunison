@@ -23,12 +23,6 @@ pub fn sync_request_evidence(
   subjects: List(String),
 ) -> Result(List(#(String, BitArray)), String)
 
-@external(erlang, "gleamunison_ffi_io", "sync_push_defs")
-pub fn sync_push_defs(
-  node: String,
-  defs: List(#(String, BitArray)),
-) -> Result(Nil, String)
-
 pub type PeerId {
   PeerId(name: String)
 }

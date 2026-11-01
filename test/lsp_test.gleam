@@ -1,6 +1,5 @@
 import gleam/bit_array
 import gleam/dynamic/decode
-import gleam/int
 import gleam/string
 import gleamunison/dynamic_ffi.{to_dynamic}
 import gleamunison/json
@@ -8,23 +7,6 @@ import gleamunison/lsp
 import gleamunison/lsp_types
 import gleamunison/version
 import gleeunit/should
-
-pub fn decode_framed_message_test() {
-  let body = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}"
-  let framed =
-    "Content-Length: "
-    <> int.to_string(string.length(body))
-    <> "\r\n\r\n"
-    <> body
-  let assert Ok(#(msg, rest)) = lsp.decode_framed(framed)
-  msg |> should.equal(body)
-  rest |> should.equal("")
-}
-
-pub fn decode_incomplete_waits_test() {
-  let partial = "Content-Length: 100\r\n\r\n{\"jsonrpc\":"
-  lsp.decode_framed(partial) |> should.be_error
-}
 
 pub fn initialize_advertises_full_sync_test() {
   let body =

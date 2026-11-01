@@ -4,7 +4,7 @@
     eval_expression/1,
     spawn_concurrent_evals/0,
     sync_connect/1, sync_send_refs/2, sync_receive_diff/1,
-    sync_request_defs/2, sync_push_defs/2,
+    sync_request_defs/2,
     serialize_term/1, deserialize_term/1,
     register_peer_refs/2, compute_diff/1, fetch_defs_binary/1, receive_pushed_defs/1,
     node_atom/1, hex_to_ref/1, ref_to_hex/1, parse_host_port/1,
@@ -174,22 +174,6 @@ sync_request_evidence(NodeBin, Subjects) ->
             end;
         false ->
             tcp_call(NodeBin, {request_evidence, Subjects})
-    end.
-
-sync_push_defs(NodeBin, Defs) ->
-    case has_node_at(NodeBin) of
-        true ->
-            case safe_node_atom(NodeBin) of
-                {ok, NodeAtom} ->
-                    case rpc:call(NodeAtom, gleamunison_ffi_io, receive_pushed_defs, [Defs]) of
-                        {badrpc, Reason} -> {error, list_to_binary(io_lib:format("RPC failed: ~p", [Reason]))};
-                        {error, _} = Error -> Error;
-                        ok -> {ok, nil}
-                    end;
-                {error, Reason} -> {error, Reason}
-            end;
-        false ->
-            tcp_call(NodeBin, {push_defs, Defs})
     end.
 
 register_peer_refs(Peer, Refs) ->

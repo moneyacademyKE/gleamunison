@@ -1,4 +1,3 @@
-import gleam/option.{None, Some}
 import gleamunison/auth
 import gleeunit/should
 
@@ -7,7 +6,7 @@ pub fn public_routes_require_no_identity_test() {
   auth.required_scope("/api/live") |> should.equal(auth.Public)
   auth.required_scope("/api/ready") |> should.equal(auth.Public)
   auth.required_scope("/static/app.js") |> should.equal(auth.Public)
-  auth.authorize(auth.Anonymous, "/api/live") |> should.be_ok
+  auth.authorize_scopes([auth.Public], "/api/live") |> should.be_ok
 }
 
 pub fn write_routes_require_data_write_test() {
@@ -15,48 +14,36 @@ pub fn write_routes_require_data_write_test() {
   auth.required_scope("/define") |> should.equal(auth.DataWrite)
   auth.required_scope("/mcp") |> should.equal(auth.DataWrite)
   auth.required_scope("/app/greeting") |> should.equal(auth.DataWrite)
-  auth.authorize(auth.Anonymous, "/eval") |> should.be_error
-  auth.authorize(auth.Anonymous, "/app/greeting") |> should.be_error
+  // An anonymous caller resolves to public scope only; the credential→scopes
+  // resolution itself lives in erl (gleamunison_http:token_scopes/1).
+  auth.authorize_scopes([auth.Public], "/eval") |> should.be_error
+  auth.authorize_scopes([auth.Public], "/app/greeting") |> should.be_error
 }
 
 pub fn api_routes_require_admin_test() {
   auth.required_scope("/api/status") |> should.equal(auth.Admin)
   auth.required_scope("/api/traces") |> should.equal(auth.Admin)
-  auth.authorize(auth.Anonymous, "/api/status") |> should.be_error
+  auth.authorize_scopes([auth.Public], "/api/status") |> should.be_error
 }
 
-pub fn bearer_identity_authorizes_write_routes_test() {
-  let identity = auth.bearer_identity(Some("server-secret"), [auth.Admin])
-  auth.authorize(identity, "/eval") |> should.be_ok
-  auth.authorize(identity, "/mcp") |> should.be_ok
-  auth.authorize(identity, "/api/status") |> should.be_ok
+pub fn admin_scope_authorizes_write_routes_test() {
+  auth.authorize_scopes([auth.Admin], "/eval") |> should.be_ok
+  auth.authorize_scopes([auth.Admin], "/mcp") |> should.be_ok
+  auth.authorize_scopes([auth.Admin], "/api/status") |> should.be_ok
 }
 
-pub fn read_scoped_bearer_cannot_reach_admin_routes_test() {
-  let reader =
-    auth.bearer_identity(Some("read-token"), [auth.Public, auth.DataRead])
-  auth.authorize(reader, "/api/live") |> should.be_ok
-  auth.authorize(reader, "/api/status") |> should.be_error
-  auth.authorize(reader, "/eval") |> should.be_error
+pub fn read_scoped_token_cannot_reach_admin_routes_test() {
+  let reader = [auth.Public, auth.DataRead]
+  auth.authorize_scopes(reader, "/api/live") |> should.be_ok
+  auth.authorize_scopes(reader, "/api/status") |> should.be_error
+  auth.authorize_scopes(reader, "/eval") |> should.be_error
 }
 
-pub fn write_scoped_bearer_cannot_reach_admin_routes_test() {
-  let writer =
-    auth.bearer_identity(Some("write-token"), [
-      auth.Public,
-      auth.DataRead,
-      auth.DataWrite,
-    ])
-  auth.authorize(writer, "/eval") |> should.be_ok
-  auth.authorize(writer, "/define") |> should.be_ok
-  auth.authorize(writer, "/api/traces") |> should.be_error
-}
-
-pub fn empty_bearer_token_is_anonymous_test() {
-  auth.bearer_identity(None, [auth.Admin]) |> should.equal(auth.Anonymous)
-  auth.bearer_identity(Some(""), [auth.Admin]) |> should.equal(auth.Anonymous)
-  auth.authorize(auth.bearer_identity(None, [auth.Admin]), "/define")
-  |> should.be_error
+pub fn write_scoped_token_cannot_reach_admin_routes_test() {
+  let writer = [auth.Public, auth.DataRead, auth.DataWrite]
+  auth.authorize_scopes(writer, "/eval") |> should.be_ok
+  auth.authorize_scopes(writer, "/define") |> should.be_ok
+  auth.authorize_scopes(writer, "/api/traces") |> should.be_error
 }
 
 pub fn authorize_scopes_is_the_whole_decision_test() {
@@ -65,13 +52,6 @@ pub fn authorize_scopes_is_the_whole_decision_test() {
   auth.authorize_scopes([auth.DataWrite], "/api/status") |> should.be_error
   auth.authorize_scopes([auth.Admin], "/api/status") |> should.be_ok
   auth.authorize_scopes([], "/") |> should.be_ok
-}
-
-pub fn proxy_principal_scopes_are_enforced_test() {
-  let reader = auth.ProxyPrincipal("ci", [auth.Public, auth.DataRead])
-  auth.authorize(reader, "/api/live") |> should.be_ok
-  auth.authorize(reader, "/eval") |> should.be_error
-  auth.authorize(reader, "/api/status") |> should.be_error
 }
 
 pub fn loopback_bind_always_allowed_test() {

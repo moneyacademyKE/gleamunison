@@ -72,7 +72,6 @@ test_ffi_io_coverage() ->
     {error, _} = gleamunison_ffi_io:sync_send_refs(NodeBin, []),
     {error, _} = gleamunison_ffi_io:sync_receive_diff(NodeBin),
     {error, _} = gleamunison_ffi_io:sync_request_defs(NodeBin, []),
-    {error, _} = gleamunison_ffi_io:sync_push_defs(NodeBin, []),
 
     %% 4b. Test TCP fallback when no @ in peer name
     NodeNoAt = <<"localhost:12345">>,

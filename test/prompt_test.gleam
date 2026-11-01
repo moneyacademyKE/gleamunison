@@ -33,27 +33,30 @@ pub fn hash_is_the_audit_identity_test() {
   let assert True = string.length(ref_hex(ref)) == 64
 }
 
-pub fn render_by_hash_substitutes_vars_test() {
+pub fn render_substitutes_vars_test() {
   let cb = codebase.empty()
   let assert Ok(#(cb, ref)) =
     prompt.put_checked(cb, "Summarize {{topic}} in {{style}} style.")
+  let assert Ok(template) = prompt.get(cb, ref)
   let assert Ok(rendered) =
-    prompt.render_by_hash(cb, ref, [#("topic", "effects"), #("style", "haiku")])
+    prompt.render(template, [#("topic", "effects"), #("style", "haiku")])
   let assert True = rendered == "Summarize effects in haiku style."
 }
 
 pub fn render_missing_var_names_it_test() {
   let cb = codebase.empty()
   let assert Ok(#(cb, ref)) = prompt.put_checked(cb, "Summarize {{topic}}")
-  let assert Error(prompt.MissingVar(name)) = prompt.render_by_hash(cb, ref, [])
+  let assert Ok(template) = prompt.get(cb, ref)
+  let assert Error(prompt.MissingVar(name)) = prompt.render(template, [])
   let assert True = name == "topic"
 }
 
 pub fn render_does_not_html_escape_test() {
   let cb = codebase.empty()
   let assert Ok(#(cb, ref)) = prompt.put_checked(cb, "Input: {{payload}}")
+  let assert Ok(template) = prompt.get(cb, ref)
   let assert Ok(rendered) =
-    prompt.render_by_hash(cb, ref, [#("payload", "<b>bold</b>")])
+    prompt.render(template, [#("payload", "<b>bold</b>")])
   let assert True = rendered == "Input: <b>bold</b>"
 }
 

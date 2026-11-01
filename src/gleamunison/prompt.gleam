@@ -78,17 +78,6 @@ pub fn render(
   }
 }
 
-pub fn render_by_hash(
-  cb: Codebase,
-  ref: DefinitionRef,
-  vars: List(#(String, String)),
-) -> Result(String, PromptError) {
-  case get(cb, ref) {
-    Error(e) -> Error(e)
-    Ok(template) -> render(template, vars)
-  }
-}
-
 fn has_var(vars: List(#(String, String)), name: String) -> Bool {
   list.any(vars, fn(v) { v.0 == name })
 }

@@ -29,12 +29,6 @@ pub type Diagnostic {
   Diagnostic(line: Int, col: Int, message: String)
 }
 
-/// Split one Content-Length framed message off a buffer. Error means
-/// incomplete: the pump keeps reading and retries.
-pub fn decode_framed(buffer: String) -> Result(#(String, String), Nil) {
-  lsp_frame.decode(buffer)
-}
-
 pub fn encode_frame(body: String) -> String {
   lsp_frame.encode(body)
 }

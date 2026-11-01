@@ -46,19 +46,6 @@ pub fn content_length(headers: String) -> Result(Int, Nil) {
   }
 }
 
-pub fn decode(buffer: String) -> Result(#(String, String), Nil) {
-  use #(headers, rest) <- result.try(string.split_once(buffer, "\r\n\r\n"))
-  use length <- result.try(content_length(headers))
-  case <<rest:utf8>> {
-    <<body:size(length)-bytes, remaining:bytes>> -> {
-      use body <- result.try(bit_array.to_string(body))
-      use remaining <- result.try(bit_array.to_string(remaining))
-      Ok(#(body, remaining))
-    }
-    _ -> Error(Nil)
-  }
-}
-
 pub fn encode(body: String) -> String {
   "Content-Length: "
   <> int.to_string(bit_array.byte_size(<<body:utf8>>))

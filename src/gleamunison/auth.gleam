@@ -6,7 +6,6 @@
 //// re-implement policy.
 
 import gleam/list
-import gleam/option.{type Option, None, Some}
 import gleam/string
 
 pub type Scope {
@@ -84,17 +83,6 @@ fn rank(scope: Scope) -> Int {
   }
 }
 
-fn identity_scopes(identity: Identity) -> List(Scope) {
-  case identity {
-    Anonymous -> [Public]
-    LocalPeer -> [Public, DataRead, DataWrite, Admin]
-    // A bearer token carries exactly the scopes its issuer granted. Treating
-    // every token as admin is what let a read-only token reach /api/*.
-    Bearer(_, scopes) -> scopes
-    ProxyPrincipal(_, scopes) -> scopes
-  }
-}
-
 /// The whole authorization decision, over scopes rather than an identity.
 /// Transport adapters resolve a credential to its scopes and ask this; they
 /// do not decide policy themselves.
@@ -110,21 +98,6 @@ pub fn authorize_scopes(
         True -> Ok(Nil)
         False -> Error("insufficient_scope:" <> scope_name(need))
       }
-  }
-}
-
-pub fn authorize(identity: Identity, path: String) -> Result(Identity, String) {
-  case authorize_scopes(identity_scopes(identity), path) {
-    Ok(_) -> Ok(identity)
-    Error(e) -> Error(e)
-  }
-}
-
-pub fn bearer_identity(token: Option(String), scopes: List(Scope)) -> Identity {
-  case token {
-    None -> Anonymous
-    Some("") -> Anonymous
-    Some(_) -> Bearer("bearer:present", scopes)
   }
 }
 

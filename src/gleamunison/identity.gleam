@@ -23,7 +23,7 @@ pub type LocalVar {
 fn ffi_hash_bytes(_bytes: BitArray) -> BitArray
 
 @external(erlang, "gleamunison_ffi", "hex_to_bytes")
-pub fn hex_to_bytes(hex: String) -> Result(BitArray, String)
+fn hex_to_bytes(hex: String) -> Result(BitArray, String)
 
 /// Parse an external SHA-256 reference before it reaches storage or transport.
 pub fn parse_ref_hex(hex: String) -> Result(DefinitionRef, String) {
