@@ -32,7 +32,7 @@ jobs:
       - run: gleam test
       - run: gleam format --check src test
       - run: ./build_escript.sh
-      - run: bb scripts/test_artifact.sh
+      - run: bash scripts/test_artifact.sh
       - run: bb scripts/test_release_contract.clj
       - run: bb scripts/run_playbook_tests.clj
       - name: Publish to Hex.pm
