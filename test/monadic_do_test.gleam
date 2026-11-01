@@ -1,5 +1,5 @@
-import gleamunison/cli_replay
 import gleeunit/should
+import replay_support
 import simplifile
 
 /// The flagship: `chain` over continuation-invoking handlers is real
@@ -24,7 +24,7 @@ pub fn chain_state_monad_threads_state_test() {
         <> "(define main (run-state prog 10))",
       to: path,
     )
-  let assert Ok(result) = cli_replay.run_definition(path, "main", [])
+  let assert Ok(result) = replay_support.run_definition(path, "main", [])
   result |> should.equal("11")
 }
 
@@ -45,7 +45,7 @@ pub fn chain_maybe_short_circuits_test() {
         <> "(define main (from-maybe 0 prog))",
       to: path,
     )
-  let assert Ok(result) = cli_replay.run_definition(path, "main", [])
+  let assert Ok(result) = replay_support.run_definition(path, "main", [])
   // b is Nothing: the chain short-circuits, from-maybe yields the default.
   result |> should.equal("0")
 }
@@ -63,7 +63,7 @@ pub fn chain_maybe_all_just_runs_all_steps_test() {
         <> "(define main (from-maybe 0 prog))",
       to: path,
     )
-  let assert Ok(result) = cli_replay.run_definition(path, "main", [])
+  let assert Ok(result) = replay_support.run_definition(path, "main", [])
   result |> should.equal("22")
 }
 
@@ -81,6 +81,6 @@ pub fn chain_state_put_shadows_initial_test() {
         <> "(define main (run-state prog 0))",
       to: path,
     )
-  let assert Ok(result) = cli_replay.run_definition(path, "main", [])
+  let assert Ok(result) = replay_support.run_definition(path, "main", [])
   result |> should.equal("7")
 }

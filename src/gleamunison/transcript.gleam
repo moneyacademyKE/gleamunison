@@ -47,14 +47,6 @@ pub opaque type Recorder {
   Recorder(policy: CapturePolicy, token: Dynamic)
 }
 
-/// Opaque handle to one playback cursor over raw captured values.
-///
-/// The token is the actual process-dictionary cursor key, so two playbacks
-/// in the same process cannot consume each other's entries.
-pub opaque type Playback {
-  Playback(token: Dynamic)
-}
-
 @external(erlang, "gleamunison_transcript", "new_token")
 fn new_token() -> Dynamic
 
@@ -78,12 +70,6 @@ fn log_stop(token: Dynamic) -> Nil
 
 @external(erlang, "gleamunison_transcript", "pb_start")
 fn pb_start(token: Dynamic, entries: Dynamic) -> Nil
-
-@external(erlang, "gleamunison_transcript", "pb_next")
-fn pb_next(token: Dynamic, ability: String, op: Int) -> Result(Dynamic, Dynamic)
-
-@external(erlang, "gleamunison_transcript", "pb_remaining")
-fn pb_remaining(token: Dynamic) -> Int
 
 @external(erlang, "gleamunison_transcript", "pb_stop")
 fn pb_stop(token: Dynamic) -> Nil
@@ -201,46 +187,6 @@ fn decode_entries(raw: Dynamic) -> List(OpRecord) {
       args_repr: string.inspect(args),
       result_repr: string.inspect(result),
       seq: seq,
-    )
-  })
-}
-
-/// Start replaying a tape. Replay consumes raw captured values in order;
-/// a tape built from JSON or from_entries has no raw values and replays
-/// as exhausted.
-pub fn playback(tape: Tape) -> Playback {
-  let token = new_token()
-  pb_start(token, tape.raw)
-  Playback(token:)
-}
-
-pub fn stop_playback(pb: Playback) -> Nil {
-  pb_stop(pb.token)
-}
-
-pub fn playback_remaining(pb: Playback) -> Int {
-  pb_remaining(pb.token)
-}
-
-/// Frames whose handlers serve recorded results in order, never calling
-/// the inner handler. A mismatch or exhausted tape raises: replay is for
-/// verification, and silent drift must be loud.
-pub fn replay_frames(
-  pb: Playback,
-  frames: List(HandlerFrame),
-) -> List(HandlerFrame) {
-  list.map(frames, fn(frame) {
-    let key = effects.ability_key(frame.ability)
-    HandlerFrame(
-      ability: frame.ability,
-      ops: dict.map_values(frame.ops, fn(op_idx, _inner) {
-        fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-          case pb_next(pb.token, key, op_idx) {
-            Ok(recorded) -> cont(recorded)
-            Error(_) -> panic as "transcript replay: no recorded op"
-          }
-        }
-      }),
     )
   })
 }

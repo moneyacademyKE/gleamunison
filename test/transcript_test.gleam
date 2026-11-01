@@ -23,10 +23,6 @@ fn echo_handler() -> OpHandler {
   }
 }
 
-fn boom_handler() -> OpHandler {
-  fn(_args, _cont) { panic as "playback must never call the inner handler" }
-}
-
 fn llm_frame(handler: OpHandler) -> HandlerFrame {
   HandlerFrame(ability: llm.ability_ref(), ops: dict.from_list([#(0, handler)]))
 }
@@ -48,26 +44,6 @@ pub fn record_captures_ops_in_order_test() {
   string.contains(e1.result_repr, "handled:first") |> should.be_true
   string.contains(e2.result_repr, "handled:second") |> should.be_true
   transcript.stop(rec)
-}
-
-pub fn replay_returns_recorded_results_without_inner_test() {
-  let rec = transcript.start_with(transcript.CaptureAll)
-  let frames = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
-  let assert [frame] = frames
-  let assert Ok(handler) = dict.get(frame.ops, 0)
-  let recorded = handler([to_dynamic("live")], fn(d) { d })
-  let t = transcript.capture(rec)
-  transcript.stop(rec)
-
-  // Replay against a handler that panics: proof the result came from the tape.
-  let pb = transcript.playback(t)
-  let pb_frames = transcript.replay_frames(pb, [llm_frame(boom_handler())])
-  let assert [pb_frame] = pb_frames
-  let assert Ok(pb_handler) = dict.get(pb_frame.ops, 0)
-  let replayed = pb_handler([to_dynamic("ignored")], fn(d) { d })
-  replayed |> should.equal(recorded)
-  transcript.playback_remaining(pb) |> should.equal(0)
-  transcript.stop_playback(pb)
 }
 
 pub fn json_roundtrip_preserves_entries_test() {
@@ -105,6 +81,9 @@ pub fn diff_reports_first_divergence_test() {
 }
 
 pub fn json_round_trip_preserves_replay_test() {
+  // Replay consumption is covered end-to-end through the live path in
+  // cli_replay_test (record → tape file → replay_from_file); this keeps the
+  // pure half: a v2 tape round-tripped through JSON stays replayable.
   let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
   let assert [frame] = frames
@@ -114,14 +93,6 @@ pub fn json_round_trip_preserves_replay_test() {
   let json = transcript.to_json(tape)
   let assert Ok(loaded) = transcript_json.from_json(json)
   transcript.is_replayable(loaded) |> should.be_true
-  let pb = transcript.playback(loaded)
-  let replayed = transcript.replay_frames(pb, [llm_frame(boom_handler())])
-  let assert [rframe] = replayed
-  let assert Ok(rhandler) = dict.get(rframe.ops, 0)
-  let result = rhandler([to_dynamic("hello")], fn(d) { d })
-  let decoded: String = from_dynamic(result)
-  decoded |> should.equal("handled:hello")
-  transcript.stop_playback(pb)
   transcript.stop(rec)
 }
 
@@ -158,43 +129,6 @@ pub fn interleaved_recorders_keep_separate_tapes_test() {
 
   transcript.stop(first)
   transcript.stop(second)
-}
-
-pub fn interleaved_playbacks_keep_separate_cursors_test() {
-  let recorded = record_one_tape("cursor-a")
-  let other = record_one_tape("cursor-b")
-
-  let first = transcript.playback(recorded)
-  let second = transcript.playback(other)
-  let assert [first_frame] =
-    transcript.replay_frames(first, [llm_frame(boom_handler())])
-  let assert [second_frame] =
-    transcript.replay_frames(second, [llm_frame(boom_handler())])
-  let assert Ok(first_handler) = dict.get(first_frame.ops, 0)
-  let assert Ok(second_handler) = dict.get(second_frame.ops, 0)
-
-  let first_result: String =
-    from_dynamic(first_handler([to_dynamic("ignored")], fn(d) { d }))
-  let second_result: String =
-    from_dynamic(second_handler([to_dynamic("ignored")], fn(d) { d }))
-
-  first_result |> should.equal("handled:cursor-a")
-  second_result |> should.equal("handled:cursor-b")
-  transcript.playback_remaining(first) |> should.equal(0)
-  transcript.playback_remaining(second) |> should.equal(0)
-
-  transcript.stop_playback(first)
-  transcript.stop_playback(second)
-}
-
-fn record_one_tape(tag: String) -> transcript.Tape {
-  let rec = transcript.start_with(transcript.CaptureAll)
-  let assert [frame] = transcript.wrap_frames(rec, [llm_frame(echo_handler())])
-  let assert Ok(handler) = dict.get(frame.ops, 0)
-  let _ = handler([to_dynamic(tag)], fn(d) { d })
-  let tape = transcript.capture(rec)
-  transcript.stop(rec)
-  tape
 }
 
 pub fn to_json_escapes_control_characters_test() {

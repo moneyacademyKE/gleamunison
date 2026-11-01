@@ -9,8 +9,6 @@ import gleam/result
 import gleam/string
 import gleamunison/cli_result
 import gleamunison/compile
-import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
-import gleamunison/effects.{type HandlerFrame, RuntimeConfig}
 import gleamunison/identity
 import gleamunison/transcript
 import gleamunison/transcript_json
@@ -35,23 +33,6 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
       }
     _ -> Error("usage: gleam run -- replay <file.lisp> <def-name> <tape.json>")
   }
-}
-
-/// Run a definition under caller-supplied handler frames (the recording
-/// path: wrap them with transcript.wrap_frames first).
-pub fn run_definition(
-  path: String,
-  name: String,
-  frames: List(HandlerFrame),
-) -> Result(String, String) {
-  use mod_name <- result.try(load_and_compile(path, name))
-  let result: Result(String, String) =
-    from_dynamic(
-      effects.run(RuntimeConfig(ambient_handlers: frames), fn() {
-        to_dynamic(eval_module_bare(mod_name))
-      }),
-    )
-  result
 }
 
 /// Replay a definition against a tape file. The tape must carry raw values
@@ -88,7 +69,9 @@ pub fn replay_from_file(
 /// handlers outside any replay/recording frame, which is exactly the
 /// accident this tool exists to prevent. The loader itself lives in
 /// verify.load_defs_file — one loader, shared by every CLI that loads code.
-fn load_and_compile(path: String, name: String) -> Result(String, String) {
+/// Public because the test-side recording harness (test/replay_support.gleam)
+/// shares this one name→module authority (bk-f850).
+pub fn load_and_compile(path: String, name: String) -> Result(String, String) {
   use #(_cache, defs) <- result.try(verify.load_defs_file(path))
   case list.any(defs, fn(pair) { pair.0 == name }) {
     False -> Error("replay: no definition named " <> name <> " in " <> path)

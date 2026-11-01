@@ -4,12 +4,12 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
-import gleamunison/cli_replay
 import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleamunison/repl_eval
 import gleeunit/should
+import replay_support
 import simplifile
 
 /// The ability ref surface code resolves must be the name hash — the same
@@ -49,7 +49,7 @@ pub fn surface_llm_complete_dispatches_to_frame_test() {
       "(define ask (lam m (do LLM complete m)))\n(define main (ask \"hi\"))",
       to: path,
     )
-  let result = cli_replay.run_definition(path, "main", [llm_frame()])
+  let result = replay_support.run_definition(path, "main", [llm_frame()])
   // eval renders strings as Erlang binaries.
   result |> should.equal(Ok("<<\"mocked:hi\">>"))
 }

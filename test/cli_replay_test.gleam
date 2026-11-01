@@ -7,6 +7,7 @@ import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/repl_eval
 import gleamunison/transcript
 import gleeunit/should
+import replay_support
 import simplifile
 
 fn console_frame() -> HandlerFrame {
@@ -39,7 +40,7 @@ pub fn replay_from_tape_file_matches_original_test() {
   // Record: run the def under a wrapped mock handler.
   let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [console_frame()])
-  let assert Ok(original) = cli_replay.run_definition(path, "main", frames)
+  let assert Ok(original) = replay_support.run_definition(path, "main", frames)
   let tape = transcript.capture(rec)
   transcript.stop(rec)
   let json = transcript.to_json(tape)
@@ -64,7 +65,7 @@ pub fn replay_with_tampered_ability_key_fails_loudly_test() {
 
   let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [console_frame()])
-  let assert Ok(_) = cli_replay.run_definition(path, "main", frames)
+  let assert Ok(_) = replay_support.run_definition(path, "main", frames)
   let tape = transcript.capture(rec)
   transcript.stop(rec)
   let assert [entry] = transcript.tape_entries(tape)

@@ -18,6 +18,27 @@ import gleeunit/should
 import simplifile
 import test_ffi.{without_active_storage}
 
+/// The src-level generate_and_publish adapter had zero production callers
+/// (bk-f850): tests keep their shape through this local wrap of the live
+/// generate_with_provider entry.
+fn generate_and_publish(
+  adapter: storage.StorageAdapter,
+  log_directory: String,
+  branch: String,
+  untrusted: Bool,
+  plan: generation_loop.Plan,
+  generator: fn(generation_loop.Attempt) -> String,
+) -> Result(generation_loop.Outcome, String) {
+  generation_loop.generate_with_provider(
+    adapter,
+    log_directory,
+    branch,
+    untrusted,
+    plan,
+    fn(attempt) { Ok(generator(attempt)) },
+  )
+}
+
 pub fn near_miss_generation_is_admitted_and_runnable_test() {
   with_store(fn(adapter, root) {
     let plan =
@@ -29,16 +50,9 @@ pub fn near_miss_generation_is_admitted_and_runnable_test() {
         target: None,
       )
     let assert Ok(outcome) =
-      generation_loop.generate_and_publish(
-        adapter,
-        root,
-        "factory",
-        False,
-        plan,
-        fn(_) {
-          "```json\n{source: '(define generated-greeting string-upcase)\\n(define test_generated-greeting (do Test expect 1))', signature: '(string) -> string',}\n```"
-        },
-      )
+      generate_and_publish(adapter, root, "factory", False, plan, fn(_) {
+        "```json\n{source: '(define generated-greeting string-upcase)\\n(define test_generated-greeting (do Test expect 1))', signature: '(string) -> string',}\n```"
+      })
     outcome.attempts |> should.equal(1)
     string.length(outcome.prompt_ref) |> should.equal(64)
     string.contains(outcome.rendered_prompt, "Task: a greeting.")
@@ -82,33 +96,26 @@ pub fn retry_receives_feedback_and_exhaustion_preserves_branch_test() {
     let source =
       "(define generated-number 42)\n(define test_generated-number (do Test expect 1))"
     let assert Ok(outcome) =
-      generation_loop.generate_and_publish(
-        adapter,
-        root,
-        "factory",
-        False,
-        plan,
-        fn(attempt) {
-          case attempt.number {
-            1 -> "not JSON"
-            _ -> {
-              string.contains(
-                attempt.prompt,
-                "previous candidate was rejected: generation candidate contains no JSON",
-              )
-              |> should.be_true
-              "{\"source\":"
-              <> json.json_quote(source)
-              <> ",\"signature\":\"int\"}"
-            }
+      generate_and_publish(adapter, root, "factory", False, plan, fn(attempt) {
+        case attempt.number {
+          1 -> "not JSON"
+          _ -> {
+            string.contains(
+              attempt.prompt,
+              "previous candidate was rejected: generation candidate contains no JSON",
+            )
+            |> should.be_true
+            "{\"source\":"
+            <> json.json_quote(source)
+            <> ",\"signature\":\"int\"}"
           }
-        },
-      )
+        }
+      })
     outcome.attempts |> should.equal(2)
     let assert Ok(before) = namespace.load_current(adapter, "factory")
 
     let assert Error(message) =
-      generation_loop.generate_and_publish(
+      generate_and_publish(
         adapter,
         root,
         "factory",
@@ -125,7 +132,7 @@ pub fn retry_receives_feedback_and_exhaustion_preserves_branch_test() {
     |> should.equal(namespace.get(before, "generated-number"))
 
     let assert Error(budget_message) =
-      generation_loop.generate_and_publish(
+      generate_and_publish(
         adapter,
         root,
         "factory",
@@ -150,16 +157,9 @@ pub fn signature_mismatch_is_refused_before_publication_test() {
     let source =
       "(define wrong-type \"oops\")\n(define test_wrong-type (do Test expect 1))"
     let assert Error(message) =
-      generation_loop.generate_and_publish(
-        adapter,
-        root,
-        "factory",
-        False,
-        plan,
-        fn(_) {
-          "{\"source\":" <> json.json_quote(source) <> ",\"signature\":\"int\"}"
-        },
-      )
+      generate_and_publish(adapter, root, "factory", False, plan, fn(_) {
+        "{\"source\":" <> json.json_quote(source) <> ",\"signature\":\"int\"}"
+      })
     string.contains(message, "signature") |> should.be_true
     let assert Ok(ns) = namespace.load_current_or_empty(adapter, "factory")
     namespace.names(ns) |> should.equal([])
@@ -177,14 +177,9 @@ pub fn untrusted_generation_refuses_before_candidate_or_branch_write_test() {
         target: None,
       )
     let assert Error(message) =
-      generation_loop.generate_and_publish(
-        adapter,
-        root,
-        "factory",
-        True,
-        plan,
-        fn(_) { panic as "untrusted generation must not call the generator" },
-      )
+      generate_and_publish(adapter, root, "factory", True, plan, fn(_) {
+        panic as "untrusted generation must not call the generator"
+      })
     string.contains(message, "untrusted") |> should.be_true
     let assert Ok(ns) = namespace.load_current_or_empty(adapter, "factory")
     namespace.names(ns) |> should.equal([])
@@ -207,16 +202,9 @@ pub fn explicit_target_admits_helpers_and_runs_test() {
       <> "(define generated-number (+ generated-base 2))\n"
       <> "(define test_generated-number (do Test expect (eq? generated-number 42)))\n"
     let assert Ok(outcome) =
-      generation_loop.generate_and_publish(
-        adapter,
-        root,
-        "factory",
-        False,
-        plan,
-        fn(_) {
-          "{\"source\":" <> json.json_quote(source) <> ",\"signature\":\"int\"}"
-        },
-      )
+      generate_and_publish(adapter, root, "factory", False, plan, fn(_) {
+        "{\"source\":" <> json.json_quote(source) <> ",\"signature\":\"int\"}"
+      })
     outcome.publication.admitted |> should.equal(2)
     let assert Ok(helper) = published(outcome.publication, "generated-base")
     let assert Ok(target) = published(outcome.publication, "generated-number")
@@ -256,18 +244,11 @@ pub fn invalid_explicit_target_preserves_existing_branch_test() {
       "(define generated-base 40)\n"
       <> "(define test_generated-base (do Test expect (eq? generated-base 40)))\n"
     let assert Error(missing) =
-      generation_loop.generate_and_publish(
-        adapter,
-        root,
-        "factory",
-        False,
-        plan,
-        fn(_) {
-          "{\"source\":"
-          <> json.json_quote(missing_source)
-          <> ",\"signature\":\"int\"}"
-        },
-      )
+      generate_and_publish(adapter, root, "factory", False, plan, fn(_) {
+        "{\"source\":"
+        <> json.json_quote(missing_source)
+        <> ",\"signature\":\"int\"}"
+      })
     string.contains(missing, "target") |> should.be_true
     let assert Ok(after_missing) = namespace.load_current(adapter, "factory")
     namespace.names(after_missing) |> should.equal(namespace.names(before))
@@ -278,18 +259,11 @@ pub fn invalid_explicit_target_preserves_existing_branch_test() {
       <> "(define generated-number \"wrong\")\n"
       <> "(define test_generated-number (do Test expect (eq? generated-number \"wrong\")))\n"
     let assert Error(wrong_type) =
-      generation_loop.generate_and_publish(
-        adapter,
-        root,
-        "factory",
-        False,
-        plan,
-        fn(_) {
-          "{\"source\":"
-          <> json.json_quote(wrong_source)
-          <> ",\"signature\":\"int\"}"
-        },
-      )
+      generate_and_publish(adapter, root, "factory", False, plan, fn(_) {
+        "{\"source\":"
+        <> json.json_quote(wrong_source)
+        <> ",\"signature\":\"int\"}"
+      })
     string.contains(wrong_type, "signature mismatch") |> should.be_true
     let assert Ok(after_wrong) = namespace.load_current(adapter, "factory")
     namespace.names(after_wrong) |> should.equal(namespace.names(before))
@@ -311,7 +285,7 @@ pub fn patch_reports_dependents_without_rewriting_stored_code_test() {
     let updated_source =
       "(define base-value 2)\n(define test_base-value (do Test expect 1))\n"
     let assert Ok(outcome) =
-      generation_loop.generate_and_publish(
+      generate_and_publish(
         adapter,
         root,
         "factory",

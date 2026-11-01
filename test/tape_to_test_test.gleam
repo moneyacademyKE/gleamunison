@@ -2,7 +2,6 @@ import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/option
 import gleam/string
-import gleamunison/cli_replay
 import gleamunison/cli_tape_to_test
 import gleamunison/cli_test
 import gleamunison/dynamic_ffi.{to_dynamic}
@@ -12,6 +11,7 @@ import gleamunison/storage
 import gleamunison/test_runner
 import gleamunison/transcript
 import gleeunit/should
+import replay_support
 import simplifile
 
 fn mock_console() -> OpHandler {
@@ -44,7 +44,8 @@ fn record_tape() -> String {
   write_subject()
   let rec = transcript.start_with(transcript.CaptureAll)
   let frames = transcript.wrap_frames(rec, [console_frame()])
-  let assert Ok(_) = cli_replay.run_definition(subject_path(), "main", frames)
+  let assert Ok(_) =
+    replay_support.run_definition(subject_path(), "main", frames)
   let tape = transcript.capture(rec)
   transcript.stop(rec)
   transcript.to_json(tape)

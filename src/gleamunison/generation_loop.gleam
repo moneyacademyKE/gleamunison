@@ -39,9 +39,6 @@ pub type Attempt {
   Attempt(prompt: String, number: Int, previous_error: Option(String))
 }
 
-pub type Generator =
-  fn(Attempt) -> String
-
 pub type Provider =
   fn(Attempt) -> Result(String, String)
 
@@ -68,24 +65,6 @@ type Context {
     target: Option(String),
     previous: List(agent_read_model.Entry),
     generator: Provider,
-  )
-}
-
-pub fn generate_and_publish(
-  adapter: StorageAdapter,
-  log_directory: String,
-  branch: String,
-  untrusted: Bool,
-  plan: Plan,
-  generator: Generator,
-) -> Result(Outcome, String) {
-  generate_with_provider(
-    adapter,
-    log_directory,
-    branch,
-    untrusted,
-    plan,
-    fn(attempt) { Ok(generator(attempt)) },
   )
 }
 
