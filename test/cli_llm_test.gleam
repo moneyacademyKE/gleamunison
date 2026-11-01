@@ -3,8 +3,8 @@ import gleam/dynamic.{type Dynamic}
 import gleam/string
 import gleamunison/cli_llm
 import gleamunison/dynamic_ffi.{to_dynamic}
-import gleamunison/llm
 import gleamunison/llm_types.{Anthropic, Completion, OpenAI}
+import llm_mock
 
 fn fake_env(
   pairs: List(#(String, String)),
@@ -67,7 +67,8 @@ pub fn default_provider_prefers_anthropic_when_key_present_test() {
 }
 
 pub fn complete_with_mock_returns_completion_test() {
-  let handler = llm.mock_handler(Completion("hello back", "mock-model", 3, 7))
+  let handler =
+    llm_mock.mock_handler(Completion("hello back", "mock-model", 3, 7))
   let assert Ok(c) = cli_llm.complete_with(handler, "hi")
   let assert True = c.content == "hello back"
   let assert True = c.model == "mock-model"
@@ -81,7 +82,7 @@ pub fn complete_with_surfaces_handler_error_test() {
 }
 
 pub fn command_with_handler_end_to_end_test() {
-  let handler = llm.mock_handler(Completion("it works", "mock-1", 1, 2))
+  let handler = llm_mock.mock_handler(Completion("it works", "mock-1", 1, 2))
   let env = fake_env([#("ANTHROPIC_API_KEY", "sk-ant")])
   let out = cli_llm.command_with_handler(["anthropic", "say hi"], env, handler)
   let assert True = string.contains(out, "it works")
@@ -93,7 +94,7 @@ pub fn command_usage_on_empty_args_test() {
     cli_llm.command_with_handler(
       [],
       env,
-      llm.mock_handler(Completion("x", "m", 0, 0)),
+      llm_mock.mock_handler(Completion("x", "m", 0, 0)),
     )
   let assert True = string.contains(out, "usage")
 }

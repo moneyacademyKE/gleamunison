@@ -28,8 +28,8 @@ import gleamunison/llm_budget
 import gleamunison/llm_controls
 import gleamunison/llm_settlement
 import gleamunison/llm_types.{
-  type Completion, type LlmError, type Provider, type ProviderConfig, Anthropic,
-  DecodeError, HttpError, Message, OpenAI, ProviderConfig, TransportError, User,
+  type LlmError, type Provider, type ProviderConfig, Anthropic, DecodeError,
+  HttpError, Message, OpenAI, ProviderConfig, TransportError, User,
 }
 import gleamunison/llm_wire
 
@@ -165,14 +165,6 @@ pub fn frame(handler: OpHandler) -> HandlerFrame {
 
 // ---------------------------------------------------------------------------
 // Handlers
-
-/// Deterministic mock: always answers the same completion. The live call and
-/// the test double are the same handler swap — that is the whole point.
-pub fn mock_handler(response: Completion) -> OpHandler {
-  fn(_args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic {
-    cont(to_dynamic(Ok(llm_wire.completion_json(response))))
-  }
-}
 
 /// Live provider handler: performs the HTTP call via http_client.
 pub fn provider_handler(cfg: ProviderConfig) -> OpHandler {

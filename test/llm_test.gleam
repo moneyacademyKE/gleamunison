@@ -10,6 +10,7 @@ import gleamunison/llm_types.{
   System, User,
 }
 import gleamunison/llm_wire
+import llm_mock
 
 fn openai_cfg() -> ProviderConfig {
   ProviderConfig(
@@ -106,7 +107,7 @@ pub fn parse_error_status_is_http_error_test() {
 
 pub fn mock_handler_returns_fixed_completion_test() {
   let expected = Completion("canned", "mock-model", 1, 1)
-  let handler = llm.mock_handler(expected)
+  let handler = llm_mock.mock_handler(expected)
   let args = [
     to_dynamic(bit_array.from_string("[]")),
     to_dynamic(bit_array.from_string("{}")),
@@ -119,7 +120,7 @@ pub fn mock_handler_returns_fixed_completion_test() {
 }
 
 pub fn ability_frame_targets_genesis_hash_test() {
-  let handler = llm.mock_handler(Completion("x", "m", 0, 0))
+  let handler = llm_mock.mock_handler(Completion("x", "m", 0, 0))
   let frame = llm.frame(handler)
   let assert True = frame.ability == llm.ability_ref()
 }

@@ -12,12 +12,12 @@ import gleamunison/llm_budget.{
   type Budget, Budget, CircuitOpen, Closed, ConcurrencyExceeded,
   CostBudgetExceeded, ModelNotPinned, Open, TokenBudgetExceeded,
 }
-import gleamunison/llm_middleware
 import gleamunison/llm_types.{type Completion, Completion, OpenAI}
 import gleamunison/llm_wire
 import gleamunison/transcript
 import gleeunit/should
-import test_ffi.{budget_reset, snapshot_json}
+import llm_mock
+import test_ffi.{budget_reset}
 
 /// The handler's reply, read back as the typed result the
 /// middleware contract promises.
@@ -134,64 +134,68 @@ pub fn allowed_models_parses_comma_list_test() {
   llm_budget.parse_allowed_models("") |> should.equal([])
 }
 
-// ---- middleware over fake providers ----------------------------------------
+// ---- live settlement composition (complete_env) -----------------------------
+// The dead budget_handler composition was deleted (bk-baac); these drive the
+// one live admit → release → meter → report authority instead. Refusal and
+// circuit paths are pre-transport, and 127.0.0.1:1 proves no network is
+// needed — same technique as cancelled_token_refuses_before_transport_test.
+// The old meters-on-success integration test is deliberately not migrated:
+// driving complete_env's success path needs the fake-HTTP boundary harness
+// (new infrastructure, out of scope for a deletion slice). Metering stays
+// covered at both ends: cost arithmetic below, settlement boundary in
+// llm_settlement_test.
 
-pub fn budget_middleware_admits_and_meters_within_limits_test() {
+pub fn complete_env_refuses_unpinned_model_without_calling_provider_test() {
   let assert Ok(Nil) = budget_reset()
-  let inner = llm.mock_handler(fake_completion())
-  let handler = llm_middleware.budget_handler(inner, OpenAI, "gpt-4o-mini")
-  let assert Ok(json_bin) = call(handler)
-  // The completion passed through untouched.
-  string.contains(
-    bit_array.to_string(json_bin) |> should_be_ok,
-    "\"content\":\"ok\"",
-  )
-  |> should.be_true
-  // Metering recorded the actual token usage.
-  let snap = snapshot_text()
-  string.contains(snap, "\"openai\"") |> should.be_true
-  string.contains(snap, "\"tokens\":15") |> should.be_true
-}
-
-pub fn budget_middleware_refuses_unpinned_model_without_calling_provider_test() {
-  let assert Ok(Nil) = budget_reset()
+  envoy.unset("ANTHROPIC_API_KEY")
+  envoy.set("OPENAI_API_KEY", "sk-test")
+  envoy.set("OPENAI_BASE_URL", "http://127.0.0.1:1")
+  envoy.set("OPENAI_MODEL", "gpt-4o")
   envoy.set("GLEAMUNISON_LLM_ALLOWED_MODELS", "gpt-4o-mini")
-  let inner = llm.mock_handler(fake_completion())
-  let handler = llm_middleware.budget_handler(inner, OpenAI, "gpt-4o")
-  let assert Error(reason) = call(handler)
-  bit_array.to_string(reason)
-  |> should_be_ok
-  |> string.contains("model_not_pinned")
-  |> should.be_true
+  let assert Error(reason) = llm.complete_env("hi")
+  string.contains(reason, "model_not_pinned") |> should.be_true
+  envoy.unset("OPENAI_API_KEY")
+  envoy.unset("OPENAI_BASE_URL")
+  envoy.unset("OPENAI_MODEL")
   envoy.unset("GLEAMUNISON_LLM_ALLOWED_MODELS")
 }
 
-pub fn budget_middleware_opens_circuit_after_threshold_failures_test() {
+pub fn complete_env_opens_circuit_after_threshold_failures_test() {
   let assert Ok(Nil) = budget_reset()
+  envoy.unset("ANTHROPIC_API_KEY")
+  envoy.set("OPENAI_API_KEY", "sk-test")
+  envoy.set("OPENAI_BASE_URL", "http://127.0.0.1:1")
+  envoy.set("OPENAI_MODEL", "gpt-4o-mini")
   envoy.set("GLEAMUNISON_LLM_CIRCUIT_FAILURE_THRESHOLD", "2")
-  let failing: OpHandler = fn(_args, cont) {
-    cont(to_dynamic(Error(bit_array.from_string("http 500"))))
-  }
-  let handler = llm_middleware.budget_handler(failing, OpenAI, "gpt-4o-mini")
-  let assert Error(_) = call(handler)
-  let assert Error(_) = call(handler)
-  // Third call must be refused by the circuit, not reach the provider.
-  let assert Error(refusal) = call(handler)
-  bit_array.to_string(refusal)
-  |> should_be_ok
-  |> string.contains("circuit_open")
-  |> should.be_true
+  // Two transport failures report through llm_settlement.failure...
+  let assert Error(_) = llm.complete_env("hi")
+  let assert Error(_) = llm.complete_env("hi")
+  // ...so the third call is refused by the circuit, not the transport.
+  let assert Error(refusal) = llm.complete_env("hi")
+  string.contains(refusal, "circuit_open") |> should.be_true
+  envoy.unset("OPENAI_API_KEY")
+  envoy.unset("OPENAI_BASE_URL")
+  envoy.unset("OPENAI_MODEL")
   envoy.unset("GLEAMUNISON_LLM_CIRCUIT_FAILURE_THRESHOLD")
 }
 
-pub fn concurrency_slot_is_released_after_each_call_test() {
+pub fn complete_env_releases_concurrency_slot_after_each_call_test() {
   let assert Ok(Nil) = budget_reset()
+  envoy.unset("ANTHROPIC_API_KEY")
+  envoy.set("OPENAI_API_KEY", "sk-test")
+  envoy.set("OPENAI_BASE_URL", "http://127.0.0.1:1")
+  envoy.set("OPENAI_MODEL", "gpt-4o-mini")
   envoy.set("GLEAMUNISON_LLM_MAX_CONCURRENT", "1")
-  let inner = llm.mock_handler(fake_completion())
-  let handler = llm_middleware.budget_handler(inner, OpenAI, "gpt-4o-mini")
-  // Two sequential calls both pass: the slot is released, not leaked.
-  let assert Ok(_) = call(handler)
-  let assert Ok(_) = call(handler)
+  // Two sequential calls both reach the transport and fail there: the slot
+  // is released after each, not leaked. A leak would refuse the second call
+  // with concurrency_exceeded before any transport.
+  let assert Error(first) = llm.complete_env("hi")
+  let assert Error(second) = llm.complete_env("hi")
+  string.contains(first, "concurrency_exceeded") |> should.be_false
+  string.contains(second, "concurrency_exceeded") |> should.be_false
+  envoy.unset("OPENAI_API_KEY")
+  envoy.unset("OPENAI_BASE_URL")
+  envoy.unset("OPENAI_MODEL")
   envoy.unset("GLEAMUNISON_LLM_MAX_CONCURRENT")
 }
 
@@ -205,7 +209,7 @@ pub fn transcript_never_captures_llm_payloads_test() {
     HandlerFrame(
       ability: llm.ability_ref(),
       ops: dict.from_list([
-        #(0, llm.mock_handler(fake_completion())),
+        #(0, llm_mock.mock_handler(fake_completion())),
       ]),
     ),
   ]
@@ -284,9 +288,4 @@ fn should_be_ok(r: Result(String, Nil)) -> String {
     Ok(s) -> s
     Error(_) -> ""
   }
-}
-
-fn snapshot_text() -> String {
-  // The snapshot is an Erlang map; render via the budget JSON probe.
-  snapshot_json()
 }
