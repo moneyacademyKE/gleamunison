@@ -1,7 +1,5 @@
 import gleam/dynamic.{type Dynamic}
-import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/string
 import gleamunison/capability
 import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 
@@ -73,7 +71,7 @@ pub fn local(abilities: capability.Policy) -> SandboxPolicy {
   )
 }
 
-pub fn authenticated_remote(abilities: capability.Policy) -> SandboxPolicy {
+fn authenticated_remote(abilities: capability.Policy) -> SandboxPolicy {
   SandboxPolicy(
     profile: AuthenticatedRemote,
     budget: default_budget(),
@@ -146,28 +144,6 @@ pub fn refusal_name(refusal: BoundaryRefusal) -> String {
   }
 }
 
-pub fn profile_name(profile: ExecutionProfile) -> String {
-  case profile {
-    Local -> "local"
-    AuthenticatedRemote -> "authenticated-remote"
-    UntrustedExecution -> "untrusted-execution"
-  }
-}
-
-pub fn capability_refusals(
-  _policy: SandboxPolicy,
-  denied: List(String),
-) -> List(String) {
-  list.map(denied, fn(key) { "capability_denied:" <> key })
-}
-
-pub fn profile_denies_host_authority(policy: SandboxPolicy) -> Bool {
-  case policy.profile {
-    UntrustedExecution -> True
-    _ -> False
-  }
-}
-
 fn valid_budget(budget: ResourceBudget) -> Bool {
   budget.deadline_ms > 0
   && budget.deadline_ms <= 300_000
@@ -179,13 +155,6 @@ fn valid_budget(budget: ResourceBudget) -> Bool {
   && budget.max_reductions <= 1_000_000_000
   && budget.max_concurrency > 0
   && budget.max_concurrency <= 1024
-}
-
-pub fn require_no_host_authority(keys: List(String)) -> Result(Nil, String) {
-  case list.find(keys, is_host_authority_key) {
-    Ok(key) -> Error("untrusted profile refuses host authority: " <> key)
-    Error(Nil) -> Ok(Nil)
-  }
 }
 
 /// Transport-facing admission. An Erlang route knows the deployment profile
@@ -210,8 +179,4 @@ pub fn admit_profile(profile: String) -> Result(Nil, String) {
 
 pub fn denies_untrusted_execution(profile: String) -> Bool {
   profile == "untrusted-execution"
-}
-
-fn is_host_authority_key(key: String) -> Bool {
-  string.contains(key, "ffi")
 }

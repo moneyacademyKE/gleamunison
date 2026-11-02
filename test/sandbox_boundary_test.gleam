@@ -2,18 +2,19 @@ import gleam/option.{None, Some}
 import gleamunison/capability
 import gleamunison/sandbox_policy
 import gleeunit/should
+import sandbox_support
 
 pub fn local_profile_preserves_trusted_execution_test() {
   let policy = sandbox_policy.local(capability.allow([]))
   sandbox_policy.admit(policy) |> should.equal(Ok(policy))
-  policy.profile |> sandbox_policy.profile_name |> should.equal("local")
+  policy.profile |> sandbox_support.profile_name |> should.equal("local")
 }
 
 pub fn authenticated_remote_is_not_untrusted_sandbox_test() {
-  let policy = sandbox_policy.authenticated_remote(capability.allow([]))
+  let policy = sandbox_support.authenticated_remote(capability.allow([]))
   sandbox_policy.admit(policy) |> should.equal(Ok(policy))
   policy.profile
-  |> sandbox_policy.profile_name
+  |> sandbox_support.profile_name
   |> should.equal("authenticated-remote")
 }
 
@@ -72,7 +73,7 @@ pub fn valid_untrusted_profile_with_executor_is_admitted_test() {
     )
   let policy = sandbox_policy.untrusted(capability.allow([]), Some(executor))
   sandbox_policy.admit(policy) |> should.equal(Ok(policy))
-  sandbox_policy.profile_denies_host_authority(policy) |> should.be_true
+  sandbox_support.profile_denies_host_authority(policy) |> should.be_true
 }
 
 pub fn untrusted_execution_delegates_to_external_executor_test() {
@@ -98,9 +99,9 @@ pub fn untrusted_execute_without_executor_refuses_test() {
 }
 
 pub fn host_authority_capability_names_are_rejected_test() {
-  sandbox_policy.require_no_host_authority(["m_safe"])
+  sandbox_support.require_no_host_authority(["m_safe"])
   |> should.equal(Ok(Nil))
-  sandbox_policy.require_no_host_authority(["m_native_ffi"])
+  sandbox_support.require_no_host_authority(["m_native_ffi"])
   |> should.be_error
   Some("present") |> should.equal(Some("present"))
   None |> should.equal(None)

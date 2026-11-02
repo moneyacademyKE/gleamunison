@@ -1,3 +1,4 @@
+import capability_support
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/string
@@ -24,12 +25,13 @@ fn llm_frame(handler: OpHandler) {
 }
 
 fn llm_key() -> String {
-  capability.frame_key(llm_frame(ok_handler()))
+  capability_support.frame_key(llm_frame(ok_handler()))
 }
 
 pub fn allowed_ability_executes_under_policy_test() {
   let policy = capability.allow([llm_key()])
-  let frames = capability.guard_frames(policy, [llm_frame(ok_handler())])
+  let frames =
+    capability_support.guard_frames(policy, [llm_frame(ok_handler())])
   capability.check(policy, frames) |> should.be_ok
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)
@@ -39,7 +41,8 @@ pub fn allowed_ability_executes_under_policy_test() {
 
 pub fn denied_ability_raises_capability_denied_test() {
   let policy = capability.allow([])
-  let frames = capability.guard_frames(policy, [llm_frame(ok_handler())])
+  let frames =
+    capability_support.guard_frames(policy, [llm_frame(ok_handler())])
   capability.check(policy, frames) |> should.be_error
   let assert [frame] = frames
   let assert Ok(handler) = dict.get(frame.ops, 0)
@@ -56,7 +59,7 @@ pub fn preflight_lists_denied_abilities_test() {
 }
 
 pub fn catch_all_denies_uninstalled_ability_test() {
-  let handler = capability.catch_all()
+  let handler = capability_support.catch_all()
   let result = rescue(fn() { handler(0, [to_dynamic("x")], fn(d) { d }) })
   let assert Error(reason) = result
   string.contains(reason, "capability_denied") |> should.be_true

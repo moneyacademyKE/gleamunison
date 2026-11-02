@@ -1,3 +1,4 @@
+import capability_support
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
 import gleam/option.{Some}
@@ -8,6 +9,7 @@ import gleamunison/effects.{type HandlerFrame, type OpHandler, HandlerFrame}
 import gleamunison/llm
 import gleamunison/sandbox_policy
 import gleeunit/should
+import sandbox_support
 import test_ffi.{rescue}
 
 fn ok_handler() -> OpHandler {
@@ -28,11 +30,11 @@ fn llm_frame(handler: OpHandler) -> HandlerFrame {
 fn policy_for(
   profile: sandbox_policy.ExecutionProfile,
 ) -> sandbox_policy.SandboxPolicy {
-  let key = capability.frame_key(llm_frame(ok_handler()))
+  let key = capability_support.frame_key(llm_frame(ok_handler()))
   case profile {
     sandbox_policy.Local -> sandbox_policy.local(capability.allow([key]))
     sandbox_policy.AuthenticatedRemote ->
-      sandbox_policy.authenticated_remote(capability.allow([key]))
+      sandbox_support.authenticated_remote(capability.allow([key]))
     sandbox_policy.UntrustedExecution ->
       sandbox_policy.untrusted(
         capability.allow([]),
@@ -48,9 +50,9 @@ fn policy_for(
 
 pub fn scope_policy_preserves_deny_by_default_test() {
   let frame = llm_frame(ok_handler())
-  let key = capability.frame_key(frame)
+  let key = capability_support.frame_key(frame)
   let policy = policy_for(sandbox_policy.Local)
-  let frames = capability.guard_frames(policy.abilities, [frame])
+  let frames = capability_support.guard_frames(policy.abilities, [frame])
   capability.check(policy.abilities, frames) |> should.be_ok
   let assert [guarded] = frames
   let assert Ok(handler) = dict.get(guarded.ops, 0)
@@ -62,7 +64,7 @@ pub fn scope_policy_preserves_deny_by_default_test() {
 pub fn untrusted_policy_denies_llm_capability_test() {
   let frame = llm_frame(ok_handler())
   let policy = policy_for(sandbox_policy.UntrustedExecution)
-  let frames = capability.guard_frames(policy.abilities, [frame])
+  let frames = capability_support.guard_frames(policy.abilities, [frame])
   capability.check(policy.abilities, frames) |> should.be_error
   let assert [guarded] = frames
   let assert Ok(handler) = dict.get(guarded.ops, 0)
@@ -75,9 +77,10 @@ pub fn scoped_run_denies_ambient_authority_test() {
   let policy = policy_for(sandbox_policy.UntrustedExecution)
   let denied = capability.check(policy.abilities, [llm_frame(ok_handler())])
   let assert Error(keys) = denied
-  sandbox_policy.capability_refusals(policy, keys)
+  sandbox_support.capability_refusals(policy, keys)
   |> should.equal([
-    "capability_denied:" <> capability.frame_key(llm_frame(ok_handler())),
+    "capability_denied:"
+    <> capability_support.frame_key(llm_frame(ok_handler())),
   ])
 }
 

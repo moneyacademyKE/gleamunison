@@ -194,6 +194,10 @@ pub fn verified(
   verified_at(adapter, subject, kind, policy, datetime.now_unix())
 }
 
+/// Deterministic-time seam for `verified`: tests inject the clock through
+/// this entry because the rotation-overlap and staleness decisions depend
+/// on `now`. Production callers use `verified` (current time); nothing
+/// else in src calls this.
 pub fn verified_at(
   adapter: StorageAdapter,
   subject: String,

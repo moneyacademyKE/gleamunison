@@ -1,3 +1,4 @@
+import capability_support
 import gleam/dict
 import gleam/list
 import gleam/string
@@ -82,7 +83,8 @@ pub fn denied_db_frame_never_opens_the_application_store_test() {
         ability: repl_eval.ref_for_name("Db"),
         ops: dict.from_list([#(0, handler)]),
       )
-    let assert [denied] = capability.guard_frames(capability.allow([]), [frame])
+    let assert [denied] =
+      capability_support.guard_frames(capability.allow([]), [frame])
     let assert Ok(operation) = dict.get(denied.ops, 0)
     let assert Error(reason) =
       rescue(fn() { operation([], fn(value) { value }) })
