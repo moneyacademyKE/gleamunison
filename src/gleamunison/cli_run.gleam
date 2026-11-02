@@ -54,8 +54,15 @@ pub fn run(args: List(String)) -> Result(String, #(Int, String)) {
 
 fn execute(args: List(String)) -> Result(String, #(Int, String)) {
   use #(hash, call_args, store_override, branch_override, json, inspect) <- result.try(
-    parse_args(args, None, [], None, None, False, False)
-    |> result.map_error(fn(message) { #(cli_result.refused, message) }),
+    parse_args(
+      args,
+      None,
+      [],
+      cli_lifecycle.flag_tail(cli_lifecycle.default_branch),
+      False,
+      False,
+      False,
+    ),
   )
   use ref <- result.try(
     identity.parse_ref_hex(hash)
@@ -276,69 +283,108 @@ fn parse_args(
   args: List(String),
   hash: Option(String),
   call_args: List(String),
-  store_override: Option(String),
-  branch: Option(String),
+  tail: cli_lifecycle.FlagTail,
+  branch_explicit: Bool,
   json: Bool,
   inspect: Bool,
 ) -> Result(
   #(String, List(Dynamic), Option(String), Option(String), Bool, Bool),
-  String,
+  #(Int, String),
 ) {
-  case args {
-    [] ->
-      case hash {
-        Some(value) ->
-          Ok(#(
-            value,
-            to_call_args(list.reverse(call_args)),
-            store_override,
-            branch,
-            json,
-            inspect,
-          ))
-        None -> Error(usage())
-      }
-    ["--json", ..rest] ->
-      parse_args(rest, hash, call_args, store_override, branch, True, inspect)
-    ["--inspect", ..rest] ->
-      parse_args(rest, hash, call_args, store_override, branch, json, True)
-    ["--store", path, ..rest] ->
-      parse_args(rest, hash, call_args, Some(path), branch, json, inspect)
-    ["--store"] -> Error("run: --store needs a path\n" <> usage())
-    ["--branch", name, ..rest] ->
+  case cli_lifecycle.take_flag(args, tail) {
+    cli_lifecycle.Taken(next, rest) ->
       parse_args(
         rest,
         hash,
         call_args,
-        store_override,
-        Some(name),
+        next,
+        branch_explicit || named_a_branch(args),
         json,
         inspect,
       )
-    ["--branch"] -> Error("run: --branch needs a name\n" <> usage())
-    [value, ..rest] ->
-      case hash {
-        Some(_) ->
+    // The coded missing-value owner (cli_lifecycle.missing_store_value)
+    // spells these without the "run: " prefix this command's errors have
+    // always carried, so the bytes stay local while the tail spelling and
+    // the exit-code shape come from the shared owner.
+    cli_lifecycle.MissingValue("--store") ->
+      Error(#(cli_result.refused, "run: --store needs a path\n" <> usage()))
+    cli_lifecycle.MissingValue(_) ->
+      Error(#(cli_result.refused, "run: --branch needs a name\n" <> usage()))
+    cli_lifecycle.NotTailFlag ->
+      case args {
+        [] ->
+          case hash {
+            Some(value) ->
+              Ok(#(
+                value,
+                to_call_args(list.reverse(call_args)),
+                tail.store,
+                branch_override(tail, branch_explicit),
+                json,
+                inspect,
+              ))
+            None -> Error(#(cli_result.refused, usage()))
+          }
+        ["--json", ..rest] ->
           parse_args(
             rest,
             hash,
-            [value, ..call_args],
-            store_override,
-            branch,
-            json,
-            inspect,
-          )
-        None ->
-          parse_args(
-            rest,
-            Some(value),
             call_args,
-            store_override,
-            branch,
-            json,
+            tail,
+            branch_explicit,
+            True,
             inspect,
           )
+        ["--inspect", ..rest] ->
+          parse_args(rest, hash, call_args, tail, branch_explicit, json, True)
+        [value, ..rest] ->
+          case hash {
+            Some(_) ->
+              parse_args(
+                rest,
+                hash,
+                [value, ..call_args],
+                tail,
+                branch_explicit,
+                json,
+                inspect,
+              )
+            None ->
+              parse_args(
+                rest,
+                Some(value),
+                call_args,
+                tail,
+                branch_explicit,
+                json,
+                inspect,
+              )
+          }
       }
+  }
+}
+
+/// Whether the head of `args` names a branch. take_flag owns consuming the
+/// flag; this only records that the user asked for a branch at all, because
+/// preflight_branch refuses an explicitly named branch nobody committed
+/// while leaving the default optional.
+fn named_a_branch(args: List(String)) -> Bool {
+  case args {
+    ["--branch", _, ..] -> True
+    _ -> False
+  }
+}
+
+/// The branch the user explicitly named, if any. The tail carries the
+/// default from the start, so explicitness is what preflight needs, not
+/// the value alone.
+fn branch_override(
+  tail: cli_lifecycle.FlagTail,
+  branch_explicit: Bool,
+) -> Option(String) {
+  case branch_explicit {
+    True -> Some(tail.branch)
+    False -> None
   }
 }
 

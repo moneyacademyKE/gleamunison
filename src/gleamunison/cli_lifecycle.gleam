@@ -120,12 +120,13 @@ fn branch_from(cfg: Config) -> Result(String, String) {
 /// exactly these bytes and this exit code, so the wording lives here rather
 /// than in two files that could drift apart.
 ///
-/// The other store-scoped commands keep their own where the shape genuinely
-/// differs: run prefixes "run: " and reports a bare String, pkg's publish
-/// subcommand has its own --name/--version grammar, and sync's --branch is an
-/// Option (absent means "pull no branch") rather than a defaulted name.
-/// Folding those in would mean parameterising the message, the error type
-/// and the precedence: more machinery than the four lines it would save.
+/// cli_run delegates its tail spelling to take_flag below but keeps its own
+/// missing-value bytes, because its errors carry the "run: " prefix users
+/// have always seen. pkg's publish subcommand has its own --name/--version
+/// grammar, and sync's --branch is an Option (absent means "pull no branch")
+/// rather than a defaulted name. Folding those in would mean parameterising
+/// the message, the error type and the precedence: more machinery than the
+/// four lines it would save.
 pub fn missing_store_value(usage: String) -> #(Int, String) {
   #(cli_result.refused, "--store needs a path\n" <> usage)
 }
@@ -165,7 +166,7 @@ pub type FlagTake {
 /// Consume one `--store`/`--branch` flag (with its value) from the head of
 /// `args`. This owns the spelling of the shared tail; each command keeps its
 /// own positionals and extra flags, which is why grammars that genuinely
-/// differ (cli_find's multi-word query, cli_run) stay hand-rolled.
+/// differ (cli_find's multi-word query) stay hand-rolled.
 pub fn take_flag(args: List(String), tail: FlagTail) -> FlagTake {
   case args {
     ["--store", path, ..rest] ->
