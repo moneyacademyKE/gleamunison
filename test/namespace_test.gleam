@@ -51,7 +51,7 @@ pub fn commit_advances_head_and_history_test() {
   let assert Ok(head_ns) = namespace.load(store, head_ref)
   namespace.get(head_ns, "y") |> should.equal(Ok(ref_tag("ry")))
   // History walks newest-first: seq 2 then seq 1
-  let hist = namespace.history(store, "main")
+  let assert Ok(hist) = namespace.history(store, "main")
   list.length(hist) |> should.equal(2)
   let assert [#(2, _), #(1, _)] = hist
 }

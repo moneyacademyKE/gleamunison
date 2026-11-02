@@ -187,15 +187,20 @@ pub fn load_current(
 }
 
 /// Walk the head chain newest-first: #(seq, namespace ref) entries.
+/// Only a genuinely missing pointer is an empty history; a corrupt head or
+/// a store failure is an error, never a silent empty list.
 pub fn history(
   adapter: StorageAdapter,
   branch: String,
-) -> List(#(Int, DefinitionRef)) {
-  case branch_head(adapter, branch) {
-    Error(_) -> []
-    Ok(#(seq, ns_ref)) ->
-      walk(adapter, branch_pointer_ref(branch), [#(seq, ns_ref)])
-      |> list.reverse
+) -> Result(List(#(Int, DefinitionRef)), String) {
+  case read_head(adapter, branch) {
+    Error(e) -> Error(e)
+    Ok(None) -> Ok([])
+    Ok(Some(#(seq, ns_ref, _))) ->
+      Ok(
+        walk(adapter, branch_pointer_ref(branch), [#(seq, ns_ref)])
+        |> list.reverse,
+      )
   }
 }
 
