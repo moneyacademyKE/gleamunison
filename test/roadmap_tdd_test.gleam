@@ -80,7 +80,7 @@ fn corrupt_handler_stack(val: String) -> Nil
 @external(erlang, "gleamunison_ffi", "assert_throws_corrupted_stack")
 fn assert_throws_corrupted_stack(fun: fn() -> Nil) -> Nil
 
-@external(erlang, "gleamunison_effets", "do_op")
+@external(erlang, "gleamunison_effects", "do_op")
 fn ffi_do_op(
   ability: String,
   op: Int,

@@ -76,7 +76,7 @@ pub fn level23() -> Nil {
   io.println("Level 23: OK")
 }
 
-@external(erlang, "gleamunison_effets", "do_op")
+@external(erlang, "gleamunison_effects", "do_op")
 fn ffi_do_op(
   ab: BitArray,
   op: Int,

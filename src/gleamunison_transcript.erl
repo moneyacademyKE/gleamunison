@@ -92,7 +92,7 @@ run_replay(Token, Entries, Thunk) when is_list(Entries), is_function(Thunk, 0) -
     Keys = unique_keys(Entries, []),
     Stacked = lists:foldl(
         fun(Key, Fun) ->
-            fun() -> gleamunison_effets:handle_comp(playback_frame(Token, Key, Entries), Fun) end
+            fun() -> gleamunison_effects:handle_comp(playback_frame(Token, Key, Entries), Fun) end
         end,
         Thunk,
         Keys

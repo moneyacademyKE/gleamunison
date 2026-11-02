@@ -795,7 +795,7 @@ the Console.print signature `Text → Int` or if type mismatches pass through.
 ```
 
 **Goal:** Exercise the `Handle` Term variant through the `compile.gleam`
-pipeline and the `gleamunison_effets:handle_comp/2` runtime.
+pipeline and the `gleamunison_effects:handle_comp/2` runtime.
 
 **Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
 **Location:** `src/dogfood.gleam` → `level16()`
@@ -817,7 +817,7 @@ This tests whether `Handle` wraps a computation containing multiple effects.
 - The `handle` parser syntax may not be fully wired through `sexpr_to_term`.
   The code exists in the parser but the matches are in a specific order.
 - The compiled `Handle` Term generates:
-  `gleamunison_effets:handle_comp({<ability_module>, <handler>}, fun() -> <computation> end)`
+  `gleamunison_effects:handle_comp({<ability_module>, <handler>}, fun() -> <computation> end)`
   This requires the handler to be a compiled module that exports certain
   operations. The REPL's ability system constructs handlers dynamically.
 
@@ -1181,7 +1181,7 @@ Expected: The second insert should return `Error(DuplicateDef(...))`.
 
 ## Level 24: Effects runtime from Gleam code
 
-**Goal:** Test the algebraic effects system by calling `gleamunison_effets`
+**Goal:** Test the algebraic effects system by calling `gleamunison_effects`
 FFI functions directly from Gleam host code.
 
 **Results:** ✓ PASS. Verified by dogfood test suite (`gleam run -- all`).
@@ -1191,10 +1191,10 @@ FFI functions directly from Gleam host code.
 ### 24.1 Call do_op directly
 Create a Gleam FFI wrapper:
 ```gleam
-@external(erlang, "gleamunison_effets", "handle_comp")
+@external(erlang, "gleamunison_effects", "handle_comp")
 fn ffi_handle_comp(handler: Dynamic, thunk: fn() -> Dynamic) -> Dynamic
 
-@external(erlang, "gleamunison_effets", "do_op")
+@external(erlang, "gleamunison_effects", "do_op")
 fn ffi_do_op(ability: DefinitionRef, op_idx: Int, args: List(Dynamic), cont: fn(Dynamic) -> Dynamic) -> Dynamic
 ```
 
@@ -1218,7 +1218,7 @@ put_stack({gleamunison_handlers}, "corrupted")
 // Now try a handle_comp — should fail with corrupted stack error
 ```
 
-Expected: The validation in `gleamunison_effets:handle_comp` detects the
+Expected: The validation in `gleamunison_effects:handle_comp` detects the
 corrupted stack and throws a descriptive error.
 
 ---
@@ -3107,7 +3107,7 @@ pub fn level55() -> Nil {
 
 **Background:** The Handle syntax is parsed in `sexpr_to_term`, which calls `sexpr_to_handler`.
 The elaborate step builds `ast.Handle(computation, handler_expr, ability_ref)`.
-The compile step emits `gleamunison_effets:handle_comp(...)`.
+The compile step emits `gleamunison_effects:handle_comp(...)`.
 The runtime `handle_comp` expects a 2-argument handler: the value, then a continuation.
 
 But the surface language's `(lam val body)` produces a 1-argument lambda. When it needs to be a 2-arg handler `(lam val (lam k body))`, the compiler doesn't know this.

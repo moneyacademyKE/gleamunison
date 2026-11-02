@@ -15,7 +15,7 @@ pub type RuntimeConfig {
   RuntimeConfig(ambient_handlers: List(HandlerFrame))
 }
 
-@external(erlang, "gleamunison_effets", "handle_comp")
+@external(erlang, "gleamunison_effects", "handle_comp")
 fn ffi_handle_comp(handler: Dynamic, thunk: fn() -> Dynamic) -> Dynamic
 
 /// The handler-stack key for an ability: "m_" + last 8 of its hash.

@@ -74,7 +74,7 @@ append-only log.
 ## Effects and bounded evaluation
 
 The surface language supports abilities, handlers, `do`, `handle`, holes,
-guards, and `use`. `gleamunison_effets.erl` owns the process-local ability
+guards, and `use`. `gleamunison_effects.erl` owns the process-local ability
 handler stack. `Do` dispatches to the selected frame; this is not a general
 serializable-continuation or live-process-migration implementation.
 

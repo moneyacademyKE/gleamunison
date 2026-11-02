@@ -1,4 +1,4 @@
--module(gleamunison_effets).
+-module(gleamunison_effects).
 -export([handle_comp/2, do_op/4]).
 
 handle_comp(Handler, Thunk) ->

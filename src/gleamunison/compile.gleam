@@ -67,7 +67,7 @@ fn emit_term(t: ast.Term) -> String {
     }
     ast.List(ts) -> "[" <> string.join(list.map(ts, emit_term), ", ") <> "]"
     ast.Do(ability:, operation: Local(op_i), args:) ->
-      "gleamunison_effets:do_op('"
+      "gleamunison_effects:do_op('"
       <> module_name_for(ability)
       <> "', "
       <> int.to_string(op_i)
@@ -75,7 +75,7 @@ fn emit_term(t: ast.Term) -> String {
       <> string.join(list.map(args, emit_term), ", ")
       <> "], fun(R) -> R end)"
     ast.Handle(computation:, handler:, ability:) ->
-      "gleamunison_effets:handle_comp({'"
+      "gleamunison_effects:handle_comp({'"
       <> module_name_for(ability)
       <> "', "
       <> "fun(Val, Cont) -> erlang:apply(erlang:apply("

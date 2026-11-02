@@ -9,8 +9,8 @@ Level 35 tests the dynamic dispatch and composition of a `State` ability. The pa
 ## Decision
 We bootstrapped the `State` ability in the REPL's environment initialization using `SurfaceAbilityDef` with `get` and `set` operations. To handle State effects, we defined a `StateHandler` mapping to the State's hashed module key (`fe60582e`) and composed it with `ConsoleHandler` in the Erlang FFI:
 ```erlang
-gleamunison_effets:handle_comp(ConsoleHandler, fun() ->
-    gleamunison_effets:handle_comp(StateHandler, fun() ->
+gleamunison_effects:handle_comp(ConsoleHandler, fun() ->
+    gleamunison_effects:handle_comp(StateHandler, fun() ->
         ModuleAtom:'$eval'()
     end)
 end)

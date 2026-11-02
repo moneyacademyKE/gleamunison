@@ -105,7 +105,7 @@ with_baseline_handlers(Fun) ->
     Stacked =
         lists:foldr(
             fun({Key, _Name, Ops}, Inner) ->
-                fun() -> gleamunison_effets:handle_comp({Key, Ops}, Inner) end
+                fun() -> gleamunison_effects:handle_comp({Key, Ops}, Inner) end
             end,
             Fun,
             baseline_abilities()

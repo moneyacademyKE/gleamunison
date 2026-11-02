@@ -79,7 +79,7 @@ Push handler → Try computation → Catch → Pop handler → Re-raise
                                 → Success → Pop handler → Return
 ```
 
-**Applied in:** `gleamunison_effets.erl`
+**Applied in:** `gleamunison_effects.erl`
 
 ---
 

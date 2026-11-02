@@ -44,10 +44,10 @@ test_storage_owner_survives() ->
 
 test_effects_runtime() ->
     Handler = fun(Args, Cont) -> Cont([list_to_binary(lists:reverse(binary_to_list(hd(Args))))]) end,
-    Result = gleamunison_effets:handle_comp(
+    Result = gleamunison_effects:handle_comp(
         {<<"ability1">>, Handler},
         fun() ->
-            gleamunison_effets:do_op(<<"ability1">>, 0, [<<"hello">>], fun(R) -> R end)
+            gleamunison_effects:do_op(<<"ability1">>, 0, [<<"hello">>], fun(R) -> R end)
         end
     ),
     case Result of
