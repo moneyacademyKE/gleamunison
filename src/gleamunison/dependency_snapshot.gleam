@@ -94,8 +94,7 @@ pub fn dependents(
 }
 
 pub fn names(snapshot: Snapshot, ref: DefinitionRef) -> List(String) {
-  namespace.names(snapshot.ns)
-  |> list.filter(fn(name) { namespace.get(snapshot.ns, name) == Ok(ref) })
+  namespace.names_for_ref(snapshot.ns, ref)
 }
 
 pub fn dependencies(

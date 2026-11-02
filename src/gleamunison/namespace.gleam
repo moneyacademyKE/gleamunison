@@ -39,6 +39,12 @@ pub fn binds(ns: Namespace, ref: DefinitionRef) -> Bool {
   dict.values(ns.bindings) |> list.any(fn(bound) { bound == ref })
 }
 
+/// Every name bound to this content ref, in the sorted order `names/1` uses.
+pub fn names_for_ref(ns: Namespace, ref: DefinitionRef) -> List(String) {
+  names(ns)
+  |> list.filter(fn(name) { get(ns, name) == Ok(ref) })
+}
+
 pub fn remove(ns: Namespace, name: String) -> Namespace {
   Namespace(dict.delete(ns.bindings, name))
 }

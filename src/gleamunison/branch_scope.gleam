@@ -60,8 +60,7 @@ pub fn branches_binding(
       use ns <- result.try(namespace.load_current_or_empty(adapter, branch))
       let hits =
         ns
-        |> namespace.names
-        |> list.filter(fn(name) { namespace.get(ns, name) == Ok(ref) })
+        |> namespace.names_for_ref(ref)
         |> list.map(fn(name) { #(branch, name) })
       Ok(list.append(acc, hits))
     }),
