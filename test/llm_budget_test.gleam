@@ -113,7 +113,7 @@ pub fn circuit_opens_at_threshold_and_probe_failure_reopens_test() {
   llm_budget.after_failure(Closed, 2, 2, 100) |> should.equal(Open(100))
   llm_budget.after_failure(llm_budget.HalfOpen, 1, 2, 200)
   |> should.equal(Open(200))
-  llm_budget.record_success(Open(100)) |> should.equal(Closed)
+  llm_budget.success_state(Open(100)) |> should.equal(#(Closed, 0))
 }
 
 pub fn cost_arithmetic_is_micro_usd_per_million_tokens_test() {

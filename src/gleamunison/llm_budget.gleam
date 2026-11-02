@@ -115,22 +115,6 @@ pub fn admit(
 @external(erlang, "gleamunison_llm_budget", "admit")
 pub fn admit_call(provider: String, model: String) -> Result(Nil, String)
 
-pub fn begin(usage: Usage) -> Usage {
-  Usage(..usage, in_flight: usage.in_flight + 1)
-}
-
-pub fn end(usage: Usage) -> Usage {
-  Usage(..usage, in_flight: int.max(0, usage.in_flight - 1))
-}
-
-pub fn spend(usage: Usage, tokens: Int, cost_micro_usd: Int) -> Usage {
-  Usage(
-    ..usage,
-    tokens: usage.tokens + tokens,
-    cost_micro_usd: usage.cost_micro_usd + cost_micro_usd,
-  )
-}
-
 /// Cost arithmetic stays here and only here: rates are micro-USD per
 /// 1M tokens, supplied by the caller as data.
 pub fn cost_micro_usd(
@@ -143,14 +127,9 @@ pub fn cost_micro_usd(
   / 1_000_000
 }
 
-pub fn record_success(_circuit: Circuit) -> Circuit {
-  Closed
-}
-
 /// A successful call closes the circuit and resets consecutive failures.
-/// `record_success` remains public for existing callers.
-pub fn success_state(circuit: Circuit) -> #(Circuit, Int) {
-  #(record_success(circuit), 0)
+pub fn success_state(_circuit: Circuit) -> #(Circuit, Int) {
+  #(Closed, 0)
 }
 
 /// The holder owns the consecutive-failure counter; this decides what a
