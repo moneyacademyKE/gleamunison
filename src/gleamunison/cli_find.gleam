@@ -10,6 +10,7 @@ import gleam/list
 import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/cli_result
+import gleamunison/identity
 import gleamunison/mcp_session
 
 pub fn command(args: List(String)) -> Result(Nil, String) {
@@ -68,7 +69,7 @@ fn run(query: String, loads: List(String), limit: Int) -> Result(Nil, String) {
               |> list.take(limit)
               |> list.each(fn(hit) {
                 let ref = case hit.content_ref_hex {
-                  Some(content) -> string.slice(content, 0, 12)
+                  Some(content) -> identity.short_hash_hex(content)
                   None -> "-"
                 }
                 io.println(

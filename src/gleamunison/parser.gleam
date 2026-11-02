@@ -17,6 +17,20 @@ pub type SExpr {
   SListExpr(List(SExpr), line: Int, col: Int)
 }
 
+/// One owner for the quoted-string-literal strip both sexpr converters
+/// repeat: a symbol that begins and ends with `"` yields its inner bytes
+/// (SText/SPText); anything else is an Error carrying the original name
+/// back for the variable branches.
+fn quoted_literal_bytes(name: String) -> Result(BitArray, String) {
+  case string.starts_with(name, "\"") && string.ends_with(name, "\"") {
+    True -> {
+      let inner = string.slice(name, 1, string.length(name) - 2)
+      Ok(string_to_binary(inner))
+    }
+    False -> Error(name)
+  }
+}
+
 pub fn parse_sexpr(
   tokens: List(TokenInfo),
 ) -> Result(#(SExpr, List(TokenInfo)), ParseError) {
@@ -62,12 +76,9 @@ pub fn sexpr_to_term(sexpr: SExpr) -> Result(SurfaceTerm, ParseError) {
     SAtom(FloatVal(f), _, _) -> Ok(SFloat(f))
     SAtom(Symbol("?"), _, _) -> Ok(SHole)
     SAtom(Symbol(name), l, c) -> {
-      case string.starts_with(name, "\"") && string.ends_with(name, "\"") {
-        True -> {
-          let inner = string.slice(name, 1, string.length(name) - 2)
-          Ok(elab_types.SText(string_to_binary(inner)))
-        }
-        False -> Ok(elab_types.SLoc(SVar(name), elab_types.Span(l, c)))
+      case quoted_literal_bytes(name) {
+        Ok(bytes) -> Ok(elab_types.SText(bytes))
+        Error(name) -> Ok(elab_types.SLoc(SVar(name), elab_types.Span(l, c)))
       }
     }
     SAtom(lexer.UnterminatedString(_), l, c) ->
@@ -308,12 +319,9 @@ fn sexpr_to_pattern(sexpr: SExpr) -> Result(elab_types.SPattern, ParseError) {
   case sexpr {
     SAtom(IntVal(n), _, _) -> Ok(SPInt(n))
     SAtom(Symbol(name), _, _) -> {
-      case string.starts_with(name, "\"") && string.ends_with(name, "\"") {
-        True -> {
-          let inner = string.slice(name, 1, string.length(name) - 2)
-          Ok(SPText(string_to_binary(inner)))
-        }
-        False -> Ok(SPVar(name))
+      case quoted_literal_bytes(name) {
+        Ok(bytes) -> Ok(SPText(bytes))
+        Error(name) -> Ok(SPVar(name))
       }
     }
     SListExpr([SAtom(Symbol(ctor_name), _, _), ..args], _, _) -> {
