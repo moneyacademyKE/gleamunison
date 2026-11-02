@@ -146,32 +146,20 @@ fn compile_def_module(
 ) -> Result(#(String, ast.Type, TypeCache), String) {
   let expr_ref = ref_for_name(name)
   let defs = [#(name, SurfaceTermDef(term)), ..prev_defs]
-  case elab.elaborate_unit(SurfaceUnit(expr_ref, defs), cache) {
-    Error(err) ->
-      Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
-    Ok(#(unit, next_cache, _elab_ctx)) -> {
-      case list.key_find(unit.defs, expr_ref) {
-        Error(_) -> Error("No def found")
-        Ok(def) -> {
-          let mod_name = module_name_for(expr_ref)
-          let _ = unload_binary(mod_name)
-          case compile_definition(new_compiler(), def, expr_ref) {
-            Error(e) -> Error("Compile Error: " <> string.inspect(e))
-            Ok(beam) ->
-              case load_binary(mod_name, beam) {
-                Error(err) -> Error("Load Error: " <> err)
-                Ok(_) ->
-                  case def {
-                    ast.TermDef(term: _, typ:) ->
-                      Ok(#(mod_name, typ, next_cache))
-                    _ ->
-                      Error(
-                        "Expected term definition, but got type or ability declaration",
-                      )
-                  }
-              }
+  case elaborate_keyed_unit(expr_ref, expr_ref, defs, cache, prev_defs) {
+    Error(err) -> Error(err)
+    Ok(#(def, next_cache)) -> {
+      let mod_name = module_name_for(expr_ref)
+      case compile_and_load(mod_name, def, expr_ref) {
+        Error(err) -> Error(err)
+        Ok(_) ->
+          case def {
+            ast.TermDef(term: _, typ:) -> Ok(#(mod_name, typ, next_cache))
+            _ ->
+              Error(
+                "Expected term definition, but got type or ability declaration",
+              )
           }
-        }
       }
     }
   }
@@ -208,25 +196,20 @@ pub fn handle_define(
   let prev_defs = list.filter(prev_defs, fn(pair) { pair.0 != name })
   let defs = [#(name, SurfaceTermDef(val)), ..prev_defs]
   case
-    elab.elaborate_unit(SurfaceUnit(ref_for_name("repl_expr"), defs), cache)
+    elaborate_keyed_unit(
+      ref_for_name("repl_expr"),
+      name_ref,
+      defs,
+      cache,
+      prev_defs,
+    )
   {
-    Error(err) ->
-      Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
-    Ok(#(unit, next_cache, _elab_ctx)) -> {
-      case list.key_find(unit.defs, name_ref) {
-        Error(_) -> Error("No def found")
-        Ok(def) -> {
-          let mod_name = module_name_for(name_ref)
-          let _ = unload_binary(mod_name)
-          case compile_definition(new_compiler(), def, name_ref) {
-            Error(e) -> Error("Compile Error: " <> string.inspect(e))
-            Ok(beam) ->
-              case load_binary(mod_name, beam) {
-                Error(err) -> Error("Load Error: " <> err)
-                Ok(_) -> Ok(#(next_cache, defs))
-              }
-          }
-        }
+    Error(err) -> Error(err)
+    Ok(#(def, next_cache)) -> {
+      let mod_name = module_name_for(name_ref)
+      case compile_and_load(mod_name, def, name_ref) {
+        Error(err) -> Error(err)
+        Ok(_) -> Ok(#(next_cache, defs))
       }
     }
   }
@@ -252,27 +235,20 @@ pub fn bootstrap_defs(
       elab_types.SurfaceAbilityDef(_, _) -> {
         let name_ref = ref_for_name(name)
         case
-          elab.elaborate_unit(
-            SurfaceUnit(ref_for_name("repl_expr"), [#(name, val_def)]),
+          elaborate_keyed_unit(
+            ref_for_name("repl_expr"),
+            name_ref,
+            [#(name, val_def)],
             curr_cache,
+            curr_defs,
           )
         {
           Error(_) -> acc
-          Ok(#(unit, next_cache, _elab_ctx)) -> {
-            case list.key_find(unit.defs, name_ref) {
+          Ok(#(def, next_cache)) -> {
+            let mod_name = module_name_for(name_ref)
+            case compile_and_load(mod_name, def, name_ref) {
               Error(_) -> acc
-              Ok(def) -> {
-                let mod_name = module_name_for(name_ref)
-                let _ = unload_binary(mod_name)
-                case compile_definition(new_compiler(), def, name_ref) {
-                  Error(_) -> acc
-                  Ok(beam) ->
-                    case load_binary(mod_name, beam) {
-                      Error(_) -> acc
-                      Ok(_) -> #(next_cache, [pair, ..curr_defs])
-                    }
-                }
-              }
+              Ok(_) -> #(next_cache, [pair, ..curr_defs])
             }
           }
         }
@@ -280,6 +256,51 @@ pub fn bootstrap_defs(
       _ -> acc
     }
   })
+}
+
+/// Elaborate a unit and key-find one definition by ref. One owner for the
+/// prologue every define-path in this module repeats: elaborate under a
+/// `unit_ref` (a scratch name — historically "repl_expr" — that names the
+/// elaboration unit, never a def), then look up the def the caller
+/// actually wants by its own `lookup_ref`. The `prev_defs` passed here is
+/// used only for error *rendering* (suggestions), never for elaboration —
+/// the `defs` list is the truth.
+fn elaborate_keyed_unit(
+  unit_ref: DefinitionRef,
+  lookup_ref: DefinitionRef,
+  defs: List(#(String, SurfaceDef)),
+  cache: TypeCache,
+  prev_defs: List(#(String, SurfaceDef)),
+) -> Result(#(ast.Definition, TypeCache), String) {
+  case elab.elaborate_unit(SurfaceUnit(unit_ref, defs), cache) {
+    Error(err) ->
+      Error("Typecheck Error: " <> format_elab_error(err, prev_defs))
+    Ok(#(unit, next_cache, _elab_ctx)) ->
+      case list.key_find(unit.defs, lookup_ref) {
+        Error(_) -> Error("No def found")
+        Ok(def) -> Ok(#(def, next_cache))
+      }
+  }
+}
+
+/// Unload any stale beam, compile the def, load the result. One owner for
+/// the stateless reload chain. loader.gleam's compile_and_load is a
+/// different authority: it carries Loader LRU/purge state for the store
+/// domain. Error strings are the historical contract of every caller.
+fn compile_and_load(
+  mod_name: String,
+  def: ast.Definition,
+  ref: DefinitionRef,
+) -> Result(Nil, String) {
+  let _ = unload_binary(mod_name)
+  case compile_definition(new_compiler(), def, ref) {
+    Error(e) -> Error("Compile Error: " <> string.inspect(e))
+    Ok(beam) ->
+      case load_binary(mod_name, beam) {
+        Error(err) -> Error("Load Error: " <> err)
+        Ok(_) -> Ok(Nil)
+      }
+  }
 }
 
 /// Every builtin signature comes from the bootstrap table. A partial seed
