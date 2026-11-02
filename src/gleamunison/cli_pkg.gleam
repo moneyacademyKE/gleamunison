@@ -106,10 +106,12 @@ fn parse_publish_args(
 }
 
 fn install(args: List(String)) -> Result(Nil, #(Int, String)) {
-  use #(hash_hex, peer, branch, store_override) <- result.try(
-    parse_args(args, None, None, None)
-    |> result.map_error(fn(message) { #(cli_result.refused, message) }),
-  )
+  use #(hash_hex, peer, branch, store_override) <- result.try(parse_args(
+    args,
+    None,
+    None,
+    cli_lifecycle.flag_tail(cli_lifecycle.default_branch),
+  ))
   use context <- result.try(
     cli_lifecycle.resolve_context(store_override)
     |> result.map_error(fn(message) { #(cli_result.refused, message) }),
@@ -160,53 +162,34 @@ fn parse_args(
   args: List(String),
   hash: Option(String),
   peer: Option(String),
-  store: Option(String),
-) -> Result(#(String, Option(String), String, Option(String)), String) {
-  case args {
-    [] ->
-      case hash {
-        None ->
-          Error(
-            "usage: gleam run -- pkg install <manifest-hash> [--peer host:port] [--branch name]",
-          )
-        Some(h) -> Ok(#(h, peer, cli_lifecycle.default_branch, store))
-      }
-    ["--peer", p, ..rest] -> parse_args(rest, hash, Some(p), store)
-    ["--peer"] -> Error("--peer needs host:port")
-    ["--branch", b, ..rest] ->
-      case hash {
-        None -> Error("--branch needs the manifest hash first")
-        Some(_) -> parse_args_with_branch(rest, hash, peer, store, b)
-      }
-    ["--store", path, ..rest] -> parse_args(rest, hash, peer, Some(path))
-    [h, ..rest] ->
-      case hash {
-        None -> parse_args(rest, Some(h), peer, store)
-        Some(_) -> Error("unknown argument: " <> h)
+  tail: cli_lifecycle.FlagTail,
+) -> Result(#(String, Option(String), String, Option(String)), #(Int, String)) {
+  case cli_lifecycle.take_flag(args, tail) {
+    cli_lifecycle.Taken(next, rest) -> parse_args(rest, hash, peer, next)
+    cli_lifecycle.MissingValue("--store") ->
+      Error(cli_lifecycle.missing_store_value(usage()))
+    cli_lifecycle.MissingValue(_) ->
+      Error(cli_lifecycle.missing_branch_value(usage()))
+    cli_lifecycle.NotTailFlag ->
+      case args {
+        [] ->
+          case hash {
+            None -> Error(#(cli_result.refused, usage()))
+            Some(h) -> Ok(#(h, peer, tail.branch, tail.store))
+          }
+        ["--peer", p, ..rest] -> parse_args(rest, hash, Some(p), tail)
+        ["--peer"] -> Error(#(cli_result.refused, "--peer needs host:port"))
+        [h, ..rest] ->
+          case hash {
+            None -> parse_args(rest, Some(h), peer, tail)
+            Some(_) -> Error(#(cli_result.refused, "unknown argument: " <> h))
+          }
       }
   }
 }
 
-// Branch overrides "main"; kept out of parse_args' accumulator for clarity.
-fn parse_args_with_branch(
-  rest: List(String),
-  hash: Option(String),
-  peer: Option(String),
-  store: Option(String),
-  branch: String,
-) -> Result(#(String, Option(String), String, Option(String)), String) {
-  case rest {
-    [] ->
-      case hash {
-        Some(h) -> Ok(#(h, peer, branch, store))
-        None -> Error("missing manifest hash")
-      }
-    ["--store", path, ..more] ->
-      parse_args_with_branch(more, hash, peer, Some(path), branch)
-    ["--peer", p, ..more] ->
-      parse_args_with_branch(more, hash, Some(p), store, branch)
-    [other, ..] -> Error("unknown argument: " <> other)
-  }
+fn usage() -> String {
+  "usage: gleam run -- pkg install <manifest-hash> [--peer host:port] [--branch name]"
 }
 
 // Selective pull: transfer only the package's manifest closure from the

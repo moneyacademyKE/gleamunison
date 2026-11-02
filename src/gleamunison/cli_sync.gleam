@@ -78,6 +78,10 @@ fn parse_args(
   store: Option(String),
   branch: Option(String),
 ) -> Result(#(String, Option(String), Option(String)), #(Int, String)) {
+  // Hand-rolled rather than cli_lifecycle.take_flag: here --branch is an
+  // Option (absent means "do not pull a branch"), not a defaulted branch
+  // name, so the shared FlagTail shape does not fit without contortion.
+  // The missing-value wording and codes still come from cli_lifecycle.
   case args {
     [] ->
       case peer {

@@ -3,7 +3,7 @@
 //// rather than discovered at a call site.
 
 import envoy
-import gleam/option.{Some}
+import gleam/option.{None, Some}
 import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
@@ -229,4 +229,42 @@ pub fn a_valueless_store_flag_refuses_with_the_usage_test() {
 pub fn a_valueless_branch_flag_refuses_with_the_usage_test() {
   cli_lifecycle.missing_branch_value("USAGE")
   |> should.equal(#(cli_result.refused, "--branch needs a name\nUSAGE"))
+}
+
+/// The shared flag tail: branch is an accumulator carrying the default, so a
+/// command needs one parser no matter where --branch appears. cli_pkg grew a
+/// second parser for exactly this and the second one forgot flags.
+pub fn the_flag_tail_starts_on_the_default_branch_test() {
+  let tail = cli_lifecycle.flag_tail(cli_lifecycle.default_branch)
+  tail.branch |> should.equal("main")
+  tail.store |> should.equal(None)
+}
+
+pub fn the_flag_tail_takes_store_and_branch_in_any_order_test() {
+  let tail = cli_lifecycle.flag_tail("main")
+  let assert cli_lifecycle.Taken(after_branch, rest) =
+    cli_lifecycle.take_flag(["--branch", "dev", "--store", "/tmp/s"], tail)
+  rest |> should.equal(["--store", "/tmp/s"])
+  let assert cli_lifecycle.Taken(after_store, rest2) =
+    cli_lifecycle.take_flag(rest, after_branch)
+  rest2 |> should.equal([])
+  after_store.branch |> should.equal("dev")
+  after_store.store |> should.equal(Some("/tmp/s"))
+}
+
+pub fn the_flag_tail_reports_a_valueless_flag_test() {
+  let tail = cli_lifecycle.flag_tail("main")
+  cli_lifecycle.take_flag(["--store"], tail)
+  |> should.equal(cli_lifecycle.MissingValue("--store"))
+  cli_lifecycle.take_flag(["--branch"], tail)
+  |> should.equal(cli_lifecycle.MissingValue("--branch"))
+}
+
+pub fn the_flag_tail_leaves_other_arguments_to_the_caller_test() {
+  let tail = cli_lifecycle.flag_tail("main")
+  cli_lifecycle.take_flag([], tail) |> should.equal(cli_lifecycle.NotTailFlag)
+  cli_lifecycle.take_flag(["abc123"], tail)
+  |> should.equal(cli_lifecycle.NotTailFlag)
+  cli_lifecycle.take_flag(["--peer", "host:9"], tail)
+  |> should.equal(cli_lifecycle.NotTailFlag)
 }

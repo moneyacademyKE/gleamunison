@@ -121,11 +121,11 @@ fn branch_from(cfg: Config) -> Result(String, String) {
 /// than in two files that could drift apart.
 ///
 /// The other store-scoped commands keep their own where the shape genuinely
-/// differs: run prefixes "run: " and reports a bare String, and pkg has no
-/// missing-value arm at all — its `--branch` must follow the manifest hash, so
-/// it refuses with "--branch needs the manifest hash first". Folding those in
-/// would mean parameterising the message, the error type and the precedence:
-/// more machinery than the four lines it would save.
+/// differs: run prefixes "run: " and reports a bare String, pkg's publish
+/// subcommand has its own --name/--version grammar, and sync's --branch is an
+/// Option (absent means "pull no branch") rather than a defaulted name.
+/// Folding those in would mean parameterising the message, the error type
+/// and the precedence: more machinery than the four lines it would save.
 pub fn missing_store_value(usage: String) -> #(Int, String) {
   #(cli_result.refused, "--store needs a path\n" <> usage)
 }
@@ -133,6 +133,48 @@ pub fn missing_store_value(usage: String) -> #(Int, String) {
 /// `--branch` given with no name after it. Same two commands, same exceptions.
 pub fn missing_branch_value(usage: String) -> #(Int, String) {
   #(cli_result.refused, "--branch needs a name\n" <> usage)
+}
+
+/// The `--store`/`--branch` tail every store-scoped command shares, as data.
+/// `branch` is a plain accumulator with the caller's default already in it,
+/// so a command needs exactly one parser no matter where `--branch` appears
+/// — cli_pkg used to grow a second parser (`parse_args_with_branch`) solely
+/// because branch was kept out of the accumulator, and that second parser
+/// then forgot flags the first one knew.
+pub type FlagTail {
+  FlagTail(store: Option(String), branch: String)
+}
+
+pub fn flag_tail(default_branch: String) -> FlagTail {
+  FlagTail(store: None, branch: default_branch)
+}
+
+/// What the head of an argument list is, to the shared tail.
+pub type FlagTake {
+  /// A `--store`/`--branch` flag and its value were consumed.
+  Taken(tail: FlagTail, rest: List(String))
+  /// One of those flags is present but its value is missing. The caller
+  /// builds the error from its own usage() via missing_store_value /
+  /// missing_branch_value above, so wording and exit code stay owned here.
+  MissingValue(flag: String)
+  /// The head is something else: a positional, a command's own flag, or an
+  /// unknown argument. The caller decides which.
+  NotTailFlag
+}
+
+/// Consume one `--store`/`--branch` flag (with its value) from the head of
+/// `args`. This owns the spelling of the shared tail; each command keeps its
+/// own positionals and extra flags, which is why grammars that genuinely
+/// differ (cli_find's multi-word query, cli_run) stay hand-rolled.
+pub fn take_flag(args: List(String), tail: FlagTail) -> FlagTake {
+  case args {
+    ["--store", path, ..rest] ->
+      Taken(FlagTail(..tail, store: Some(path)), rest)
+    ["--store"] -> MissingValue("--store")
+    ["--branch", name, ..rest] -> Taken(FlagTail(..tail, branch: name), rest)
+    ["--branch"] -> MissingValue("--branch")
+    _ -> NotTailFlag
+  }
 }
 
 fn validate_store_dir(path: String) -> Result(String, String) {
