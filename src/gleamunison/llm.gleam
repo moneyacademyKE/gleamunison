@@ -40,7 +40,7 @@ pub fn ability_ref() -> DefinitionRef {
   Ref(identity.hash_bytes(<<"LLM">>))
 }
 
-pub fn provider_name(provider: Provider) -> String {
+fn provider_name(provider: Provider) -> String {
   case provider {
     Anthropic -> "anthropic"
     OpenAI -> "openai"
@@ -52,6 +52,13 @@ pub fn provider_name(provider: Provider) -> String {
 /// when its key is set). Kept dependency-free so the Erlang runtime can
 /// call it directly as the ambient handler.
 pub fn complete_env(prompt: String) -> Result(String, String) {
+  complete_env_with(provider_name, prompt)
+}
+
+fn complete_env_with(
+  provider_name: fn(Provider) -> String,
+  prompt: String,
+) -> Result(String, String) {
   let provider = case env.get("ANTHROPIC_API_KEY") {
     Ok(_) -> Anthropic
     Error(_) -> OpenAI
@@ -59,10 +66,10 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
   case resolve_config(provider, env.get) {
     Error(error) -> Error(error)
     Ok(cfg) -> {
-      let provider_name = provider_name(provider)
+      let name = provider_name(provider)
       // Budget/circuit gate: admission, concurrency slot, and metering are
       // owned by gleamunison_llm_budget; refusal names are typed policy.
-      use Nil <- result.try(llm_budget.admit_call(provider_name, cfg.model))
+      use Nil <- result.try(llm_budget.admit_call(name, cfg.model))
       let body = llm_wire.messages_json([Message(User, prompt)])
       let result: Result(BitArray, BitArray) =
         from_dynamic(
@@ -91,7 +98,7 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
           }
       }
       // Release the concurrency slot exactly once, then meter and report.
-      use Nil <- result.try(llm_settlement.release(provider_name))
+      use Nil <- result.try(llm_settlement.release(name))
       case completion {
         Ok(c) -> {
           let rates = rate_config(env.get)
@@ -103,14 +110,14 @@ pub fn complete_env(prompt: String) -> Result(String, String) {
               rates.1,
             )
           use Nil <- result.try(llm_settlement.success(
-            provider_name,
+            name,
             c.input_tokens + c.output_tokens,
             cost,
           ))
           Ok(c.content)
         }
         Error(msg) -> {
-          use Nil <- result.try(llm_settlement.failure(provider_name))
+          use Nil <- result.try(llm_settlement.failure(name))
           Error(msg)
         }
       }
@@ -172,6 +179,9 @@ pub fn provider_handler(cfg: ProviderConfig) -> OpHandler {
 }
 
 /// Build a live handler with an optional caller-owned cancellation token.
+/// Kept public as the cancellation seam: the transport test drives a
+/// pre-cancelled token through it to prove refusal happens before any
+/// network byte (docs/operations/llm-policy.md → Cancellation).
 pub fn provider_handler_with_cancellation(
   cfg: ProviderConfig,
   cancellation: Option(cancellation.Token),
@@ -243,6 +253,10 @@ fn perform(
   }
 }
 
+/// The one renderer for provider errors. Kept public because it is the
+/// redaction boundary: callers render `LlmError` values as-is and must
+/// never see a provider body echoed back. Tests pin that guarantee here
+/// rather than through a private twin.
 pub fn error_string(e: LlmError) -> String {
   case e {
     TransportError(r) -> "transport: " <> r

@@ -1,3 +1,4 @@
+import cli_llm_support
 import gleam/bit_array
 import gleam/dynamic.{type Dynamic}
 import gleam/string
@@ -61,15 +62,15 @@ pub fn resolve_config_missing_key_is_clear_error_test() {
 pub fn default_provider_prefers_anthropic_when_key_present_test() {
   let env =
     fake_env([#("OPENAI_API_KEY", "sk"), #("ANTHROPIC_API_KEY", "sk-ant")])
-  let assert True = cli_llm.default_provider(env) == Anthropic
+  let assert True = cli_llm_support.default_provider(env) == Anthropic
   let env2 = fake_env([#("OPENAI_API_KEY", "sk")])
-  let assert True = cli_llm.default_provider(env2) == OpenAI
+  let assert True = cli_llm_support.default_provider(env2) == OpenAI
 }
 
 pub fn complete_with_mock_returns_completion_test() {
   let handler =
     llm_mock.mock_handler(Completion("hello back", "mock-model", 3, 7))
-  let assert Ok(c) = cli_llm.complete_with(handler, "hi")
+  let assert Ok(c) = cli_llm_support.complete_with(handler, "hi")
   let assert True = c.content == "hello back"
   let assert True = c.model == "mock-model"
   let assert True = c.output_tokens == 7
@@ -77,21 +78,22 @@ pub fn complete_with_mock_returns_completion_test() {
 
 pub fn complete_with_surfaces_handler_error_test() {
   let handler = fn(_args, cont) { cont(cast_error("quota exhausted")) }
-  let assert Error(msg) = cli_llm.complete_with(handler, "hi")
+  let assert Error(msg) = cli_llm_support.complete_with(handler, "hi")
   let assert True = string.contains(msg, "quota exhausted")
 }
 
 pub fn command_with_handler_end_to_end_test() {
   let handler = llm_mock.mock_handler(Completion("it works", "mock-1", 1, 2))
   let env = fake_env([#("ANTHROPIC_API_KEY", "sk-ant")])
-  let out = cli_llm.command_with_handler(["anthropic", "say hi"], env, handler)
+  let out =
+    cli_llm_support.command_with_handler(["anthropic", "say hi"], env, handler)
   let assert True = string.contains(out, "it works")
 }
 
 pub fn command_usage_on_empty_args_test() {
   let env = fake_env([])
   let out =
-    cli_llm.command_with_handler(
+    cli_llm_support.command_with_handler(
       [],
       env,
       llm_mock.mock_handler(Completion("x", "m", 0, 0)),

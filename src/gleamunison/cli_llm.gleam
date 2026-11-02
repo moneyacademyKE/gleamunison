@@ -5,12 +5,10 @@
 //// That swap is the entire point of the ability design.
 
 import gleam/bit_array
-import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
 import gleam/int
 import gleam/result
 import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
-import gleamunison/effects.{type OpHandler}
 import gleamunison/env
 import gleamunison/json
 import gleamunison/llm
@@ -49,18 +47,6 @@ fn command_result_with_env(
   command_with_handler_cfg(cfg, prompt)
 }
 
-/// Test seam: same pipeline with the handler swapped in.
-pub fn command_with_handler(
-  args: List(String),
-  env: EnvLookup,
-  handler: OpHandler,
-) -> String {
-  case parse_args(args, env) {
-    Error(msg) -> msg
-    Ok(#(_provider, prompt)) -> format_result(complete_with(handler, prompt))
-  }
-}
-
 fn command_with_handler_cfg(
   cfg: ProviderConfig,
   prompt: String,
@@ -70,7 +56,23 @@ fn command_with_handler_cfg(
       llm.provider_handler(cfg),
       RetryPolicy(max_attempts: 3, base_delay_ms: 500),
     )
-  complete_with(handler, prompt) |> result.map(fn(c) { format_result(Ok(c)) })
+  let body = llm_wire.messages_json([Message(User, prompt)])
+  let arg = to_dynamic(bit_array.from_string(body))
+  let result: Result(BitArray, BitArray) =
+    from_dynamic(handler([arg], fn(d) { d }))
+  let completion = case result {
+    Error(e) -> Error("llm: " <> unwrap_bit(e))
+    Ok(bin) ->
+      case json.decode(bin) {
+        Error(_) -> Error("llm: undecodable completion payload")
+        Ok(dyn) ->
+          case decode.run(dyn, completion_decoder()) {
+            Ok(c) -> Ok(c)
+            Error(_) -> Error("llm: completion shape mismatch")
+          }
+      }
+  }
+  completion |> result.map(fn(c) { format_result(Ok(c)) })
 }
 
 fn parse_args(
@@ -103,7 +105,7 @@ fn provider_flag(flag: String) -> Result(Provider, Nil) {
 
 /// Which provider to call when the user did not say: Anthropic if its key
 /// exists, else OpenAI.
-pub fn default_provider(env: EnvLookup) -> Provider {
+fn default_provider(env: EnvLookup) -> Provider {
   case env("ANTHROPIC_API_KEY") {
     Ok(_) -> Anthropic
     Error(_) -> OpenAI
@@ -116,34 +118,6 @@ pub fn resolve_config(
   env: EnvLookup,
 ) -> Result(ProviderConfig, String) {
   llm.resolve_config(provider, env)
-}
-
-/// Drive any LLM op handler with a single user prompt. The handler decides
-/// what that means — live HTTP, retry, mock; this function only moves data.
-pub fn complete_with(
-  handler: OpHandler,
-  prompt: String,
-) -> Result(Completion, String) {
-  let body = llm_wire.messages_json([Message(User, prompt)])
-  let arg = to_dynamic(bit_array.from_string(body))
-  let result: Result(BitArray, BitArray) =
-    from_dynamic(handler([arg], identity))
-  case result {
-    Error(e) -> Error("llm: " <> unwrap_bit(e))
-    Ok(bin) ->
-      case json.decode(bin) {
-        Error(_) -> Error("llm: undecodable completion payload")
-        Ok(dyn) ->
-          case decode.run(dyn, completion_decoder()) {
-            Ok(c) -> Ok(c)
-            Error(_) -> Error("llm: completion shape mismatch")
-          }
-      }
-  }
-}
-
-fn identity(d: Dynamic) -> Dynamic {
-  d
 }
 
 fn completion_decoder() -> decode.Decoder(Completion) {
