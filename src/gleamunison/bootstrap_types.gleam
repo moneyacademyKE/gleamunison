@@ -3,6 +3,7 @@
 
 import gleam/bit_array
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleamunison/ast
 import gleamunison/identity.{type DefinitionRef, Ref, hash_bytes}
 
@@ -45,9 +46,23 @@ pub fn host_value() -> ast.Type {
   apply("HostValue", [])
 }
 
+/// The single owner of the builtin type-name list: resolves a runtime
+/// type-constructor ref to its printed name, or None for user types.
+pub fn type_name(ref: DefinitionRef) -> Option(String) {
+  case
+    list.find(
+      ["List", "Dict", "Set", "Pair", "Either", "Process", "HostValue"],
+      fn(name) { named(name) == ref },
+    )
+  {
+    Ok(name) -> Some(name)
+    Error(_) -> None
+  }
+}
+
 pub fn is_type_ref(ref: DefinitionRef) -> Bool {
-  list.any(
-    ["List", "Dict", "Set", "Pair", "Either", "Process", "HostValue"],
-    fn(name) { named(name) == ref },
-  )
+  case type_name(ref) {
+    Some(_) -> True
+    _ -> False
+  }
 }

@@ -54,10 +54,9 @@ fn join_types(types: List(ast.Type), resolver: NameResolver) -> String {
 }
 
 fn builtin_type_name(ref: DefinitionRef) -> String {
-  let names = ["List", "Dict", "Set", "Pair", "Either", "Process", "HostValue"]
-  case list.find(names, fn(name) { bootstrap_types.named(name) == ref }) {
-    Ok(name) -> name
-    Error(_) -> {
+  case bootstrap_types.type_name(ref) {
+    Some(name) -> name
+    None -> {
       let Ref(h) = ref
       let hex = hash_to_debug_string(h)
       "type@" <> string.slice(hex, 0, 8)
