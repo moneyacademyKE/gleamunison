@@ -83,7 +83,11 @@ pub fn refusal_name(refusal: TrustRefusal) -> String {
   }
 }
 
-fn keys_admit(
+/// The pure key-state decision: does a signer's key, in its current state,
+/// admit a timestamp? No signature, no freshness — just the window. Public
+/// for downstream consumers deciding on bare key state (replica-author
+/// admission); the production path composes this inside `admit` on Evidence.
+pub fn keys_admit(
   keys: List(TrustedKey),
   signer_id: String,
   ts: Int,
