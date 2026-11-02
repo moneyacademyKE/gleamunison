@@ -67,7 +67,7 @@ pub fn effective_usage(usage: Usage, window_ms: Int, now: Int) -> Usage {
 fn model_allowed(budget: Budget, model: String) -> Bool {
   case budget.allowed_models {
     [] -> True
-    allowed -> list.contains(allowed, model)
+    allowed -> model != "" && list.contains(allowed, model)
   }
 }
 
@@ -147,6 +147,12 @@ pub fn record_success(_circuit: Circuit) -> Circuit {
   Closed
 }
 
+/// A successful call closes the circuit and resets consecutive failures.
+/// `record_success` remains public for existing callers.
+pub fn success_state(circuit: Circuit) -> #(Circuit, Int) {
+  #(record_success(circuit), 0)
+}
+
 /// The holder owns the consecutive-failure counter; this decides what a
 /// failure means given the circuit we were in. A failed half-open probe
 /// re-opens immediately.
@@ -180,13 +186,21 @@ pub fn refusal_name(refusal: Refusal) -> String {
 }
 
 /// Parse the operator-facing allowlist: comma-separated, trimmed.
+/// A non-empty, delimiter-only setting admits no models rather than silently
+/// disabling the allowlist; the empty sentinel cannot match a model.
 pub fn parse_allowed_models(text: String) -> List(String) {
   case string.trim(text) {
     "" -> []
-    _ ->
-      text
-      |> string.split(",")
-      |> list.map(string.trim)
-      |> list.filter(fn(m) { m != "" })
+    _ -> {
+      let models =
+        text
+        |> string.split(",")
+        |> list.map(string.trim)
+        |> list.filter(fn(m) { m != "" })
+      case models {
+        [] -> [""]
+        _ -> models
+      }
+    }
   }
 }

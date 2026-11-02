@@ -62,14 +62,13 @@ handle_call({admit, Provider, Model, Caller}, _From, State) ->
             Row0 = maps:get(Provider, Rows, #row{}),
             Now = erlang:system_time(millisecond),
             Budget = budget_from_env(),
-            Row1 = roll_window(Row0, Budget, Now),
-            Usage = usage_tuple(Row1),
+            Row1 = roll_window(Row0, Budget),
+            Usage = usage_tuple(Row1, Budget),
             Circuit = circuit_tuple(Row1),
             case gleamunison@llm_budget:admit(Budget, Usage, Circuit, Model, Now) of
                 {ok, nil} ->
                     Mon = erlang:monitor(process, Caller),
-                    Row2 = Row1#row{in_flight = Row1#row.in_flight + 1,
-                                    window_start = actual_window_start(Row1, Budget, Now)},
+                    Row2 = Row1#row{in_flight = Row1#row.in_flight + 1},
                     Row3 = case Row1#row.circuit of
                         open -> Row2#row{circuit = half_open};
                         _ -> Row2
@@ -96,17 +95,17 @@ handle_call({spend, Provider, Tokens, Cost}, _From, State) ->
     case maps:find(Provider, Rows) of
         error -> {reply, {ok, nil}, State};
         {ok, Row} ->
-            Now = erlang:system_time(millisecond),
             Budget = budget_from_env(),
-            Rolled = roll_window(Row, Budget, Now),
+            Rolled = roll_window(Row, Budget),
             New = Rolled#row{tokens = Rolled#row.tokens + Tokens,
-                             cost = Rolled#row.cost + Cost,
-                             window_start = actual_window_start(Rolled, Budget, Now)},
+                             cost = Rolled#row.cost + Cost},
             {reply, {ok, nil}, State#{rows := Rows#{Provider => New}}}
     end;
 handle_call({report_success, Provider}, _From, State) ->
-    {reply, {ok, nil}, update_row(State, Provider,
-        fun(R) -> R#row{circuit = closed, failures = 0} end)};
+    {reply, {ok, nil}, update_row(State, Provider, fun(R) ->
+        {Circuit, Failures} = gleamunison@llm_budget:success_state(circuit_tuple(R)),
+        R#row{circuit = circuit_atom(Circuit), failures = Failures}
+    end)};
 handle_call({report_failure, Provider}, _From, State) ->
     Threshold = env_int("GLEAMUNISON_LLM_CIRCUIT_FAILURE_THRESHOLD", 3),
     Now = erlang:system_time(millisecond),
@@ -156,32 +155,31 @@ update_row(State, Provider, Fun) ->
         {ok, Row} -> State#{rows := Rows#{Provider => Fun(Row)}}
     end.
 
-roll_window(Row, Budget, Now) ->
-    case effective(Row, Budget, Now) of
-        rolled -> Row#row{tokens = 0, cost = 0, window_start = Now};
-        current -> Row
+roll_window(Row, Budget) ->
+    {usage, Tokens, Cost, _InFlight, Start} = usage_tuple(Row, Budget),
+    case {Tokens, Cost, Start} =:= {Row#row.tokens, Row#row.cost, Row#row.window_start} of
+        true -> Row;
+        false -> Row#row{tokens = Tokens, cost = Cost, window_start = Start}
     end.
 
-effective(Row, Budget, Now) ->
-    WindowMs = element(5, Budget),
-    case Row#row.window_start of
-        0 -> current;
-        Start when Now - Start >= WindowMs -> rolled;
-        _ -> current
-    end.
+usage_tuple(Row, Budget) ->
+    Now = erlang:system_time(millisecond),
+    Start = case Row#row.window_start of
+        0 -> Now;
+        S -> S
+    end,
+    {usage, Tokens0, Cost0, InFlight, _StartedAt} =
+        gleamunison@llm_budget:effective_usage(
+                 {usage, Row#row.tokens, Row#row.cost, Row#row.in_flight, Start},
+                 window_ms(Budget),
+                 Now),
+    {usage, Tokens0, Cost0, InFlight, Start}.
 
-actual_window_start(Row, Budget, Now) ->
-    case effective(Row, Budget, Now) of
-        rolled -> Now;
-        current -> Row#row.window_start
-    end.
+window_ms({budget, _Tokens, _Cost, _Conc, WindowMs, _Models, _Thresh, _Reset}) -> WindowMs.
 
-usage_tuple(Row) ->
-    {usage, Row#row.tokens, Row#row.cost, Row#row.in_flight,
-     case Row#row.window_start of
-         0 -> erlang:system_time(millisecond);
-         S -> S
-     end}.
+circuit_atom(closed) -> closed;
+circuit_atom(half_open) -> half_open;
+circuit_atom({open, _T}) -> open.
 
 circuit_tuple(#row{circuit = open, opened_at = T}) -> {open, T};
 circuit_tuple(#row{circuit = half_open}) -> half_open;
@@ -190,8 +188,7 @@ circuit_tuple(_) -> closed.
 budget_from_env() ->
     Models = case os:getenv("GLEAMUNISON_LLM_ALLOWED_MODELS") of
         false -> [];
-        "" -> [];
-        Csv -> [list_to_binary(string:trim(M)) || M <- string:split(Csv, ",", all)]
+        Csv -> gleamunison@llm_budget:parse_allowed_models(list_to_binary(Csv))
     end,
     {budget,
      env_int("GLEAMUNISON_LLM_MAX_TOKENS", 1000000),

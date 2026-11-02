@@ -12,6 +12,7 @@ import gleamunison/llm_budget.{
   type Budget, Budget, CircuitOpen, Closed, ConcurrencyExceeded,
   CostBudgetExceeded, ModelNotPinned, Open, TokenBudgetExceeded,
 }
+import gleamunison/llm_settlement
 import gleamunison/llm_types.{type Completion, Completion, OpenAI}
 import gleamunison/llm_wire
 import gleamunison/transcript
@@ -132,6 +133,64 @@ pub fn refusal_names_are_stable_machine_readable_vocabulary_test() {
 pub fn allowed_models_parses_comma_list_test() {
   llm_budget.parse_allowed_models(" a, b ,,c ") |> should.equal(["a", "b", "c"])
   llm_budget.parse_allowed_models("") |> should.equal([])
+}
+
+// ---- holder boundary ---------------------------------------------------------
+
+pub fn allowed_models_empty_entries_match_the_pure_parser_test() {
+  let key = "GLEAMUNISON_LLM_ALLOWED_MODELS"
+  let previous = envoy.get(key)
+  let assert Ok(Nil) = budget_reset()
+  envoy.set(key, " a,,b ")
+  let allowed = llm_budget.admit_call("allowlist-valid-test", "a")
+  let _ = llm_settlement.release("allowlist-valid-test")
+  let empty_model = llm_budget.admit_call("allowlist-empty-test", "")
+  envoy.set(key, " , , ")
+  let invalid_list =
+    llm_budget.admit_call("allowlist-invalid-test", "any-model")
+  let _ = budget_reset()
+  restore_env(key, previous)
+  llm_budget.parse_allowed_models(" a,,b ") |> should.equal(["a", "b"])
+  llm_budget.parse_allowed_models(" , , ") |> should.equal([""])
+  allowed |> should.equal(Ok(Nil))
+  empty_model |> should.equal(Error("model_not_pinned:"))
+  invalid_list |> should.equal(Error("model_not_pinned:any-model"))
+}
+
+pub fn spent_tokens_roll_over_after_the_first_window_test() {
+  let window_key = "GLEAMUNISON_LLM_WINDOW_MS"
+  let limit_key = "GLEAMUNISON_LLM_MAX_TOKENS"
+  let models_key = "GLEAMUNISON_LLM_ALLOWED_MODELS"
+  let old_window = envoy.get(window_key)
+  let old_limit = envoy.get(limit_key)
+  let old_models = envoy.get(models_key)
+  let assert Ok(Nil) = budget_reset()
+  envoy.set(window_key, "300")
+  envoy.set(limit_key, "10")
+  envoy.unset(models_key)
+  let assert Ok(Nil) = llm_budget.admit_call("window-roll-test", "model")
+  let assert Ok(Nil) = llm_settlement.release("window-roll-test")
+  let assert Ok(Nil) = llm_settlement.success("window-roll-test", 10, 0)
+  let before = llm_budget.admit_call("window-roll-test", "model")
+  sleep(400)
+  let after = llm_budget.admit_call("window-roll-test", "model")
+  let _ = llm_settlement.release("window-roll-test")
+  let _ = budget_reset()
+  restore_env(window_key, old_window)
+  restore_env(limit_key, old_limit)
+  restore_env(models_key, old_models)
+  before |> should.equal(Error("token_budget_exceeded:10"))
+  after |> should.equal(Ok(Nil))
+}
+
+@external(erlang, "timer", "sleep")
+fn sleep(milliseconds: Int) -> Nil
+
+fn restore_env(key: String, previous: Result(String, Nil)) -> Nil {
+  case previous {
+    Ok(value) -> envoy.set(key, value)
+    Error(Nil) -> envoy.unset(key)
+  }
 }
 
 // ---- live settlement composition (complete_env) -----------------------------
