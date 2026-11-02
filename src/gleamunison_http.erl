@@ -173,12 +173,12 @@ listen(Port, BindIp) ->
     end.
 
 ensure_counter() ->
-    case ets:whereis(gleamunison_http_counter) of
-        undefined ->
-            ets:new(gleamunison_http_counter, [set, public, named_table]),
-            ets:insert(gleamunison_http_counter, {count, 0});
-        _ -> ok
-    end.
+    gleamunison_tables:ensure(gleamunison_http_counter, [set, public, named_table]),
+    %% Seed exactly once: insert_new refuses to overwrite, so a racing
+    %% seeder (or a counter incremented before this ran) is never
+    %% reset to 0 (bk-1e5e).
+    ets:insert_new(gleamunison_http_counter, {count, 0}),
+    ok.
 
 worker_count(Pid) when is_pid(Pid) ->
     case sys:get_state(Pid) of

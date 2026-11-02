@@ -208,10 +208,7 @@ handle_static_file(Socket, FilePath) ->
     end.
 
 handle_sse_route(Socket) ->
-    try ets:whereis(gleamunison_sse_clients) of
-        undefined ->
-            ets:new(gleamunison_sse_clients, [set, public, named_table])
-    catch _:_ -> ok end,
+    gleamunison_tables:ensure(gleamunison_sse_clients, [set, public, named_table]),
     case ets:info(gleamunison_sse_clients, size) < ?MAX_SSE_CLIENTS of
         false ->
             gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"sse client limit reached\"}">>);
