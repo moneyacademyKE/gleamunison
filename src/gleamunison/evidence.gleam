@@ -10,6 +10,7 @@ import gleamunison/env
 import gleamunison/identity.{
   type DefinitionRef, Ref, hash_bytes, hash_equal, hash_to_debug_string,
 }
+import gleamunison/namespace_codec.{decode_text, encode_text}
 import gleamunison/storage.{type StorageAdapter}
 
 /// What kind of evidence this is. Deploy gates ask for these by name.
@@ -87,17 +88,6 @@ fn tag_kind(s: String) -> Result(Kind, Nil) {
     "io" -> Ok(Io)
     _ -> Error(Nil)
   }
-}
-
-fn encode_text(value: String) -> String {
-  bit_array.base64_encode(bit_array.from_string(value), True)
-}
-
-fn decode_text(value: String) -> Result(String, Nil) {
-  use bytes <- result.try(
-    bit_array.base64_decode(value) |> result.replace_error(Nil),
-  )
-  bit_array.to_string(bytes) |> result.replace_error(Nil)
 }
 
 /// Canonical serialization. All free text is base64, so parsing is
