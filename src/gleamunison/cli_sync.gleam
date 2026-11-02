@@ -7,7 +7,6 @@ import gleam/int
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
-import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/cli_store
@@ -19,14 +18,17 @@ import gleamunison/store_log
 import gleamunison/sync
 import gleamunison/sync_types.{PeerId}
 
-pub fn command(args: List(String)) -> Result(Nil, String) {
+pub fn command(args: List(String)) -> Result(Nil, #(Int, String)) {
   use #(peer, store_override, branch) <- result.try(parse_args(
     args,
     None,
     None,
     None,
   ))
-  use context <- result.try(cli_lifecycle.resolve_context(store_override))
+  use context <- result.try(
+    cli_lifecycle.resolve_context(store_override)
+    |> result.map_error(fn(message) { #(cli_result.unresolvable, message) }),
+  )
   let store_path = cli_lifecycle.store_path(context)
   use output <- result.try(
     cli_store.with_dets(store_path, fn(adapter) {
@@ -34,7 +36,9 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
       let state = sync.new_sync_state()
       use #(_, _, new_refs) <- result.try(
         sync.pull_sync(state, PeerId(peer), cb)
-        |> result.map_error(fn(e) { "sync: pull failed: " <> string.inspect(e) }),
+        |> result.map_error(fn(e) {
+          "sync: pull failed: " <> sync.describe_error(e)
+        }),
       )
       // Pulled content is admitted content: it entered this store just now, so
       // it belongs in the content log beside the definitions `publish` admits.
@@ -62,9 +66,10 @@ pub fn command(args: List(String)) -> Result(Nil, String) {
         <> peer
         <> branch_status,
       )
-    }),
+    })
+    |> result.map_error(fn(message) { #(cli_result.refused, message) }),
   )
-  cli_result.success(output)
+  cli_result.success_coded(output)
 }
 
 fn parse_args(
@@ -72,26 +77,27 @@ fn parse_args(
   peer: Option(String),
   store: Option(String),
   branch: Option(String),
-) -> Result(#(String, Option(String), Option(String)), String) {
+) -> Result(#(String, Option(String), Option(String)), #(Int, String)) {
   case args {
     [] ->
       case peer {
         Some(p) -> Ok(#(p, store, branch))
-        None ->
-          Error(
-            "usage: gleam run -- sync <peer-host:port> [--store path] [--branch name]",
-          )
+        None -> Error(#(cli_result.refused, usage()))
       }
     ["--store", path, ..rest] -> parse_args(rest, peer, Some(path), branch)
-    ["--store"] -> Error("--store needs a path")
+    ["--store"] -> Error(cli_lifecycle.missing_store_value(usage()))
     ["--branch", name, ..rest] -> parse_args(rest, peer, store, Some(name))
-    ["--branch"] -> Error("--branch needs a name")
+    ["--branch"] -> Error(cli_lifecycle.missing_branch_value(usage()))
     [arg, ..rest] ->
       case peer {
         None -> parse_args(rest, Some(arg), store, branch)
-        Some(_) -> Error("unknown argument: " <> arg)
+        Some(_) -> Error(#(cli_result.refused, "unknown argument: " <> arg))
       }
   }
+}
+
+fn usage() -> String {
+  "usage: gleam run -- sync <peer-host:port> [--store path] [--branch name]"
 }
 
 /// Pull a branch's chunk set: the pointer ref is derivable from the branch

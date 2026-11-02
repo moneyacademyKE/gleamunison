@@ -120,8 +120,8 @@ fn branch_from(cfg: Config) -> Result(String, String) {
 /// exactly these bytes and this exit code, so the wording lives here rather
 /// than in two files that could drift apart.
 ///
-/// The other three store-scoped commands keep their own: run prefixes "run: "
-/// and reports a bare String, sync omits the usage block, and pkg has no
+/// The other store-scoped commands keep their own where the shape genuinely
+/// differs: run prefixes "run: " and reports a bare String, and pkg has no
 /// missing-value arm at all — its `--branch` must follow the manifest hash, so
 /// it refuses with "--branch needs the manifest hash first". Folding those in
 /// would mean parameterising the message, the error type and the precedence:

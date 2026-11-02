@@ -17,6 +17,40 @@ pub fn new_sync_state() -> SyncState {
   SyncState(peers: dict.new(), known_refs: set.new())
 }
 
+/// The one place a SyncError becomes a user sentence. The constructors carry
+/// the facts (which peer, what message, which ref conflicts); rendering them
+/// belongs here, with the type, rather than at each CLI call site — inspect
+/// output is a debug rendering and must never reach a user.
+pub fn describe_error(error: SyncError) -> String {
+  case error {
+    ConnectionFailed(peer, cause) -> {
+      let PeerId(name) = peer
+      "could not connect to " <> name <> ": " <> describe_connect_error(cause)
+    }
+    TransferFailed(peer, message) -> {
+      let PeerId(name) = peer
+      "transfer from " <> name <> " failed: " <> message
+    }
+    HashConflict(peer, ref, _, _) -> {
+      let PeerId(name) = peer
+      "hash conflict with "
+      <> name
+      <> " for "
+      <> identity.ref_hex(ref)
+      <> ": local and remote bytes differ"
+    }
+  }
+}
+
+fn describe_connect_error(error: sync_types.ConnectError) -> String {
+  case error {
+    sync_types.PeerNotFound(_) -> "peer not found"
+    sync_types.CookieMismatch(_) -> "cookie mismatch"
+    sync_types.Timeout(_) -> "connection timed out"
+    sync_types.Refused(_, reason) -> "connection refused: " <> reason
+  }
+}
+
 /// Open a connection to a peer. Stays open for subsequent fetch_refs
 /// batches — the selective-pull primitive's session handle.
 pub fn connect(peer: PeerId) -> Result(Nil, SyncError) {
