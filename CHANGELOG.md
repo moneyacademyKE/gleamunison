@@ -2,6 +2,54 @@
 
 ---
 
+## What's New in v3.26.0 (2026-11-02)
+
+The consolidation release: six simplicity slices retired the duplicated and
+test-only surface the 3.25.0 audit flagged, the release pipeline learned to
+actually run its own gates, and the pure key-state trust decision is public
+again for downstream adoption.
+
+### The public surface shrank on purpose
+
+- The LLM settlement path has one authority: `complete_env`. The dead
+  budget/fallback/recording composition is deleted and the mock handler lives
+  with the tests, not in the package (bk-baac).
+- Test-only entry points left the public API: the replay harness
+  `run_definition` moved to test support; the playback controls and the
+  `generate_and_publish` adapter were deleted, along with the dead auth
+  wrappers, the unused sync-push FFI, `prompt.render_by_hash`, and the
+  duplicate LSP buffer framing (bk-f850, bk-bbfc).
+- Storage and manifest helpers that only tests called now live in test
+  support modules — src carries production surface only (bk-e431).
+- `identity.hex_to_bytes` is private; scopes are the one auth vocabulary.
+
+### The internals folded onto single owners
+
+- repl_eval's three inline unload→compile→load chains share one
+  elaboration-and-compile path, error strings byte-identical (bk-e5cb).
+- Five hand-rolled ETS ensure-table idioms folded onto one race-safe
+  `gleamunison_tables:ensure/2`, with boundary tests pinning idempotence,
+  concurrent create, and option preservation (bk-09d9).
+- `cli_find`'s short hash delegates to `identity.short_hash_hex`; the
+  parser's twin quote-strips share one helper (bk-ccdb).
+
+### Trust
+
+- `trust.keys_admit` — the pure key-state decision — is public again. Every
+  type in its signature was already exported, and downstream replica-author
+  admission needs the bare window check that Evidence-based admission
+  composes internally (bk-49cb).
+
+### Fixed
+
+- `publish.yml` installs pinned Babashka and runs the artifact gate under
+  `bash` instead of `bb`; the release battery is green end-to-end (bk-c60e).
+
+The suite stands at 812 passing: dead-machinery tests deleted with their
+coverage notes documented, three ETS boundary tests added.
+
+---
+
 ## What's New in v3.25.0 (2026-11-01)
 
 The content-addressed lifecycle release: definitions run by their content hash, names bind and retract per branch, and the CLI, HTTP and MCP surfaces speak one JSON dialect — with a 205-commit audit behind it that retired every duplicated authority the codebase had accumulated.

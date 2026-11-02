@@ -8,7 +8,7 @@ type, compiled on demand to BEAM bytecode, and loaded into a running VM by
 hash. Not a filename, not a module path, not a package — the hash *is* the
 identity.
 
-- **Version:** 3.25.0
+- **Version:** 3.26.0
 - **Verified local suite:** 822 tests, no failures ([factory acceptance](docs/verification/factory-readiness-2026-10-26.md))
 - **CI:** Erlang/OTP 27, 28, 29 × Ubuntu, macOS — matrix configured; local receipts are not a substitute for every hosted leg
 - **Classification:** `authenticated-single-node-service`
