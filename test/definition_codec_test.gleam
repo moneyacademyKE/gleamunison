@@ -9,6 +9,7 @@ import gleamunison/identity.{Local, Ref, hash_bytes}
 import gleamunison/repl_eval
 import gleamunison/storage
 import gleeunit/should
+import storage_support
 
 @external(erlang, "gleamunison_cas_test", "invalid_payloads")
 fn invalid_payloads() -> List(BitArray)
@@ -181,10 +182,10 @@ pub fn integrity_check_detects_trusted_store_corruption_test() {
   let bytes = <<"intact">>
   let ref = Ref(hash_bytes(bytes))
   storage.insert_content(adapter, ref, bytes) |> should.equal(Ok(Nil))
-  storage.check_content(adapter, ref) |> should.equal(Ok(Nil))
+  storage_support.check_content(adapter, ref) |> should.equal(Ok(Nil))
   adapter.insert(ref, <<"corruption">>) |> should.equal(Ok(Nil))
-  storage.check_content(adapter, ref) |> should.be_error
-  storage.check_content(adapter, Ref(hash_bytes(<<"missing">>)))
+  storage_support.check_content(adapter, ref) |> should.be_error
+  storage_support.check_content(adapter, Ref(hash_bytes(<<"missing">>)))
   |> should.equal(Error(storage.NotFound))
 }
 

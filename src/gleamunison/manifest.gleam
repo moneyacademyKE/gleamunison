@@ -38,11 +38,6 @@ pub fn new(name: String, version: String) -> Manifest {
   Manifest(name, version, [], [], True, 2)
 }
 
-/// Add a pure definition. Pure is the conservative compatibility default.
-pub fn add_def(m: Manifest, name: String, hash_hex: String) -> Manifest {
-  add_def_with_effect(m, name, hash_hex, False)
-}
-
 pub fn add_def_with_effect(
   m: Manifest,
   name: String,
@@ -66,18 +61,6 @@ pub fn def_hash(def: ManifestDef) -> String {
 
 pub fn def_effectful(def: ManifestDef) -> Bool {
   def.effectful
-}
-
-pub fn add_dep(m: Manifest, manifest_hash_hex: String) -> Manifest {
-  Manifest(
-    ..m,
-    deps: list.append(m.deps, [manifest_hash_hex]),
-    format_version: 2,
-  )
-}
-
-pub fn without_evidence_requirement(m: Manifest) -> Manifest {
-  Manifest(..m, require_evidence: False, format_version: 2)
 }
 
 /// Content hash over the canonical form: same contents, same hash,

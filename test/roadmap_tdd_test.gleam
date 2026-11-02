@@ -19,7 +19,7 @@ pub fn sha256_hash_length_test() {
 
 pub fn dets_storage_adapter_test() {
   let path = "/tmp/test_dets_db.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(adapter) = storage.dets(path)
   let ref = Ref(hash_bytes(<<"test_dets_ref">>))
   let data = <<"hello dets">>
@@ -28,13 +28,13 @@ pub fn dets_storage_adapter_test() {
   let assert Ok(Some(retrieved)) = adapter.lookup(ref)
   let assert True = retrieved == data
   let assert Ok(Nil) = adapter.close()
-  let assert Ok(Nil) = storage.dets_delete_file(path)
+  let assert Ok(Nil) = test_ffi.dets_delete_file(path)
 }
 
 pub fn partitioned_dets_storage_test() {
   let path = "/tmp/test_partitioned_dets"
-  let _ = storage.partitioned_dets_delete(path)
-  let assert Ok(adapter) = storage.partitioned_dets(path)
+  let _ = test_ffi.partitioned_dets_delete(path)
+  let assert Ok(adapter) = storage_support.partitioned_dets(path)
   let ref1 = Ref(hash_bytes(<<"ref_a">>))
   let ref2 = Ref(hash_bytes(<<"ref_b">>))
   let data1 = <<"data a">>
@@ -53,7 +53,7 @@ pub fn partitioned_dets_storage_test() {
   let assert True = list.contains(refs, ref1) && list.contains(refs, ref2)
 
   let assert Ok(Nil) = adapter.close()
-  let assert Ok(Nil) = storage.partitioned_dets_delete(path)
+  let assert Ok(Nil) = test_ffi.partitioned_dets_delete(path)
 }
 
 pub fn lru_purging_test() {
@@ -129,8 +129,8 @@ fn get_open_dets_count(prefix: String) -> Int
 
 pub fn dets_fd_pool_test() {
   let path = "/tmp/test_fd_pool"
-  let _ = storage.partitioned_dets_delete(path)
-  let assert Ok(adapter) = storage.partitioned_dets(path)
+  let _ = test_ffi.partitioned_dets_delete(path)
+  let assert Ok(adapter) = storage_support.partitioned_dets(path)
 
   let refs = list.map(range(0, 15), fn(i) { test_make_ref(<<i:4, 0:252>>) })
 
@@ -147,7 +147,7 @@ pub fn dets_fd_pool_test() {
     adapter.lookup(test_make_ref(<<15:4, 0:252>>))
 
   let assert Ok(Nil) = adapter.close()
-  let assert Ok(Nil) = storage.partitioned_dets_delete(path)
+  let assert Ok(Nil) = test_ffi.partitioned_dets_delete(path)
 }
 
 @external(erlang, "gleamunison_ffi", "test_soft_purge_scenario")
@@ -160,6 +160,8 @@ pub fn soft_purge_test() {
 import gleamunison/repl_eval
 import gleamunison/repl_io
 import gleamunison/types.{empty_cache}
+import storage_support
+import test_ffi
 
 pub fn spelling_suggestions_test() {
   let prev_defs = [

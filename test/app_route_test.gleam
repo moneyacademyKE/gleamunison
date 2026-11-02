@@ -140,7 +140,7 @@ fn with_published_app(
 ) -> a {
   let root = "/tmp/gleamunison-app-route-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "app-route-test-key")
   let result =
@@ -164,6 +164,6 @@ fn with_published_app(
       work(adapter, greeting.content_ref, answer.content_ref)
     })
   envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   result
 }

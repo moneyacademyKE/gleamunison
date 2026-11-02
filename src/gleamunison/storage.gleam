@@ -95,12 +95,6 @@ pub fn ffi_dets_list_refs(tab: BitArray) -> Result(List(BitArray), StorageError)
 @external(erlang, "gleamunison_storage", "dets_close")
 fn ffi_dets_close(tab: BitArray) -> Result(Nil, StorageError)
 
-@external(erlang, "gleamunison_storage", "dets_delete_file")
-pub fn dets_delete_file(path: String) -> Result(Nil, StorageError)
-
-@external(erlang, "gleamunison_storage", "partitioned_dets_new")
-fn ffi_partitioned_dets_new(dir_path: String) -> Result(BitArray, StorageError)
-
 @external(erlang, "gleamunison_storage", "partitioned_dets_insert")
 pub fn ffi_partitioned_dets_insert(
   tab: BitArray,
@@ -118,12 +112,6 @@ pub fn ffi_partitioned_dets_lookup(
 pub fn ffi_partitioned_dets_list_refs(
   tab: BitArray,
 ) -> Result(List(BitArray), StorageError)
-
-@external(erlang, "gleamunison_storage", "partitioned_dets_close")
-fn ffi_partitioned_dets_close(tab: BitArray) -> Result(Nil, StorageError)
-
-@external(erlang, "gleamunison_storage", "partitioned_dets_delete_file")
-pub fn partitioned_dets_delete(dir_path: String) -> Result(Nil, StorageError)
 
 @external(erlang, "gleamunison_storage", "mnesia_new")
 fn ffi_mnesia_new(table_name: String) -> Result(BitArray, StorageError)
@@ -172,18 +160,6 @@ pub fn insert_content(
     Ok(None) -> adapter.insert(ref, bytes)
     Ok(Some(existing)) if existing == bytes -> Ok(Nil)
     Ok(Some(_)) -> Error(StorageError("content_conflict"))
-    Error(error) -> Error(error)
-  }
-}
-
-/// Check a known immutable ref. Mutable pointer cells are not CAS content.
-pub fn check_content(
-  adapter: StorageAdapter,
-  ref: DefinitionRef,
-) -> Result(Nil, StorageError) {
-  case adapter.lookup(ref) {
-    Ok(Some(bytes)) -> verify_content(ref, bytes)
-    Ok(None) -> Error(NotFound)
     Error(error) -> Error(error)
   }
 }
@@ -237,39 +213,6 @@ pub fn dets(path: String) -> Result(StorageAdapter, StorageError) {
             }
           },
           close: fn() { ffi_dets_close(tab) },
-        ),
-      )
-    }
-    Error(e) -> Error(e)
-  }
-}
-
-pub fn partitioned_dets(
-  dir_path: String,
-) -> Result(StorageAdapter, StorageError) {
-  case ffi_partitioned_dets_new(dir_path) {
-    Ok(tab) -> {
-      Ok(
-        StorageAdapter(
-          insert: fn(ref, bytes) {
-            let Ref(h) = ref
-            ffi_partitioned_dets_insert(tab, hash_to_bytes(h), bytes)
-          },
-          lookup: fn(ref) {
-            let Ref(h) = ref
-            ffi_partitioned_dets_lookup(tab, hash_to_bytes(h))
-          },
-          delete: fn(ref) {
-            let Ref(h) = ref
-            ffi_partitioned_dets_delete(tab, hash_to_bytes(h))
-          },
-          list_refs: fn() {
-            case ffi_partitioned_dets_list_refs(tab) {
-              Ok(lst) -> Ok(list.map(lst, fn(b) { Ref(hash_from_bytes(b)) }))
-              Error(e) -> Error(e)
-            }
-          },
-          close: fn() { ffi_partitioned_dets_close(tab) },
         ),
       )
     }

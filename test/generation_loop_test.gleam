@@ -341,7 +341,7 @@ fn ref(hex: String) -> identity.DefinitionRef {
 fn with_store(work: fn(storage.StorageAdapter, String) -> a) -> a {
   let root = "/tmp/gleamunison-generation-loop-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   envoy.set("GLEAMUNISON_EVIDENCE_SIGNING_KEY", "generation-loop-test-key")
   let result =
@@ -350,6 +350,6 @@ fn with_store(work: fn(storage.StorageAdapter, String) -> a) -> a {
       work(adapter, root)
     })
   envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   result
 }

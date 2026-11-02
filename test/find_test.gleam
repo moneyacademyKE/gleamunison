@@ -16,7 +16,7 @@ import test_ffi.{without_active_storage}
 pub fn find_boots_from_the_selected_durable_branch_test() {
   let dir = "/tmp/gleamunison-find-cli-test"
   let path = dir <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(dir)
   let assert Ok(adapter) = storage.dets(path)
   let definition = ast.TermDef(ast.Int(42), ast.Builtin(ast.IntType))
@@ -51,7 +51,7 @@ pub fn find_boots_from_the_selected_durable_branch_test() {
   hit.content_ref_hex |> should.equal(Some(hash_to_debug_string(hash)))
   envoy.unset("GLEAMUNISON_STORE_DIR")
   envoy.unset("GLEAMUNISON_BRANCH")
-  let assert Ok(_) = storage.dets_delete_file(path)
+  let assert Ok(_) = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.delete(dir)
 }
 

@@ -118,7 +118,7 @@ pub fn untrusted_profile_refuses_agent_writes_test() {
 fn with_store(work: fn(storage.StorageAdapter, String) -> a) -> a {
   let root = "/tmp/gleamunison-agent-publish-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   let result =
     without_active_storage(fn() {
@@ -126,6 +126,6 @@ fn with_store(work: fn(storage.StorageAdapter, String) -> a) -> a {
       let value = work(adapter, root)
       value
     })
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   result
 }

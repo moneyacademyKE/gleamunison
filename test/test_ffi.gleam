@@ -14,6 +14,7 @@
 //// `loader_ffi`, `time_ffi` and `json`.
 
 import gleam/dynamic.{type Dynamic}
+import gleamunison/storage.{type StorageError}
 
 /// Keyed process-dictionary counter: increment and return the new value. Tests
 /// use it to prove an operation happened exactly once.
@@ -99,3 +100,18 @@ pub fn trace_count() -> Int
 
 @external(erlang, "gleamunison_trace", "clear_traces")
 pub fn clear_traces() -> Nil
+
+// Storage test-support surface over the production erl backend (bk-e431):
+// same functions, same signatures, test-side declarations. src keeps only
+// the ones production calls (per-ref partitioned ops via active_storage).
+@external(erlang, "gleamunison_storage", "dets_delete_file")
+pub fn dets_delete_file(path: String) -> Result(Nil, StorageError)
+
+@external(erlang, "gleamunison_storage", "partitioned_dets_delete_file")
+pub fn partitioned_dets_delete(dir_path: String) -> Result(Nil, StorageError)
+
+@external(erlang, "gleamunison_storage", "partitioned_dets_new")
+pub fn partitioned_dets_new(dir_path: String) -> Result(BitArray, StorageError)
+
+@external(erlang, "gleamunison_storage", "partitioned_dets_close")
+pub fn partitioned_dets_close(tab: BitArray) -> Result(Nil, StorageError)

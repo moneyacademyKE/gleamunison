@@ -143,7 +143,7 @@ pub fn mcp_authority_untrusted_execution_refuses_eval_test() {
 pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
   let root = "/tmp/gleamunison-mcp-publish-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   envoy.set("GLEAMUNISON_STORE_DIR", root)
   envoy.set("GLEAMUNISON_BRANCH", "factory")
@@ -189,7 +189,7 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
   let cli_execution =
     cli_run.run([published_ref, "--store", path, "--branch", "factory"])
   envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   execution |> should.equal(Ok("42"))
   cli_execution |> should.equal(Ok("42"))
 }
@@ -197,7 +197,7 @@ pub fn mcp_publish_refreshes_reads_preserves_scratch_and_runs_test() {
 pub fn mcp_generation_reaches_configured_provider_and_app_test() {
   let root = "/tmp/gleamunison-mcp-generation-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   let candidate =
     "```json\n{source: '"
@@ -251,7 +251,7 @@ pub fn mcp_generation_reaches_configured_provider_and_app_test() {
   |> should.equal(Ok("40"))
   let assert Ok(Nil) = adapter.close()
   envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
 }
 
 @external(erlang, "gleamunison_generation_test", "start_completion_server")
@@ -271,7 +271,7 @@ pub fn mcp_generated_db_routes_survive_db_owner_restart_test() {
   let root = "/tmp/gleamunison-mcp-generated-db-test"
   let path = root <> "/store.dets"
   let db_path = root <> "/application.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let _ = simplifile.delete(db_path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   envoy.set("GLEAMUNISON_STORE_DIR", root)
@@ -304,7 +304,7 @@ pub fn mcp_generated_db_routes_survive_db_owner_restart_test() {
       })
     })
   unset_generation_env()
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let _ = simplifile.delete(db_path)
   let assert Ok(#(200, write_body)) = write_response
   string.contains(write_body, "\"value\":1") |> should.be_true
@@ -362,7 +362,7 @@ fn generate_from_provider(id: Int, source: String, signature: String) -> Nil {
 pub fn mcp_generation_rejects_untrusted_before_storage_test() {
   let root = "/tmp/gleamunison-mcp-untrusted-generation-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   envoy.set("GLEAMUNISON_STORE_DIR", root)
   envoy.set("GLEAMUNISON_PROFILE", "untrusted-execution")
   envoy.set("GLEAMUNISON_BRANCH", "factory")
@@ -384,7 +384,7 @@ pub fn mcp_generation_rejects_untrusted_before_storage_test() {
 pub fn mcp_untrusted_write_is_refused_before_storage_test() {
   let root = "/tmp/gleamunison-mcp-untrusted-write-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   envoy.set("GLEAMUNISON_STORE_DIR", root)
   envoy.set("GLEAMUNISON_PROFILE", "untrusted-execution")
   let result =

@@ -8,6 +8,7 @@ import gleamunison/storage
 import gleamunison/sync
 import gleamunison/sync_types.{PeerId}
 import gleeunit/should
+import test_ffi
 
 @external(erlang, "gleamunison_cas_test", "encode_definition")
 fn encode_definition(def: ast.Definition) -> BitArray
@@ -144,7 +145,7 @@ pub fn definition_reopens_from_dets_test() {
   let assert Ok(reopened) = storage.dets(path)
   reopened.lookup(ref) |> should.equal(Ok(Some(encode_definition(def))))
   reopened.close() |> should.equal(Ok(Nil))
-  storage.dets_delete_file(path) |> should.equal(Ok(Nil))
+  test_ffi.dets_delete_file(path) |> should.equal(Ok(Nil))
 }
 
 pub fn closed_dets_write_returns_error_test() {
@@ -155,7 +156,7 @@ pub fn closed_dets_write_returns_error_test() {
   let ref = Ref(codebase.hash_of_definition(def))
   codebase.insert(codebase.with_adapter(adapter), ast.Unit(ref, [#(ref, def)]))
   |> should.be_error
-  storage.dets_delete_file(path) |> should.equal(Ok(Nil))
+  test_ffi.dets_delete_file(path) |> should.equal(Ok(Nil))
 }
 
 pub fn function_requirements_are_part_of_identity_test() {

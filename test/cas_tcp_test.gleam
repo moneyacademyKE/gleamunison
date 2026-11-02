@@ -3,6 +3,7 @@ import gleamunison/codebase
 import gleamunison/identity.{Ref, hash_bytes, hash_to_debug_string}
 import gleamunison/storage
 import gleeunit/should
+import storage_support
 
 @external(erlang, "gleamunison_cas_test", "tcp_push")
 fn tcp_push(defs: List(#(String, BitArray))) -> Result(Nil, String)
@@ -51,5 +52,6 @@ pub fn checked_raw_insert_does_not_admit_forged_content_test() {
 }
 
 pub fn partitioned_storage_invalid_path_is_reported_test() {
-  storage.partitioned_dets("gleam.toml/not-a-directory") |> should.be_error
+  storage_support.partitioned_dets("gleam.toml/not-a-directory")
+  |> should.be_error
 }

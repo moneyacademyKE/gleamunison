@@ -20,7 +20,7 @@ import test_ffi.{
 pub fn mcp_publish_then_http_app_route_executes_same_content_test() {
   let root = "/tmp/gleamunison-app-http-test"
   let path = root <> "/store.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   envoy.set("GLEAMUNISON_STORE_DIR", root)
   envoy.set("GLEAMUNISON_BRANCH", "factory")
@@ -50,7 +50,7 @@ pub fn mcp_publish_then_http_app_route_executes_same_content_test() {
   envoy.unset("GLEAMUNISON_STORE_DIR")
   envoy.unset("GLEAMUNISON_BRANCH")
   envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
 
   assert_route_success(by_name, ref)
   assert_route_success(by_ref, ref)
@@ -80,7 +80,7 @@ pub fn http_app_route_persists_db_facts_across_owner_restart_test() {
   let root = "/tmp/gleamunison-app-db-http-test"
   let path = root <> "/store.dets"
   let db_path = root <> "/application.dets"
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let _ = simplifile.delete(db_path)
   let assert Ok(_) = simplifile.create_directory_all(root)
   envoy.set("GLEAMUNISON_STORE_DIR", root)
@@ -132,7 +132,7 @@ pub fn http_app_route_persists_db_facts_across_owner_restart_test() {
   envoy.unset("GLEAMUNISON_STORE_DIR")
   envoy.unset("GLEAMUNISON_BRANCH")
   envoy.unset("GLEAMUNISON_EVIDENCE_SIGNING_KEY")
-  let _ = storage.dets_delete_file(path)
+  let _ = test_ffi.dets_delete_file(path)
   let _ = simplifile.delete(db_path)
 
   let assert Ok(#(200, write_body)) = written

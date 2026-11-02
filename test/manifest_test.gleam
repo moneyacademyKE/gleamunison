@@ -2,13 +2,14 @@ import gleam/list
 import gleamunison/manifest
 import gleamunison/storage
 import gleeunit/should
+import manifest_support
 
 fn sample() -> manifest.Manifest {
   let m =
     manifest.new("http-utils", "1.0.0")
-    |> manifest.add_def("get-json", "aaa111")
-    |> manifest.add_def("post-json", "bbb222")
-    |> manifest.add_dep("ccc333")
+    |> manifest_support.add_def("get-json", "aaa111")
+    |> manifest_support.add_def("post-json", "bbb222")
+    |> manifest_support.add_dep("ccc333")
   m
 }
 
@@ -18,7 +19,7 @@ pub fn manifest_hash_is_content_addressed_test() {
   let b = sample()
   manifest.hash_of(a) |> should.equal(manifest.hash_of(b))
 
-  let c = manifest.add_def(a, "extra", "ddd444")
+  let c = manifest_support.add_def(a, "extra", "ddd444")
   should.not_equal(manifest.hash_of(a), manifest.hash_of(c))
 }
 
@@ -40,7 +41,7 @@ pub fn manifest_round_trip_test() {
 pub fn manifest_effect_flags_round_trip_test() {
   let m =
     manifest.new("p", "1.0.0")
-    |> manifest.add_def("pure", "aaa")
+    |> manifest_support.add_def("pure", "aaa")
     |> manifest.add_def_with_effect("io", "bbb", True)
   let assert Ok(parsed) = manifest.parse(manifest.serialize(m))
   let assert [first, second] = parsed.defs
@@ -103,12 +104,12 @@ pub fn manifest_parse_rejects_garbage_test() {
 pub fn manifest_hash_order_independent_test() {
   let a =
     manifest.new("p", "1.0.0")
-    |> manifest.add_def("x", "111")
-    |> manifest.add_def("y", "222")
+    |> manifest_support.add_def("x", "111")
+    |> manifest_support.add_def("y", "222")
   let b =
     manifest.new("p", "1.0.0")
-    |> manifest.add_def("y", "222")
-    |> manifest.add_def("x", "111")
+    |> manifest_support.add_def("y", "222")
+    |> manifest_support.add_def("x", "111")
   manifest.hash_of(a) |> should.equal(manifest.hash_of(b))
   // serialize is canonical (sorted) so stored bytes are identical too
   manifest.serialize(a) |> should.equal(manifest.serialize(b))
