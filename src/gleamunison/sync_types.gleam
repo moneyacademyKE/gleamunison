@@ -45,12 +45,5 @@ pub type SyncState {
 }
 
 pub type PeerState {
-  PeerState(last_seen: Int, refs: Set(DefinitionRef), status: PeerStatus)
-}
-
-pub type PeerStatus {
-  Connected
-  Disconnected
-  Syncing
-  Failed(String)
+  PeerState(refs: Set(DefinitionRef))
 }

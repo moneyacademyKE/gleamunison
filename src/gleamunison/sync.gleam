@@ -7,10 +7,9 @@ import gleam/string
 import gleamunison/codebase.{type Codebase}
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/sync_types.{
-  type PeerId, type SyncError, type SyncState, Connected, ConnectionFailed,
-  HashConflict, PeerId, PeerNotFound, PeerState, SyncState, TransferFailed,
-  sync_connect, sync_receive_diff, sync_request_defs, sync_request_evidence,
-  sync_send_refs,
+  type PeerId, type SyncError, type SyncState, ConnectionFailed, HashConflict,
+  PeerId, PeerNotFound, PeerState, SyncState, TransferFailed, sync_connect,
+  sync_receive_diff, sync_request_defs, sync_request_evidence, sync_send_refs,
 }
 import gleamy/priority_queue
 
@@ -194,12 +193,7 @@ pub fn pull_sync(
                     Error(e) -> Error(e)
                     Ok(#(new_cb, next_pq)) -> {
                       let new_refs = priority_queue.to_list(next_pq)
-                      let ps =
-                        PeerState(
-                          last_seen: 1,
-                          refs: set.from_list(our_refs),
-                          status: Connected,
-                        )
+                      let ps = PeerState(refs: set.from_list(our_refs))
                       let new_peers = dict.insert(state.peers, peer, ps)
                       let new_known =
                         set.union(state.known_refs, set.from_list(new_refs))
