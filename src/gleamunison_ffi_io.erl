@@ -177,18 +177,12 @@ sync_request_evidence(NodeBin, Subjects) ->
     end.
 
 register_peer_refs(Peer, Refs) ->
-    ensure_table(gleamunison_peer_refs),
+    gleamunison_tables:ensure(gleamunison_peer_refs, [set, public, named_table]),
     ets:insert(gleamunison_peer_refs, {Peer, Refs}),
     ok.
 
-ensure_table(Name) ->
-    case ets:whereis(Name) of
-        undefined -> ets:new(Name, [set, public, named_table]);
-        _ -> ok
-    end.
-
 compute_diff(Peer) ->
-    ensure_table(gleamunison_peer_refs),
+    gleamunison_tables:ensure(gleamunison_peer_refs, [set, public, named_table]),
     PeerRefs = try ets:lookup(gleamunison_peer_refs, Peer) of
         [{Peer, R}] -> R;
         _ -> []

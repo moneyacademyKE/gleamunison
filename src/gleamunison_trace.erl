@@ -25,11 +25,8 @@ capture_request(Method, Path, Headers) when is_binary(Method), is_binary(Path), 
     {ok, Id}.
 
 ensure_table() ->
-    case ets:whereis(?TRACE_TABLE) of
-        undefined ->
-            ets:new(?TRACE_TABLE, [ordered_set, public, named_table]);
-        _ -> ok
-    end.
+    gleamunison_tables:ensure(?TRACE_TABLE, [ordered_set, public, named_table]),
+    ok.
 
 trace_count() ->
     ensure_table(),

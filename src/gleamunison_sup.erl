@@ -55,8 +55,8 @@ start_holder() ->
             undefined -> register(gleamunison_ets_holder, self());
             _ -> ok
         end,
-        try ets:new(gleamunison_store_sup, [set, public, named_table]) catch _:_ -> ok end,
-        try ets:new(gleamunison_peer_refs, [set, public, named_table]) catch _:_ -> ok end,
+        gleamunison_tables:ensure(gleamunison_store_sup, [set, public, named_table]),
+        gleamunison_tables:ensure(gleamunison_peer_refs, [set, public, named_table]),
         receive after infinity -> ok end
     end),
     {ok, Pid}.

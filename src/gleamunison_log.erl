@@ -37,8 +37,5 @@ evict_oldest() ->
     end.
 
 ensure_table() ->
-    case ets:whereis(?ETS_TABLE) of
-        undefined ->
-            ets:new(?ETS_TABLE, [ordered_set, public, named_table]);
-        _ -> ok
-    end.
+    gleamunison_tables:ensure(?ETS_TABLE, [ordered_set, public, named_table]),
+    ok.

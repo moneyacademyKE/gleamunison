@@ -176,12 +176,10 @@ claim_session(ClientNonce, ServerNonce) ->
     end.
 
 ensure_session_table() ->
-    case ets:whereis(gleamunison_sync_sessions) of
-        undefined ->
-            try ets:new(gleamunison_sync_sessions, [set, public, named_table])
-            catch _:_ -> gleamunison_sync_sessions end;
-        _ -> gleamunison_sync_sessions
-    end.
+    gleamunison_tables:ensure(
+        gleamunison_sync_sessions, [set, public, named_table]
+    ),
+    gleamunison_sync_sessions.
 
 send_reply(Sock, Reply) ->
     ReplyBin = term_to_binary(Reply),
