@@ -59,6 +59,24 @@ pub fn import_storage_failure_never_publishes_pointer_test() {
   dst.lookup(namespace.branch_pointer_ref("main")) |> should.equal(Ok(None))
 }
 
+/// A failing adapter's StorageError reaches the caller as the described
+/// storage sentence, not a canned constant (bk-5772).
+pub fn storage_error_surfaces_described_sentence_test() {
+  let failing_insert =
+    storage.StorageAdapter(..storage.inmemory(), insert: fn(_ref, _bytes) {
+      Error(storage.IoError("disk full"))
+    })
+  namespace.save(failing_insert, namespace.empty())
+  |> should.equal(Error("io error: disk full"))
+
+  let failing_lookup =
+    storage.StorageAdapter(..storage.inmemory(), lookup: fn(_ref) {
+      Error(storage.IoError("disk offline"))
+    })
+  namespace.load(failing_lookup, Ref(hash_bytes(<<1>>)))
+  |> should.equal(Error("io error: disk offline"))
+}
+
 pub fn malformed_embedded_ref_fails_without_exception_test() {
   let adapter = storage.inmemory()
   let bytes = bit_array.from_string("ns\n1\neA==:nope")

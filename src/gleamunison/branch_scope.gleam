@@ -25,13 +25,13 @@ pub fn branches(
 ) -> Result(List(String), String) {
   use refs <- result.try(
     adapter.list_refs()
-    |> result.map_error(fn(_) { "store lookup failed" }),
+    |> result.map_error(storage.describe_error),
   )
   use found <- result.try(
     list.try_fold(refs, [], fn(acc, ref) {
       use bytes <- result.try(
         adapter.lookup(ref)
-        |> result.map_error(fn(_) { "store lookup failed" }),
+        |> result.map_error(storage.describe_error),
       )
       case bytes {
         // A vanished ref cannot prove that no branch binds the content.

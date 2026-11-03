@@ -61,7 +61,7 @@ pub fn save(
   let ref = Ref(hash_bytes(bytes))
   adapter.insert(ref, bytes)
   |> result.map(fn(_) { ref })
-  |> result.map_error(fn(_) { "store insert failed" })
+  |> result.map_error(storage.describe_error)
 }
 
 pub fn load(
@@ -78,7 +78,7 @@ pub fn load(
         False -> Error("namespace integrity failure")
       }
     Ok(None) -> Error("namespace not found")
-    Error(_) -> Error("store lookup failed")
+    Error(error) -> Error(storage.describe_error(error))
   }
 }
 
@@ -138,12 +138,12 @@ pub fn commit(
   let head_ref = Ref(hash_bytes(head_bytes))
   use _ <- result.try(
     adapter.insert(head_ref, head_bytes)
-    |> result.map_error(fn(_) { "store insert failed" }),
+    |> result.map_error(storage.describe_error),
   )
   // The branch pointer cell is overwritten (the one mutable datum).
   use _ <- result.try(
     adapter.insert(branch_pointer_ref(branch), head_bytes)
-    |> result.map_error(fn(_) { "store insert failed" }),
+    |> result.map_error(storage.describe_error),
   )
   Ok(head_ref)
 }
@@ -160,7 +160,7 @@ fn read_head(
         _ -> Error("corrupt branch head or branch identity mismatch")
       }
     Ok(None) -> Ok(None)
-    Error(_) -> Error("store lookup failed")
+    Error(error) -> Error(storage.describe_error(error))
   }
 }
 
@@ -307,7 +307,7 @@ pub fn export_branch(
       )
     }
     Ok(None) -> Error("no such branch: " <> branch)
-    Error(_) -> Error("store lookup failed")
+    Error(error) -> Error(storage.describe_error(error))
   }
 }
 
@@ -329,7 +329,7 @@ fn walk_head_chain(
           case adapter.lookup(prev_ref) {
             Ok(Some(prev_bytes)) -> walk_head_chain(adapter, prev_bytes, next)
             Ok(None) -> Error("missing head chunk in chain")
-            Error(_) -> Error("store lookup failed")
+            Error(error) -> Error(storage.describe_error(error))
           }
       }
     }
@@ -343,7 +343,7 @@ fn fetch_chunk(
   case adapter.lookup(ref) {
     Ok(Some(bytes)) -> Ok(#(ref_hex(ref), bytes))
     Ok(None) -> Error("missing chunk: " <> ref_hex(ref))
-    Error(_) -> Error("store lookup failed")
+    Error(error) -> Error(storage.describe_error(error))
   }
 }
 
@@ -378,7 +378,7 @@ pub fn import_branch(
           False -> parse_ref_hex(string.drop_start(key, 6))
         })
         adapter.insert(ref, bytes)
-        |> result.map_error(fn(_) { "store insert failed" })
+        |> result.map_error(storage.describe_error)
       }
     }
   })

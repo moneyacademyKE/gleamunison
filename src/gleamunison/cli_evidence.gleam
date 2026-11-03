@@ -67,7 +67,9 @@ fn attest(hash: String, note: String) -> Result(Nil, String) {
           |> result.map(fn(pair) {
             "attested io on " <> hash <> " (evidence " <> pair.1 <> ")"
           })
-          |> result.map_error(fn(_) { "evidence attest: store insert failed" })
+          |> result.map_error(fn(e) {
+            "evidence attest: " <> evidence.describe_attach_error(e)
+          })
         }),
       )
       cli_result.success(output)
