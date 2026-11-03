@@ -2,7 +2,6 @@ import gleam/dict
 import gleam/list
 import gleam/option
 import gleam/result
-import gleam/string
 import gleamunison/ast
 import gleamunison/elab_ctx.{type ElabCtx}
 import gleamunison/elab_term.{elaborate_term}
@@ -18,20 +17,12 @@ import gleamunison/types.{
   TypeMismatch,
 }
 
-/// Render an inference error for the user without the embedded subterm
-/// (which would be an unreadable AST dump); the subterm's span is attached
-/// separately as an At wrapper. Shared with typecheck's recheck path: one
-/// renderer for the inference vocabulary.
+/// Render an inference error for the user; the rendering itself lives
+/// with the type (types.describe_inference_error). Kept as a delegate so
+/// elab_def and typecheck share one spelling. The failing subterm's span
+/// is attached separately as an At wrapper.
 pub fn render_inference_error(e: InferenceError) -> String {
-  case e {
-    TypeMismatch(expected, actual, message, _) ->
-      message
-      <> ": expected "
-      <> string.inspect(expected)
-      <> ", got "
-      <> string.inspect(actual)
-    other -> string.inspect(other)
-  }
+  types.describe_inference_error(e)
 }
 
 /// The source location of an inference failure, when the failing subterm
