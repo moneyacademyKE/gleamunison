@@ -170,10 +170,10 @@ fn read_optional(file_path: String) -> Result(Option(String), String) {
     Ok(True) ->
       simplifile.read(file_path)
       |> result.map_error(fn(error) {
-        file_path <> ": " <> string.inspect(error)
+        file_path <> ": " <> simplifile.describe_error(error)
       })
       |> result.map(Some)
-    Error(error) -> Error(file_path <> ": " <> string.inspect(error))
+    Error(error) -> Error(file_path <> ": " <> simplifile.describe_error(error))
   }
 }
 

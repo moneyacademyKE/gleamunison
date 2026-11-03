@@ -76,3 +76,14 @@ pub fn replay_with_tampered_ability_key_fails_loudly_test() {
   let result = cli_replay.replay_from_file(path, "main", tape_path)
   should.be_error(result)
 }
+
+/// A missing tape reaches the user as a sentence, not a FileError dump:
+/// the CLI boundary renders simplifile.describe_error, never Enoent(.
+pub fn missing_tape_reads_as_a_sentence_test() {
+  cli_replay.replay_from_file(
+    "subject.lisp",
+    "main",
+    "/tmp/gleamunison-no-such-tape.json",
+  )
+  |> should.equal(Error("replay: cannot read tape: No such file or directory"))
+}

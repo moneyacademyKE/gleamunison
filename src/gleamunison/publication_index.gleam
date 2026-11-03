@@ -79,7 +79,7 @@ pub fn read(path: String) -> Result(List(Line), Failure) {
   case simplifile.read(path) {
     Ok(content) -> Ok(parse(content))
     Error(simplifile.Enoent) -> Ok([])
-    Error(error) -> Error(Failure(Read, string.inspect(error)))
+    Error(error) -> Error(Failure(Read, simplifile.describe_error(error)))
   }
 }
 
@@ -144,13 +144,13 @@ pub fn upsert(
 pub fn replace(path: String, lines: List(Line)) -> Result(Nil, Failure) {
   let temp = path <> ".tmp"
   case simplifile.write(temp, render(lines)) {
-    Error(error) -> Error(Failure(Write, string.inspect(error)))
+    Error(error) -> Error(Failure(Write, simplifile.describe_error(error)))
     Ok(_) ->
       case simplifile.rename(temp, path) {
         Ok(_) -> Ok(Nil)
         Error(error) -> {
           let _ = simplifile.delete(temp)
-          Error(Failure(Replace, string.inspect(error)))
+          Error(Failure(Replace, simplifile.describe_error(error)))
         }
       }
   }

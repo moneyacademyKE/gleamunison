@@ -78,6 +78,18 @@ pub fn generated_test_suite_passes_test() {
   list_all_pass(results) |> should.be_true
 }
 
+/// A missing subject reaches the user as a sentence, not a FileError
+/// dump: generate renders simplifile.describe_error, never Enoent(.
+pub fn missing_subject_reads_as_a_sentence_test() {
+  let json = record_tape()
+  cli_tape_to_test.generate(
+    "/tmp/gleamunison-no-such-subject.lisp",
+    "main",
+    json,
+  )
+  |> should.equal(Error("cannot read subject: No such file or directory"))
+}
+
 fn list_all_pass(results: List(test_runner.TestResult)) -> Bool {
   case results {
     [] -> True

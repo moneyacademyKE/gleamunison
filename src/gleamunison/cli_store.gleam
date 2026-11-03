@@ -27,7 +27,9 @@ pub fn with_dets_mapped(
   use _ <- result.try(
     simplifile.create_directory_all(directory_of(path))
     |> result.map_error(fn(e) {
-      on_store_error("cannot create store directory: " <> string.inspect(e))
+      on_store_error(
+        "cannot create store directory: " <> simplifile.describe_error(e),
+      )
     }),
   )
   use adapter <- result.try(

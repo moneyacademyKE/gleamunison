@@ -133,7 +133,7 @@ fn convert_bootstrap_type(t: bootstraps.BootstrapType) -> elab_types.Typ {
 /// the last non-define form (None when the file only defines).
 fn run_file(path: String) -> Result(option.Option(String), String) {
   case simplifile.read(path) {
-    Error(e) -> Error("Failed to read file: " <> string.inspect(e))
+    Error(e) -> Error("Failed to read file: " <> simplifile.describe_error(e))
     Ok(content) -> {
       let tokens = lexer.tokenize(content)
       case parse_all_sexprs(tokens, []) {
@@ -196,7 +196,7 @@ pub fn load_defs_file_scoped(
   path: String,
 ) -> Result(#(TypeCache, List(#(String, SurfaceDef)), List(String)), String) {
   case simplifile.read(path) {
-    Error(e) -> Error("Failed to read file: " <> string.inspect(e))
+    Error(e) -> Error("Failed to read file: " <> simplifile.describe_error(e))
     Ok(content) -> {
       let tokens = lexer.tokenize(content)
       case parse_all_sexprs(tokens, []) {

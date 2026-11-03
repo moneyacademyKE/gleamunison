@@ -32,7 +32,7 @@ pub fn command(args: List(String)) -> Nil {
         // a nonzero code.
         Error(e) ->
           cli_result.fail(
-            "tape-to-test: cannot read tape: " <> string.inspect(e),
+            "tape-to-test: cannot read tape: " <> simplifile.describe_error(e),
           )
         Ok(json) ->
           case generate(path, name, json) {
@@ -45,7 +45,8 @@ pub fn command(args: List(String)) -> Nil {
                   |> cli_result.finish
                 Error(e) ->
                   cli_result.fail(
-                    "tape-to-test: write failed: " <> string.inspect(e),
+                    "tape-to-test: write failed: "
+                    <> simplifile.describe_error(e),
                   )
               }
             }
@@ -80,7 +81,7 @@ pub fn generate(
   })
   use subject <- result_try(case simplifile.read(subject_path) {
     Ok(t) -> Ok(t)
-    Error(e) -> Error("cannot read subject: " <> string.inspect(e))
+    Error(e) -> Error("cannot read subject: " <> simplifile.describe_error(e))
   })
   use ability_name <- result_try(ability_name_for_key(entry.ability))
   use args_lit <- result_try(repr_to_literal(entry.args_repr))

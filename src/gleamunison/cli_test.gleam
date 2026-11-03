@@ -5,7 +5,6 @@ import gleam/io
 import gleam/list
 import gleam/option
 import gleam/result
-import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/cli_result
 import gleamunison/evidence
@@ -59,7 +58,8 @@ fn run_with_signer(path: String, signer: evidence.Signer) -> Nil {
   }
   let store_path = cli_lifecycle.store_path(context)
   case simplifile.create_directory_all(cli_lifecycle.root_dir(context)) {
-    Error(e) -> fail("test: cannot create store: " <> string.inspect(e))
+    Error(e) ->
+      fail("test: cannot create store: " <> simplifile.describe_error(e))
     Ok(_) ->
       case storage.dets(store_path) {
         Error(e) ->

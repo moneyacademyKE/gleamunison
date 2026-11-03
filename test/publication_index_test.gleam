@@ -133,3 +133,10 @@ pub fn describe_keeps_the_established_wording_test() {
     "unpublish: cannot replace the index: Eexist",
   ))
 }
+
+/// An unreadable index (a directory where a file is expected) reports a
+/// sentence from simplifile.describe_error, not an Eisdir( dump.
+pub fn unreadable_index_reads_as_a_sentence_test() {
+  publication_index.read("/tmp")
+  |> should.equal(Error(Failure(Read, "Is a directory")))
+}

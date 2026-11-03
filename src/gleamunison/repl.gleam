@@ -129,7 +129,7 @@ fn preload_onto(
   defs: List(#(String, elab_types.SurfaceDef)),
 ) -> Result(#(TypeCache, List(#(String, elab_types.SurfaceDef))), String) {
   case simplifile.read(path) {
-    Error(e) -> Error("cannot read file: " <> string.inspect(e))
+    Error(e) -> Error("cannot read file: " <> simplifile.describe_error(e))
     Ok(content) -> {
       let tokens = lexer.tokenize(content)
       use sexprs <- result.try(

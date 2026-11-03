@@ -6,7 +6,6 @@
 
 import gleam/list
 import gleam/result
-import gleam/string
 import gleamunison/cli_result
 import gleamunison/compile
 import gleamunison/identity
@@ -44,7 +43,8 @@ pub fn replay_from_file(
 ) -> Result(String, String) {
   use tape_text <- result.try(case simplifile.read(tape_path) {
     Ok(t) -> Ok(t)
-    Error(e) -> Error("replay: cannot read tape: " <> string.inspect(e))
+    Error(e) ->
+      Error("replay: cannot read tape: " <> simplifile.describe_error(e))
   })
   use tape <- result.try(transcript_json.from_json(tape_text))
   case transcript.is_replayable(tape) {
