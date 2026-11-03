@@ -1,5 +1,6 @@
 import gleam/result
 import gleam/string
+import gleamunison/crypto
 import gleamunison/loader_ffi
 
 /// Opaque hash type. No access to the inner bytes outside this module.
@@ -39,9 +40,6 @@ pub fn parse_ref_hex(hex: String) -> Result(DefinitionRef, String) {
 @external(erlang, "gleamunison_ffi", "hash_equal")
 fn ffi_hash_equal(_a: BitArray, _b: BitArray) -> Bool
 
-@external(erlang, "gleamunison_crypto", "hash_to_hex")
-fn ffi_hash_to_hex(_bytes: BitArray) -> String
-
 // --- Construction (module-private) ---
 
 pub fn hash_from_bytes(contents: BitArray) -> Hash {
@@ -77,7 +75,7 @@ pub fn name_ref(name: String) -> DefinitionRef {
 
 /// Produce a hex string for display/debugging.
 pub fn hash_to_debug_string(h: Hash) -> String {
-  ffi_hash_to_hex(hash_to_bytes(h))
+  crypto.to_hex(hash_to_bytes(h))
 }
 
 /// The canonical external representation of a definition reference.
