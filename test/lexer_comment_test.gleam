@@ -101,3 +101,10 @@ pub fn crlf_file_with_a_comment_parses_test() {
     Error(_) -> panic as "a CRLF file with a comment must parse"
   }
 }
+
+/// The describe owner renders message + position as one sentence; callers
+/// add their own prefix and never re-spell the tail.
+pub fn describe_error_renders_message_and_position_test() {
+  let assert "Unexpected EOF at line 3, col 7" =
+    lexer.describe_error(lexer.ParseError("Unexpected EOF", 3, 7))
+}

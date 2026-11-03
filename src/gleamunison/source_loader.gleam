@@ -3,7 +3,6 @@
 
 import gleam/list
 import gleam/result
-import gleam/string
 import gleamunison/elab_types.{type SurfaceDef, type SurfaceTerm}
 import gleamunison/lexer
 import gleamunison/repl_eval
@@ -22,13 +21,13 @@ pub fn load(source: String) -> Result(LoadedSource, String) {
   let tokens = lexer.tokenize(source)
   use exprs <- result.try(
     verify.parse_all_sexprs(tokens, [])
-    |> result.map_error(fn(e) {
-      "Parse Error: " <> e.message <> " at line " <> string.inspect(e.line)
-    }),
+    |> result.map_error(fn(e) { "Parse Error: " <> lexer.describe_error(e) }),
   )
   use terms <- result.try(
     verify.terms_from_sexprs(exprs, [])
-    |> result.map_error(fn(e) { "S-Expression Error: " <> e.message }),
+    |> result.map_error(fn(e) {
+      "S-Expression Error: " <> lexer.describe_error(e)
+    }),
   )
   use terms <- result.try(verify.require_forms(terms))
   let init_defs = verify.get_init_defs()

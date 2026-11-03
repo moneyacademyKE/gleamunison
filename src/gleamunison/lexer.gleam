@@ -28,6 +28,17 @@ pub type ParseError {
   ParseError(message: String, line: Int, col: Int)
 }
 
+/// Render a parse error as a sentence: the message with its position.
+/// Callers add their own prefix; this owns only the shared tail so the
+/// position is never rendered with inspects or re-spelled per site.
+pub fn describe_error(error: ParseError) -> String {
+  error.message
+  <> " at line "
+  <> int.to_string(error.line)
+  <> ", col "
+  <> int.to_string(error.col)
+}
+
 pub fn tokenize(input: String) -> List(TokenInfo) {
   case source_budget.check(input) {
     Error(reason) -> [TokenInfo(AdmissionRefused(reason), 1, 1)]

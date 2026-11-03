@@ -154,15 +154,7 @@ fn parse_all(tokens, acc) {
     _ ->
       case parser.parse_sexpr(tokens) {
         Ok(#(sexpr, rest)) -> parse_all(rest, [sexpr, ..acc])
-        Error(e) ->
-          Error(
-            "tokenize: "
-            <> e.message
-            <> " at line "
-            <> int.to_string(e.line)
-            <> ", col "
-            <> int.to_string(e.col),
-          )
+        Error(e) -> Error("tokenize: " <> lexer.describe_error(e))
       }
   }
 }

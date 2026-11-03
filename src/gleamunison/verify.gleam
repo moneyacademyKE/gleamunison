@@ -1,7 +1,6 @@
 import gleam/list
 import gleam/option
 import gleam/result
-import gleam/string
 import gleamunison/bootstraps
 import gleamunison/elab_types.{type SurfaceDef, type SurfaceTerm, SurfaceTermDef}
 import gleamunison/lexer
@@ -142,27 +141,11 @@ fn read_terms(path: String) -> Result(List(SurfaceTerm), String) {
   let tokens = lexer.tokenize(content)
   use exprs <- result.try(case parse_all_sexprs(tokens, []) {
     Ok(exprs) -> Ok(exprs)
-    Error(e) ->
-      Error(
-        "Parse Error: "
-        <> e.message
-        <> " at line "
-        <> string.inspect(e.line)
-        <> ", col "
-        <> string.inspect(e.col),
-      )
+    Error(e) -> Error("Parse Error: " <> lexer.describe_error(e))
   })
   use terms <- result.try(case terms_from_sexprs(exprs, []) {
     Ok(terms) -> Ok(terms)
-    Error(e) ->
-      Error(
-        "S-Expression Error: "
-        <> e.message
-        <> " at line "
-        <> string.inspect(e.line)
-        <> ", col "
-        <> string.inspect(e.col),
-      )
+    Error(e) -> Error("S-Expression Error: " <> lexer.describe_error(e))
   })
   require_forms(terms)
 }
