@@ -38,6 +38,25 @@ pub type InsertError {
   StorageFailure(storage.StorageError)
 }
 
+/// The one place an InsertError becomes a user sentence. Rendering belongs
+/// here, with the type, rather than at each call site — inspect output is
+/// a debug rendering and must never reach a user.
+pub fn describe_insert_error(error: InsertError) -> String {
+  case error {
+    HashMismatch(expected, got) ->
+      "hash mismatch: expected "
+      <> identity.ref_hex(Ref(expected))
+      <> ", got "
+      <> identity.ref_hex(Ref(got))
+    DuplicateDef(existing, incoming) ->
+      "duplicate definition: "
+      <> identity.ref_hex(incoming)
+      <> " already stored as "
+      <> identity.ref_hex(existing)
+    StorageFailure(error) -> storage.describe_error(error)
+  }
+}
+
 fn hash_to_binary(h: Hash) -> BitArray {
   str_to_bits(hash_to_debug_string(h))
 }

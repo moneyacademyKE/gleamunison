@@ -208,7 +208,7 @@ fn pull_first(
   let fetch = fn(hexes: List(String)) -> Result(Nil, String) {
     sync.fetch_refs(PeerId(peer), cb, hexes)
     |> result.map(fn(_) { Nil })
-    |> result.map_error(fn(e) { string.inspect(e) })
+    |> result.map_error(fn(e) { sync.describe_error(e) })
   }
   use closure <- result.try(pkg.pull_closure(adapter, root_hex, fetch))
   // The closure is content; admission is a claim about it. Pull the peer's
@@ -218,7 +218,7 @@ fn pull_first(
     sync.fetch_evidence(PeerId(peer), cb, closure.defs)
     |> result.map(fn(_) { Nil })
     |> result.map_error(fn(e) {
-      "pkg: cannot fetch evidence: " <> string.inspect(e)
+      "pkg: cannot fetch evidence: " <> sync.describe_error(e)
     }),
   )
   cli_result.success(

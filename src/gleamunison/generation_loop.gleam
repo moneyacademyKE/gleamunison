@@ -94,7 +94,7 @@ fn prepare(
   use rendered <- result.try(
     prompt.render(plan.template, [#("signature", signature), ..plan.variables])
     |> result.map_error(fn(error) {
-      "cannot render generation prompt: " <> string.inspect(error)
+      "cannot render generation prompt: " <> prompt.describe_error(error)
     }),
   )
   use Nil <- result.try(check_size(
@@ -106,7 +106,7 @@ fn prepare(
   use #(_, prompt_ref) <- result.try(
     prompt.put_checked(codebase.with_adapter(adapter), plan.template)
     |> result.map_error(fn(error) {
-      "cannot store generation prompt: " <> string.inspect(error)
+      "cannot store generation prompt: " <> prompt.describe_error(error)
     }),
   )
   attempt(

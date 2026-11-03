@@ -24,6 +24,18 @@ pub type PromptError {
   Storage(reason: String)
 }
 
+/// The one place a PromptError becomes a user sentence. Rendering belongs
+/// here, with the type, rather than at each call site — inspect output is
+/// a debug rendering and must never reach a user.
+pub fn describe_error(error: PromptError) -> String {
+  case error {
+    NotFound -> "prompt not found"
+    Unreadable -> "prompt unreadable"
+    MissingVar(name) -> "missing template variable: " <> name
+    Storage(reason) -> reason
+  }
+}
+
 /// Store a prompt without hiding a failed CAS write behind a valid-looking ref.
 pub fn put_checked(
   cb: Codebase,
@@ -31,7 +43,9 @@ pub fn put_checked(
 ) -> Result(#(Codebase, DefinitionRef), PromptError) {
   let ref = template_ref(template)
   codebase.insert_raw_checked(cb, ref, bit_array.from_string(template))
-  |> result.map_error(fn(error) { Storage(string.inspect(error)) })
+  |> result.map_error(fn(error) {
+    Storage(codebase.describe_insert_error(error))
+  })
   |> result.map(fn(updated) { #(updated, ref) })
 }
 

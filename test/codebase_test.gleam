@@ -1,6 +1,11 @@
 import gleamunison/ast
-import gleamunison/codebase.{HashMismatch, empty, hash_of_definition, insert}
-import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal}
+import gleamunison/codebase.{
+  DuplicateDef, HashMismatch, StorageFailure, describe_insert_error, empty,
+  hash_of_definition, insert,
+}
+import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal, ref_hex}
+import gleamunison/storage
+import gleeunit/should
 
 pub fn typedef_distinct_hash_test() {
   let t1 =
@@ -44,4 +49,29 @@ pub fn hash_mismatch_labels_test() {
   let Ref(wrong_hash) = wrong_ref
   let assert True = hash_equal(expected, computed)
   let assert True = hash_equal(got, wrong_hash)
+}
+
+pub fn describe_insert_error_renders_sentences_test() {
+  let expected = hash_bytes(<<"expected">>)
+  let got = hash_bytes(<<"got">>)
+  describe_insert_error(HashMismatch(expected, got))
+  |> should.equal(
+    "hash mismatch: expected "
+    <> ref_hex(Ref(expected))
+    <> ", got "
+    <> ref_hex(Ref(got)),
+  )
+  let existing = Ref(hash_bytes(<<"existing">>))
+  let incoming = Ref(hash_bytes(<<"incoming">>))
+  describe_insert_error(DuplicateDef(existing, incoming))
+  |> should.equal(
+    "duplicate definition: "
+    <> ref_hex(incoming)
+    <> " already stored as "
+    <> ref_hex(existing),
+  )
+  describe_insert_error(StorageFailure(storage.NotFound))
+  |> should.equal("not found")
+  describe_insert_error(StorageFailure(storage.IoError("disk offline")))
+  |> should.equal("io error: disk offline")
 }

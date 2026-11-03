@@ -51,6 +51,15 @@ pub type AttachError {
   StoreFailed(String)
 }
 
+/// The one place an AttachError becomes a user sentence. Rendering belongs
+/// here, with the type, rather than at each call site — inspect output is
+/// a debug rendering and must never reach a user.
+pub fn describe_attach_error(error: AttachError) -> String {
+  case error {
+    StoreFailed(reason) -> reason
+  }
+}
+
 pub fn production_signer() -> Result(Signer, String) {
   case env.get("GLEAMUNISON_EVIDENCE_SIGNING_KEY") {
     Ok(secret) if secret != "" ->

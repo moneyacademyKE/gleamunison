@@ -1,5 +1,5 @@
 import gleam/bit_array
-import gleamunison/evidence
+import gleamunison/evidence.{StoreFailed, describe_attach_error}
 import gleamunison/identity.{Ref}
 import gleamunison/storage
 import gleamunison/trust
@@ -132,4 +132,9 @@ pub fn signed_evidence_requires_matching_identity_and_secret_test() {
     trust.policy([trust.active(wrong_secret, 0, trust.never)]),
   )
   |> should.equal(Error(trust.SignatureMismatch("ci")))
+}
+
+pub fn describe_attach_error_returns_payload_sentence_test() {
+  describe_attach_error(StoreFailed("evidence store unavailable"))
+  |> should.equal("evidence store unavailable")
 }

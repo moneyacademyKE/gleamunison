@@ -132,7 +132,7 @@ pub fn run_file(
   use records <- result.try(
     result.all(attached)
     |> result.map_error(fn(e) {
-      "cannot attach evidence: " <> string.inspect(e)
+      "cannot attach evidence: " <> evidence.describe_attach_error(e)
     }),
   )
   Ok(#(
@@ -156,7 +156,7 @@ fn run_file_with_signer(
   use records <- result.try(
     result.all(attached)
     |> result.map_error(fn(e) {
-      "cannot attach evidence: " <> string.inspect(e)
+      "cannot attach evidence: " <> evidence.describe_attach_error(e)
     }),
   )
   Ok(#(

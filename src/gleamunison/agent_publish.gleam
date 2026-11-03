@@ -178,7 +178,7 @@ fn attest_results(
         )
       result.all(attachments)
       |> result.map_error(fn(error) {
-        "cannot attach evidence: " <> string.inspect(error)
+        "cannot attach evidence: " <> evidence.describe_attach_error(error)
       })
       |> result.map(fn(_) { Nil })
     }

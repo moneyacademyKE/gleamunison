@@ -188,7 +188,10 @@ fn store_definitions(
           ast.Unit(root: ref, defs: [#(ref, subject.definition)]),
         )
         |> result.map_error(fn(error) {
-          "cannot store " <> subject.name <> ": " <> string.inspect(error)
+          "cannot store "
+          <> subject.name
+          <> ": "
+          <> codebase.describe_insert_error(error)
         }),
       )
       store_log.record_content(directory, subject.content_ref, "term")

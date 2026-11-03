@@ -79,3 +79,12 @@ pub fn vars_extraction_dedups_test() {
   let assert True = list.contains(vs, "b")
   let assert True = list.length(vs) == 2
 }
+
+pub fn describe_error_renders_sentences_test() {
+  let assert "prompt not found" = prompt.describe_error(prompt.NotFound)
+  let assert "prompt unreadable" = prompt.describe_error(prompt.Unreadable)
+  let assert "missing template variable: signature" =
+    prompt.describe_error(prompt.MissingVar("signature"))
+  let assert "lookup failed" =
+    prompt.describe_error(prompt.Storage("lookup failed"))
+}
