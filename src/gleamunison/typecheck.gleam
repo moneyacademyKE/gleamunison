@@ -1,7 +1,7 @@
 import gleam/dict
 import gleam/list
-import gleam/string
 import gleamunison/ast
+import gleamunison/elab_def
 import gleamunison/elab_types.{type ElaborateError, InferFailed}
 import gleamunison/identity.{Ref, hash_to_debug_string}
 import gleamunison/infer_helper.{normalize_type}
@@ -38,7 +38,7 @@ pub fn typecheck_unit(
                 }
               }
             }
-            Error(e) -> Error(InferFailed(string.inspect(e)))
+            Error(e) -> Error(InferFailed(elab_def.render_inference_error(e)))
           }
         }
         _ -> Ok(current_cache)

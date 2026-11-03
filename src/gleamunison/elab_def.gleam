@@ -20,8 +20,9 @@ import gleamunison/types.{
 
 /// Render an inference error for the user without the embedded subterm
 /// (which would be an unreadable AST dump); the subterm's span is attached
-/// separately as an At wrapper.
-fn render_inference_error(e: InferenceError) -> String {
+/// separately as an At wrapper. Shared with typecheck's recheck path: one
+/// renderer for the inference vocabulary.
+pub fn render_inference_error(e: InferenceError) -> String {
   case e {
     TypeMismatch(expected, actual, message, _) ->
       message

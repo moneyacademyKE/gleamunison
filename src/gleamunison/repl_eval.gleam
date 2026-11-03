@@ -294,7 +294,10 @@ fn compile_and_load(
 ) -> Result(Nil, String) {
   let _ = unload_binary(mod_name)
   case compile_definition(new_compiler(), def, ref) {
-    Error(e) -> Error("Compile Error: " <> string.inspect(e))
+    Error(e) -> {
+      let compile.InternalError(reason) = e
+      Error("Compile Error: " <> reason)
+    }
     Ok(beam) ->
       case load_binary(mod_name, beam) {
         Error(err) -> Error("Load Error: " <> err)

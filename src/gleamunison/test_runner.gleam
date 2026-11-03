@@ -11,7 +11,9 @@ import gleamunison/dynamic_ffi.{from_dynamic, to_dynamic}
 import gleamunison/effects.{
   type HandlerFrame, type OpHandler, HandlerFrame, RuntimeConfig,
 }
-import gleamunison/elab_types.{type SurfaceDef, SurfaceTermDef, SurfaceUnit}
+import gleamunison/elab_types.{
+  type SurfaceDef, SurfaceTermDef, SurfaceUnit, describe,
+}
 import gleamunison/elaborate as elab
 import gleamunison/evidence
 import gleamunison/identity.{type DefinitionRef, hash_to_debug_string}
@@ -146,7 +148,7 @@ pub fn elaborated_def_for(
 ) -> Result(ast.Definition, String) {
   let root = identity.name_ref(name)
   case elab.elaborate_unit(SurfaceUnit(root: root, defs:), cache) {
-    Error(err) -> Error(string.inspect(err))
+    Error(err) -> Error(describe(err))
     Ok(#(unit, _, _)) ->
       case list.key_find(unit.defs, root) {
         Ok(def) -> Ok(def)

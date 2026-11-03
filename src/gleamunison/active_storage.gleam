@@ -3,7 +3,6 @@
 import gleam/dynamic.{type Dynamic}
 import gleam/list
 import gleam/result
-import gleam/string
 import gleamunison/cli_lifecycle
 import gleamunison/dynamic_ffi.{from_dynamic}
 import gleamunison/identity.{
@@ -37,7 +36,7 @@ pub fn active_or_open() -> Result(StorageAdapter, String) {
     Ok(backend) -> Ok(adapter(from_dynamic(backend)))
     Error(_) -> {
       use path <- result.try(cli_lifecycle.resolve_store_path())
-      storage.dets(path) |> result.map_error(string.inspect)
+      storage.dets(path) |> result.map_error(storage.describe_error)
     }
   }
 }

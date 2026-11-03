@@ -1,4 +1,3 @@
-import gleam/string
 import gleamunison/ast
 import gleamunison/compile.{
   compile_definition, module_name_for, new as new_compiler,
@@ -43,7 +42,10 @@ pub fn compile_only(
   let _ = unload_binary(mod_name)
   case compile_definition(new_compiler(), def, ref) {
     Ok(beam) -> Ok(beam)
-    Error(e) -> Error(string.inspect(e))
+    Error(e) -> {
+      let compile.InternalError(reason) = e
+      Error("Compile Error: " <> reason)
+    }
   }
 }
 
