@@ -4,9 +4,7 @@
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/string
-import gleamunison/effects.{
-  type HandlerFrame, type OpHandler, HandlerFrame, ability_key,
-}
+import gleamunison/effects.{type OpHandler, ability_key}
 import gleamunison/identity.{type DefinitionRef}
 
 pub fn ability_ref() -> DefinitionRef {
@@ -38,10 +36,6 @@ pub fn operations() -> Dict(Int, OpHandler) {
     #(1, binary_operation("get", get)),
     #(2, binary_operation("find", find)),
   ])
-}
-
-pub fn frame() -> HandlerFrame {
-  HandlerFrame(ability: ability_ref(), ops: operations())
 }
 
 fn binary_operation(

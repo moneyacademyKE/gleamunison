@@ -10,9 +10,6 @@ pub type CryptoError {
   InvalidInput(reason: String)
 }
 
-@external(erlang, "gleamunison_crypto", "hash")
-fn ffi_hash(algo: String, data: BitArray) -> Result(BitArray, String)
-
 @external(erlang, "gleamunison_crypto", "hmac")
 fn ffi_hmac(
   algo: String,
@@ -31,14 +28,6 @@ fn algo_to_string(algo: HashAlgorithm) -> String {
   }
 }
 
-pub fn hash(
-  algo: HashAlgorithm,
-  data: BitArray,
-) -> Result(BitArray, CryptoError) {
-  ffi_hash(algo_to_string(algo), data)
-  |> result.map_error(fn(e) { InvalidInput(e) })
-}
-
 pub fn hmac(
   algo: HashAlgorithm,
   key: BitArray,
@@ -46,16 +35,6 @@ pub fn hmac(
 ) -> Result(BitArray, CryptoError) {
   ffi_hmac(algo_to_string(algo), key, data)
   |> result.map_error(fn(e) { InvalidInput(e) })
-}
-
-pub fn hash_hex(
-  algo: HashAlgorithm,
-  data: BitArray,
-) -> Result(String, CryptoError) {
-  case hash(algo, data) {
-    Ok(digest) -> Ok(ffi_hash_to_hex(digest))
-    Error(e) -> Error(e)
-  }
 }
 
 /// Hex-encode raw bytes (no hashing).

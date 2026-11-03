@@ -7,14 +7,6 @@
 import birl
 import gleam/string
 
-pub opaque type DateTime {
-  DateTime(timestamp: Int)
-}
-
-pub fn now() -> DateTime {
-  DateTime(now_unix())
-}
-
 /// Whole Unix seconds, the shape stored by logs and evidence.
 pub fn now_unix() -> Int {
   birl.to_unix(birl.utc_now())
