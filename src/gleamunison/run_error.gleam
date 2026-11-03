@@ -8,7 +8,6 @@
 import gleam/int
 import gleamunison/codebase
 import gleamunison/identity.{type DefinitionRef}
-import gleamunison/loader
 
 pub type RunError {
   Missing(ref: DefinitionRef)
@@ -29,13 +28,6 @@ pub fn read_error(ref: DefinitionRef, error: codebase.ReadError) -> RunError {
   case error {
     codebase.NotFound(_) -> Missing(ref)
     other -> Unreadable(ref, codebase.describe_read_error(other))
-  }
-}
-
-pub fn describe_load(error: loader.LoaderError) -> String {
-  case error {
-    loader.CompileFailed(_, message) -> "compile failed: " <> message
-    loader.LoadFailed(_, message) -> "load failed: " <> message
   }
 }
 

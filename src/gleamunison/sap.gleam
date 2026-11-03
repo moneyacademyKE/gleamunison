@@ -33,6 +33,14 @@ pub type SapError {
   ValidationFailed(paths: List(String))
 }
 
+pub fn describe(error: SapError) -> String {
+  case error {
+    NoJsonFound -> "contains no JSON"
+    StrictError(reason) -> "is not valid JSON: " <> reason
+    ValidationFailed(paths) -> "schema mismatch: " <> string.join(paths, ", ")
+  }
+}
+
 /// Repair near-miss model output into strict JSON text.
 pub fn parse(text: String) -> Result(String, SapError) {
   let unfenced = strip_fences(text)

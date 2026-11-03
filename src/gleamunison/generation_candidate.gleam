@@ -23,7 +23,8 @@ pub fn decode(
   expected_signature: String,
 ) -> Result(String, String) {
   use value <- result.try(
-    sap.decode_as(raw, envelope_schema()) |> result.map_error(describe_sap),
+    sap.decode_as(raw, envelope_schema())
+    |> result.map_error(describe_candidate_error),
   )
   use fields <- result.try(decode_fields(value))
   use Nil <- result.try(case dict.size(fields) {
@@ -67,12 +68,6 @@ fn string_field(
   )
 }
 
-fn describe_sap(error: sap.SapError) -> String {
-  case error {
-    sap.NoJsonFound -> "generation candidate contains no JSON"
-    sap.StrictError(reason) ->
-      "generation candidate is not valid JSON: " <> reason
-    sap.ValidationFailed(paths) ->
-      "generation candidate schema mismatch: " <> string.join(paths, ", ")
-  }
+fn describe_candidate_error(error: sap.SapError) -> String {
+  "generation candidate " <> sap.describe(error)
 }

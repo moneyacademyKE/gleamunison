@@ -18,7 +18,7 @@ import gleamunison/identity.{type DefinitionRef}
 import gleamunison/loader
 import gleamunison/name_snapshot
 import gleamunison/run_error.{
-  type RunError, Cycle, LoadFailed, Missing, describe_load, read_error,
+  type RunError, Cycle, LoadFailed, Missing, read_error,
 }
 
 pub fn resolve(
@@ -74,7 +74,7 @@ pub fn resolve_definition(
         ),
       )
       loader.ensure_loaded(ld, ref, definition)
-      |> result.map_error(fn(pair) { LoadFailed(ref, describe_load(pair.1)) })
+      |> result.map_error(fn(pair) { LoadFailed(ref, loader.describe(pair.1)) })
     }
   }
 }

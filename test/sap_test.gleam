@@ -5,10 +5,21 @@ import gleam/string
 import gleamunison/ast
 import gleamunison/json
 import gleamunison/sap.{SBool, SInt, SList, SObj, SText}
+import gleeunit/should
 
 pub fn clean_json_passes_through_test() {
   let assert Ok(repaired) = sap.parse("{\"a\": 1, \"b\": [1, 2]}")
   let assert True = repaired == "{\"a\": 1, \"b\": [1, 2]}"
+}
+
+pub fn describe_sap_errors_test() {
+  sap.describe(sap.NoJsonFound) |> should.equal("contains no JSON")
+
+  sap.describe(sap.StrictError("unexpected token"))
+  |> should.equal("is not valid JSON: unexpected token")
+
+  sap.describe(sap.ValidationFailed(["$.age", "$.name"]))
+  |> should.equal("schema mismatch: $.age, $.name")
 }
 
 pub fn strips_markdown_fence_test() {

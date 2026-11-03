@@ -20,6 +20,13 @@ pub type LoaderError {
   LoadFailed(DefinitionRef, message: String)
 }
 
+pub fn describe(error: LoaderError) -> String {
+  case error {
+    CompileFailed(_, message) -> "compile failed: " <> message
+    LoadFailed(_, message) -> "load failed: " <> message
+  }
+}
+
 pub opaque type Loader {
   Loader(
     compiler: Compiler,
