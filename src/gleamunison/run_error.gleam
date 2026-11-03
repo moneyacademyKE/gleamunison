@@ -6,7 +6,6 @@
 //// would only add translation layers between them.
 
 import gleam/int
-import gleam/string
 import gleamunison/codebase
 import gleamunison/identity.{type DefinitionRef}
 import gleamunison/loader
@@ -29,11 +28,7 @@ fn hex(ref: DefinitionRef) -> String {
 pub fn read_error(ref: DefinitionRef, error: codebase.ReadError) -> RunError {
   case error {
     codebase.NotFound(_) -> Missing(ref)
-    codebase.StoreFailure(reason) -> Unreadable(ref, string.inspect(reason))
-    codebase.Corrupt(_, reason) ->
-      Unreadable(ref, "content does not match its ref: " <> reason)
-    codebase.DecodeFailed(_, reason) ->
-      Unreadable(ref, "payload is not a definition: " <> reason)
+    other -> Unreadable(ref, codebase.describe_read_error(other))
   }
 }
 

@@ -57,6 +57,19 @@ pub fn describe_insert_error(error: InsertError) -> String {
   }
 }
 
+/// The one place a ReadError becomes a user sentence. Same rule as
+/// describe_insert_error: rendering belongs with the type, and inspect
+/// output must never reach a user. NotFound carries no sentence here —
+/// callers with a "missing" vocabulary of their own name it there.
+pub fn describe_read_error(error: ReadError) -> String {
+  case error {
+    NotFound(_) -> "not in the store"
+    StoreFailure(error) -> storage.describe_error(error)
+    Corrupt(_, reason) -> "content does not match its ref: " <> reason
+    DecodeFailed(_, reason) -> "payload is not a definition: " <> reason
+  }
+}
+
 fn hash_to_binary(h: Hash) -> BitArray {
   str_to_bits(hash_to_debug_string(h))
 }

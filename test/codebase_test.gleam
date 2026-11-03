@@ -1,7 +1,7 @@
 import gleamunison/ast
 import gleamunison/codebase.{
-  DuplicateDef, HashMismatch, StorageFailure, describe_insert_error, empty,
-  hash_of_definition, insert,
+  Corrupt, DecodeFailed, DuplicateDef, HashMismatch, NotFound, StorageFailure,
+  describe_insert_error, describe_read_error, empty, hash_of_definition, insert,
 }
 import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal, ref_hex}
 import gleamunison/storage
@@ -74,4 +74,18 @@ pub fn describe_insert_error_renders_sentences_test() {
   |> should.equal("not found")
   describe_insert_error(StorageFailure(storage.IoError("disk offline")))
   |> should.equal("io error: disk offline")
+}
+
+pub fn describe_read_error_renders_sentences_test() {
+  let ref = Ref(hash_bytes(<<"missing">>))
+  describe_read_error(NotFound(ref))
+  |> should.equal("not in the store")
+  describe_read_error(codebase.StoreFailure(storage.NotFound))
+  |> should.equal("not found")
+  describe_read_error(codebase.StoreFailure(storage.IoError("disk offline")))
+  |> should.equal("io error: disk offline")
+  describe_read_error(Corrupt(ref, "checksum failed"))
+  |> should.equal("content does not match its ref: checksum failed")
+  describe_read_error(DecodeFailed(ref, "bad tag"))
+  |> should.equal("payload is not a definition: bad tag")
 }
