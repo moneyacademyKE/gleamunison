@@ -128,7 +128,8 @@ pub fn retract(
     |> result.map_error(fn(error) {
       #(
         cli_result.refused,
-        "unpublish: cannot inspect store: " <> string.inspect(error),
+        "unpublish: cannot inspect store: "
+          <> dependency_snapshot.describe_error(error),
       )
     }),
   )

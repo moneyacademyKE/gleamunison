@@ -75,7 +75,8 @@ pub fn purge(
     |> result.map_error(fn(error) {
       #(
         cli_result.refused,
-        "purge: cannot inspect store: " <> string.inspect(error),
+        "purge: cannot inspect store: "
+          <> dependency_snapshot.describe_error(error),
       )
     }),
   )

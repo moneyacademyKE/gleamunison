@@ -7,15 +7,21 @@
 
 import gleam/list
 import gleam/option.{None, Some}
+import gleam/string
 import gleamunison/ast
+import gleamunison/cli_store
 import gleamunison/codebase
 import gleamunison/definition_refs
-import gleamunison/dependency_snapshot
+import gleamunison/dependency_snapshot.{
+  CorruptDefinition, NamespaceFailure, StoreFailure, describe_error,
+}
 import gleamunison/genesis
-import gleamunison/identity.{type DefinitionRef, Local, Ref}
+import gleamunison/identity.{type DefinitionRef, Local, Ref, ref_hex}
 import gleamunison/namespace
 import gleamunison/repl_eval
+import gleamunison/storage
 import gleeunit/should
+import simplifile
 
 fn insert(
   cb: codebase.Codebase,
@@ -245,4 +251,39 @@ pub fn a_shared_transitive_dependency_stays_test() {
 fn should_not_contain(items: List(a), value: a) -> Bool {
   let assert False = list.contains(items, value)
   True
+}
+
+pub fn describe_error_store_failure_renders_sentence_test() {
+  describe_error(StoreFailure(storage.StorageError("read denied")))
+  |> should.equal("read denied")
+  describe_error(StoreFailure(storage.NotFound)) |> should.equal("not found")
+  describe_error(StoreFailure(storage.IoError("disk offline")))
+  |> should.equal("io error: disk offline")
+}
+
+pub fn describe_error_namespace_failure_passes_through_test() {
+  describe_error(NamespaceFailure("branch pointer unreadable"))
+  |> should.equal("branch pointer unreadable")
+}
+
+pub fn describe_error_corrupt_definition_names_ref_test() {
+  let ref = int_fn_returning(12) |> codebase.hash_of_definition |> Ref
+  describe_error(CorruptDefinition(ref))
+  |> should.equal("corrupt or unreadable definition " <> ref_hex(ref))
+}
+
+pub fn broken_store_path_yields_sentence_not_constructor_dump_test() {
+  let dir = "/tmp/gleamunison-store-deps-describe"
+  let _ = simplifile.create_directory_all(dir)
+  let outcome =
+    cli_store.with_dets_mapped(dir, fn(_adapter) { Ok(Nil) }, fn(message) {
+      message
+    })
+  let _ = simplifile.delete(dir)
+  let assert Error(message) = outcome
+  message
+  |> string.starts_with("cannot open store at " <> dir <> ": ")
+  |> should.be_true
+  message |> string.contains("StorageError(") |> should.be_false
+  message |> string.contains("IoError(") |> should.be_false
 }

@@ -19,6 +19,20 @@ pub type ScanError {
   CorruptDefinition(DefinitionRef)
 }
 
+/// The one place a ScanError becomes a user sentence. Rendering belongs
+/// here, with the type, rather than at each CLI call site — inspect output
+/// is a debug rendering and must never reach a user. Mirrors
+/// store_deps.describe_dependency_error without sharing the type: each
+/// error keeps its own owner.
+pub fn describe_error(error: ScanError) -> String {
+  case error {
+    StoreFailure(error) -> storage.describe_error(error)
+    NamespaceFailure(reason) -> reason
+    CorruptDefinition(ref) ->
+      "corrupt or unreadable definition " <> identity.ref_hex(ref)
+  }
+}
+
 pub opaque type Snapshot {
   Snapshot(
     ns: namespace.Namespace,

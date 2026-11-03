@@ -62,13 +62,15 @@ fn run_with_signer(path: String, signer: evidence.Signer) -> Nil {
     Error(e) -> fail("test: cannot create store: " <> string.inspect(e))
     Ok(_) ->
       case storage.dets(store_path) {
-        Error(e) -> fail("test: cannot open store: " <> string.inspect(e))
+        Error(e) ->
+          fail("test: cannot open store: " <> storage.describe_error(e))
         Ok(adapter) -> {
           let outcome = run_file_with_signer(path, adapter, signer)
           // This command owns the adapter. Closing flushes buffered DETS
           // writes before any success message or nonzero process exit.
           case adapter.close() {
-            Error(e) -> fail("test: cannot close store: " <> string.inspect(e))
+            Error(e) ->
+              fail("test: cannot close store: " <> storage.describe_error(e))
             Ok(_) ->
               case outcome {
                 Error(err) -> fail("test: " <> err)

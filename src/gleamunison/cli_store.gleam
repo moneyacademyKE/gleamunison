@@ -34,7 +34,7 @@ pub fn with_dets_mapped(
     storage.dets(path)
     |> result.map_error(fn(e) {
       on_store_error(
-        "cannot open store at " <> path <> ": " <> string.inspect(e),
+        "cannot open store at " <> path <> ": " <> storage.describe_error(e),
       )
     }),
   )
@@ -43,7 +43,9 @@ pub fn with_dets_mapped(
   case outcome, closed {
     Error(reason), _ -> Error(reason)
     Ok(_), Error(reason) ->
-      Error(on_store_error("cannot close store: " <> string.inspect(reason)))
+      Error(on_store_error(
+        "cannot close store: " <> storage.describe_error(reason),
+      ))
     Ok(value), Ok(_) -> Ok(value)
   }
 }

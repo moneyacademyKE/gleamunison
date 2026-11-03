@@ -52,7 +52,8 @@ fn publish_with_store(
   let manifest_path = cli_lifecycle.manifest_path(context)
   let _ = simplifile.create_directory_all(cli_lifecycle.root_dir(context))
   case storage.dets(store_path) {
-    Error(e) -> fail("publish: cannot open store: " <> string.inspect(e))
+    Error(e) ->
+      fail("publish: cannot open store: " <> storage.describe_error(e))
     Ok(adapter) ->
       case verify.load_defs_file_scoped(path) {
         Error(err) -> {
@@ -86,7 +87,9 @@ fn publish_with_store(
                 )
               case adapter.close() {
                 Error(e) ->
-                  fail("publish: cannot close store: " <> string.inspect(e))
+                  fail(
+                    "publish: cannot close store: " <> storage.describe_error(e),
+                  )
                 Ok(_) -> Nil
               }
               case decision {
