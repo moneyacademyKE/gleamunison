@@ -78,6 +78,17 @@ pub fn hash_to_debug_string(h: Hash) -> String {
   crypto.to_hex(hash_to_bytes(h))
 }
 
+/// The canonical byte input a hash contributes when another hash is derived
+/// over it (structural hashing in codebase). FROZEN: this is the hash's
+/// 64-char lowercase hex text re-encoded as UTF-8 bytes, not the raw
+/// 32 digest bytes of hash_to_bytes. Every stored definition ref was
+/// derived over these bytes; switching to raw bytes would orphan all
+/// stored content. The derivation is documented here, with its owner,
+/// so no other module keeps a private copy of it.
+pub fn hash_to_hash_input(h: Hash) -> BitArray {
+  loader_ffi.string_to_binary(hash_to_debug_string(h))
+}
+
 /// The canonical external representation of a definition reference.
 pub fn ref_hex(ref: DefinitionRef) -> String {
   let Ref(hash) = ref

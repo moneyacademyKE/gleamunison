@@ -10,7 +10,7 @@ import gleamunison/ast
 import gleamunison/definition_codec
 import gleamunison/identity.{
   type DefinitionRef, type Hash, Local, Ref, hash_bytes, hash_equal,
-  hash_to_debug_string,
+  hash_to_debug_string, hash_to_hash_input,
 }
 import gleamunison/storage.{type StorageAdapter, inmemory}
 
@@ -70,16 +70,14 @@ pub fn describe_read_error(error: ReadError) -> String {
   }
 }
 
-fn hash_to_binary(h: Hash) -> BitArray {
-  str_to_bits(hash_to_debug_string(h))
-}
-
 fn hash_type_ref(tr: ast.TypeRef) -> Hash {
   case tr {
     ast.TypeRefVar(Local(i)) ->
       hash_bytes(str_to_bits("typerefvar:" <> int.to_string(i)))
     ast.TypeCon(Ref(h)) ->
-      hash_bytes(bit_array.concat([str_to_bits("typecon:"), hash_to_binary(h)]))
+      hash_bytes(
+        bit_array.concat([str_to_bits("typecon:"), hash_to_hash_input(h)]),
+      )
     ast.TypeRefBuiltin(bt) -> {
       let name = case bt {
         ast.IntType -> "int"
@@ -99,7 +97,7 @@ fn hash_constructor(c: ast.Constructor) -> Hash {
   hash_bytes(
     bit_array.concat([
       str_to_bits("constructor:" <> int.to_string(i)),
-      ..list.map(args, fn(a) { hash_to_binary(hash_type_ref(a)) })
+      ..list.map(args, fn(a) { hash_to_hash_input(hash_type_ref(a)) })
     ]),
   )
 }
@@ -109,8 +107,8 @@ fn hash_operation(op: ast.Operation) -> Hash {
   hash_bytes(
     bit_array.concat([
       str_to_bits("operation:" <> int.to_string(i)),
-      hash_to_binary(hash_type_ref(output)),
-      ..list.map(inputs, fn(inp) { hash_to_binary(hash_type_ref(inp)) })
+      hash_to_hash_input(hash_type_ref(output)),
+      ..list.map(inputs, fn(inp) { hash_to_hash_input(hash_type_ref(inp)) })
     ]),
   )
 }
@@ -130,15 +128,15 @@ fn hash_pattern(p: ast.Pattern) -> Hash {
       hash_bytes(
         bit_array.concat([
           str_to_bits("patas:" <> int.to_string(i) <> ":"),
-          hash_to_binary(hash_pattern(inner)),
+          hash_to_hash_input(hash_pattern(inner)),
         ]),
       )
     ast.PatConstructor(ctor_ref: Ref(h), args:) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("patctor:"),
-          hash_to_binary(h),
-          ..list.map(args, fn(a) { hash_to_binary(hash_pattern(a)) })
+          hash_to_hash_input(h),
+          ..list.map(args, fn(a) { hash_to_hash_input(hash_pattern(a)) })
         ]),
       )
   }
@@ -152,9 +150,9 @@ fn hash_case(c: ast.Case) -> Hash {
   hash_bytes(
     bit_array.concat([
       str_to_bits("case:"),
-      hash_to_binary(hash_pattern(c.pattern)),
-      hash_to_binary(guard_hash),
-      hash_to_binary(hash_term(c.body)),
+      hash_to_hash_input(hash_pattern(c.pattern)),
+      hash_to_hash_input(guard_hash),
+      hash_to_hash_input(hash_term(c.body)),
     ]),
   )
 }
@@ -169,66 +167,68 @@ fn hash_term(term: ast.Term) -> Hash {
     ast.List(ts) ->
       hash_bytes(bit_array.concat(
         [str_to_bits("list:")]
-        |> list.append(list.map(ts, fn(t) { hash_to_binary(hash_term(t)) })),
+        |> list.append(list.map(ts, fn(t) { hash_to_hash_input(hash_term(t)) })),
       ))
     ast.Lambda(binder: Local(i), body:) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("lam:" <> int.to_string(i) <> ":"),
-          hash_to_binary(hash_term(body)),
+          hash_to_hash_input(hash_term(body)),
         ]),
       )
     ast.Apply(function: f, arg: a) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("app:"),
-          hash_to_binary(hash_term(f)),
-          hash_to_binary(hash_term(a)),
+          hash_to_hash_input(hash_term(f)),
+          hash_to_hash_input(hash_term(a)),
         ]),
       )
     ast.Let(binder: Local(i), value: v, body: b) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("let:" <> int.to_string(i) <> ":"),
-          hash_to_binary(hash_term(v)),
-          hash_to_binary(hash_term(b)),
+          hash_to_hash_input(hash_term(v)),
+          hash_to_hash_input(hash_term(b)),
         ]),
       )
     ast.LocalVarRef(Local(i)) ->
       hash_bytes(str_to_bits("localvar:" <> int.to_string(i)))
     ast.RefTo(Ref(h)) ->
-      hash_bytes(bit_array.concat([str_to_bits("refto:"), hash_to_binary(h)]))
+      hash_bytes(
+        bit_array.concat([str_to_bits("refto:"), hash_to_hash_input(h)]),
+      )
     ast.Match(scrutinee:, cases:) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("match:"),
-          hash_to_binary(hash_term(scrutinee)),
-          ..list.map(cases, fn(c) { hash_to_binary(hash_case(c)) })
+          hash_to_hash_input(hash_term(scrutinee)),
+          ..list.map(cases, fn(c) { hash_to_hash_input(hash_case(c)) })
         ]),
       )
     ast.Do(ability: Ref(h), operation: Local(op_i), args:) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("do:" <> int.to_string(op_i) <> ":"),
-          hash_to_binary(h),
-          ..list.map(args, fn(a) { hash_to_binary(hash_term(a)) })
+          hash_to_hash_input(h),
+          ..list.map(args, fn(a) { hash_to_hash_input(hash_term(a)) })
         ]),
       )
     ast.Handle(computation:, handler:, ability: Ref(h)) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("handle:"),
-          hash_to_binary(h),
-          hash_to_binary(hash_term(computation)),
-          hash_to_binary(hash_term(handler)),
+          hash_to_hash_input(h),
+          hash_to_hash_input(hash_term(computation)),
+          hash_to_hash_input(hash_term(handler)),
         ]),
       )
     ast.Construct(ctor_ref: Ref(h), args:) ->
       hash_bytes(
         bit_array.concat([
           str_to_bits("construct:"),
-          hash_to_binary(h),
-          ..list.map(args, fn(a) { hash_to_binary(hash_term(a)) })
+          hash_to_hash_input(h),
+          ..list.map(args, fn(a) { hash_to_hash_input(hash_term(a)) })
         ]),
       )
     ast.Hole -> hash_bytes(str_to_bits("hole"))
@@ -236,8 +236,8 @@ fn hash_term(term: ast.Term) -> Hash {
       hash_bytes(
         bit_array.concat([
           str_to_bits("use:" <> int.to_string(i) <> ":"),
-          hash_to_binary(hash_term(call)),
-          hash_to_binary(hash_term(body)),
+          hash_to_hash_input(hash_term(call)),
+          hash_to_hash_input(hash_term(body)),
         ]),
       )
   }
@@ -259,8 +259,8 @@ fn hash_type(typ: ast.Type) -> Hash {
         bit_array.concat(list.append(
           [
             str_to_bits("fn:"),
-            hash_to_binary(hash_type(result)),
-            ..list.map(params, fn(p) { hash_to_binary(hash_type(p)) })
+            hash_to_hash_input(hash_type(result)),
+            ..list.map(params, fn(p) { hash_to_hash_input(hash_type(p)) })
           ],
           requirement_bytes(requires),
         )),
@@ -269,8 +269,8 @@ fn hash_type(typ: ast.Type) -> Hash {
       hash_bytes(
         bit_array.concat([
           str_to_bits("app:"),
-          hash_to_binary(h),
-          ..list.map(args, fn(a) { hash_to_binary(hash_type(a)) })
+          hash_to_hash_input(h),
+          ..list.map(args, fn(a) { hash_to_hash_input(hash_type(a)) })
         ]),
       )
   }
@@ -294,7 +294,7 @@ fn requirement_bytes(requirement: ast.Requirement) -> List(BitArray) {
       [
         str_to_bits("requires:"),
         ..list.map(parts, fn(part) {
-          hash_to_binary(hash_bytes(str_to_bits(part)))
+          hash_to_hash_input(hash_bytes(str_to_bits(part)))
         })
       ]
     }
@@ -307,8 +307,8 @@ pub fn hash_of_definition(def: ast.Definition) -> Hash {
       hash_bytes(
         bit_array.concat([
           str_to_bits("termdef:"),
-          hash_to_binary(hash_term(term)),
-          hash_to_binary(hash_type(typ)),
+          hash_to_hash_input(hash_term(term)),
+          hash_to_hash_input(hash_type(typ)),
         ]),
       )
     ast.TypeDef(ast.Structural(Local(n), parameters:, constructors:)) -> {
@@ -324,8 +324,10 @@ pub fn hash_of_definition(def: ast.Definition) -> Hash {
         )
       hash_bytes(
         bit_array.concat([
-          hash_to_binary(h1),
-          ..list.map(constructors, fn(c) { hash_to_binary(hash_constructor(c)) })
+          hash_to_hash_input(h1),
+          ..list.map(constructors, fn(c) {
+            hash_to_hash_input(hash_constructor(c))
+          })
         ]),
       )
     }
@@ -334,7 +336,7 @@ pub fn hash_of_definition(def: ast.Definition) -> Hash {
         bit_array.concat([
           str_to_bits("typedef:unique:" <> int.to_string(n) <> ":" <> guid),
           str_to_bits(":schema:"),
-          hash_to_binary(
+          hash_to_hash_input(
             hash_of_definition(
               ast.TypeDef(ast.Structural(Local(n), parameters, constructors)),
             ),
@@ -345,7 +347,9 @@ pub fn hash_of_definition(def: ast.Definition) -> Hash {
       hash_bytes(
         bit_array.concat([
           str_to_bits("abilitydecl:" <> int.to_string(n)),
-          ..list.map(operations, fn(op) { hash_to_binary(hash_operation(op)) })
+          ..list.map(operations, fn(op) {
+            hash_to_hash_input(hash_operation(op))
+          })
         ]),
       )
     }
