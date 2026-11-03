@@ -129,50 +129,54 @@ fn convert_bootstrap_type(t: bootstraps.BootstrapType) -> elab_types.Typ {
   }
 }
 
-/// Shared pipeline: read, parse, bootstrap, evaluate. Returns the value of
+/// Read a file to its surface terms: read, tokenize, parse, convert, and
+/// require well-formed forms. One owner for the pipeline so every caller
+/// renders the same failure the same way: parse and s-expression errors
+/// carry line and column, and a read failure names the file error as a
+/// sentence. Bootstrap, folding, and evaluation stay with the callers.
+fn read_terms(path: String) -> Result(List(SurfaceTerm), String) {
+  use content <- result.try(case simplifile.read(path) {
+    Ok(content) -> Ok(content)
+    Error(e) -> Error("Failed to read file: " <> simplifile.describe_error(e))
+  })
+  let tokens = lexer.tokenize(content)
+  use exprs <- result.try(case parse_all_sexprs(tokens, []) {
+    Ok(exprs) -> Ok(exprs)
+    Error(e) ->
+      Error(
+        "Parse Error: "
+        <> e.message
+        <> " at line "
+        <> string.inspect(e.line)
+        <> ", col "
+        <> string.inspect(e.col),
+      )
+  })
+  use terms <- result.try(case terms_from_sexprs(exprs, []) {
+    Ok(terms) -> Ok(terms)
+    Error(e) ->
+      Error(
+        "S-Expression Error: "
+        <> e.message
+        <> " at line "
+        <> string.inspect(e.line)
+        <> ", col "
+        <> string.inspect(e.col),
+      )
+  })
+  require_forms(terms)
+}
+
+/// Shared pipeline: read_terms, bootstrap, evaluate. Returns the value of
 /// the last non-define form (None when the file only defines).
 fn run_file(path: String) -> Result(option.Option(String), String) {
-  case simplifile.read(path) {
-    Error(e) -> Error("Failed to read file: " <> simplifile.describe_error(e))
-    Ok(content) -> {
-      let tokens = lexer.tokenize(content)
-      case parse_all_sexprs(tokens, []) {
-        Error(e) ->
-          Error(
-            "Parse Error: "
-            <> e.message
-            <> " at line "
-            <> string.inspect(e.line)
-            <> ", col "
-            <> string.inspect(e.col),
-          )
-        Ok(exprs) -> {
-          case terms_from_sexprs(exprs, []) {
-            Error(e) ->
-              Error(
-                "S-Expression Error: "
-                <> e.message
-                <> " at line "
-                <> string.inspect(e.line)
-                <> ", col "
-                <> string.inspect(e.col),
-              )
-            Ok(terms) -> {
-              use terms <- result.try(require_forms(terms))
-              let init_defs = get_init_defs()
-              let #(cache, bootstrap_list) =
-                repl_eval.bootstrap_defs(init_defs, empty_cache())
-              case
-                verify_terms_valued(terms, cache, bootstrap_list, option.None)
-              {
-                Ok(#(_, _, last)) -> Ok(last)
-                Error(err) -> Error(err)
-              }
-            }
-          }
-        }
-      }
-    }
+  use terms <- result.try(read_terms(path))
+  let init_defs = get_init_defs()
+  let #(cache, bootstrap_list) =
+    repl_eval.bootstrap_defs(init_defs, empty_cache())
+  case verify_terms_valued(terms, cache, bootstrap_list, option.None) {
+    Ok(#(_, _, last)) -> Ok(last)
+    Error(err) -> Error(err)
   }
 }
 
@@ -195,38 +199,13 @@ pub fn verify_file(path: String) -> Result(String, String) {
 pub fn load_defs_file_scoped(
   path: String,
 ) -> Result(#(TypeCache, List(#(String, SurfaceDef)), List(String)), String) {
-  case simplifile.read(path) {
-    Error(e) -> Error("Failed to read file: " <> simplifile.describe_error(e))
-    Ok(content) -> {
-      let tokens = lexer.tokenize(content)
-      case parse_all_sexprs(tokens, []) {
-        Error(e) ->
-          Error(
-            "Parse Error: "
-            <> e.message
-            <> " at line "
-            <> string.inspect(e.line),
-          )
-        Ok(exprs) ->
-          case terms_from_sexprs(exprs, []) {
-            Error(e) -> Error("S-Expression Error: " <> e.message)
-            Ok(terms) -> {
-              use terms <- result.try(require_forms(terms))
-              let init_defs = get_init_defs()
-              let #(cache, bootstrap_list) =
-                repl_eval.bootstrap_defs(init_defs, empty_cache())
-              let names = defined_names(terms, [])
-              use #(c, defs) <- result.try(fold_defines(
-                terms,
-                cache,
-                bootstrap_list,
-              ))
-              Ok(#(c, defs, names))
-            }
-          }
-      }
-    }
-  }
+  use terms <- result.try(read_terms(path))
+  let init_defs = get_init_defs()
+  let #(cache, bootstrap_list) =
+    repl_eval.bootstrap_defs(init_defs, empty_cache())
+  let names = defined_names(terms, [])
+  use #(c, defs) <- result.try(fold_defines(terms, cache, bootstrap_list))
+  Ok(#(c, defs, names))
 }
 
 fn defined_names(terms: List(SurfaceTerm), acc: List(String)) -> List(String) {
