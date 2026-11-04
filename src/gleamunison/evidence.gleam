@@ -174,7 +174,7 @@ fn signature_input(e: Evidence) -> BitArray {
 }
 
 fn signature_for(signer: Signer, e: Evidence) -> String {
-  case crypto.hmac(crypto.Sha256, signer_secret(signer), signature_input(e)) {
+  case crypto.hmac_sha256(signer_secret(signer), signature_input(e)) {
     Ok(bytes) -> crypto.to_hex(bytes)
     Error(_) -> ""
   }

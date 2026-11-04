@@ -1,11 +1,5 @@
 import gleam/result
 
-pub type HashAlgorithm {
-  Sha256
-  Sha512
-  Md5
-}
-
 pub type CryptoError {
   InvalidInput(reason: String)
 }
@@ -20,20 +14,11 @@ fn ffi_hmac(
 @external(erlang, "gleamunison_crypto", "hash_to_hex")
 fn ffi_hash_to_hex(bytes: BitArray) -> String
 
-fn algo_to_string(algo: HashAlgorithm) -> String {
-  case algo {
-    Sha256 -> "sha256"
-    Sha512 -> "sha512"
-    Md5 -> "md5"
-  }
-}
-
-pub fn hmac(
-  algo: HashAlgorithm,
+pub fn hmac_sha256(
   key: BitArray,
   data: BitArray,
 ) -> Result(BitArray, CryptoError) {
-  ffi_hmac(algo_to_string(algo), key, data)
+  ffi_hmac("sha256", key, data)
   |> result.map_error(fn(e) { InvalidInput(e) })
 }
 
