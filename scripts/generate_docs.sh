@@ -147,7 +147,6 @@ cat > "$DOC_DIR/index.html" <<HTMLEND
 <tr><td><code>GET /api/events</code></td><td>SSE event stream (eval, define, trace events)</td><td>v0.9</td></tr>
 <tr><td><code>GET /api/logs</code></td><td>Structured log entries (last 50)</td><td>v0.9</td></tr>
 <tr><td><code>GET /api/sync-status</code></td><td>Genesis count, loaded modules, beam files</td><td>v0.9</td></tr>
-<tr><td><code>GET /api/redefinitions</code></td><td>Recent redefinitions with timestamps</td><td>v0.9</td></tr>
 <tr><td><code>GET /eval?expr=...</code></td><td>Evaluate S-expression</td><td>v0.9</td></tr>
 <tr><td><code>GET /define?name=...&expr=...</code></td><td>Define named term</td><td>v0.9</td></tr>
 <tr><td><code>GET /counter</code></td><td>Increment and return request counter</td><td>v0.9</td></tr>

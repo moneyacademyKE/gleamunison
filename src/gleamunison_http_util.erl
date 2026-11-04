@@ -132,12 +132,6 @@ index_html() ->
           <div class=\"metric-value\" id=\"sync-beams\">-</div>
         </div>
       </div>
-      <div class=\"card span-full\">
-        <div class=\"card-title\">Redefinitions</div>
-        <div class=\"timeline\" id=\"redef-list\">
-          <div style=\"color:var(--text-muted);font-size:0.85rem;\">No redefinitions yet</div>
-        </div>
-      </div>
     </div>
   </div>
 

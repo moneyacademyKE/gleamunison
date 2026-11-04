@@ -11,7 +11,7 @@ Batch 16: HTTP server integration, health variants, effects stacking, datetime p
 **1703** — /api/status + /api/health via HTTP client
 **1704** — /api/modules + /api/logs
 **1705** — /api/processes + /api/sync-status
-**1706** — /api/traces + /api/redefinitions
+**1706** — /api/traces (redefinitions route removed 2026-11-04: served a table no code ever wrote)
 **1707** — /api/traces/nonexistent-id (404/error path)
 
 ## Health Variants (1708–1710)

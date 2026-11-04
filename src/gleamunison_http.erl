@@ -452,8 +452,6 @@ handle_route(Socket, <<"/api/processes">>) ->
     gleamunison_http_routes:handle_processes_route(Socket);
 handle_route(Socket, <<"/api/sync-status">>) ->
     gleamunison_http_routes:handle_sync_status_route(Socket);
-handle_route(Socket, <<"/api/redefinitions", _Rest/binary>>) ->
-    gleamunison_http_routes:handle_redefinitions_route(Socket);
 handle_route(Socket, <<"/api/logs">>) ->
     gleamunison_http_routes:handle_logs_route(Socket);
 handle_route(Socket, <<"/api/modules">>) ->

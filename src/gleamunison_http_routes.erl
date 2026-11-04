@@ -2,7 +2,7 @@
 -include_lib("kernel/include/file.hrl").
 -export([handle_eval_route/2, handle_counter_route/1, handle_define_route/2, handle_browse_route/1,
          handle_mcp_route/2, serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
-         handle_processes_route/1, handle_sync_status_route/1, handle_redefinitions_route/1,
+         handle_processes_route/1, handle_sync_status_route/1,
          handle_logs_route/1, handle_enhanced_modules_route/1, handle_observability_route/1,
          handle_traces_route/1, handle_trace_detail_route/2, handle_app_route/3]).
 
@@ -277,21 +277,6 @@ handle_sync_status_route(Socket) ->
     Json = iolist_to_binary(io_lib:format(
         "{\"genesis_count\":~p,\"notebook_defs\":~p,\"loaded_modules\":~p,\"beams_loaded\":~p,\"sync_port\":~s}",
         [length(gleamunison@bootstraps:get_init_defs_data()), length(Keys), LoadedMods, BeamCount, SyncPort])),
-    gleamunison_http_util:send_json(Socket, 200, Json).
-
-handle_redefinitions_route(Socket) ->
-    Events = case ets:whereis(gleamunison_redefs) of
-        undefined -> [];
-        _ -> lists:sublist(lists:reverse(ets:tab2list(gleamunison_redefs)), 20)
-    end,
-    Parts = [iolist_to_binary(io_lib:format(
-        "{\"timestamp\":~ts,\"name\":~ts,\"old_hash\":~ts,\"new_hash\":~ts,\"elapsed_ms\":~p}",
-        [gleamunison_http_util:escape_json(TS),
-         gleamunison_http_util:escape_json(Name),
-         gleamunison_http_util:escape_json(OH),
-         gleamunison_http_util:escape_json(NH), Elapsed]))
-        || {TS, Name, OH, NH, Elapsed} <- Events],
-    Json = <<"{\"events\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_logs_route(Socket) ->

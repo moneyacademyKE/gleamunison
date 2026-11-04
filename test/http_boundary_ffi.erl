@@ -26,7 +26,7 @@ end).
 auth_routes() -> with_server(fun() ->
     Protected = [<<"/eval?expr=42">>, <<"/define?name=x&expr=1">>, <<"/mcp">>,
       <<"/browse">>, <<"/counter">>, <<"/api/status">>, <<"/api/events">>,
-      <<"/api/processes">>, <<"/api/sync-status">>, <<"/api/redefinitions">>,
+      <<"/api/processes">>, <<"/api/sync-status">>,
       <<"/api/logs">>, <<"/api/modules">>, <<"/api/traces">>, <<"/api/traces/1">>],
     lists:all(fun(Path) ->
         Code = get_status(Path, <<>>),
