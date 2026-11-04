@@ -42,8 +42,7 @@ fn run(args: List(String)) -> Result(String, #(Int, String)) {
     args,
     None,
     False,
-    None,
-    cli_lifecycle.default_branch,
+    cli_lifecycle.flag_tail(cli_lifecycle.default_branch),
   ))
   use ref <- result.try(
     identity.parse_ref_hex(hash)
@@ -263,30 +262,31 @@ fn parse_args(
   args: List(String),
   hash: Option(String),
   confirmed: Bool,
-  store_override: Option(String),
-  branch: String,
+  tail: cli_lifecycle.FlagTail,
 ) -> Result(#(String, Bool, Option(String), String), #(Int, String)) {
-  case args {
-    [] ->
-      case hash {
-        Some(value) -> Ok(#(value, confirmed, store_override, branch))
-        None -> Error(#(cli_result.refused, usage()))
-      }
-    ["--yes"] -> parse_args([], hash, True, store_override, branch)
-    ["--store", path, ..rest] ->
-      parse_args(rest, hash, confirmed, Some(path), branch)
-    ["--store"] -> Error(cli_lifecycle.missing_store_value(usage()))
-    ["--branch", name, ..rest] ->
-      parse_args(rest, hash, confirmed, store_override, name)
-    ["--branch"] -> Error(cli_lifecycle.missing_branch_value(usage()))
-    [value, ..rest] ->
-      case hash {
-        Some(_) ->
-          Error(#(
-            cli_result.refused,
-            "purge: unexpected argument '" <> value <> "'\n" <> usage(),
-          ))
-        None -> parse_args(rest, Some(value), confirmed, store_override, branch)
+  case cli_lifecycle.take_flag(args, tail) {
+    cli_lifecycle.Taken(next, rest) -> parse_args(rest, hash, confirmed, next)
+    cli_lifecycle.MissingValue("--store") ->
+      Error(cli_lifecycle.missing_store_value(usage()))
+    cli_lifecycle.MissingValue(_) ->
+      Error(cli_lifecycle.missing_branch_value(usage()))
+    cli_lifecycle.NotTailFlag ->
+      case args {
+        [] ->
+          case hash {
+            Some(value) -> Ok(#(value, confirmed, tail.store, tail.branch))
+            None -> Error(#(cli_result.refused, usage()))
+          }
+        ["--yes"] -> parse_args([], hash, True, tail)
+        [value, ..rest] ->
+          case hash {
+            Some(_) ->
+              Error(#(
+                cli_result.refused,
+                "purge: unexpected argument '" <> value <> "'\n" <> usage(),
+              ))
+            None -> parse_args(rest, Some(value), confirmed, tail)
+          }
       }
   }
 }
