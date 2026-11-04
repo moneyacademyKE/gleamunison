@@ -62,13 +62,8 @@ trace_summary({TS, Id, Method, Path, _Headers}) ->
     #{id => Id, timestamp => TS, method => Method, path => Path}.
 
 logs_snapshot() ->
-    Entries = case ets:whereis(gleamunison_logs) of
-        undefined -> [];
-        _ -> ets:tab2list(gleamunison_logs)
-    end,
-    Sorted = lists:reverse(lists:sort(Entries)),
-    Recent = lists:sublist(Sorted, 50),
-    #{count => ets_size(gleamunison_logs), limit => 1024,
+    Recent = gleamunison_log:recent(50),
+    #{count => gleamunison_log:log_count(), limit => gleamunison_log:max_entries(),
       recent => [log_summary(E) || E <- Recent]}.
 
 log_summary({_Seq, TS, Level, Message, _Context}) ->
@@ -87,8 +82,8 @@ saturation() ->
       sse_client_limit => 32,
       trace_entries => gleamunison_trace:trace_count(),
       trace_entry_limit => 512,
-      log_entries => ets_size(gleamunison_logs),
-      log_entry_limit => 1024}.
+      log_entries => gleamunison_log:log_count(),
+      log_entry_limit => gleamunison_log:max_entries()}.
 
 http_worker_count() ->
     case persistent_term:get({gleamunison_http, listener}, undefined) of

@@ -1,5 +1,6 @@
 -module(gleamunison_log).
--export([log_entry/4, log_count/0, clear_logs/0, ensure_table/0]).
+-export([log_entry/4, log_count/0, clear_logs/0, ensure_table/0,
+         recent/1, max_entries/0]).
 
 -define(ETS_TABLE, gleamunison_logs).
 %% Bounded cache, same contract as traces: at most MAX_LOG_ENTRIES,
@@ -21,6 +22,19 @@ log_entry(Level, Message, Keys, Vals) when is_binary(Level), is_binary(Message) 
 log_count() ->
     ensure_table(),
     ets:info(?ETS_TABLE, size).
+
+%% Newest-first, N-bounded: the read API the owner always owed. The table
+%% is an ordered_set keyed on the monotonic Seq, so tab2list is already
+%% key-ascending (oldest first) and reverse alone yields newest-first.
+recent(N) when is_integer(N), N > 0 ->
+    ensure_table(),
+    lists:sublist(lists:reverse(ets:tab2list(?ETS_TABLE)), N);
+recent(_) ->
+    ensure_table(),
+    [].
+
+max_entries() ->
+    ?MAX_LOG_ENTRIES.
 
 clear_logs() ->
     case ets:whereis(?ETS_TABLE) of

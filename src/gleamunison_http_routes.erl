@@ -295,10 +295,7 @@ handle_redefinitions_route(Socket) ->
     gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_logs_route(Socket) ->
-    Entries = case ets:whereis(gleamunison_logs) of
-        undefined -> [];
-        _ -> lists:sublist(lists:reverse(lists:sort(ets:tab2list(gleamunison_logs))), 50)
-    end,
+    Entries = gleamunison_log:recent(50),
     %% escape_json/1 already returns a quoted, escaped string: wrapping it in
     %% another pair of quotes produced "timestamp":""2026-..."", which no
     %% JSON parser accepts.
