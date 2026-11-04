@@ -104,7 +104,6 @@ drain(Timeout) when is_integer(Timeout), Timeout >= 0 ->
 
 init(Port) ->
     application:ensure_all_started(crypto),
-    ensure_counter(),
     %% The log table must outlive the request workers that write to it: an
     %% entry created by a worker dies with that worker, which is why /api/logs
     %% served an empty list while errors were being logged.
@@ -176,14 +175,6 @@ listen(Port, BindIp) ->
             {ok, #{socket => ListenSocket, acceptor => Acceptor, workers => #{}}};
         {error, Reason} -> {stop, Reason}
     end.
-
-ensure_counter() ->
-    gleamunison_tables:ensure(gleamunison_http_counter, [set, public, named_table]),
-    %% Seed exactly once: insert_new refuses to overwrite, so a racing
-    %% seeder (or a counter incremented before this ran) is never
-    %% reset to 0 (bk-1e5e).
-    ets:insert_new(gleamunison_http_counter, {count, 0}),
-    ok.
 
 worker_count(Pid) when is_pid(Pid) ->
     case sys:get_state(Pid) of
@@ -438,8 +429,6 @@ handle_post_route(Socket, _Path, _Body) ->
 
 handle_route(Socket, <<"/eval", Rest/binary>>) ->
     gleamunison_http_routes:handle_eval_route(Socket, Rest);
-handle_route(Socket, <<"/counter">>) ->
-    gleamunison_http_routes:handle_counter_route(Socket);
 handle_route(Socket, <<"/define", Rest/binary>>) ->
     gleamunison_http_routes:handle_define_route(Socket, Rest);
 handle_route(Socket, <<"/browse">>) ->

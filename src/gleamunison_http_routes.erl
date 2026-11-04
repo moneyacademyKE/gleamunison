@@ -1,6 +1,6 @@
 -module(gleamunison_http_routes).
 -include_lib("kernel/include/file.hrl").
--export([handle_eval_route/2, handle_counter_route/1, handle_define_route/2, handle_browse_route/1,
+-export([handle_eval_route/2, handle_define_route/2, handle_browse_route/1,
          handle_mcp_route/2, serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
          handle_processes_route/1, handle_sync_status_route/1,
          handle_logs_route/1, handle_enhanced_modules_route/1, handle_observability_route/1,
@@ -115,11 +115,6 @@ handle_mcp_admitted(Socket, Body) ->
                     gleamunison_http_util:send_json(Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
             end
     end.
-
-handle_counter_route(Socket) ->
-    Val = try ets:update_counter(gleamunison_http_counter, count, {2, 1}, {count, 0}) catch _:_ -> 0 end,
-    Json = iolist_to_binary(io_lib:format("{\"count\":~p}", [Val])),
-    gleamunison_http_util:send_json(Socket, 200, Json).
 
 handle_define_route(Socket, <<"?name=", Rest/binary>>) ->
     admit_execution(Socket, fun() -> handle_define_admitted(Socket, Rest) end);
