@@ -430,7 +430,7 @@ Erlang BIFs like `apply/2`, `spawn/1`, and `list_to_binary/1` shadow any module-
 
 ## 39. Telemetry-Integrated Metrics
 
-Metrics are recorded via ETS for local queries and simultaneously emitted as `:telemetry` events for external reporters (Prometheus, StatsD). This dual-write pattern ensures zero-config local monitoring while supporting production-grade observability infrastructure.
+Metrics are recorded in the metrics gen_server's state for local queries and simultaneously emitted as `:telemetry` events for external reporters (Prometheus, StatsD). This dual-write pattern ensures zero-config local monitoring while supporting production-grade observability infrastructure.
 
 **Applied in:** `gleamunison_metrics.erl`, `metrics.gleam`
 
