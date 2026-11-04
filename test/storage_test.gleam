@@ -5,7 +5,7 @@ import gleamunison/identity.{Ref, hash_bytes}
 import gleamunison/storage.{
   IoError, NotFound, StorageError, describe_error, inmemory,
 }
-import gleamunison/sync.{new_sync_state, pull_sync}
+import gleamunison/sync.{pull_sync}
 import gleamunison/sync_types.{PeerId}
 
 pub fn storage_roundtrip_test() {
@@ -27,8 +27,7 @@ pub fn describe_storage_errors_test() {
 
 pub fn pull_empty_diff_test() {
   let cb = codebase.empty()
-  let state = new_sync_state()
   let peer = PeerId("localnode")
-  let _ = pull_sync(state, peer, cb)
+  let _ = pull_sync(peer, cb)
   io.println("Sync empty diff test adapted for TCP protocol")
 }

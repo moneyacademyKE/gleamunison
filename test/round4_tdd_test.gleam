@@ -10,7 +10,7 @@ import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal}
 import gleamunison/inference
 import gleamunison/loader.{ensure_loaded, new_loader}
 import gleamunison/lower.{lower_type_ref}
-import gleamunison/sync.{new_sync_state, pull_sync}
+import gleamunison/sync.{pull_sync}
 import gleamunison/sync_types.{PeerId}
 import gleamunison/typecheck
 import gleamunison/types
@@ -93,9 +93,8 @@ pub fn codebase_insert_persists_bytes_test() {
 
 pub fn pull_sync_persists_synced_blobs_test() {
   let cb = codebase.empty()
-  let state = new_sync_state()
   let peer = PeerId("test_node")
-  let _result = pull_sync(state, peer, cb)
+  let _result = pull_sync(peer, cb)
   io.println("Sync test adapted for TCP protocol (peer not running)")
 }
 

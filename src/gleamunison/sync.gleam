@@ -1,4 +1,3 @@
-import gleam/dict
 import gleam/list
 import gleam/option.{Some}
 import gleam/result
@@ -7,15 +6,11 @@ import gleam/string
 import gleamunison/codebase.{type Codebase}
 import gleamunison/identity.{type DefinitionRef, Ref, hash_to_debug_string}
 import gleamunison/sync_types.{
-  type PeerId, type SyncError, type SyncState, ConnectionFailed, HashConflict,
-  PeerId, PeerNotFound, PeerState, SyncState, TransferFailed, sync_connect,
-  sync_receive_diff, sync_request_defs, sync_request_evidence, sync_send_refs,
+  type PeerId, type SyncError, ConnectionFailed, HashConflict, PeerId,
+  TransferFailed, sync_connect, sync_receive_diff, sync_request_defs,
+  sync_request_evidence, sync_send_refs,
 }
 import gleamy/priority_queue
-
-pub fn new_sync_state() -> SyncState {
-  SyncState(peers: dict.new(), known_refs: set.new())
-}
 
 /// The one place a SyncError becomes a user sentence. The constructors carry
 /// the facts (which peer, what message, which ref conflicts); rendering them
@@ -23,9 +18,9 @@ pub fn new_sync_state() -> SyncState {
 /// output is a debug rendering and must never reach a user.
 pub fn describe_error(error: SyncError) -> String {
   case error {
-    ConnectionFailed(peer, cause) -> {
+    ConnectionFailed(peer, reason) -> {
       let PeerId(name) = peer
-      "could not connect to " <> name <> ": " <> describe_connect_error(cause)
+      "could not connect to " <> name <> ": " <> reason
     }
     TransferFailed(peer, message) -> {
       let PeerId(name) = peer
@@ -42,22 +37,13 @@ pub fn describe_error(error: SyncError) -> String {
   }
 }
 
-fn describe_connect_error(error: sync_types.ConnectError) -> String {
-  case error {
-    sync_types.PeerNotFound(_) -> "peer not found"
-    sync_types.CookieMismatch(_) -> "cookie mismatch"
-    sync_types.Timeout(_) -> "connection timed out"
-    sync_types.Refused(_, reason) -> "connection refused: " <> reason
-  }
-}
-
 /// Open a connection to a peer. Stays open for subsequent fetch_refs
 /// batches — the selective-pull primitive's session handle.
 pub fn connect(peer: PeerId) -> Result(Nil, SyncError) {
   let PeerId(name) = peer
   case sync_connect(name) {
     Ok(_) -> Ok(Nil)
-    Error(_) -> Error(ConnectionFailed(peer, PeerNotFound(peer)))
+    Error(reason) -> Error(ConnectionFailed(peer, reason))
   }
 }
 
@@ -171,10 +157,9 @@ pub fn validate_chunk_set(
 }
 
 pub fn pull_sync(
-  state: SyncState,
   peer: PeerId,
   codebase: Codebase,
-) -> Result(#(SyncState, Codebase, List(DefinitionRef)), SyncError) {
+) -> Result(#(Codebase, List(DefinitionRef)), SyncError) {
   let PeerId(name) = peer
   case sync_connect(name) {
     Ok(_) -> {
@@ -184,8 +169,7 @@ pub fn pull_sync(
           TransferFailed(peer, "storage lookup failed")
         }),
       )
-      let our_refs =
-        set.to_list(set.union(state.known_refs, set.from_list(refs)))
+      let our_refs = refs
       let ref_strings =
         list.map(our_refs, fn(r) {
           let Ref(h) = r
@@ -225,18 +209,8 @@ pub fn pull_sync(
                     })
                   case accept {
                     Error(e) -> Error(e)
-                    Ok(#(new_cb, next_pq)) -> {
-                      let new_refs = priority_queue.to_list(next_pq)
-                      let ps = PeerState(refs: set.from_list(our_refs))
-                      let new_peers = dict.insert(state.peers, peer, ps)
-                      let new_known =
-                        set.union(state.known_refs, set.from_list(new_refs))
-                      Ok(#(
-                        SyncState(peers: new_peers, known_refs: new_known),
-                        new_cb,
-                        new_refs,
-                      ))
-                    }
+                    Ok(#(new_cb, next_pq)) ->
+                      Ok(#(new_cb, priority_queue.to_list(next_pq)))
                   }
                 }
                 Error(msg) -> Error(TransferFailed(peer, msg))
@@ -248,6 +222,6 @@ pub fn pull_sync(
         Error(msg) -> Error(TransferFailed(peer, msg))
       }
     }
-    Error(_) -> Error(ConnectionFailed(peer, PeerNotFound(peer)))
+    Error(reason) -> Error(ConnectionFailed(peer, reason))
   }
 }

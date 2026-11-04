@@ -11,8 +11,8 @@ import gleamunison/elab_types.{
 import gleamunison/elaborate as elab
 import gleamunison/identity.{Ref, hash_bytes}
 import gleamunison/storage
-import gleamunison/sync.{new_sync_state, pull_sync}
-import gleamunison/sync_types.{PeerId, TransferFailed}
+import gleamunison/sync.{pull_sync}
+import gleamunison/sync_types.{ConnectionFailed, PeerId, TransferFailed}
 import gleamunison/types.{empty_cache}
 import gleeunit/should
 
@@ -30,13 +30,11 @@ pub fn pull_sync_over_tcp_test() {
   let ref = Ref(hash_of_definition(def))
   let unit = ast.Unit(ref, [#(ref, def)])
   let assert Ok(cb) = insert(new_codebase(), unit)
-  let state = new_sync_state()
-
   let peer_name = "localhost:" <> int.to_string(port)
   let peer = PeerId(peer_name)
 
-  case pull_sync(state, peer, cb) {
-    Ok(#(_next_state, _cb, new_refs)) ->
+  case pull_sync(peer, cb) {
+    Ok(#(_cb, new_refs)) ->
       io.println(
         "Sync returned " <> int.to_string(list.length(new_refs)) <> " refs",
       )
@@ -54,7 +52,7 @@ pub fn pull_sync_preserves_local_list_failure_test() {
     storage.StorageAdapter(..adapter, list_refs: fn() {
       Error(storage.IoError("local list failed"))
     })
-  pull_sync(new_sync_state(), peer, codebase.with_adapter(broken))
+  pull_sync(peer, codebase.with_adapter(broken))
   |> should.equal(Error(TransferFailed(peer, "storage lookup failed")))
 }
 
@@ -160,4 +158,18 @@ fn ffi_evidence_for_subjects(
 
 fn b64(value: String) -> String {
   bit_array.base64_encode(bit_array.from_string(value), True)
+}
+
+/// Connecting to a peer whose node name cannot route surfaces the
+/// transport's actual reason. The FFI answers "Connection failed (pang)"
+/// for a dead distributed name; the old PeerNotFound fabrication reported
+/// "peer not found" for every refusal, timeout, and unreachable host.
+pub fn connect_to_unroutable_peer_surfaces_transport_reason_test() {
+  let peer = PeerId("gleamunison_no_such_peer@127.0.0.1")
+  let assert Error(ConnectionFailed(_, reason)) = sync.connect(peer)
+  reason |> should.equal("Connection failed (pang)")
+  sync.describe_error(ConnectionFailed(peer, reason))
+  |> should.equal(
+    "could not connect to gleamunison_no_such_peer@127.0.0.1: Connection failed (pang)",
+  )
 }

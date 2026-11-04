@@ -33,9 +33,8 @@ pub fn command(args: List(String)) -> Result(Nil, #(Int, String)) {
   use output <- result.try(
     cli_store.with_dets(store_path, fn(adapter) {
       let cb = codebase.with_adapter(adapter)
-      let state = sync.new_sync_state()
-      use #(_, _, new_refs) <- result.try(
-        sync.pull_sync(state, PeerId(peer), cb)
+      use #(_, new_refs) <- result.try(
+        sync.pull_sync(PeerId(peer), cb)
         |> result.map_error(fn(e) {
           "sync: pull failed: " <> sync.describe_error(e)
         }),
