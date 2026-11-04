@@ -7,10 +7,9 @@ import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/dynamic.{type Dynamic}
 import gleam/dynamic/decode
-import gleam/int
 import gleam/list
 import gleam/string
-import gleamunison/json
+import gleamunison/json.{type JsonId, IntId, NoId, StrId}
 
 pub type Tool {
   Tool(
@@ -29,12 +28,6 @@ pub type Response {
   NoReply
 }
 
-type JsonId {
-  IntId(Int)
-  StrId(String)
-  NoId
-}
-
 type Request {
   Request(id: JsonId, method: String, params: Dict(String, Dynamic))
 }
@@ -44,13 +37,15 @@ const protocol_version = "2025-06-18"
 /// Handle one raw JSON-RPC request body. Pure: JSON in, JSON out.
 pub fn handle_message(server: Server, body: String) -> Response {
   case json.decode(bit_array.from_string(body)) {
-    Error(_) -> Respond(error_body(NoId, -32_700, "Parse error"))
+    Error(_) -> Respond(json.error_respond("null", -32_700, "Parse error"))
     Ok(dyn) ->
       case validate_request(dyn) {
-        Error(_) -> Respond(error_body(NoId, -32_600, "Invalid Request"))
+        Error(_) ->
+          Respond(json.error_respond("null", -32_600, "Invalid Request"))
         Ok(_) ->
           case decode.run(dyn, request_decoder()) {
-            Error(_) -> Respond(error_body(NoId, -32_600, "Invalid Request"))
+            Error(_) ->
+              Respond(json.error_respond("null", -32_600, "Invalid Request"))
             Ok(req) -> dispatch(server, req)
           }
       }
@@ -101,11 +96,18 @@ fn dispatch(server: Server, req: Request) -> Response {
     NoId -> NoReply
     _ ->
       case req.method {
-        "initialize" -> Respond(ok_body(req.id, initialize_result(server)))
-        "tools/list" -> Respond(ok_body(req.id, tools_list_result(server)))
+        "initialize" ->
+          Respond(json.respond(json.id_text(req.id), initialize_result(server)))
+        "tools/list" ->
+          Respond(json.respond(json.id_text(req.id), tools_list_result(server)))
         "tools/call" -> Respond(tools_call(server, req))
-        "ping" -> Respond(ok_body(req.id, "{}"))
-        _ -> Respond(error_body(req.id, -32_601, "Method not found"))
+        "ping" -> Respond(json.respond(json.id_text(req.id), "{}"))
+        _ ->
+          Respond(json.error_respond(
+            json.id_text(req.id),
+            -32_601,
+            "Method not found",
+          ))
       }
   }
 }
@@ -158,15 +160,18 @@ fn tool_schema(name: String) -> String {
 
 fn tools_call(server: Server, req: Request) -> String {
   case dict.get(req.params, "name"), dict.get(req.params, "arguments") {
-    Error(_), _ -> error_body(req.id, -32_602, "Invalid params")
-    Ok(_), Error(_) -> error_body(req.id, -32_602, "Invalid params")
+    Error(_), _ ->
+      json.error_respond(json.id_text(req.id), -32_602, "Invalid params")
+    Ok(_), Error(_) ->
+      json.error_respond(json.id_text(req.id), -32_602, "Invalid params")
     Ok(name_dyn), Ok(args_dyn) ->
       case
         decode.run(name_dyn, decode.string),
         decode.run(args_dyn, decode.dict(decode.string, decode.dynamic))
       {
         Ok(name), Ok(args) -> dispatch_tool(server, req.id, name, args)
-        _, _ -> error_body(req.id, -32_602, "Invalid params")
+        _, _ ->
+          json.error_respond(json.id_text(req.id), -32_602, "Invalid params")
       }
   }
 }
@@ -178,11 +183,15 @@ fn dispatch_tool(
   args: Dict(String, Dynamic),
 ) -> String {
   case list.find(server.tools, fn(t) { t.name == name }) {
-    Error(_) -> ok_body(id, tool_result("unknown tool: " <> name, True))
+    Error(_) ->
+      json.respond(
+        json.id_text(id),
+        tool_result("unknown tool: " <> name, True),
+      )
     Ok(tool) ->
       case tool.handler(args) {
-        Ok(text) -> ok_body(id, tool_result(text, False))
-        Error(err) -> ok_body(id, tool_result(err, True))
+        Ok(text) -> json.respond(json.id_text(id), tool_result(text, False))
+        Error(err) -> json.respond(json.id_text(id), tool_result(err, True))
       }
   }
 }
@@ -197,32 +206,6 @@ fn tool_result(text: String, is_error: Bool) -> String {
   <> "}],\"isError\":"
   <> err
   <> "}"
-}
-
-fn ok_body(id: JsonId, result: String) -> String {
-  "{\"jsonrpc\":\"2.0\",\"id\":"
-  <> id_json(id)
-  <> ",\"result\":"
-  <> result
-  <> "}"
-}
-
-fn error_body(id: JsonId, code: Int, message: String) -> String {
-  "{\"jsonrpc\":\"2.0\",\"id\":"
-  <> id_json(id)
-  <> ",\"error\":{\"code\":"
-  <> int.to_string(code)
-  <> ",\"message\":"
-  <> json_string(message)
-  <> "}}"
-}
-
-fn id_json(id: JsonId) -> String {
-  case id {
-    IntId(n) -> int.to_string(n)
-    StrId(s) -> json_string(s)
-    NoId -> "null"
-  }
 }
 
 /// Thin delegate to the JSON boundary's single escaper (json.json_quote).

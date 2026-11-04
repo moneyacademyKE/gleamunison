@@ -4,8 +4,6 @@
 
 import gleam/dict
 import gleam/dynamic.{type Dynamic}
-import gleam/dynamic/decode
-import gleam/int
 import gleam/option.{type Option}
 import gleamunison/json
 
@@ -33,30 +31,9 @@ pub type Message {
 }
 
 pub fn respond(id: Dynamic, result: String) -> String {
-  "{\"jsonrpc\":\"2.0\",\"id\":"
-  <> id_json(id)
-  <> ",\"result\":"
-  <> result
-  <> "}"
+  json.respond(json.id_of_dynamic(id), result)
 }
 
 pub fn error_response(id: Dynamic, code: Int, message: String) -> String {
-  "{\"jsonrpc\":\"2.0\",\"id\":"
-  <> id_json(id)
-  <> ",\"error\":{\"code\":"
-  <> int.to_string(code)
-  <> ",\"message\":"
-  <> json.json_quote(message)
-  <> "}}"
-}
-
-fn id_json(id: Dynamic) -> String {
-  case decode.run(id, decode.int) {
-    Ok(n) -> int.to_string(n)
-    Error(_) ->
-      case decode.run(id, decode.string) {
-        Ok(s) -> json.json_quote(s)
-        Error(_) -> "null"
-      }
-  }
+  json.error_respond(json.id_of_dynamic(id), code, message)
 }
