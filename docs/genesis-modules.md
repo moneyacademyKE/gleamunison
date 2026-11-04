@@ -1,8 +1,9 @@
 # Genesis Modules
 
-**Checked-in Erlang genesis implementations** (`src/m_*.erl`), including the
-numbered builtins and the `m_state` helper. The source directory and artifact
-contract are the inventory; this page explains their role and naming scheme.
+**Checked-in Erlang genesis implementations** (`src/m_*.erl`): the 52
+numbered builtins, one module per genesis ref — the availability test pins
+the mapping. The source directory and artifact contract are the inventory;
+this page explains their role and naming scheme.
 
 ## What Are Genesis Modules?
 
@@ -96,12 +97,6 @@ Each genesis module:
 | `m_00000033` | `json_parse` | `JsonStr → parsed` (via gleam_json) |
 | `m_00000034` | `http_get` | `Url → response` |
 | `m_00000035` | `file_read` | `Path → file:read_file(Path)` |
-
-### State Handler (`m_state`)
-
-| Module | Operation | Signature |
-|---|---|---|
-| `m_state` | State ability bootstrap | Exports `state_get/1`, `state_put/2` for process-dictionary-backed mutable state |
 
 ## Why Erlang, Not Gleam?
 
