@@ -1,9 +1,8 @@
 -module(gleamunison_http_routes).
--include_lib("kernel/include/file.hrl").
 -export([handle_eval_route/2, handle_define_route/2, handle_browse_route/1,
          handle_mcp_route/2, serve_static/2, handle_status_route/1, handle_static_file/2, handle_sse_route/1,
          handle_processes_route/1, handle_sync_status_route/1,
-         handle_logs_route/1, handle_enhanced_modules_route/1, handle_observability_route/1,
+         handle_logs_route/1, handle_observability_route/1,
          handle_traces_route/1, handle_trace_detail_route/2, handle_app_route/3]).
 
 -define(MAX_SSE_CLIENTS, 32).
@@ -288,32 +287,6 @@ handle_logs_route(Socket) ->
 
 handle_observability_route(Socket) ->
     gleamunison_http_util:send_json(Socket, 200, gleamunison_observability:export_json()).
-
-handle_enhanced_modules_route(Socket) ->
-    Mods = [{atom_to_binary(M, utf8), 
-             safe_beam_size(F),
-             modified_ts(F),
-             atom_to_binary(M, utf8)}
-            || {M, F} <- code:all_loaded(), lists:prefix("m_", atom_to_list(M))],
-    Parts = [iolist_to_binary(io_lib:format(
-        "{\"name\":\"~s\",\"hash\":\"~s\",\"beam_size_bytes\":~p,\"compiled_at\":\"~s\",\"diagnostics\":\"ok\"}",
-        [M, M, Size, TS]))
-        || {M, Size, TS, _} <- Mods],
-    Json = <<"{\"modules\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
-    gleamunison_http_util:send_json(Socket, 200, Json).
-
-safe_beam_size(Path) ->
-    case filelib:file_size(Path) of
-        N when is_integer(N) -> N;
-        _ -> 0
-    end.
-
-modified_ts(Path) ->
-    case file:read_file_info(Path) of
-        {ok, #file_info{mtime = {{Y, Mo, D}, {H, Mi, S}}}} ->
-            iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ", [Y, Mo, D, H, Mi, S]));
-        _ -> <<"unknown">>
-    end.
 
 handle_traces_route(Socket) ->
     gleamunison_trace:start_trace(),

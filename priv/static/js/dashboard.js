@@ -132,12 +132,7 @@ function updateModuleList(modules) {
     modules.forEach(m => {
       const item = document.createElement('div');
       item.className = 'module-item';
-      const name = typeof m === 'string' ? m : (m.name || m);
-      const hash = typeof m === 'object' ? m.hash : '';
-      const beamTag = typeof m === 'object' && m.diagnostics ? m.diagnostics : 'BEAM';
-      const label = textElement('span', '', name);
-      if (hash) label.appendChild(textElement('span', 'module-hash', hash));
-      item.append(label, textElement('span', 'module-tag', beamTag));
+      item.append(textElement('span', '', m), textElement('span', 'module-tag', 'BEAM'));
       listDiv.appendChild(item);
     });
   }

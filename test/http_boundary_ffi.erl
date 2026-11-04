@@ -27,13 +27,16 @@ auth_routes() -> with_server(fun() ->
     Protected = [<<"/eval?expr=42">>, <<"/define?name=x&expr=1">>, <<"/mcp">>,
       <<"/browse">>, <<"/api/status">>, <<"/api/events">>,
       <<"/api/processes">>, <<"/api/sync-status">>,
-      <<"/api/logs">>, <<"/api/modules">>, <<"/api/traces">>, <<"/api/traces/1">>],
+      <<"/api/logs">>, <<"/api/traces">>, <<"/api/traces/1">>],
     lists:all(fun(Path) ->
         Code = get_status(Path, <<>>),
         io:format("auth_probe ~s => ~p~n", [Path, Code]),
         Code =:= 401 andalso get_status(Path, <<"wrong">>) =:= 401
     end, Protected) andalso get_status(<<"/api/status">>, <<"test-boundary-token">>) =:= 200
       andalso get_status(<<"/api/live">>, <<>>) =:= 200
+      %% /api/modules was deleted (bk-ce50): no route matches, so the static
+      %% catch-all must answer 404 for it, authorized or not.
+      andalso get_status(<<"/api/modules">>, <<"test-boundary-token">>) =:= 404
 end).
 
 symlink_escape() -> with_server(fun() ->

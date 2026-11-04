@@ -24,7 +24,6 @@ index_html() ->
 
   <nav class=\"tab-bar\">
     <button class=\"tab-btn active\" data-tab=\"overview\">Overview</button>
-    <button class=\"tab-btn\" data-tab=\"modules\">Modules</button>
     <button class=\"tab-btn\" data-tab=\"processes\">Processes</button>
     <button class=\"tab-btn\" data-tab=\"definitions\">Definitions</button>
     <button class=\"tab-btn\" data-tab=\"sync\">Sync</button>
@@ -65,17 +64,6 @@ index_html() ->
         <div class=\"card-title\">Loaded AST Modules</div>
         <div class=\"module-list\" id=\"module-list\">
           <div style=\"color:var(--text-muted);font-size:0.85rem;\">No compiled modules loaded</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id=\"tab-modules\" class=\"tab-content\">
-    <div class=\"dashboard-layout\">
-      <div class=\"card span-full\">
-        <div class=\"card-title\">Enhanced Module Listing</div>
-        <div class=\"module-list\" id=\"enhanced-module-list\">
-          <div style=\"color:var(--text-muted);font-size:0.85rem;\">Select the Modules tab to load</div>
         </div>
       </div>
     </div>

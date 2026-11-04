@@ -443,8 +443,6 @@ handle_route(Socket, <<"/api/sync-status">>) ->
     gleamunison_http_routes:handle_sync_status_route(Socket);
 handle_route(Socket, <<"/api/logs">>) ->
     gleamunison_http_routes:handle_logs_route(Socket);
-handle_route(Socket, <<"/api/modules">>) ->
-    gleamunison_http_routes:handle_enhanced_modules_route(Socket);
 handle_route(Socket, <<"/api/traces">>) ->
     gleamunison_http_routes:handle_traces_route(Socket);
 handle_route(Socket, <<"/api/traces/", Id/binary>>) ->

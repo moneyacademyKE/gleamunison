@@ -451,7 +451,7 @@ liveness are always available for orchestrators.
 | `POST /mcp` | MCP over HTTP |
 | `POST /app/:name`, `POST /app/ref/:content-ref` | Execute an admitted definition on the selected branch |
 | `GET /api/status`, `/api/events`, `/api/processes`, `/api/sync-status` | Runtime state |
-| `GET /api/logs`, `/api/modules`, `/api/traces`, `/api/traces/:id` | Observability |
+| `GET /api/logs`, `/api/traces`, `/api/traces/:id` | Observability |
 | `GET /api/health`, `/api/observability` | Detailed health and resource report |
 | `GET /api/ready`, `/api/live` | Readiness (503 when unhealthy) and liveness |
 
