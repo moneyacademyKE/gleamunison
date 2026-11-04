@@ -11,7 +11,7 @@ pub fn named(name: String) -> DefinitionRef {
   Ref(hash_bytes(bit_array.from_string(name)))
 }
 
-pub fn apply(name: String, args: List(ast.Type)) -> ast.Type {
+fn apply(name: String, args: List(ast.Type)) -> ast.Type {
   ast.App(named(name), args)
 }
 

@@ -5,7 +5,7 @@ pub type Budget {
   Budget(bytes: Int, tokens: Int, depth: Int, forms: Int, token_bytes: Int)
 }
 
-pub fn defaults() -> Budget {
+fn defaults() -> Budget {
   Budget(
     bytes: 1_048_576,
     tokens: 100_000,

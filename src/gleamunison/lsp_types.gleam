@@ -50,7 +50,7 @@ pub fn error_response(id: Dynamic, code: Int, message: String) -> String {
   <> "}}"
 }
 
-pub fn id_json(id: Dynamic) -> String {
+fn id_json(id: Dynamic) -> String {
   case decode.run(id, decode.int) {
     Ok(n) -> int.to_string(n)
     Error(_) ->

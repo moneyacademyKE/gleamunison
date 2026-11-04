@@ -211,6 +211,6 @@ fn print_help() -> Nil {
   )
   io.println("  pkg install <manifest-hash> [--peer host:port]")
   io.println("  pkg publish <file.lisp> --name <pkg> --version <v>")
-  io.println("  watch <file.lisp>      watch a file and re-run it on change")
+  io.println(cli_watch.usage())
   io.println("  help, --help, demo     this list")
 }

@@ -64,7 +64,7 @@ fn mtime_or_zero(path: String) -> Int {
   }
 }
 
-/// Help text fragment for the CLI banner.
+/// Help text for the CLI banner.
 pub fn usage() -> String {
   "  watch <file.lisp> — re-verify the file on every save"
 }
