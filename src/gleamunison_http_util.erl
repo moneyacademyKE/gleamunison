@@ -1,5 +1,5 @@
 -module(gleamunison_http_util).
--export([index_html/0, url_decode/1, escape_json/1, send_json/3, send_response/3, send_file_response/4, status_text/1, mime_type/1, notify_sse_eval/2, notify_sse_def/1, notify_sse_module/2]).
+-export([index_html/0, url_decode/1, escape_json/1, send_json/3, send_response/3, send_file_response/4, status_text/1, mime_type/1, notify_sse_eval/2, notify_sse_def/1, notify_sse_module/2, broadcast_sse/2]).
 
 index_html() ->
     <<"<!DOCTYPE html>

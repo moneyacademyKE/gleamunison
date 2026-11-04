@@ -82,14 +82,14 @@ sensitive_headers() ->
     [<<"authorization">>, <<"cookie">>, <<"set-cookie">>,
      <<"x-api-key">>, <<"proxy-authorization">>, <<"x-sync-token">>].
 
+%% One broadcast owner: gleamunison_http_util:broadcast_sse. The payload
+%% escapes every string field through the single escaper
+%% (gleamunison_ffi:json_quote via escape_json/1) so a method or path
+%% carrying quotes cannot break the JSON envelope.
 notify_sse_trace(Id, Method, Path) ->
-    case ets:whereis(gleamunison_sse_clients) of
-        undefined -> ok;
-        _ ->
-            Payload = iolist_to_binary(io_lib:format(
-                "{\"id\":\"~s\",\"method\":\"~s\",\"path\":\"~s\"}",
-                [Id, Method, Path])),
-            Clients = ets:match(gleamunison_sse_clients, {'$1', true}),
-            [Pid ! {sse_event, <<"trace">>, Payload} || [Pid] <- Clients],
-            ok
-    end.
+    Payload = iolist_to_binary(io_lib:format(
+        "{\"id\":~ts,\"method\":~ts,\"path\":~ts}",
+        [gleamunison_http_util:escape_json(Id),
+         gleamunison_http_util:escape_json(Method),
+         gleamunison_http_util:escape_json(Path)])),
+    gleamunison_http_util:broadcast_sse(<<"trace">>, Payload).

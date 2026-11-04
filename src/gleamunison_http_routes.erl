@@ -285,8 +285,11 @@ handle_redefinitions_route(Socket) ->
         _ -> lists:sublist(lists:reverse(ets:tab2list(gleamunison_redefs)), 20)
     end,
     Parts = [iolist_to_binary(io_lib:format(
-        "{\"timestamp\":\"~s\",\"name\":\"~s\",\"old_hash\":\"~s\",\"new_hash\":\"~s\",\"elapsed_ms\":~p}",
-        [gleamunison_http_util:escape_json(TS), Name, OH, NH, Elapsed]))
+        "{\"timestamp\":~ts,\"name\":~ts,\"old_hash\":~ts,\"new_hash\":~ts,\"elapsed_ms\":~p}",
+        [gleamunison_http_util:escape_json(TS),
+         gleamunison_http_util:escape_json(Name),
+         gleamunison_http_util:escape_json(OH),
+         gleamunison_http_util:escape_json(NH), Elapsed]))
         || {TS, Name, OH, NH, Elapsed} <- Events],
     Json = <<"{\"events\":[", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "]}">>,
     gleamunison_http_util:send_json(Socket, 200, Json).
@@ -348,8 +351,12 @@ handle_trace_detail_route(Socket, Id) ->
         {ok, {TS, Id, Method, Path, Headers}} ->
             HeaderJson = encode_headers(Headers),
             Json = iolist_to_binary(io_lib:format(
-                "{\"id\":\"~s\",\"timestamp\":\"~s\",\"method\":\"~s\",\"path\":\"~s\",\"headers\":~s}",
-                [Id, TS, Method, Path, HeaderJson])),
+                "{\"id\":~ts,\"timestamp\":~ts,\"method\":~ts,\"path\":~ts,\"headers\":~s}",
+                [gleamunison_http_util:escape_json(Id),
+                 gleamunison_http_util:escape_json(TS),
+                 gleamunison_http_util:escape_json(Method),
+                 gleamunison_http_util:escape_json(Path),
+                 HeaderJson])),
             gleamunison_http_util:send_json(Socket, 200, Json);
         {error, _} ->
             gleamunison_http_util:send_json(Socket, 404, <<"{\"error\":\"not found\"}">>)
@@ -357,12 +364,20 @@ handle_trace_detail_route(Socket, Id) ->
 
 format_trace({TS, Id, Method, Path, _Headers}) ->
     iolist_to_binary(io_lib:format(
-        "{\"id\":\"~s\",\"timestamp\":\"~s\",\"method\":\"~s\",\"path\":\"~s\"}",
-        [Id, TS, Method, Path])).
+        "{\"id\":~ts,\"timestamp\":~ts,\"method\":~ts,\"path\":~ts}",
+        [gleamunison_http_util:escape_json(Id),
+         gleamunison_http_util:escape_json(TS),
+         gleamunison_http_util:escape_json(Method),
+         gleamunison_http_util:escape_json(Path)])).
 
 encode_headers(Headers) ->
+    %% Header values are redacted at capture, but redaction does not make a
+    %% value JSON-safe: a User-Agent carrying a quote still breaks the envelope
+    %% unless it goes through the single escaper.
     Parts = [begin
         {K, V} = H,
-        iolist_to_binary(io_lib:format("\"~s\":\"~s\"", [K, V]))
+        iolist_to_binary(io_lib:format("~ts:~ts",
+            [gleamunison_http_util:escape_json(K),
+             gleamunison_http_util:escape_json(V)]))
     end || H <- Headers],
     <<"{", (iolist_to_binary(lists:join(<<",">>, Parts)))/binary, "}">>.
