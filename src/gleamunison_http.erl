@@ -109,6 +109,11 @@ init(Port) ->
     %% entry created by a worker dies with that worker, which is why /api/logs
     %% served an empty list while errors were being logged.
     gleamunison_log:ensure_table(),
+    %% Same ownership rule for the trace table: requests are captured by the
+    %% ephemeral worker, so the table must be created here, by the gen_server
+    %% that outlives every request. Before bk-64a4 no production code wrote
+    %% traces at all, so the only table owner was the test process.
+    gleamunison_trace:start_trace(),
     case bind_gate() of
         {ok, BindIp} -> listen(Port, BindIp);
         {error, _} = Refusal -> {stop, Refusal}
@@ -275,6 +280,7 @@ handle_request(Socket) ->
 handle_get_headers(Socket, Path) ->
     case read_headers(Socket, 0, [], 0) of
         {ok, _ContentLength, Headers} ->
+            trace_request(<<"GET">>, Path, Headers),
             case authorized(Path, Headers) of
                 true -> handle_route(Socket, Path);
                 false -> send_unauthorized(Socket)
@@ -286,6 +292,7 @@ handle_get_headers(Socket, Path) ->
 handle_post_headers(Socket, Path) ->
     case read_headers(Socket, 0, [], 0) of
         {ok, ContentLength, Headers} ->
+            trace_request(<<"POST">>, Path, Headers),
             case authorized(Path, Headers) of
                 false -> send_unauthorized(Socket);
                 true -> handle_post_body(Socket, Path, ContentLength)
@@ -354,6 +361,14 @@ parse_content_length(Value) ->
     catch
         _:_ -> error
     end.
+
+%% One trace entry per request, captured after headers are read and before
+%% authorization: the bounded trace cache records what actually arrived
+%% (credentials redacted at capture by gleamunison_trace), so /api/traces
+%% and /api/observability deliver the request log they have always promised.
+trace_request(Method, Path, Headers) ->
+    _ = gleamunison_trace:capture_request(Method, header_binary(Path), Headers),
+    ok.
 
 %% Authorization: the route's required scope comes from gleamunison@auth (the
 %% one policy owner), and the credential is resolved to the scopes its token
