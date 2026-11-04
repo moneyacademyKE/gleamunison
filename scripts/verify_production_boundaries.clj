@@ -62,7 +62,9 @@
 (defn test-file?
   "Test files are exempt from the 500-LOC ceiling (house rule): the test/
    tree and test-only probe modules (src/gleamunison_ffi_test.erl moved to
-   test/ in bk-618f, joining the other test-boundary .erl modules)."
+   test/ in bk-618f, joining the other test-boundary .erl modules; the four
+   remaining src/*_test.erl harnesses — cas_test, generation_test,
+   health_test, metrics_test — followed in bk-66e5)."
   [path]
   (boolean (re-find #"(^|/)test/|_test\.(erl|gleam)$" path)))
 
@@ -162,7 +164,7 @@
    :classification_note "untrusted-execution profile remains disabled: external OS/container isolation is required and not claimed"
    :gates @results
    :exclusions ["CI matrix (OTP 27/28/29 x ubuntu/macos) runs on push; local proof is OTP 29 / macOS arm64"
-                "LOC ceiling: gleamunison_ffi_test.erl (625 LOC, base 471) is a test-only probe module called exclusively from test/*.gleam; moved out of src/ to test/ in bk-618f, so the exemption is now by tree, and it no longer compiles into production builds or ships in the hex package; every production file touched by this branch is under 500 LOC"
+                "LOC ceiling: gleamunison_ffi_test.erl (625 LOC, base 471) is a test-only probe module called exclusively from test/*.gleam; moved out of src/ to test/ in bk-618f, so the exemption is now by tree, and it no longer compiles into production builds or ships in the hex package; the four remaining src/*_test.erl harnesses (cas_test, generation_test, health_test, metrics_test, 340 LOC total) moved to test/ in bk-66e5 by the same logic; every production file touched by this branch is under 500 LOC"
                 "all gates execute behind /usr/bin/env with a pinned tool PATH (homebrew + ~/.local/bin) so results never depend on the caller environment; recorded commands are the logical ones"]
    :unresolved_risks ["the 'transient full-suite flake' (507/1) recorded by earlier runs is identified and fixed: evaluation_timeout_test asserted the wall-clock timeout message while the 10ms budget tick could hit the reduction ceiling first on fast machines — reproduced on all seven CI matrix legs; the test now asserts containment under any named evaluation_* error (bk-19fe)"
                       "first CI matrix run on PR #30 exposed four latent platform defects, all root-caused from the matrix's own honest-error output and fixed (bk-19fe): (1) binary:join/2 does not exist on OTP 27 (added in OTP 28) — json.encode plus 8 HTTP route handlers that would have crashed any OTP-27 deployment now use lists:join; (2) the emitter emitted curried handler application ('m':'$eval'()(Val)) that OTP 27/28 erl_parse rejects while OTP 29's extended grammar accepts it — now nested erlang:apply like every other call site; (3) the corrupt-artifact rollback probe assumed an exit code, but Linux exec rejects the corrupt file with an IOException where macOS returns one — exec refusal now counts as failing loudly; (4) drain raced a self-inflicted link backfire: the http acceptor is spawn_linked and drain killed it with reason shutdown without unlinking, so the signal could kill the server before the drain reply under CI scheduling — macos-28 crashed with {shutdown,{gen_server,call,...}} and no assertion block, the same shape as the earlier blockless '4th failure' on ubuntu-27; fixed by unlink-before-kill, stress probe 120/120 clean. Next matrix run is the confirmation"
