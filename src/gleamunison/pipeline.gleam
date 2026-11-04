@@ -1,7 +1,5 @@
 import gleamunison/ast
-import gleamunison/compile.{
-  compile_definition, module_name_for, new as new_compiler,
-}
+import gleamunison/compile.{compile_definition, module_name_for}
 import gleamunison/elab_ctx.{type ElabCtx}
 import gleamunison/elab_types.{
   type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
@@ -40,7 +38,7 @@ pub fn compile_only(
 ) -> Result(BitArray, String) {
   let mod_name = module_name_for(ref)
   let _ = unload_binary(mod_name)
-  case compile_definition(new_compiler(), def, ref) {
+  case compile_definition(def, ref) {
     Ok(beam) -> Ok(beam)
     Error(e) -> {
       let compile.InternalError(reason) = e

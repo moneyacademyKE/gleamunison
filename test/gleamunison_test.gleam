@@ -76,11 +76,10 @@ pub fn type_inference_do_test() {
 }
 
 pub fn compiler_output_correctness_test() {
-  let compiler = compile.new()
   let lam = Lambda(binder: Local(0), body: LocalVarRef(Local(0)))
   let def = TermDef(term: lam, typ: TypeVar(0))
   let ref = Ref(hash_bytes(<<"identity">>))
-  let assert Ok(beam) = compile.compile_definition(compiler, def, ref)
+  let assert Ok(beam) = compile.compile_definition(def, ref)
   let mod_name = module_name_for(ref)
   let _ = loader_ffi.unload_binary(mod_name)
   let assert Ok(Nil) = loader_ffi.load_binary(mod_name, beam)

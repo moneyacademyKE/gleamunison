@@ -5,9 +5,7 @@ import gleam/list
 import gleam/string
 import gleamunison/ast
 import gleamunison/bootstraps
-import gleamunison/compile.{
-  compile_definition, module_name_for, new as new_compiler,
-}
+import gleamunison/compile.{compile_definition, module_name_for}
 import gleamunison/elab_types.{
   type SurfaceDef, type SurfaceTerm, SurfaceTermDef, SurfaceUnit,
 }
@@ -293,7 +291,7 @@ fn compile_and_load(
   ref: DefinitionRef,
 ) -> Result(Nil, String) {
   let _ = unload_binary(mod_name)
-  case compile_definition(new_compiler(), def, ref) {
+  case compile_definition(def, ref) {
     Error(e) -> {
       let compile.InternalError(reason) = e
       Error("Compile Error: " <> reason)

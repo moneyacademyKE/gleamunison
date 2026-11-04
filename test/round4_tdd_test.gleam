@@ -3,7 +3,7 @@ import gleam/io
 import gleam/option.{Some}
 import gleamunison/ast
 import gleamunison/codebase
-import gleamunison/compile.{compile_definition, new as new_compiler}
+import gleamunison/compile.{compile_definition}
 import gleamunison/definition_codec
 import gleamunison/elab_types.{TVar}
 import gleamunison/identity.{Local, Ref, hash_bytes, hash_equal}
@@ -62,12 +62,10 @@ pub fn structural_hashing_round4_test() {
 }
 
 pub fn compile_and_evaluate_handle_test() {
-  let compiler = new_compiler()
   let ability_ref = Ref(hash_bytes(<<"myability">>))
   let do_term = ast.Do(ability_ref, Local(0), [ast.Int(42)])
   let compiled =
     compile_definition(
-      compiler,
       ast.TermDef(
         ast.Handle(do_term, ast.Int(100), ability_ref),
         ast.TypeVar(0),

@@ -10,7 +10,7 @@ import gleamunison/ast
 import gleamunison/codebase.{
   empty as new_codebase, get_adapter, hash_of_definition, insert,
 }
-import gleamunison/compile.{compile_definition, new as new_compiler}
+import gleamunison/compile.{compile_definition}
 import gleamunison/elab_types
 import gleamunison/identity.{Local, Ref, hash_to_debug_string}
 import gleamunison/loader.{ensure_loaded, new_loader}
@@ -35,12 +35,11 @@ pub fn level21() -> Nil {
 
 pub fn level22() -> Nil {
   io.println("--- Level 22: Compile & Load cycle ---")
-  let compiler = new_compiler()
   let loader = new_loader()
   let lam = ast.Lambda(binder: Local(0), body: ast.LocalVarRef(Local(0)))
   let def = ast.TermDef(term: lam, typ: ast.TypeVar(0))
   let ref = Ref(hash_of_definition(def))
-  case compile_definition(compiler, def, ref) {
+  case compile_definition(def, ref) {
     Ok(beam) ->
       io.println(
         "Compiled: " <> string.inspect(bit_array.byte_size(beam)) <> " bytes",

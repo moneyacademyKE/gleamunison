@@ -4,7 +4,6 @@ import gleamunison/identity.{Ref, hash_bytes}
 import gleamunison/loader_ffi
 
 pub fn live_process_migration_test() {
-  let compiler = compile.new()
   // Define a simple term: Int(42)
   // We'll compile it under a unique ref
   let ref = Ref(hash_bytes(<<"migration_test_ref">>))
@@ -13,7 +12,7 @@ pub fn live_process_migration_test() {
   let def = ast.TermDef(term: term, typ: ast.Builtin(ast.IntType))
 
   // 1. Compile to BEAM binary
-  let assert Ok(beam) = compile.compile_definition(compiler, def, ref)
+  let assert Ok(beam) = compile.compile_definition(def, ref)
 
   // 2. Load it
   let _ = loader_ffi.unload_binary(mod_name)

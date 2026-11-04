@@ -5,8 +5,6 @@ import gleamunison/loader_ffi
 import gleeunit/should
 
 pub fn stored_definition_wins_over_legacy_jet_hash_test() {
-  let compiler = compile.new()
-
   // This hash belonged to the experimental Fibonacci jet. Its stored lambda,
   // not registry membership, must determine the module's behavior.
   let bytes = <<0:224, 123:32>>
@@ -23,7 +21,7 @@ pub fn stored_definition_wins_over_legacy_jet_hash_test() {
     )
 
   let assert Ok(stored_beam) =
-    compile.compile_definition(compiler, stored_def, stored_ref)
+    compile.compile_definition(stored_def, stored_ref)
   let _ = loader_ffi.unload_binary(stored_mod)
   let assert Ok(Nil) = loader_ffi.load_binary(stored_mod, stored_beam)
 
@@ -32,7 +30,7 @@ pub fn stored_definition_wins_over_legacy_jet_hash_test() {
   let caller_term = Apply(function: RefTo(stored_ref), arg: Int(10))
   let caller_def = TermDef(term: caller_term, typ: ast.Builtin(ast.IntType))
   let assert Ok(caller_beam) =
-    compile.compile_definition(compiler, caller_def, caller_ref)
+    compile.compile_definition(caller_def, caller_ref)
   let _ = loader_ffi.unload_binary(caller_mod)
   let assert Ok(Nil) = loader_ffi.load_binary(caller_mod, caller_beam)
 

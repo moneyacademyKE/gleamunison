@@ -2,9 +2,7 @@ import gleam/dict.{type Dict}
 import gleam/list
 import gleam/set.{type Set}
 import gleamunison/ast
-import gleamunison/compile.{
-  type Compiler, compile_definition, module_name_for, new as new_compiler,
-}
+import gleamunison/compile.{compile_definition, module_name_for}
 import gleamunison/identity.{type DefinitionRef}
 import gleamunison/loader_ffi.{load_binary}
 import gleamy/bimap
@@ -29,7 +27,6 @@ pub fn describe(error: LoaderError) -> String {
 
 pub opaque type Loader {
   Loader(
-    compiler: Compiler,
     module_names: bimap.Bimap(DefinitionRef, String),
     failed: Dict(DefinitionRef, LoaderError),
     order: List(DefinitionRef),
@@ -40,7 +37,6 @@ pub opaque type Loader {
 
 pub fn new_loader() -> Loader {
   Loader(
-    compiler: new_compiler(),
     module_names: bimap.new(),
     failed: dict.new(),
     order: [],
@@ -51,7 +47,6 @@ pub fn new_loader() -> Loader {
 
 pub fn new_loader_with_limit(limit: Int) -> Loader {
   Loader(
-    compiler: new_compiler(),
     module_names: bimap.new(),
     failed: dict.new(),
     order: [],
@@ -101,9 +96,8 @@ fn retry_pending_purges(ld: Loader) -> Loader {
 fn compile_and_load(
   ref: DefinitionRef,
   def: ast.Definition,
-  compiler: Compiler,
 ) -> Result(BitArray, String) {
-  case compile_definition(compiler, def, ref) {
+  case compile_definition(def, ref) {
     Ok(beam) -> Ok(beam)
     Error(e) -> Error(e.reason)
   }
@@ -124,7 +118,7 @@ pub fn ensure_loaded(
       case dict.get(ld.failed, ref) {
         Ok(e) -> Error(#(ld, e))
         Error(_) -> {
-          case compile_and_load(ref, def, ld.compiler) {
+          case compile_and_load(ref, def) {
             Ok(beam) -> {
               let mod_name = module_name_for(ref)
               case load_binary(mod_name, beam) {

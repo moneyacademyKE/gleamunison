@@ -6,14 +6,6 @@ import gleam/string
 import gleamunison/ast
 import gleamunison/identity.{type DefinitionRef, Local, runtime_module_name}
 
-pub type Compiler {
-  Compiler
-}
-
-pub fn new() -> Compiler {
-  Compiler
-}
-
 pub type CompileError {
   InternalError(reason: String)
 }
@@ -133,7 +125,6 @@ fn emit_pattern_body_aware(p: ast.Pattern, body: String) -> String {
 }
 
 pub fn compile_definition(
-  _c: Compiler,
   def: ast.Definition,
   ref: DefinitionRef,
 ) -> Result(BitArray, CompileError) {
