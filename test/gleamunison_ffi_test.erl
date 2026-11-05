@@ -4,7 +4,7 @@
 -export([start_http_server/1, stop_http_server/0, http_get/2, http_post/3, http_post_auth/4,
          http_post_auth_length/5, set_http_token/1,
          clear_http_token/0, tcp_auth_probe/1, set_eval_timeout/1,
-         clear_eval_timeout/0, otp_blake2b64/1, constant_time_equal_probe/2,
+         clear_eval_timeout/0, constant_time_equal_probe/2,
          app_db_table_name_probe/1, store_log_table_name_probe/1,
          storage_table_name_probe/1]).
 -export([pd_counter_inc/1, pd_counter_get/1, pd_record/2, pd_records/1]).
@@ -526,10 +526,6 @@ recv_all(Socket, Acc) ->
         {error, closed} -> {ok, Acc};
         {error, Reason} -> {error, Reason}
     end.
-
-%% Native OTP BLAKE2b-64 for cross-checking our pure implementation.
-otp_blake2b64(Data) ->
-    crypto:hash(blake2b, Data).
 
 %% Test probe exposing the one-owner constant-time secret compare (bk-49ec):
 %% gleamunison_crypto:constant_time_equal/2, sha256-then-compare so unequal

@@ -93,3 +93,79 @@ pub fn ref_hex_pins_the_canonical_lowercase_bytes_test() {
   // ref_hex and crypto.to_hex are now the SAME encoder, not two that agree.
   crypto.to_hex(digest) |> should.equal(expected)
 }
+
+// ── Ported from crypto_argon2_test (bk-eca5): production crypto surface ──
+// to_hex was already pinned above; the argon2/blake2b island carried the
+// constant-time compare contract, so it moves here unchanged.
+
+// The one-owner constant-time secret compare (bk-49ec), used by the HTTP
+// bearer gate and the TCP sync handshake: sha256-then-compare means tokens
+// of UNEQUAL length take the same fixed-digest path instead of a
+// short-circuiting size check.
+@external(erlang, "gleamunison_ffi_test", "constant_time_equal_probe")
+fn constant_time_equal_probe(a: BitArray, b: BitArray) -> Bool
+
+pub fn constant_time_equal_unequal_length_tokens_test() {
+  // unequal length, unequal content
+  let assert False =
+    constant_time_equal_probe(<<"a-longer-secret-token":utf8>>, <<"short":utf8>>)
+  // unequal length, one side empty (the missing-Authorization-header path)
+  let assert False = constant_time_equal_probe(<<"secret":utf8>>, <<"":utf8>>)
+  let assert True = constant_time_equal_probe(<<"":utf8>>, <<"":utf8>>)
+  // equal length, equal content
+  let assert True =
+    constant_time_equal_probe(<<"same-token":utf8>>, <<"same-token":utf8>>)
+  // equal length, different content
+  let assert False =
+    constant_time_equal_probe(<<"token-a":utf8>>, <<"token-b":utf8>>)
+  // unequal length where the longer token starts with the shorter one —
+  // a prefix must never pass
+  let assert False =
+    constant_time_equal_probe(<<"token":utf8>>, <<"token-extended":utf8>>)
+}
+
+// secure_compare is the equal-size constant-time compare under the
+// arbitrary-length owner above (crypto_argon2_test pinned it on argon2
+// tags; plain tokens carry the same contract).
+pub fn secure_compare_matches_and_rejects_test() {
+  let assert True =
+    crypto.secure_compare(<<"same-tag":utf8>>, <<"same-tag":utf8>>)
+  let assert False =
+    crypto.secure_compare(<<"token-a":utf8>>, <<"token-b":utf8>>)
+  // unequal lengths never enter the constant-time path: False, never a crash
+  let assert False =
+    crypto.secure_compare(<<"short":utf8>>, <<"a-longer-secret-token":utf8>>)
+}
+
+// HMAC-SHA256 known-answer vector (RFC 4231 test case 1). The argon2 test
+// file never pinned hmac; the evidence-signing primitive gets its first
+// direct assertion here so the port leaves no named surface uncovered.
+pub fn hmac_sha256_rfc4231_case1_test() {
+  let key = <<
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+  >>
+  let assert Ok(mac) = crypto.hmac_sha256(key, <<"Hi There":utf8>>)
+  crypto.to_hex(mac)
+  |> should.equal(
+    "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7",
+  )
+}
