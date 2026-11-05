@@ -22,17 +22,6 @@ import gleamunison/llm_wire
 pub type EnvLookup =
   fn(String) -> Result(String, Nil)
 
-/// CLI entry: `gleam run -- llm [openai|anthropic] <prompt>`.
-pub fn command(args: List(String)) -> String {
-  command_with_env(args, env.get)
-}
-
-fn command_with_env(args: List(String), env: EnvLookup) -> String {
-  case command_result_with_env(args, env) {
-    Ok(message) | Error(message) -> message
-  }
-}
-
 /// The process boundary must not guess success from the rendered text.
 pub fn command_result(args: List(String)) -> Result(String, String) {
   command_result_with_env(args, env.get)
