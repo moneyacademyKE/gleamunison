@@ -274,10 +274,10 @@ handle_get_headers(Socket, Path) ->
             trace_request(<<"GET">>, Path, Headers),
             case authorized(Path, Headers) of
                 true -> handle_route(Socket, Path);
-                false -> send_unauthorized(Socket)
+                false -> gleamunison_http_util:send_error(Socket, 401, <<"unauthorized">>)
             end;
-        {error, headers_too_large} -> send_error(Socket, 413, <<"headers too large">>);
-        {error, _} -> send_error(Socket, 400, <<"invalid headers">>)
+        {error, headers_too_large} -> gleamunison_http_util:send_error(Socket, 413, <<"headers too large">>);
+        {error, _} -> gleamunison_http_util:send_error(Socket, 400, <<"invalid headers">>)
     end.
 
 handle_post_headers(Socket, Path) ->
@@ -285,19 +285,19 @@ handle_post_headers(Socket, Path) ->
         {ok, ContentLength, Headers} ->
             trace_request(<<"POST">>, Path, Headers),
             case authorized(Path, Headers) of
-                false -> send_unauthorized(Socket);
+                false -> gleamunison_http_util:send_error(Socket, 401, <<"unauthorized">>);
                 true -> handle_post_body(Socket, Path, ContentLength)
             end;
-        {error, body_too_large} -> send_error(Socket, 413, <<"request body too large">>);
-        {error, headers_too_large} -> send_error(Socket, 413, <<"headers too large">>);
-        {error, _} -> send_error(Socket, 400, <<"invalid headers">>)
+        {error, body_too_large} -> gleamunison_http_util:send_error(Socket, 413, <<"request body too large">>);
+        {error, headers_too_large} -> gleamunison_http_util:send_error(Socket, 413, <<"headers too large">>);
+        {error, _} -> gleamunison_http_util:send_error(Socket, 400, <<"invalid headers">>)
     end.
 
 handle_post_body(Socket, Path, ContentLength) ->
     inet:setopts(Socket, [{packet, raw}]),
     case recv_body(Socket, ContentLength, <<>>) of
         {ok, Body} -> handle_post_route(Socket, Path, Body);
-        {error, _} -> send_error(Socket, 400, <<"incomplete request body">>)
+        {error, _} -> gleamunison_http_util:send_error(Socket, 400, <<"incomplete request body">>)
     end.
 
 %% Read headers until end-of-headers. Header names are normalized so auth and
@@ -413,19 +413,12 @@ token_scopes(Headers) ->
             end
     end.
 
-send_unauthorized(Socket) ->
-    gleamunison_http_util:send_json(Socket, 401, <<"{\"error\":\"unauthorized\"}">>).
-
-send_error(Socket, Status, Message) ->
-    Json = iolist_to_binary(io_lib:format("{\"error\":~ts}", [gleamunison_http_util:escape_json(Message)])),
-    gleamunison_http_util:send_json(Socket, Status, Json).
-
 handle_post_route(Socket, <<"/mcp">>, Body) ->
     gleamunison_http_routes:handle_mcp_route(Socket, Body);
 handle_post_route(Socket, <<"/app/", Target/binary>>, Body) ->
     gleamunison_http_routes:handle_app_route(Socket, Target, Body);
 handle_post_route(Socket, _Path, _Body) ->
-    gleamunison_http_util:send_json(Socket, 404, <<"{\"error\":\"not found\"}">>).
+    gleamunison_http_util:send_error(Socket, 404, <<"not found">>).
 
 handle_route(Socket, <<"/eval", Rest/binary>>) ->
     gleamunison_http_routes:handle_eval_route(Socket, Rest);

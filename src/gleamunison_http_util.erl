@@ -1,5 +1,5 @@
 -module(gleamunison_http_util).
--export([index_html/0, url_decode/1, escape_json/1, send_json/3, send_response/3, send_file_response/4, status_text/1, mime_type/1, notify_sse_eval/2, notify_sse_def/1, notify_sse_module/2, broadcast_sse/2]).
+-export([index_html/0, url_decode/1, escape_json/1, send_json/3, send_error/3, send_response/3, send_file_response/4, status_text/1, mime_type/1, notify_sse_eval/2, notify_sse_def/1, notify_sse_module/2, broadcast_sse/2]).
 
 index_html() ->
     <<"<!DOCTYPE html>
@@ -179,6 +179,13 @@ send_json(Socket, StatusCode, Body) ->
     )),
     gen_tcp:send(Socket, Response),
     gen_tcp:close(Socket).
+
+%% The single owner of the one-key JSON error envelope {"error":<escaped>}.
+%% Was a private fn of gleamunison_http while every route hand-rolled the same
+%% bytes (bk-f789); now the one emitter every error site delegates to.
+send_error(Socket, Status, Message) ->
+    Json = iolist_to_binary(io_lib:format("{\"error\":~ts}", [escape_json(Message)])),
+    send_json(Socket, Status, Json).
 
 send_response(Socket, StatusCode, Body) ->
     gleamunison_http_metrics:observe(StatusCode),

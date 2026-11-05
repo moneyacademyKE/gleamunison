@@ -19,7 +19,7 @@ handle_eval_route(Socket, <<"?expr=", Expr/binary>>) ->
 handle_eval_route(Socket, Expr) when is_binary(Expr) ->
     admit_execution(Socket, fun() -> handle_eval_admitted(Socket, Expr) end);
 handle_eval_route(Socket, _) ->
-    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing expr parameter\"}">>).
+    gleamunison_http_util:send_error(Socket, 400, <<"missing expr parameter">>).
 
 %% One admission gate for every route that evaluates caller-supplied code.
 %% The policy lives in gleamunison/sandbox_policy.gleam and the profile name
@@ -53,8 +53,7 @@ handle_eval_admitted(Socket, Expr) ->
                     Json = <<"{\"result\":", (gleamunison_http_util:escape_json(Result))/binary, "}">>,
                     gleamunison_http_util:send_json(Socket, 200, Json);
                 {error, Error} ->
-                    Json = <<"{\"error\":", (gleamunison_http_util:escape_json(Error))/binary, "}">>,
-                    gleamunison_http_util:send_json(Socket, 400, Json)
+                    gleamunison_http_util:send_error(Socket, 400, Error)
             end;
         false ->
             gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
@@ -83,8 +82,7 @@ handle_app_route(Socket, Target, Body) ->
                             <<"{\"error\":\"config_invalid\",\"detail\":", (gleamunison_http_util:escape_json(Reason))/binary, "}">>)
                 end;
             {error, _Reason} ->
-                gleamunison_http_util:send_json(Socket, 503,
-                    <<"{\"error\":\"storage_unavailable\"}">>)
+                gleamunison_http_util:send_error(Socket, 503, <<"storage_unavailable">>)
         end
     end).
 
@@ -94,8 +92,8 @@ handle_mcp_route(Socket, Body) ->
 handle_mcp_admitted(Socket, Body) ->
     case whereis(gleamunison_mcp_session) of
         undefined ->
-            gleamunison_http_util:send_json(
-                Socket, 503, <<"{\"error\":\"mcp session not running\"}">>);
+            gleamunison_http_util:send_error(
+                Socket, 503, <<"mcp session not running">>);
         _Pid ->
             case try gen_server:call(gleamunison_mcp_session, {rpc, Body}, 30000) of
                 RpcResult -> RpcResult
@@ -107,18 +105,18 @@ handle_mcp_admitted(Socket, Body) ->
                 {ok, no_reply} ->
                     gleamunison_http_util:send_json(Socket, 202, <<>>);
                 {error, busy} ->
-                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session busy\"}">>);
+                    gleamunison_http_util:send_error(Socket, 503, <<"mcp session busy">>);
                 {'EXIT', _} ->
-                    gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"mcp session unavailable\"}">>);
+                    gleamunison_http_util:send_error(Socket, 503, <<"mcp session unavailable">>);
                 _ ->
-                    gleamunison_http_util:send_json(Socket, 504, <<"{\"error\":\"mcp session timeout\"}">>)
+                    gleamunison_http_util:send_error(Socket, 504, <<"mcp session timeout">>)
             end
     end.
 
 handle_define_route(Socket, <<"?name=", Rest/binary>>) ->
     admit_execution(Socket, fun() -> handle_define_admitted(Socket, Rest) end);
 handle_define_route(Socket, _) ->
-    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>).
+    gleamunison_http_util:send_error(Socket, 400, <<"missing name or expr parameter">>).
 
 handle_define_admitted(Socket, Rest) ->
     case is_localhost(Socket) of
@@ -140,13 +138,10 @@ handle_define_admitted(Socket, Rest) ->
                             )),
                             gleamunison_http_util:send_json(Socket, 200, Json);
                         {error, Error} ->
-                            Json = iolist_to_binary(io_lib:format(
-                                "{\"error\":~ts}", [gleamunison_http_util:escape_json(Error)]
-                            )),
-                            gleamunison_http_util:send_json(Socket, 400, Json)
+                            gleamunison_http_util:send_error(Socket, 400, Error)
                     end;
                 _ ->
-                    gleamunison_http_util:send_json(Socket, 400, <<"{\"error\":\"missing name or expr parameter\"}">>)
+                    gleamunison_http_util:send_error(Socket, 400, <<"missing name or expr parameter">>)
             end;
         false ->
             gleamunison_http_util:send_response(Socket, 403, <<"Forbidden">>)
@@ -205,7 +200,7 @@ handle_sse_route(Socket) ->
     gleamunison_tables:ensure(gleamunison_sse_clients, [set, public, named_table]),
     case ets:info(gleamunison_sse_clients, size) < ?MAX_SSE_CLIENTS of
         false ->
-            gleamunison_http_util:send_json(Socket, 503, <<"{\"error\":\"sse client limit reached\"}">>);
+            gleamunison_http_util:send_error(Socket, 503, <<"sse client limit reached">>);
         true ->
             Headers = <<"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n">>,
             gen_tcp:send(Socket, Headers),
@@ -309,7 +304,7 @@ handle_trace_detail_route(Socket, Id) ->
                  HeaderJson])),
             gleamunison_http_util:send_json(Socket, 200, Json);
         {error, _} ->
-            gleamunison_http_util:send_json(Socket, 404, <<"{\"error\":\"not found\"}">>)
+            gleamunison_http_util:send_error(Socket, 404, <<"not found">>)
     end.
 
 format_trace({TS, Id, Method, Path, _Headers}) ->
