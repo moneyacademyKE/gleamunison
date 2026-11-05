@@ -1,7 +1,7 @@
-//// Typed request identity, scopes, and bind policy.
+//// Request scopes and bind policy.
 ////
-//// Data over dispatch: routes map to scopes, identities carry scopes, and
-//// authorization is a pure decision. The Erlang HTTP/sync servers call
+//// Data over dispatch: routes map to scopes and authorization is a pure
+//// decision on scope lists. The Erlang HTTP/sync servers call
 //// required_scope/1, authorize_scopes/2 and bind_decision/1; they do not
 //// re-implement policy.
 
@@ -13,13 +13,6 @@ pub type Scope {
   DataRead
   DataWrite
   Admin
-}
-
-pub type Identity {
-  Anonymous
-  LocalPeer
-  Bearer(token_hash: String, scopes: List(Scope))
-  ProxyPrincipal(name: String, scopes: List(Scope))
 }
 
 pub type BindDecision {
