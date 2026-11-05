@@ -2,6 +2,75 @@
 
 ---
 
+## What's New in v3.27.0 (2026-11-05)
+
+The hygiene release: thirty simplicity slices since 3.26.0 turned every
+error into a sentence, deleted every promise the runtime couldn't keep,
+gave each repeated decision one owner, and took the test scaffolding out
+of the published package. The one addition is a promise finally kept: the
+request log `/api/traces` always claimed now actually records.
+
+### Errors became sentences
+
+- Every error type now has one owner that renders it: lexer, elaboration,
+  inference, storage, codebase reads and inserts, sync, prompts, evidence
+  attach, dependency scans, and file errors. Users see "no such file or
+  directory" and "at line 3, col 7" — not `Enoent(...)` and
+  `StorageError(...)` inspect dumps (bk-09e6, bk-f76d, bk-712c, bk-20d9,
+  bk-d7f4, bk-69c2, bk-d1e6, bk-1b42).
+- Failures stopped masquerading as answers: `namespace.history` returns an
+  honest Result, and the namespace and branch-scope paths report the
+  storage error instead of discarding it into a canned "store insert
+  failed" (bk-71dd, bk-5772).
+- The canonical hash derivation is frozen and documented — the hash input
+  is the 64-char hex text as UTF-8 — and the misnamed private copy is gone
+  (bk-490d).
+
+### Promises the runtime couldn't keep
+
+- Three dead routes deleted: `/api/redefinitions`, `/counter`, and
+  `/api/modules` served payloads no backend produced and no reader ever
+  fetched (bk-c7dc, bk-a871, bk-ce50).
+- Every request is now captured into the trace log, with the table owned
+  by the HTTP listener so it outlives request workers, and the trace and
+  routes JSON emitters escape caller-controlled fields (bk-64a4, bk-5f78).
+- Fabricated taxonomies deleted: ConnectError variants never constructed,
+  the Identity type with zero users, unconstructed PeerStatus variants,
+  Sha512/Md5, the stateless Compiler token, and `validate_handler`, which
+  no production seam could ever call (bk-ae3b, bk-7e70, bk-41ce, bk-2d42,
+  bk-17bf, bk-f80c).
+
+### One owner per decision
+
+- The JSON-RPC envelope and id boundary lives in `json`, pinned
+  byte-exact by a golden test, and every one-key JSON error body goes
+  through one `send_error` (bk-3fe7, bk-f789).
+- The ETS ensure-table idiom, the base64-text codec, the builtin
+  type-name list, names-for-ref, and the CLI flag-tail parser each live
+  exactly once (bk-1e5e, bk-5d01, bk-3715, bk-8b6b, bk-5696, bk-9f16,
+  bk-05dc, bk-bf72).
+- The pure `llm_budget` decisions own the window and circuit math; the
+  Erlang holder applies them and never invents its own. The metrics table
+  folded into the gen_server, and the log table gained the read API its
+  owner always owed (bk-e2df, bk-9cc3, bk-931d).
+
+### The package shrank
+
+- Five test-only Erlang harnesses moved out of `src/` — the hex package
+  stops shipping them — the genesis inventory is pinned by test, and the
+  unreachable `m_state` fossil is deleted (bk-618f, bk-66e5, bk-0540).
+- The test-only argon2+blake2b island is gone, with an RFC 4231
+  known-answer vector now pinning the HMAC signing primitive, and the
+  misspelled `gleamunison_effets` module is `gleamunison_effects`
+  (bk-eca5, bk-0f91).
+- Test-only seams left `src`: the cli_llm scaffolding and the
+  sandbox/capability helpers live with the tests (bk-15d8, bk-b282).
+
+The suite stands at 844 passing: 32 tests added while the dead-machinery
+tests retired with their coverage gaps documented.
+
+---
+
 ## What's New in v3.26.0 (2026-11-02)
 
 The consolidation release: six simplicity slices retired the duplicated and
