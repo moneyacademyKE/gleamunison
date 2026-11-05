@@ -23,14 +23,20 @@ double_ensure_ok() ->
 concurrent_ensure_ok() ->
     cleanup(?TEST_TABLE_2),
     Self = self(),
+    %% A table dies with its owner: whichever creator wins the ets:new
+    %% race owns ?TEST_TABLE_2, so creators must outlive the liveness
+    %% check below or the check races owner exit (publish run 41999195654:
+    %% 843/844, only this assertion failed; 8-of-300 repro locally).
     Creators = [spawn(fun() ->
         ok = gleamunison_tables:ensure(?TEST_TABLE_2, [set, public, named_table]),
-        Self ! done
+        Self ! done,
+        receive stop -> ok after 10000 -> ok end
     end) || _ <- lists:seq(1, 16)],
     ok = gleamunison_tables:ensure(?TEST_TABLE_2, [set, public, named_table]),
     [receive done -> ok after 5000 -> exit(creator_timeout) end
      || _ <- Creators],
     Alive = undefined =/= ets:whereis(?TEST_TABLE_2),
+    [C ! stop || C <- Creators],
     cleanup(?TEST_TABLE_2),
     Alive.
 
