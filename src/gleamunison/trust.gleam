@@ -11,6 +11,7 @@ import gleam/list
 import gleam/result
 import gleam/string
 import gleamunison/config
+import gleamunison/crypto
 import gleamunison/datetime
 import gleamunison/evidence.{type Evidence, type Signer}
 import gleamunison/storage.{type StorageAdapter}
@@ -59,6 +60,10 @@ pub type TrustRefusal {
   KeyNotYetValid(id: String, since: Int)
   KeyExpired(id: String, until: Int)
   SignatureMismatch(id: String)
+  /// The recomputed signature could not be produced: the HMAC backend
+  /// failed. Not a mismatch (we never compared), and never the unsigned
+  /// state (the record arrived signed).
+  SignatureComputationFailed(reason: String)
   UnsignedRecord
   AttestationTooOld(kind: String, ts: Int, max_age_secs: Int)
   EvidenceReadFailed
@@ -75,6 +80,8 @@ pub fn refusal_name(refusal: TrustRefusal) -> String {
     KeyNotYetValid(id, _since) -> "key_not_yet_valid:" <> id
     KeyExpired(id, _until) -> "key_expired:" <> id
     SignatureMismatch(id) -> "signature_mismatch:" <> id
+    SignatureComputationFailed(reason) ->
+      "signature_computation_failed:" <> reason
     UnsignedRecord -> "unsigned_record"
     AttestationTooOld(kind, _ts, _max) -> "attestation_too_old:" <> kind
     EvidenceReadFailed -> "evidence_read_failed"
@@ -136,8 +143,8 @@ fn admit_at(
             Ok(_) ->
               case keys_admit(keys, record.signer, record.ts) {
                 Error(refusal) -> Error(refusal)
-                Ok(key) -> {
-                  let expected =
+                Ok(key) ->
+                  case
                     evidence.sign(
                       key.signer,
                       record.subject,
@@ -146,16 +153,22 @@ fn admit_at(
                       record.payload,
                       record.ts,
                     )
-                  case
-                    evidence.secure_compare_hex(
-                      record.signature,
-                      expected.signature,
-                    )
                   {
-                    True -> Ok(record)
-                    False -> Error(SignatureMismatch(record.signer))
+                    Error(reason) ->
+                      Error(
+                        SignatureComputationFailed(crypto.describe_error(reason)),
+                      )
+                    Ok(expected) ->
+                      case
+                        evidence.secure_compare_hex(
+                          record.signature,
+                          expected.signature,
+                        )
+                      {
+                        True -> Ok(record)
+                        False -> Error(SignatureMismatch(record.signer))
+                      }
                   }
-                }
               }
           }
       }

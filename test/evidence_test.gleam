@@ -1,5 +1,6 @@
 import gleam/bit_array
-import gleamunison/evidence.{StoreFailed, describe_attach_error}
+import gleamunison/crypto
+import gleamunison/evidence.{SigningFailed, StoreFailed, describe_attach_error}
 import gleamunison/identity.{Ref}
 import gleamunison/storage
 import gleamunison/trust
@@ -137,4 +138,50 @@ pub fn signed_evidence_requires_matching_identity_and_secret_test() {
 pub fn describe_attach_error_returns_payload_sentence_test() {
   describe_attach_error(StoreFailed("evidence store unavailable"))
   |> should.equal("evidence store unavailable")
+}
+
+pub fn failing_hmac_is_an_explicit_signing_error_test() {
+  let signer = evidence.signer("ci", <<"ci-secret">>)
+  let always_fail = fn(_secret, _input) {
+    Error(crypto.InvalidInput("hmac backend unavailable"))
+  }
+  evidence.sign_with_hmac(
+    signer,
+    subject_hex,
+    evidence.Test,
+    "pass",
+    "payload",
+    1,
+    always_fail,
+  )
+  |> should.equal(Error(crypto.InvalidInput("hmac backend unavailable")))
+}
+
+pub fn signing_failure_never_masquerades_as_unsigned_test() {
+  // The record this module used to produce on crypto failure — signer set,
+  // signature empty — is exactly the shape the admission gate reads as the
+  // legacy unsigned path. The failure path must never build one.
+  let signer = evidence.signer("ci", <<"ci-secret">>)
+  let always_fail = fn(_secret, _input) {
+    Error(crypto.InvalidInput("hmac backend unavailable"))
+  }
+  case
+    evidence.sign_with_hmac(
+      signer,
+      subject_hex,
+      evidence.Test,
+      "pass",
+      "payload",
+      1,
+      always_fail,
+    )
+  {
+    Error(_) -> Nil
+    Ok(record) -> should.be_false(record.signer != "" && record.signature == "")
+  }
+}
+
+pub fn describe_attach_error_renders_signing_failure_test() {
+  describe_attach_error(SigningFailed("hmac backend unavailable"))
+  |> should.equal("hmac backend unavailable")
 }

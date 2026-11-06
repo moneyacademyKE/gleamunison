@@ -16,7 +16,9 @@ fn key_b() -> evidence.Signer {
 }
 
 fn record(signer: evidence.Signer, ts: Int) -> evidence.Evidence {
-  evidence.sign(signer, subject, Test, "pass", "green", ts)
+  let assert Ok(record) =
+    evidence.sign(signer, subject, Test, "pass", "green", ts)
+  record
 }
 
 pub fn unknown_signer_is_refused_test() {
@@ -245,4 +247,9 @@ pub fn describe_states_what_is_enforced_test() {
   |> should.equal("key-a: active since 0, no expiry; no attestation age limit")
   trust.describe(trust.policy([trust.revoked(key_a())]))
   |> should.equal("key-a: revoked; no attestation age limit")
+}
+
+pub fn signature_computation_failure_has_a_stable_name_test() {
+  trust.refusal_name(trust.SignatureComputationFailed("backend down"))
+  |> should.equal("signature_computation_failed:backend down")
 }

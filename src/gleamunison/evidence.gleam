@@ -11,7 +11,7 @@ import gleamunison/identity.{
   type DefinitionRef, Ref, hash_bytes, hash_equal, hash_to_debug_string,
 }
 import gleamunison/namespace_codec.{decode_text, encode_text}
-import gleamunison/storage.{type StorageAdapter}
+import gleamunison/storage.{type StorageAdapter, describe_error}
 
 /// What kind of evidence this is. Deploy gates ask for these by name.
 pub type Kind {
@@ -49,6 +49,9 @@ pub fn signer(id: String, secret: BitArray) -> Signer {
 
 pub type AttachError {
   StoreFailed(String)
+  /// The HMAC backend failed while signing. Not a store problem and never
+  /// the unsigned state: a signer that set out to sign did sign-or-fail.
+  SigningFailed(String)
 }
 
 /// The one place an AttachError becomes a user sentence. Rendering belongs
@@ -57,6 +60,7 @@ pub type AttachError {
 pub fn describe_attach_error(error: AttachError) -> String {
   case error {
     StoreFailed(reason) -> reason
+    SigningFailed(reason) -> reason
   }
 }
 
@@ -173,14 +177,22 @@ fn signature_input(e: Evidence) -> BitArray {
   ))
 }
 
-fn signature_for(signer: Signer, e: Evidence) -> String {
-  case crypto.hmac_sha256(signer_secret(signer), signature_input(e)) {
-    Ok(bytes) -> crypto.to_hex(bytes)
-    Error(_) -> ""
+fn signature_for(
+  signer: Signer,
+  e: Evidence,
+  hmac: fn(BitArray, BitArray) -> Result(BitArray, crypto.CryptoError),
+) -> Result(String, crypto.CryptoError) {
+  case hmac(signer_secret(signer), signature_input(e)) {
+    Ok(bytes) -> Ok(crypto.to_hex(bytes))
+    Error(reason) -> Error(reason)
   }
 }
 
-/// Create an identity-bearing evidence record.
+/// Create an identity-bearing evidence record. Error carries the crypto
+/// reason when the HMAC backend fails — a signing failure must never be
+/// stored as the empty signature, because the admission gate reads that
+/// as "unsigned": a record whose signer says "ci" and whose signature says
+/// nothing is a lie about what actually happened.
 pub fn sign(
   signer: Signer,
   subject: String,
@@ -188,18 +200,45 @@ pub fn sign(
   verdict: String,
   payload: String,
   ts: Int,
-) -> Evidence {
+) -> Result(Evidence, crypto.CryptoError) {
+  sign_with_hmac(
+    signer,
+    subject,
+    kind,
+    verdict,
+    payload,
+    ts,
+    crypto.hmac_sha256,
+  )
+}
+
+/// Test seam: inject the HMAC primitive so tests can drive the failure
+/// path production only reaches when the crypto backend breaks. Production
+/// callers use sign/6, which passes the real primitive.
+pub fn sign_with_hmac(
+  signer: Signer,
+  subject: String,
+  kind: Kind,
+  verdict: String,
+  payload: String,
+  ts: Int,
+  hmac hmac: fn(BitArray, BitArray) -> Result(BitArray, crypto.CryptoError),
+) -> Result(Evidence, crypto.CryptoError) {
   let unsigned =
     Evidence(subject, kind, verdict, payload, ts, signer_id(signer), "")
-  Evidence(
-    unsigned.subject,
-    unsigned.kind,
-    unsigned.verdict,
-    unsigned.payload,
-    unsigned.ts,
-    unsigned.signer,
-    signature_for(signer, unsigned),
-  )
+  case signature_for(signer, unsigned, hmac) {
+    Ok(signature) ->
+      Ok(Evidence(
+        unsigned.subject,
+        unsigned.kind,
+        unsigned.verdict,
+        unsigned.payload,
+        unsigned.ts,
+        unsigned.signer,
+        signature,
+      ))
+    Error(reason) -> Error(reason)
+  }
 }
 
 fn ref_hash(ref: DefinitionRef) {
@@ -215,7 +254,10 @@ fn attach_record(
   let ref = Ref(hash_bytes(bytes))
   case adapter.insert(ref, bytes) {
     Ok(Nil) -> Ok(#(ref, hash_to_debug_string(ref_hash(ref))))
-    Error(_) -> Error(StoreFailed("evidence chunk insert failed"))
+    Error(reason) ->
+      Error(StoreFailed(
+        "evidence chunk insert failed: " <> describe_error(reason),
+      ))
   }
 }
 
@@ -241,7 +283,10 @@ pub fn attach_signed(
   payload payload: String,
   ts ts: Int,
 ) -> Result(#(DefinitionRef, String), AttachError) {
-  attach_record(adapter, sign(signer, subject, kind, verdict, payload, ts))
+  case sign(signer, subject, kind, verdict, payload, ts) {
+    Ok(e) -> attach_record(adapter, e)
+    Error(reason) -> Error(SigningFailed(crypto.describe_error(reason)))
+  }
 }
 
 /// One operation-local view, keyed by subject. Tampered/non-evidence chunks

@@ -4,6 +4,15 @@ pub type CryptoError {
   InvalidInput(reason: String)
 }
 
+/// The one place a CryptoError becomes a user sentence. Rendering belongs
+/// with the type, not at each call site — inspect output must never reach
+/// a user.
+pub fn describe_error(error: CryptoError) -> String {
+  case error {
+    InvalidInput(reason) -> reason
+  }
+}
+
 @external(erlang, "gleamunison_crypto", "hmac")
 fn ffi_hmac(
   algo: String,
