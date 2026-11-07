@@ -7,7 +7,7 @@ import gleam/string
 import gleamunison/effects.{type OpHandler, ability_key}
 import gleamunison/identity.{type DefinitionRef}
 
-pub fn ability_ref() -> DefinitionRef {
+fn ability_ref() -> DefinitionRef {
   identity.name_ref("Db")
 }
 

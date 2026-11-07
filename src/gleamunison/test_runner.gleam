@@ -28,7 +28,7 @@ pub type TestResult {
 }
 
 /// The Test ability's ref: surface-declared abilities are keyed by name hash.
-pub fn ability_ref() -> DefinitionRef {
+fn ability_ref() -> DefinitionRef {
   identity.name_ref("Test")
 }
 

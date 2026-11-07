@@ -1,7 +1,7 @@
 import gleam/string
 
 @external(erlang, "gleamunison_repl_ffi", "read_line")
-pub fn read_line(prompt: String) -> Result(String, Nil)
+fn read_line(prompt: String) -> Result(String, Nil)
 
 pub fn count_brackets(str: String, in_string: Bool, depth: Int) -> Int {
   case string.pop_grapheme(str) {

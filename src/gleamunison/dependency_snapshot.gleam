@@ -111,10 +111,7 @@ pub fn names(snapshot: Snapshot, ref: DefinitionRef) -> List(String) {
   namespace.names_for_ref(snapshot.ns, ref)
 }
 
-pub fn dependencies(
-  snapshot: Snapshot,
-  ref: DefinitionRef,
-) -> List(DefinitionRef) {
+fn dependencies(snapshot: Snapshot, ref: DefinitionRef) -> List(DefinitionRef) {
   dict.get(snapshot.uses, ref)
   |> result.unwrap([])
   |> list.filter(fn(dep) { dict.has_key(snapshot.uses, dep) })

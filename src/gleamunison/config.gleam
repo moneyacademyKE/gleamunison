@@ -36,7 +36,7 @@ pub fn empty() -> Config {
 }
 
 /// The config file selected by `GLEAMUNISON_CONFIG`, else the project default.
-pub fn path() -> String {
+fn path() -> String {
   env.string_or(path_key, default_path)
 }
 
