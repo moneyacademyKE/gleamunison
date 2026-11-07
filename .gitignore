@@ -2,6 +2,7 @@
 *.ez
 /build
 erl_crash.dump
+Mnesia.nonode@nohost/
 test_file.txt
 .DS_Store
 
