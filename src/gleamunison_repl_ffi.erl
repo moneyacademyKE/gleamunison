@@ -45,7 +45,6 @@ baseline_abilities() ->
             end
         }},
         {DbKey, <<"Db">>, gleamunison@db:operations()},
-        {DbKey, <<"Db">>, gleamunison@db:operations()},
         {<<"m_b514a6e3">>, <<"Math">>, #{
             0 => fun([X, Y], Cont) -> Cont(X + Y) end,
             1 => fun([X, Y], Cont) -> Cont(X - Y) end,
