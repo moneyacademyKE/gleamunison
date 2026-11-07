@@ -193,38 +193,23 @@ pub fn history(
   adapter: StorageAdapter,
   branch: String,
 ) -> Result(List(#(Int, DefinitionRef)), String) {
-  case read_head(adapter, branch) {
-    Error(e) -> Error(e)
+  case adapter.lookup(branch_pointer_ref(branch)) {
+    Error(error) -> Error(storage.describe_error(error))
     Ok(None) -> Ok([])
-    Ok(Some(#(seq, ns_ref, _))) ->
-      Ok(
-        walk(adapter, branch_pointer_ref(branch), [#(seq, ns_ref)])
-        |> list.reverse,
-      )
-  }
-}
-
-fn walk(
-  adapter: StorageAdapter,
-  ptr: DefinitionRef,
-  acc: List(#(Int, DefinitionRef)),
-) -> List(#(Int, DefinitionRef)) {
-  case adapter.lookup(ptr) {
     Ok(Some(bytes)) ->
       case namespace_codec.parse_head(bytes) {
-        Ok(#(_, _, _, Some(prev_head_ref))) ->
-          case adapter.lookup(prev_head_ref) {
-            Ok(Some(prev_bytes)) ->
-              case namespace_codec.parse_head(prev_bytes) {
-                Ok(#(_, pseq, pns, _)) ->
-                  walk(adapter, prev_head_ref, [#(pseq, pns), ..acc])
-                Error(_) -> acc
-              }
-            _ -> acc
-          }
-        _ -> acc
+        Ok(#(name, seq, _ns_ref, _)) if name == branch && seq > 0 -> {
+          use chain <- result.try(walk_head_chain(adapter, bytes, []))
+          Ok(
+            list.reverse(chain)
+            |> list.map(fn(h) {
+              let #(_, cseq, cns, _, _) = h
+              #(cseq, cns)
+            }),
+          )
+        }
+        _ -> Error("corrupt branch head or branch identity mismatch")
       }
-    _ -> acc
   }
 }
 

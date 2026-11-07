@@ -56,6 +56,38 @@ pub fn commit_advances_head_and_history_test() {
   let assert [#(2, _), #(1, _)] = hist
 }
 
+pub fn history_errors_on_corrupt_prev_head_test() {
+  let store = storage.inmemory()
+  let ns1 = namespace.empty() |> namespace.set("x", ref_tag("rx1"))
+  let assert Ok(head1) = namespace.commit(store, "main", ns1)
+  let ns2 = ns1 |> namespace.set("y", ref_tag("ry"))
+  let assert Ok(_) = namespace.commit(store, "main", ns2)
+  // Overwrite the older head chunk with garbage: the chain is corrupt
+  // mid-chain, and history must report it instead of truncating.
+  let assert Ok(_) = store.insert(head1, <<0, 1, 2, 3>>)
+  let assert Error(e) = namespace.history(store, "main")
+  e |> should.equal("corrupt head chunk")
+}
+
+pub fn history_errors_on_mid_chain_store_failure_test() {
+  let store = storage.inmemory()
+  let ns1 = namespace.empty() |> namespace.set("x", ref_tag("rx1"))
+  let assert Ok(head1) = namespace.commit(store, "main", ns1)
+  let ns2 = ns1 |> namespace.set("y", ref_tag("ry"))
+  let assert Ok(_) = namespace.commit(store, "main", ns2)
+  // A store whose lookup dies past the first head must surface as an
+  // error, never as a silently truncated history.
+  let failing =
+    storage.StorageAdapter(..store, lookup: fn(ref) {
+      case ref == head1 {
+        True -> Error(storage.IoError("disk offline"))
+        False -> store.lookup(ref)
+      }
+    })
+  let assert Error(e) = namespace.history(failing, "main")
+  e |> should.equal("io error: disk offline")
+}
+
 pub fn branches_are_independent_test() {
   let store = storage.inmemory()
   let ns_a = namespace.empty() |> namespace.set("x", ref_tag("rxa"))
