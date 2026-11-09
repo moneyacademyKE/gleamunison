@@ -7,6 +7,7 @@
 //// only the result.
 
 import gleam/io
+import gleam/result
 
 /// Exit the process with the failure code and no message of its own: the caller
 /// has already said why. This is the raw form of `fail` below, for the commands
@@ -55,6 +56,11 @@ pub fn print(result: Result(String, String)) -> Nil {
     Ok(message) -> finish(success(message))
     Error(message) -> fail(message)
   }
+}
+
+/// Print a result while preserving the command's refusal or resolution code.
+pub fn print_coded(outcome: Result(String, #(Int, String))) -> Nil {
+  outcome |> result.try(success_coded) |> finish_coded
 }
 
 /// Fail on stderr. The doc comment above says stdout carries only the result,

@@ -6,7 +6,6 @@
 //// monotonic sequence number.
 
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/option.{None}
 import gleam/result
@@ -20,10 +19,7 @@ import gleamunison/store_log
 const default_tail = 20
 
 pub fn command(args: List(String)) -> Nil {
-  case run(args) {
-    Ok(message) -> io.println(message)
-    Error(#(code, message)) -> cli_result.fail_with_code(code, message)
-  }
+  cli_result.print_coded(run(args))
 }
 
 fn run(args: List(String)) -> Result(String, #(Int, String)) {

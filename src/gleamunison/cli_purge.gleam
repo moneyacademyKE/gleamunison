@@ -15,7 +15,6 @@
 //// load — the exact lie `unpublish` exists to prevent.
 
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
@@ -31,10 +30,7 @@ import gleamunison/storage
 import gleamunison/store_deps
 
 pub fn command(args: List(String)) -> Nil {
-  case run(args) {
-    Ok(message) -> io.println(message)
-    Error(#(code, message)) -> cli_result.fail_with_code(code, message)
-  }
+  cli_result.print_coded(run(args))
 }
 
 fn run(args: List(String)) -> Result(String, #(Int, String)) {
