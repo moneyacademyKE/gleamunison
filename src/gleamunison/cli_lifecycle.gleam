@@ -136,6 +136,14 @@ pub fn missing_branch_value(usage: String) -> #(Int, String) {
   #(cli_result.refused, "--branch needs a name\n" <> usage)
 }
 
+/// Translate a MissingValue from the shared tail without duplicating its policy.
+pub fn flag_missing_error(flag: String, usage: String) -> #(Int, String) {
+  case flag {
+    "--store" -> missing_store_value(usage)
+    _ -> missing_branch_value(usage)
+  }
+}
+
 /// The `--store`/`--branch` tail every store-scoped command shares, as data.
 /// `branch` is a plain accumulator with the caller's default already in it,
 /// so a command needs exactly one parser no matter where `--branch` appears
@@ -155,8 +163,8 @@ pub type FlagTake {
   /// A `--store`/`--branch` flag and its value were consumed.
   Taken(tail: FlagTail, rest: List(String))
   /// One of those flags is present but its value is missing. The caller
-  /// builds the error from its own usage() via missing_store_value /
-  /// missing_branch_value above, so wording and exit code stay owned here.
+  /// builds the error from its own usage() via flag_missing_error above, so
+  /// wording and exit code stay owned here.
   MissingValue(flag: String)
   /// The head is something else: a positional, a command's own flag, or an
   /// unknown argument. The caller decides which.

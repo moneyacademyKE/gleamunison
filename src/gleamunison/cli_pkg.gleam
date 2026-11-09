@@ -166,10 +166,8 @@ fn parse_args(
 ) -> Result(#(String, Option(String), String, Option(String)), #(Int, String)) {
   case cli_lifecycle.take_flag(args, tail) {
     cli_lifecycle.Taken(next, rest) -> parse_args(rest, hash, peer, next)
-    cli_lifecycle.MissingValue("--store") ->
-      Error(cli_lifecycle.missing_store_value(usage()))
-    cli_lifecycle.MissingValue(_) ->
-      Error(cli_lifecycle.missing_branch_value(usage()))
+    cli_lifecycle.MissingValue(flag) ->
+      Error(cli_lifecycle.flag_missing_error(flag, usage()))
     cli_lifecycle.NotTailFlag ->
       case args {
         [] ->

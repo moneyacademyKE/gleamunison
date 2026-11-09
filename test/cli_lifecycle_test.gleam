@@ -231,6 +231,13 @@ pub fn a_valueless_branch_flag_refuses_with_the_usage_test() {
   |> should.equal(#(cli_result.refused, "--branch needs a name\nUSAGE"))
 }
 
+pub fn a_missing_tail_value_uses_the_shared_sentence_test() {
+  cli_lifecycle.flag_missing_error("--store", "USAGE\n")
+  |> should.equal(#(cli_result.refused, "--store needs a path\nUSAGE\n"))
+  cli_lifecycle.flag_missing_error("--branch", "USAGE\n")
+  |> should.equal(#(cli_result.refused, "--branch needs a name\nUSAGE\n"))
+}
+
 /// The shared flag tail: branch is an accumulator carrying the default, so a
 /// command needs one parser no matter where --branch appears. cli_pkg grew a
 /// second parser for exactly this and the second one forgot flags.
