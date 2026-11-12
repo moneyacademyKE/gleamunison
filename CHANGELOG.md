@@ -2,6 +2,45 @@
 
 ---
 
+## What's New in v3.28.0 (2026-11-12)
+
+The honesty release: two failures stopped pretending to be answers,
+five names stopped pretending to be API, and the GitHub release now
+carries a binary. Seven slices, every one verified by the suite.
+
+### Failures stopped pretending
+
+- A signature that failed to compute no longer produces a record that
+  looks unsigned: `evidence.sign` returns an honest `Result`, trust
+  refuses with `SignatureComputationFailed` instead of comparing a
+  would-be empty signature, and a failing HMAC surfaces as a typed
+  error rendered by the crypto module that owns it (bk-77df).
+- A corrupt branch head no longer silently truncates history into a
+  short, confident, wrong list: `namespace.history` delegates to the
+  honest chain walker, errors loudly on corrupt and missing chunks,
+  and the module keeps one walker instead of two (bk-3dd5).
+
+### Surfaces stopped pretending
+
+- Five collision-shadowed internal-only functions went private —
+  names the word-boundary probe couldn't see because each collides
+  with a common word or a same-named function elsewhere (bk-bed9).
+- The duplicate Db handler is gone: the baseline admission table no
+  longer wraps the same handler inside itself, and the
+  unhandled-ability error no longer tells users "Db" is provided
+  twice (bk-bed9).
+- The CLI error translation folded into its owners: the
+  missing-flag-value mapping and the print-or-fail dispatch each
+  live once instead of three times (bk-a922).
+
+### Platform
+
+- Binary releases: the GitHub release now carries the escript
+  artifact with a sha256 checksum, built at the tag and verified by
+  the release contract before upload (new since 3.27.0).
+
+---
+
 ## What's New in v3.27.0 (2026-11-05)
 
 The hygiene release: thirty simplicity slices since 3.26.0 turned every
